@@ -194,7 +194,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <p className="text-xs text-muted">{MEASURED} · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
           </div>
           <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
-          <ul aria-label="Proof" className="flex max-w-2xl flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-4 text-xs text-muted">
+          <ul aria-label="Proof" className="flex max-w-2xl flex-wrap gap-x-4 gap-y-0.5 border-t border-line pt-4 text-xs text-muted">
             <ProofItem href={HARNESS_REPORT}>Tested with {HARNESS.agents.length} real coding agents</ProofItem>
             <ProofItem href={`${DOCS}/benchmarks.md#run-log`}>{RUNS.label} committed benchmark runs</ProofItem>
             <ProofItem href={NER_MODEL}>Published open NER model</ProofItem>
@@ -489,7 +489,7 @@ function Point({ title, children }: { title: string; children: ReactNode }) {
 
 /** One proof signal under the hero's call to action: a short claim that links to its evidence. */
 function ProofItem({ href, children }: { href: string; children: ReactNode }) {
-  return <li><a className="inline-flex items-center gap-1.5 rounded-sm underline-offset-4 hover:text-ink hover:underline" href={href}><span aria-hidden="true" className="size-1.5 rounded-full bg-guard-dot" />{children}</a></li>;
+  return <li><a className="inline-flex min-h-6 items-center gap-1.5 rounded-sm underline-offset-4 hover:text-ink hover:underline" href={href}><span aria-hidden="true" className="size-1.5 rounded-full bg-guard-dot" />{children}</a></li>;
 }
 
 /** One model in the Meta strip: what it does and where it runs. */
