@@ -9,8 +9,8 @@ export const useHostedSession = () => useContext(HostedSessionContext);
 /** The project's source repository: the public page's and the console's GitHub and docs links. */
 export const SOURCE = "https://github.com/watt-mind/pii-guard";
 
-/** The public page's section anchors, plus #site for the console's "Visit site"; every other hash is the console's. */
-export const SITE_HASHES: ReadonlySet<string> = new Set(["#site", "#demo", "#why", "#for", "#europe", "#how", "#images", "#meta", "#results", "#run", "#data", "#privacy"]);
+/** The public page's section anchors, plus #site for the console's "Visit site" and #api (the API reference); every other hash is the console's. */
+export const SITE_HASHES: ReadonlySet<string> = new Set(["#site", "#demo", "#why", "#for", "#europe", "#how", "#images", "#meta", "#results", "#run", "#data", "#privacy", "#api"]);
 
 /** `/v1/account`, kept on a failed refresh so a signed-in owner stays in the console. */
 export function useAccount(call: Requester) {
