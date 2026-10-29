@@ -35,13 +35,13 @@ and `training/ner/eu-openpii-train-manifest.json`.
 | lt | 5,000 / 100 (4,898) | 1,077 / 120 (7,140) | 2,000 | 5 / 5 |
 | hr | 5,000 / 100 (4,954) | 1,078 / 120 (6,594) | 2,000 | 5 / 5 |
 | sl | 5,000 / 100 (4,896) | 1,079 / 120 (6,288) | 2,000 | 5 / 5 |
-| fr | 5,000 / 100 (4,754) | – | 2,000 | 5 / 4 |
-| es | 5,000 / 100 (4,609) | – | 2,000 | 5 / 4 |
-| it | 5,000 / 100 (4,911) | – | 2,000 | 5 / 4 |
-| nl | 5,000 / 100 (4,866) | – | 2,000 | 5 / 4 |
-| ro | 5,000 / 100 (4,576) | – | 2,000 | 5 / 4 |
-| mt | none in the dataset | – | 2,000 | 5 / 4 |
-| ga | none in the dataset | – | 2,000 | 5 / 4 |
+| fr | 5,000 / 100 (4,754) | 1,079 / 120 (6,078) | 2,000 | 5 / 4 |
+| es | 5,000 / 100 (4,609) | 1,076 / 120 (5,721) | 2,000 | 5 / 4 |
+| it | 5,000 / 100 (4,911) | 1,080 / 120 (6,003) | 2,000 | 5 / 4 |
+| nl | 5,000 / 100 (4,866) | 1,080 / 120 (7,579) | 2,000 | 5 / 4 |
+| ro | 5,000 / 100 (4,576) | 1,080 / 120 (6,202) | 2,000 | 5 / 4 |
+| mt | none in the dataset | 1,075 / 119 (6,460) | 2,000 | 5 / 4 |
+| ga | none in the dataset | 1,068 / 119 (6,220) | 2,000 | 5 / 4 |
 | bg | 5,000 / 100 (4,853) | – | 2,000 | – |
 | cs | 5,000 / 100 (4,715) | – | 2,000 | – |
 | da | 5,000 / 100 (4,782) | – | 2,000 | – |
@@ -59,12 +59,16 @@ English court-style training set: 1,500 train + 100 dev documents, 14,424 PERSON
 OpenPII rows: 5,000 train + 100 dev per language in seeded order, so candidate A's 2,500 rows
 per language are the first half of candidate B's 5,000. OpenPII has no Irish or Maltese rows.
 Muse documents: 90 % train / 10 % dev by a seeded split. 4,800 documents were planned (1,200 per language) and 4,793 kept: 3 missing a value, 3 with an invented person, 1 with an invented identifier. Writing cost $2.48 of Meta Model API credits (2.65 M prompt and 11.1 M completion tokens, reasoning included).
+Phase 1b (LAB-1534) ran the same pipeline for fr, es, it, nl, ro, ga and mt: 8,400 planned, 8,376
+kept (10 missing a value, 14 with an invented person), $3.98 of Meta Model API credits. Its files
+are `eval/generated/distill-eu-1b-s1525/` (manifest sources `muse-eu-1b` and
+`muse-eu-1b-labelled`).
 
 ## How the Muse documents are labeled
 
 The generator's own identity packs exist only for hu and en, so `eu_identities.py` adds
-fictional packs for lv, lt, hr and sl: common given names combined at random with common
-surnames (with the gendered forms Latvian and Lithuanian use), random house numbers on common
+fictional packs for lv, lt, hr and sl (phase 1) and fr, es, it, nl, ro, ga and mt (phase
+1b): common given names combined at random with common surnames (with the gendered forms Latvian and Lithuanian use), random house numbers on common
 street names of real towns, national-shaped phone numbers, IBANs with valid check digits but
 random bank codes, and personal codes in the national format (checksummed where the format has
 a check digit). E-mails use the reserved `example.*` domains.
@@ -73,7 +77,12 @@ These languages decline names (`Jānis Bērziņš` → `Jāņa Bērziņa`, `Jona
 `Jonui Kazlauskui`). The writer is told to give each full name once in the nominative and to
 decline freely after that; the labeler then finds every planted name in any declined form
 `eu_identities.name_forms` lists, as a whole word (the convention of
-`eval/fixtures/hu-inflection.jsonl`). Every other value must appear exactly as given. A document
+`eval/fixtures/hu-inflection.jsonl`). In phase 1b, Romanian given names take the
+genitive-dative and vocative (`Ioana` → `Ioanei`), Irish names their initial mutations and
+slender genitive (`Seán Ó Briain` → `Sheáin Uí Bhriain`), a Spanish person's first surname
+alone counts (`García López` → `García`), and a Dutch particle may be capitalized
+(`De Vries`); French, Italian and Maltese names don't decline. Every other value must appear
+exactly as given. A document
 is discarded when a value is missing, when the rules find an identifier nobody planted, or
 when a capitalized given name of the language's list appears outside every planted person (an
 invented person would otherwise be taught as `O`).
@@ -94,8 +103,26 @@ credits. Over the 4,793 documents (`eval/results/2026-10-29-lab-1525-eu-data/gli
 | disagreements (excluded from the loss) | 76 |
 | names the writer added, adopted as labels | 37 people, 8 organizations |
 
+Phase 1b (LAB-1534), the same job over the 8,376 fr / es / it / nl / ro / ga / mt documents
+(`eval/results/2026-10-29-lab-1534-eu-data-1b/glimmer-label-stats.json`), on Modal credits:
+
+| | count |
+|---|---|
+| planted gold the teacher also found | 61,148 |
+| planted gold the teacher missed (kept: planted gold always wins) | 4,938 |
+| teacher spans agreeing with gold | 66,831 |
+| disagreements (excluded from the loss) | 264 |
+| names the writer added, adopted as labels | 367 people, 22 organizations |
+
+The writer added more names of its own in phase 1b than in phase 1 (367 against 37). The
+teacher adopts them, so they are labeled rather than taught as `O`.
+
 The training files are `eval/generated/distill-eu-s1525/labelled/<lang>-distill-{train,dev}.jsonl`;
 the teacher cache is kept next to them, so a rerun of `label.py --cache-only` is local and free.
+Phase 1b's are under `eval/generated/distill-eu-1b-s1525/labelled/`. Rows are not committed;
+the whole phase-1b output (documents, labels, teacher cache and the Muse response cache) is the
+corpus `phase1b` in the data root, backed up at revision
+`5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28` (see "Where the data lives").
 
 ## Gate sets
 
@@ -150,7 +177,7 @@ Hugging Face dataset, so removing a worktree no longer loses them.
 
 | Corpus | What | Revision |
 |---|---|---|
-| `phase1b` | Muse es/fr/it/nl/ro/ga/mt documents + response cache (LAB-1534), no teacher labels yet | `6fbb52b62d990e2c2a1008d2427d66f413dddebb` |
+| `phase1b` | Muse fr/es/it/nl/ro/ga/mt documents (8,376), response cache, **Glimmer-labelled** (`labelled/`, `teacher-cache.jsonl`) (LAB-1534) | `5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28` |
 | `v41` | Muse court-style documents bg..ga, pilot, response cache (LAB-1539, snapshot while the run continued) | `4b6c928f4abd8b9e7137d5d0cfbd519744f6bf9a` |
 | `v20-s11` | v2.0's s11 hu/en corpus, Glimmer labels, teacher and writer caches (LAB-1128) | `294adb3fc4d411825f5a416f4b6b93468e4836fe` |
 
@@ -158,16 +185,16 @@ Hugging Face dataset, so removing a worktree no longer loses them.
 set -a; source .env; set +a   # or: hf auth login (read access to watt-mind)
 # restore a corpus into the data root, pinned to a revision
 uv run --no-sync --with huggingface-hub python training/ner/data_sync.py pull phase1b \
-  --revision 6fbb52b62d990e2c2a1008d2427d66f413dddebb
+  --revision 5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28
 # what a push would upload (nothing is sent)
 uv run --no-sync python training/ner/data_sync.py check phase1b
 # back up a corpus by hand (prints the revision)
 uv run --no-sync --with huggingface-hub python training/ner/data_sync.py push phase1b
 # copy a revision to the Modal volume, then train from it without uploading
 uv run --no-sync --with huggingface-hub --with modal python training/ner/data_sync.py volume phase1b \
-  --revision 6fbb52b62d990e2c2a1008d2427d66f413dddebb
+  --revision 5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28
 modal run training/distill/modal_train.py --config <toml> \
-  --data phase1b@6fbb52b62d990e2c2a1008d2427d66f413dddebb
+  --data phase1b@5b4ddcecbae18ff0f25c5c75439f7d151b7a2b28
 ```
 
 ## Rebuild
@@ -184,13 +211,15 @@ set -a; source .env; set +a   # META_API_KEY; cached responses make a rerun free
 uv run --no-sync python training/ner/eu_corpus.py --languages lv,lt,hr,sl --n 1200 --budget-usd 4 --workers 32 \
   --out eval/generated/distill-eu-s1525 --cache eval/generated/cache --no-push
 EU_CORPUS=eval/generated/distill-eu-s1525 uv run --no-sync --with modal modal run training/ner/modal_eu_label.py --no-push
+# phase 1b (LAB-1534), under the data root (corpus phase1b)
+uv run --no-sync python training/ner/eu_corpus.py --languages fr,es,it,nl,ro,ga,mt --n 1200 --budget-usd 4.8 --workers 8 \
+  --out ~/Develop/.worktrees/pii-guard/data-eu/phase1b/distill-eu-1b-s1525 --cache ~/Develop/.worktrees/pii-guard/data-eu/phase1b/cache --no-push
+EU_CORPUS=phase1b/distill-eu-1b-s1525 uv run --no-sync --with modal modal run training/ner/modal_eu_label.py
 uv run --no-sync python training/ner/eu_phase1_manifest.py
 uv run --no-sync python eval/fixtures/build_eu_gates.py
 ```
 
 ## Not in this PR
 
-- Muse documents for fr, es, it, nl, ro, ga and mt. The script takes a language once its
-  identity pack exists in `eu_identities.py`; the gate sets for those languages are here.
 - Maltese zero-shot measurement on MLRS (the ticket's step before Maltese training data).
 - Training and selection: the next ticket.
