@@ -5,6 +5,7 @@ import { HostedApp } from "./hosted/HostedApp";
 import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
 import { useSetupPending } from "./hosted/setup";
 import { ClientSetup } from "./hosted/ClientSetup";
+import { loadFirstRun } from "./hosted/firstRun";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
 import { chatModesOf, offersDemoTraffic, offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -68,11 +69,36 @@ export function App(props: AppProps) {
 /** A signed-in hosted owner gets the same console; the server's capabilities decide its sections. */
 export function SignedInConsole({ session, ...props }: AppProps & { session: HostedSession }) {
   const hostedChat = useMemo(() => createHttpChat({ fetch: hostedChatFetch }), []);
+  useFirstRunLanding(session.call);
   return (
     <HostedSessionContext.Provider value={session}>
       <LocalConsole {...props} envMode={props.envMode ?? "api"} chat={{ ...props.chat, api: props.chat?.api ?? hostedChat }} />
     </HostedSessionContext.Provider>
   );
+}
+
+/**
+ * First run (LAB-1455): straight after sign-in the server provisions the owner's default
+ * endpoint and its first key. While that key is on this page (or the endpoint still needs the
+ * owner's Meta key), sign-in lands on Connect, "Connect your client", instead of the Overview,
+ * unless the owner has already moved elsewhere. A failed first run leaves the console as it is.
+ */
+function useFirstRunLanding(call: HostedSession["call"]) {
+  useEffect(() => {
+    let live = true;
+    loadFirstRun(call).then(
+      (first) => {
+        const hash = globalThis.location?.hash ?? "";
+        if (!live || !(first.key || first.state === "needs_key") || !(hash === "" || hash === "#" || hash === "#overview")) return;
+        writeHash({ section: "connect", tab: "text" }, "replace");
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [call]);
 }
 
 function LocalConsole(props: AppProps) {
@@ -405,7 +431,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               loadSnippets={hostedSnippets}
               gatewayLine={!caps.accounts}
               accounts={caps.accounts ? <ProviderConnections /> : undefined}
-              clientSetup={caps.accounts && hosted ? (quickstart) => <ClientSetup call={hosted.call} quickstart={quickstart} /> : undefined}
+              clientSetup={caps.accounts && hosted ? () => <ClientSetup call={hosted.call} /> : undefined}
               traffic={trafficOpened ? trafficHandle : undefined}
               onOpenLog={(id) => {
                 setLogFocus({ id, nonce: Date.now() });
@@ -432,7 +458,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           {caps.accounts ? (
             <>
               All sample data is fictional. This page talks only to pii-guard, never to a model provider: pii-guard masks what you send and forwards it to the model your
-              endpoint or connection names. The round trip uses a simulated answer.
+              endpoint or connection names. The Playground round trip uses a simulated answer; the test request on Connect goes to your endpoint’s real model.
             </>
           ) : (
             <>

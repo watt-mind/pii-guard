@@ -43,7 +43,18 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
           {clientSetup((load) => (
             <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={load} />
           ))}
-          {accounts}
+          {/* The Playground's own provider keys: optional, folded so the first run asks for one key only (LAB-1455). */}
+          {accounts && (
+            <details className="group rounded-xl border border-line bg-surface">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-ink sm:px-5 [&::-webkit-details-marker]:hidden">
+                <span aria-hidden="true" className="mr-2 inline-block text-muted transition-transform group-open:rotate-90">
+                  ›
+                </span>
+                Optional: model provider keys for the Playground
+              </summary>
+              <div className="border-t border-line p-4 sm:p-5">{accounts}</div>
+            </details>
+          )}
         </>
       ) : (
         accounts

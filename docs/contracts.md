@@ -1522,6 +1522,20 @@ another owner's connection fails, never falls back to sponsored. Already admitte
 may finish with their selected connection after deletion. Supported presets are Meta,
 OpenAI, Fireworks and OpenRouter; custom connections require public HTTPS on port 443.
 
+`POST /v1/account/first-run {issue_key?,meta_api_key?}` (LAB-1455, signed-in Google session
+only; a guard key gets `401`) provisions the owner's default endpoint once and describes it:
+`{project_id,endpoint,state,created,active_keys,key,sponsored_enabled,gateway_url}`. When the
+default project has no endpoint it creates `Default endpoint` on the sponsored route with the
+first allow-listed model and the default policy version; otherwise it creates nothing and
+describes the oldest enabled endpoint. `state` is `ready`, `needs_key` (sponsored while
+sponsorship is unavailable) or `disabled`. `issue_key: true` issues one endpoint key, returned
+raw only in that response, while the endpoint has no active key. `meta_api_key` converts a
+`needs_key` sponsored default endpoint, in place, to an own-key `meta` endpoint on
+`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The
+operation is one atomic store update (a single conditional write on the Blob store, re-read and
+retried up to three times after a conflict), so repeat sign-ins and concurrent first requests never create a second
+endpoint. It spends no daily request or token budget and takes no runtime.
+
 ### Projects, policies and endpoints
 
 The project store persists configuration in local SQLite or hosted authenticated encrypted

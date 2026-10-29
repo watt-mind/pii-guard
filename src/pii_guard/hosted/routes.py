@@ -7,8 +7,10 @@ upstream text on the server; callers choose a sample, never supply a prompt or m
 from __future__ import annotations
 
 import json
+from functools import partial
 from typing import Any, Literal
 
+import anyio.to_thread
 from fastapi import Path, Request
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from starlette.responses import Response
@@ -25,8 +27,10 @@ from pii_guard.gateway.service import (
     UpstreamError,
 )
 from pii_guard.hosted.connections import PROVIDERS
+from pii_guard.hosted.egress import validate_destination
 from pii_guard.hosted.identity import IdentityError, Principal
 from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS
+from pii_guard.projects.first_run import META_BASE_URL, ensure_first_run
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import PLACEHOLDER_RE, VaultSession
 
@@ -68,6 +72,11 @@ class ConnectionRequest(_StrictBody):
     provider: Literal["meta", "openai", "fireworks", "openrouter", "custom"]
     api_key: SecretStr = Field(min_length=1, max_length=4096, repr=False)
     base_url: str | None = Field(default=None, max_length=2048, repr=False)
+
+
+class FirstRunRequest(_StrictBody):
+    issue_key: bool = False
+    meta_api_key: SecretStr | None = Field(default=None, min_length=1, max_length=4096, repr=False)
 
 
 class DemoRequest(_StrictBody):
@@ -175,6 +184,38 @@ def delete_connection(
     principal = _signed_in(request)
     request.app.state.hosted.connections.delete(principal.id, connection_id)
     return Response(status_code=204)
+
+
+@router.post("/v1/account/first-run")
+async def first_run(body: FirstRunRequest, request: Request) -> dict[str, Any]:
+    """The signed-in owner's ready default endpoint, provisioned once (LAB-1455).
+
+    ``issue_key`` returns one endpoint key, shown once, while the endpoint has none.
+    ``meta_api_key`` converts a ``needs_key`` default endpoint to the owner's own Meta key.
+    """
+    principal = _signed_in(request)
+    hosted = request.app.state.hosted
+    sponsored = hosted.sponsored_enabled
+    if body.meta_api_key is not None:
+        # The same public-HTTPS preflight as an endpoint form save; checked again at use.
+        await validate_destination(META_BASE_URL)
+    result = await anyio.to_thread.run_sync(
+        partial(
+            ensure_first_run,
+            request.app.state.projects.store,
+            principal.id,
+            model=hosted.settings.hosted_models[0],
+            sponsored_enabled=sponsored,
+            issue_key=body.issue_key,
+            meta_api_key=body.meta_api_key,
+        )
+    )
+    endpoint = result["endpoint"]
+    return {
+        **result,
+        "sponsored_enabled": sponsored,
+        "gateway_url": f"{hosted.origin.rstrip('/')}/e/{endpoint['id']}/v1",
+    }
 
 
 def _demo_entities(original: str, masked: str, session: VaultSession) -> list[dict[str, Any]]:

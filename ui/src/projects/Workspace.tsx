@@ -36,7 +36,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   fireworks: "Fireworks",
   openrouter: "OpenRouter",
   custom: "Custom HTTPS endpoint",
-  sponsored: "Sponsored Meta (subject to allowance)",
+  sponsored: "Meta Muse Spark (no key needed)",
 };
 const providerLabel = (provider: string) => PROVIDER_LABEL[provider] ?? provider;
 const LANGUAGE_LABEL: Record<string, string> = { hu: "Hungarian", en: "English", de: "German" };
@@ -411,7 +411,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
   const selected = policies.find((p) => p.policy_version_id === policyId);
   const requiresCredential = provider !== "sponsored" && (!endpoint?.credential_configured || endpoint.provider !== provider);
   const keyLabel = requiresCredential ? "Provider API key" : "Replace provider API key (optional)";
-  const blockedReason = isSponsored && !model ? "Choose a sponsored model to save." : !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
+  const blockedReason = isSponsored && !model ? "Choose a model to save." : !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
   return (
     <Card
       title={endpoint ? `Edit ${endpoint.name}` : "Create endpoint"}
@@ -438,7 +438,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
             </Field>
           )}
           {isSponsored ? (
-            <Field label="Model" required hint={allowed === "failed" ? "The allowed models could not be loaded. Enter one the operator allows." : "Sponsored requests use one of the operator’s allowed models."}>
+            <Field label="Model" required hint={allowed === "failed" ? "The allowed models could not be loaded. Enter one the operator allows." : "Requests without your own key use one of the allowed models."}>
               {Array.isArray(allowed) && allowed.length ? (
                 <Select value={model} onChange={(e) => setModel(e.target.value)}>
                   {allowed.map((m) => <option key={m} value={m}>{m}</option>)}
