@@ -353,3 +353,40 @@ def test_a_pii_shaped_model_is_refused_before_forwarding(model: str) -> None:
     assert response.json()["error"]["code"] == "unsupported_content"
     assert model not in response.text
     assert upstream.requests == []
+
+
+@pytest.mark.parametrize("role", ["user", "tool", "function"])
+@pytest.mark.parametrize("parts", [False, True])
+def test_chat_gutter_whole_name_is_masked_upstream(role: str, parts: bool) -> None:
+    from pii_guard.types import Span
+
+    class TokenNames(FakeLlm):
+        """Model the whitespace token boundary that a glued gutter used to hide."""
+
+        def detect(self, text: str, language: str = "hu") -> list[Span]:
+            spans = super().detect(text, language)
+            return [s for s in spans if s.start == 0 or text[s.start - 1].isspace()]
+
+    upstream = MockUpstream()
+    app = _app(upstream)
+    settings = Settings(tenant_key=TEST_TENANT_KEY)
+    app.state.gateway_detectors = build_mode_detectors(
+        settings, app.state.gateway_config, base=[TokenNames()]
+    )
+    content: Any = "12|Jane Placeholder"
+    if parts:
+        content = [{"type": "text", "text": content}]
+    message = {"role": role, "content": content}
+    if role == "tool":
+        message["tool_call_id"] = "c1"
+    if role == "function":
+        message["name"] = "read_file"
+    with TestClient(app) as client:
+        response = client.post("/v1/chat/completions", json={"model": "m", "messages": [message]})
+    assert response.status_code == 200
+    forwarded = json.loads(upstream.requests[0].content)
+    result = forwarded["messages"][-1]["content"]
+    if parts:
+        result = result[0]["text"]
+    assert result.startswith("12|[[PERSON_") and result.endswith("]]")
+    assert "Jane" not in result and "Placeholder" not in result
