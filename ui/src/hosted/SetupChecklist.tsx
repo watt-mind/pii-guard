@@ -1,27 +1,35 @@
-import { useEffect, useSyncExternalStore } from "react";
-import { ButtonLink } from "../components/ui";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { Button, ButtonLink, Notice } from "../components/ui";
 import type { Account, Requester } from "./api";
 import { SETUP_STEPS, getLastRead, loadSetup, publish, subscribe, type SetupState } from "./setup";
 
 /** One ordered setup list with ticks and one primary action: the next step not yet done. */
 export function SetupChecklist({ call, account, active, calls }: { call: Requester; account: Account; active: boolean; calls: number }) {
   const state = useSyncExternalStore(subscribe, getLastRead, () => null);
+  const [revision, setRevision] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!active) return;
     let live = true;
     loadSetup(call, account).then(
-      (s) => live && publish(s),
-      // Keep the last good read on a failed refresh; the first failure shows nothing.
-      () => live && publish(getLastRead()),
+      (s) => { if (live) { publish(s); setFailed(false); setLoading(false); } },
+      // Preserve the last good progress, but make failed refreshes recoverable.
+      () => { if (live) { publish(getLastRead()); setFailed(true); setLoading(false); } },
     );
     return () => {
       live = false;
     };
-  }, [call, account, active]);
-  if (!state) return null;
+  }, [call, account, active, revision]);
+  const feedback = loading ? <p role="status" className="mt-3 text-sm text-muted">Checking setup progress…</p> : failed ? (
+    <Notice tone="warn" live className="mt-3" action={<Button size="sm" onClick={() => { setLoading(true); setFailed(false); setRevision((n) => n + 1); }}>Retry setup</Button>}>
+      Setup progress could not be refreshed. {state ? "Showing the last available progress." : "You can still continue in Connect or Projects."}
+    </Notice>
+  ) : null;
+  if (!state) return feedback;
   const done: SetupState = { ...state, call: state.call || calls > 0 };
   const next = SETUP_STEPS.find((s) => !done[s.id]);
-  if (!next) return null;
+  if (!next) return feedback;
   const count = SETUP_STEPS.filter((s) => done[s.id]).length;
   return (
     <section aria-labelledby="setup-title" className="mt-5 border-t border-line pt-5">
@@ -33,6 +41,7 @@ export function SetupChecklist({ call, account, active, calls }: { call: Request
           {count} of {SETUP_STEPS.length} done
         </span>
       </div>
+      {feedback}
       <ol className="mt-3 space-y-2.5">
         {SETUP_STEPS.map((s, i) => {
           const ok = done[s.id];
@@ -59,7 +68,7 @@ export function SetupChecklist({ call, account, active, calls }: { call: Request
                   {s.title}
                   <span className="sr-only">{ok ? " (done)" : current ? " (next)" : ""}</span>
                 </p>
-                {!ok && <p className="text-xs text-muted">{s.hint}</p>}
+                {!ok && <p className="text-xs text-muted">{s.id === "provider" && account.limits.sponsored_enabled === false ? "Free runs are paused. Connect your own provider key to choose a model." : s.hint}</p>}
               </div>
             </li>
           );

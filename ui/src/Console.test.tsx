@@ -154,9 +154,17 @@ describe("console shell", () => {
     expect(menu).toHaveAttribute("aria-expanded", "false");
     await user.click(menu);
     expect(menu).toHaveAttribute("aria-expanded", "true");
+    const destination = screen.getByRole("main");
+    const scroll = vi.spyOn(destination, "scrollIntoView").mockImplementation(() => {
+      expect(menu).toHaveAttribute("aria-expanded", "false");
+      expect(location.hash).toBe("#connect");
+    });
     await user.click(within(screen.getByRole("navigation", { name: "Console" })).getByRole("link", { name: /^Connect/ }));
     expect(menu).toHaveAttribute("aria-expanded", "false");
     expect(location.hash).toBe("#connect");
+    expect(screen.getByRole("main")).toHaveFocus();
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "instant" });
+    scroll.mockRestore();
     await user.click(menu);
     await user.keyboard("{Escape}");
     expect(menu).toHaveAttribute("aria-expanded", "false");

@@ -99,7 +99,6 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const [result, setResult] = useState<DemoResult | null>(null);
   const [running, setRunning] = useState(false);
-  const [step, setStep] = useState(0);
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState("");
   const [quota, setQuota] = useState(false);
@@ -108,16 +107,9 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const [text, setText] = useState(RECORDED[language].original);
   const [editable, setEditable] = useState(false);
   const controller = useRef<AbortController | null>(null);
+  const focusEditor = useRef(false);
 
   useEffect(() => () => controller.current?.abort(), []);
-  // Stepwise progress while a run is in flight. The browser sees one request, so the steps are
-  // paced, not measured; the last one completes when the answer arrives.
-  useEffect(() => {
-    if (!running) return;
-    const timers = [700, 1400].map((ms, i) => setTimeout(() => setStep(i + 1), ms));
-    return () => timers.forEach(clearTimeout);
-  }, [running]);
-
   const signedIn = Boolean(account?.authenticated);
   const loginUrl = account?.login_url || LOGIN;
   // Sponsorship stays off until the provider authorises it (docs/hosted.md): then a guest has
@@ -132,13 +124,12 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   // The model's name comes from the server (`included_model`), never from this page (LAB-1466).
   const model = account?.included_model ? modelName(account.included_model) : null;
   const modelOr = (fallback: string) => model ?? fallback;
-  const steps = ["Finding personal data", "Swapping it for placeholders", `Waiting for ${ownConnection ? `your ${providerLabel(ownConnection.provider)} model` : modelOr("the model")}`, "Putting the real values back"];
 
   function reset(nextLanguage = language) {
     setLanguage(nextLanguage); setText(RECORDED[nextLanguage].original); setResult(null); setFailed(false); setQuota(false); setError(""); setAnnounce("");
   }
   async function run() {
-    setRunning(true); setStep(0); setError(""); setFailed(false); setQuota(false); setResult(null); setAnnounce("Running the live demo…");
+    setRunning(true); setError(""); setFailed(false); setQuota(false); setResult(null); setAnnounce("Running the live demo…");
     try {
       let next: DemoResult;
       // The curated sample goes through /v1/demo (included model only); your text, or any run
@@ -181,7 +172,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const counts = shown ? placeholderCounts(shown.masked) : [];
   const legend = new Map<EntityType, number>(counts.filter((c): c is [EntityType, string, number] => c[0] !== null).map(([type, , n]) => [type, n]));
   const masked = counts.reduce((sum, [, , n]) => sum + n, 0);
-  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: shown ? "Live run didn’t finish · showing the recorded run" : "Live run didn’t finish · try again" } : { tone: "neutral", text: shown ? "Recorded run · real model · fictional data" : "Your text · ready for a live run" };
+  const badge: { tone: BadgeTone; text: string } = running ? { tone: "neutral", text: "Live run in progress" } : result ? { tone: "live", text: `Live result · answered by ${friendlyModel(result.model)}` } : failed ? { tone: "failed", text: shown ? "Live run didn’t finish · showing the recorded run" : "Live run didn’t finish · try again" } : { tone: "neutral", text: shown ? "Recorded run · real model · fictional data" : text.trim() ? "Your text · ready for a live run" : "Your text · add text to run" };
   const heroCta = signedIn && !needsKey ? "Run your own text" : guestLive ? "Run the live demo" : "See the demo";
   // A guest with a live run gets it from the hero in one press (LAB-1479): the link still points
   // at #demo for modified clicks and paused guests. Signed-in visitors open the text editor.
@@ -260,7 +251,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <div className="flex items-center gap-3"><p aria-hidden="true" className="text-sm font-medium text-ink">Sample</p><SegmentedControl label="Sample language" options={LANGUAGES.map((l) => ({ ...l, disabled: running }))} value={language} onChange={(v) => reset(v as Language)} /></div>
             {signedIn && !needsKey && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">The sample</option><option value="custom">Your text</option></Select></Field>}
             {canRun && !quota && <Button variant="primary" busy={running} disabled={!running && editable && !text.trim()} onClick={() => void run()}>{running ? "Running…" : failed ? "Try again" : editable ? "Run your text" : "Run the live demo"}</Button>}
-            {result && !running && <Button onClick={() => reset()}>Back to the recorded run</Button>}
+            {result && !running && <>
+              {editable && <Button onClick={() => { focusEditor.current = true; setResult(null); setAnnounce("Your draft is ready to edit."); }}>Edit your text</Button>}
+              <Button onClick={() => { setEditable(false); reset(); }}>Back to the recorded run</Button>
+            </>}
             <div className="basis-full sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
           </div>
@@ -269,7 +263,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             {needsKey && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={hasConsole ? "#connect" : "#account"}>Add a model key</ButtonLink>}>Add your own model key to run it, or follow the recorded run below.</Notice>}
             {!account && accountError && <Notice title="The live service isn’t reachable" action={<Button busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Retry live service"}</Button>}>The recorded run below still shows the whole flow.</Notice>}
             {running && <div className="rounded-lg border border-line bg-surface-2 p-3 sm:p-4">
-              <ol aria-label="Live run progress" className="flex flex-wrap gap-x-6 gap-y-2">{steps.map((label, i) => <li key={label} data-state={i < step ? "done" : i === step ? "active" : "todo"} className={["inline-flex items-center gap-2", i === step ? "font-medium text-ink" : "text-muted"].join(" ")}><span aria-hidden="true" className={["size-2 rounded-full border", i < step ? "border-guard-dot bg-guard-dot" : i === step ? "border-ink bg-ink motion-safe:animate-pulse" : "border-field"].join(" ")} />{label}{i === step && <span className="sr-only"> (in progress)</span>}</li>)}</ol>
+              <p className="flex items-center gap-2 text-sm font-medium text-ink"><span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ink motion-safe:animate-pulse" />Waiting for the live result</p>
+              <p className="mt-2 text-xs text-muted">Masking, the model response and restoration happen on the server. Individual stage progress isn’t available here.</p>
               <p className="mt-2 text-xs text-muted">Usually a few seconds. The first run after a quiet spell can take up to a minute while the service wakes up.</p>
             </div>}
             {error && <Notice tone="danger" live action={quota && !signedIn ? <ButtonLink variant="primary" href={loginUrl}>Sign in for more runs</ButtonLink> : undefined}>{error}{quota && account && resetsIn(account) && <> Free runs reset {resetsIn(account)}.</>}</Notice>}
@@ -279,7 +274,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <div data-flow className={["space-y-4 transition-opacity", running ? "opacity-55" : ""].join(" ")}>
           <div className="flex flex-col lg:flex-row lg:items-stretch">
             <Pane headingLevel={3} id="demo-input" side="you" eyebrow="Stays with PII Guard" title="Your text" className="lg:flex-1" footer={result ? "A real guard and model produced this. Check the masked request: detection can miss values, and this is pseudonymization, not anonymization." : shown ? `Recorded ${RECORDED_ON} on this hosted preview: the real gateway masked the server’s fictional sample and ${model ? modelName(shown.model) : "Meta’s model"} answered. A live run sends the same sample again.` : "Runs through the real gateway and model when you press Run your text."}>
-              {shown ? <YourText text={shown.original} masked={shown.masked} entities={shown.entities.length ? shown.entities : undefined} /> : <Field label="Your text" hint="PII Guard receives this text in full on Azure in Sweden Central. Use fictional data while you evaluate."><Textarea value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field>}
+              {shown ? <YourText text={shown.original} masked={shown.masked} entities={shown.entities.length ? shown.entities : undefined} /> : <Field label="Your text" hint="PII Guard receives this text in full on Azure in Sweden Central. Use fictional data while you evaluate."><Textarea ref={(node) => { if (node && focusEditor.current) { focusEditor.current = false; node.focus(); } }} value={text} disabled={running} onChange={(e) => { setText(e.target.value); setResult(null); }} /></Field>}
             </Pane>
             <Boundary direction="outbound" label="PII Guard boundary: only this crosses to the model">
               {shown && <dl className="text-center"><Metric label="masked" value={masked} className="min-w-12" /></dl>}
