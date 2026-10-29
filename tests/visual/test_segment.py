@@ -260,7 +260,11 @@ def test_report_keeps_segmenter_runs_apart() -> None:
 
     index = report_cli.current_index(ROOT)  # built, not committed (LAB-1269)
     segment_runs = [r for r in index["visual"] if charts.is_segment_run(r)]
-    assert {r["fixture_set"] for r in segment_runs} == {"fictional-specimens", "prompt-set", "specimens"}
+    assert {r["fixture_set"] for r in segment_runs} == {
+        "fictional-specimens",
+        "prompt-set",
+        "specimens",
+    }
     main_chart = charts.visual_recall(index)
     seg_chart = charts.visual_recall(index, segmenters=True)
     assert "yunet" not in main_chart and "yunet-2023mar" in seg_chart
