@@ -37,6 +37,56 @@ export function percentBox(box: ImageRegion["box"], width: number, height: numbe
   };
 }
 
+/**
+ * A region of a `render: "labels"` response: the session placeholder printed on its cover and
+ * the area the cover takes (the box grown by the padding and, for a legible label, extended to
+ * the right). `label_lines`/`label_px` are how the server fitted the label (recorded by
+ * scripts/record_image_labels.py), so the browser prints it at the same size. Never a value.
+ */
+export interface LabelledRegion extends ImageRegion {
+  placeholder?: string | null;
+  label?: string | null;
+  cover_box?: ImageRegion["box"] | null;
+  label_lines?: string[];
+  label_px?: number | null;
+}
+
+/** The server's label colours (src/pii_guard/visual/render.py LABEL_FILL, LABEL_INK). Drawn over the image, so the same in both themes. */
+export const LABEL_FILL = "rgb(226 228 232)";
+export const LABEL_INK = "rgb(32 36 44)";
+
+export interface LabelCover {
+  box: PercentBox;
+  /** Lines to print, empty when the box is cover only. */
+  lines: string[];
+  /** Font size as a share of the image width, for `cqw` units on an `@container` parent. */
+  fontCqw: number;
+  /** A photo or face (segmenter) rather than a text value (OCR). */
+  visual: boolean;
+}
+
+const inside = (a: ImageRegion["box"], b: ImageRegion["box"]) => a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3];
+
+/**
+ * The covers of a labels render, in drawing order. A cover inside another with the same label
+ * (the face inside its ID photo, both `PHOTO · [[PERSON_…]]`) is drawn without its own label,
+ * so the placeholder reads once.
+ */
+export function labelCovers(regions: readonly LabelledRegion[], width: number, height: number): LabelCover[] {
+  const masked = regions.filter((r) => r.policy === "mask");
+  return masked.map((r) => {
+    const cover = r.cover_box ?? r.box;
+    const nested = masked.some((o) => o !== r && o.label && o.label === r.label && inside(cover, o.cover_box ?? o.box) && !inside(o.cover_box ?? o.box, cover));
+    const lines = nested ? [] : (r.label_lines ?? (r.label ? [r.label] : []));
+    return {
+      box: percentBox(cover, width, height, r.cover_box ? 0 : MASK_PADDING),
+      lines,
+      fontCqw: r.label_px ? (r.label_px / width) * 100 : 0,
+      visual: r.source !== "ocr",
+    };
+  });
+}
+
 /** Model ids per detector, as `analysis.ocr.models` reports them. */
 export type DetectorModels = Readonly<Record<string, string>>;
 

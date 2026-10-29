@@ -1,22 +1,21 @@
-import { IMAGE_RECORDINGS } from "../api/imageMock";
+import { IMAGE_LABELS } from "../content/imageLabels";
 import { DEFAULT_IMAGE_SAMPLE } from "../content/imageSamples";
-import { MASK_PADDING, percentBox } from "../lib/imageRegions";
+import { LabelledCovers } from "./LabelledCovers";
 
 /*
- * The hero's image strip (LAB-1478): the same fictional specimen and recorded regions as the
- * image showcase, small, before and after. Loaded on demand with the showcase's chunk. Decorative:
- * the hero's figure caption says what it shows.
+ * The hero's image strip (LAB-1478, labels render LAB-1484): the same fictional specimen and
+ * labels recording as the image showcase, small, before and after: the photo covered, each ID
+ * detail covered by its placeholder. Loaded on demand with the showcase's chunk. Decorative: the
+ * hero's figure caption says what it shows.
  */
 
 const sample = DEFAULT_IMAGE_SAMPLE;
-const recording = IMAGE_RECORDINGS.samples[sample.id]!;
-const KEPT_ON_HOSTED = new Set(["SIGNATURE", "STAMP"]);
-const masked = recording.regions.filter((r) => r.policy === "mask" && !KEPT_ON_HOSTED.has(r.entity_type));
+const { image } = IMAGE_LABELS;
 
 function Thumb({ mask }: { mask: boolean }) {
-  return <div className="relative min-w-0 flex-1 overflow-hidden rounded-md ring-1 ring-line">
-    <img src={sample.src} alt="" width={recording.width} height={recording.height} loading="lazy" decoding="async" className="block h-auto w-full" />
-    {mask && masked.map((r, i) => <span key={i} className="absolute" style={{ ...percentBox(r.box, recording.width, recording.height, MASK_PADDING), backgroundColor: "var(--image-mask-fill, #000)" }} />)}
+  return <div className="@container relative min-w-0 flex-1 overflow-hidden rounded-md ring-1 ring-line">
+    <img src={sample.src} alt="" width={image.width} height={image.height} loading="lazy" decoding="async" className="block h-auto w-full" />
+    {mask && <LabelledCovers regions={image.regions} width={image.width} height={image.height} />}
   </div>;
 }
 
