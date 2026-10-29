@@ -1,7 +1,8 @@
 import { useEffect, useRef, type MouseEvent } from "react";
-import { ButtonLink, Logo, ThemeToggle } from "../components/ui";
+import { ButtonLink, ThemeToggle } from "../components/ui";
 import { useTheme } from "../hooks/useTheme";
 import { SECTIONS, type Section } from "../lib/routes";
+import { PublicHeader } from "./PublicHeader";
 import { loginFor } from "./consoleLink";
 
 /** What a signed-out visitor is told about each console screen, and where the public page shows it. */
@@ -44,18 +45,10 @@ export function SignedOutConsole({ section, hash, loginUrl, expired }: { section
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-sm text-ink">
-      <header>
-        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12 lg:px-10">
-          <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink">
-            <Logo />
-            PII Guard
-          </a>
-          <ThemeToggle theme={theme} onTheme={setTheme} />
-        </div>
-        <div aria-hidden="true" className="header-hairline" />
-      </header>
+      <PublicHeader accountHref={loginFor(loginUrl, hash)} />
       <main id="main" className="mx-auto flex w-full max-w-[1280px] flex-1 items-start justify-center px-4 py-12 sm:px-6 sm:py-20 lg:px-10">
         <section aria-labelledby="signed-out-heading" className="w-full max-w-xl rounded-xl border border-line bg-surface p-6 sm:p-8">
+          <div className="mb-4 flex justify-end"><ThemeToggle theme={theme} onTheme={setTheme} /></div>
           <p className="font-mono text-xs text-guard">Console · {label}</p>
           <h1 id="signed-out-heading" ref={heading} tabIndex={-1} className="mt-2 text-2xl font-medium text-balance text-ink focus:outline-none">
             {expired ? "Your session ended" : `Sign in to see ${screen.noun}`}

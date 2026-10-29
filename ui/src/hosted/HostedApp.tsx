@@ -22,6 +22,7 @@ import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 import { useCurrentSection } from "./useCurrentSection";
 import { consoleSectionOf } from "./consoleLink";
+import { PublicHeader } from "./PublicHeader";
 import { PublicEvaluation } from "./PublicEvaluation";
 import { SignedOutConsole } from "./SignedOut";
 
@@ -60,15 +61,6 @@ const RECORDED_ON = new Date(`${demoRecording.recorded_at}T12:00:00Z`).toLocaleD
 type Language = keyof typeof RECORDED;
 const LANGUAGES = [{ value: "en", label: "English" }, { value: "hu", label: "Hungarian" }] as const;
 
-/** The sticky nav's sections, in page order; `wide` ones show from lg up, the rest from md. */
-const NAV: readonly { href: string; label: string; wide?: boolean }[] = [
-  { href: "#demo", label: "Demo" },
-  { href: "#meta", label: "Meta models", wide: true },
-  { href: "#images", label: "Images" },
-  { href: "#results", label: "Results" },
-  { href: "#how", label: "How it works" },
-  { href: "#data", label: "Your data", wide: true },
-];
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
 const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
 
@@ -198,18 +190,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
   return <div className="min-h-dvh bg-canvas text-sm text-ink">
     <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
-    <header className="sticky top-0 z-30 bg-canvas">
-      <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:h-12 lg:px-10">
-        <a href="#" className="flex h-11 shrink-0 items-center gap-2.5 rounded-sm whitespace-nowrap text-base font-medium text-ink"><Logo />PII Guard</a>
-        <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-1 sm:gap-2 md:gap-5">
-          {NAV.map((item) => <a key={item.href} aria-current={current === item.href.slice(1) ? "location" : undefined} className={["hidden text-muted hover:text-ink aria-[current]:text-ink aria-[current]:underline aria-[current]:decoration-guard aria-[current]:decoration-2 aria-[current]:underline-offset-[6px]", item.wide ? "lg:inline" : "md:inline"].join(" ")} href={item.href}>{item.label}</a>)}
-          <a className="hidden text-muted hover:text-ink md:inline" href={SELF_HOST}>Self-host</a>
-          <SectionMenu current={current} />
-          {signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Console</ButtonLink>}
-        </nav>
-      </div>
-      <div aria-hidden="true" className="header-hairline" />
-    </header>
+    <PublicHeader current={current} signedIn={signedIn} accountHref={signedIn ? (hasConsole ? "#overview" : "#account") : loginUrl} />
     <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10">
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
@@ -448,7 +429,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
     </main>
-    <footer className="border-t border-line">
+    <footer className="public-footer border-t border-line">
       <div className="mx-auto grid max-w-[1280px] gap-4 px-4 py-8 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <a href="#" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
@@ -456,14 +437,17 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
         <p className="text-muted">Open-source privacy gateway for AI agents. Every example on this page is fictional.</p>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-          <a className="text-ink hover:underline" href={SOURCE}>Source code</a>
-          <a className="text-ink hover:underline" href={SELF_HOST}>Self-host</a>
-          <a className="text-ink hover:underline" href={`${DOCS}/integrations/README.md`}>Integrate</a>
-          <a className="text-ink hover:underline" href="#data">Your data</a>
-          <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks</a>
+          <a className="text-ink hover:underline" href={SELF_HOST}>Self-hosting guide <span aria-hidden="true">↗</span></a>
+          <a className="text-ink hover:underline" href={`${DOCS}/integrations/README.md`}>Integration guide <span aria-hidden="true">↗</span></a>
+          <a className="text-ink hover:underline" href="#data">Privacy</a>
+          <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks <span aria-hidden="true">↗</span></a>
           {PRIVACY_NOTICE_URL && <a className="text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
-          <a className="text-ink hover:underline" href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Questions and issues"}</a>
+          <a className="text-ink hover:underline" href={CONTACT_URL ?? `${SOURCE}/issues`}>{CONTACT_URL ? "Contact" : "Questions and issues"} <span aria-hidden="true">↗</span></a>
         </nav>
+        <div className="public-footer-brands">
+          <a href="https://watt-mind.com/"><img className="watt-mind-mark" src="/brands/watt-mind.svg" alt="" width="24" height="24" />Watt Mind <span aria-hidden="true">↗</span></a>
+          <a href={SOURCE}><img className="github-mark" src="/brands/github.svg" alt="" width="24" height="24" />GitHub <span aria-hidden="true">↗</span></a>
+        </div>
         <p className="text-xs text-muted">Apache-2.0 · Built for the Meta Global AI Developer Hackathon 2026</p>
         {OPERATOR && <p className="text-xs text-muted">Operated by {OPERATOR}.</p>}
       </div>
@@ -482,49 +466,6 @@ function SectionHead({ id, eyebrow, title, lead }: { id: string; eyebrow: string
     <h2 id={id} tabIndex={-1} className="mt-2 text-2xl font-medium text-balance text-ink focus:outline-none sm:text-3xl">{title}</h2>
     {lead && <p className="mt-3 text-sm text-pretty text-muted sm:text-base">{lead}</p>}
   </div>;
-}
-
-/**
- * The section menu below md, where the nav's links don't fit (L1 carryover 3): a disclosure that
- * closes when a link is followed, on Escape (focus back on its toggle), on a tap outside it and
- * when the page scrolls, so it never sits over the content.
- */
-function SectionMenu({ current }: { current: string | null }) {
-  const ref = useRef<HTMLDetailsElement>(null);
-  useEffect(() => {
-    const menu = ref.current;
-    if (!menu) return;
-    let openedAt = 0;
-    const close = () => menu.removeAttribute("open");
-    const onToggle = () => { openedAt = scrollY; };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && menu.open) { close(); menu.querySelector("summary")?.focus(); } };
-    const onFocus = (e: FocusEvent) => { if (menu.open && !menu.contains(e.target as Node)) close(); };
-    const onPointer = (e: PointerEvent) => { if (menu.open && !menu.contains(e.target as Node)) close(); };
-    const onScroll = () => { if (menu.open && Math.abs(scrollY - openedAt) > 48) close(); };
-    menu.addEventListener("toggle", onToggle);
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("focusin", onFocus);
-    addEventListener("scroll", onScroll, { passive: true });
-    return () => { menu.removeEventListener("toggle", onToggle); document.removeEventListener("keydown", onKey); document.removeEventListener("pointerdown", onPointer); document.removeEventListener("focusin", onFocus); removeEventListener("scroll", onScroll); };
-  }, []);
-  return <details ref={ref} className="group relative md:hidden">
-    <summary className="flex h-11 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">Sections<svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m4 6 4 4 4-4" /></svg></summary>
-    <ul className="absolute right-0 z-40 mt-2 max-h-[calc(100dvh-5rem)] w-52 overflow-y-auto rounded-lg border border-line bg-surface p-1.5 shadow-lg">
-      {[...NAV.slice(0, 2), { href: "#europe", label: "Why Europe" }, ...NAV.slice(2), { href: "#account", label: "Get started" }].map((item) => <li key={item.href}><a href={item.href} aria-current={current === item.href.slice(1) ? "location" : undefined} onClick={(e) => {
-        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-        ref.current?.removeAttribute("open");
-        // Let native hash navigation finish before moving keyboard focus.
-        const link = e.currentTarget;
-        requestAnimationFrame(() => {
-          // Safari doesn't focus links on click, so focus may sit on the body.
-          const at = document.activeElement;
-          if (at === link || at === document.body || at === null) document.querySelector<HTMLElement>(`${item.href} h2`)?.focus({ preventScroll: true });
-        });
-      }} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2 aria-[current]:font-medium aria-[current]:text-guard">{item.label}</a></li>)}
-      <li><a href={SELF_HOST} onClick={() => ref.current?.removeAttribute("open")} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2">Self-host ↗</a></li>
-    </ul>
-  </details>;
 }
 
 /** One of the five differences: a short lead that links to the section that shows it. */

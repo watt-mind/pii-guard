@@ -274,3 +274,22 @@ and encoded with `cwebp -q 82`. `demo.webp` is six of those frames at 2.4 s each
 
 English UI. Hungarian appears only as content of a Hungarian sample, and sample titles lead
 in English. Say what ran ("4 values masked by Rules + checksum"), never what might have.
+
+## Public navigation
+
+The landing, public Evaluation and signed-out headers share `hosted/PublicHeader.tsx`.
+Their scoped `publicNavigation.css` keeps the existing Geist typography, shield and warm
+surfaces. The 64px bar has 44px targets, centered desktop primary links, a Resources
+disclosure, and a separate account action. Below 1024px the disclosure becomes a wide Menu
+panel, bounded by the viewport height; native Tab navigation is preserved.
+
+Only the public header replaces the accent stripe with a static 2px divider:
+`--public-divider` (teal `#14b8a6`) mixed into the light theme's line, and
+`--public-divider-mint` (`#4fdbc8`) mixed into the dark theme's line. These decorative
+brand hues do not replace status colors or the console's existing hairline. Section
+anchors reserve 82px so headings clear the sticky header.
+
+Footer brand links use the official assets in `public/brands/`, with adjacent visible
+names, decorative image alt text, and same-tab external navigation. The Watt Mind mark
+retains its original colors on a small white mat in both themes; GitHub uses its mono mark.
+See that directory's README and license for provenance.

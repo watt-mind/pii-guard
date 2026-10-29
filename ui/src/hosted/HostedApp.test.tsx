@@ -36,7 +36,7 @@ describe("public hosted workflow", () => {
     await screen.findAllByText(/free runs/i);
     expect(screen.getByText(/Runs on Muse Spark 1.3 · no key needed/)).toHaveTextContent("3 of 3 free runs left today");
     expect(document.body.textContent).not.toMatch(/sponsor/i);
-    const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Console" })];
+    const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Sign in" })];
     expect(links.length).toBeGreaterThanOrEqual(2);
     for (const link of links) expect(link).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23overview");
   });
@@ -367,7 +367,7 @@ describe("positioning and copy (LAB-1466)", () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
     await screen.findAllByText(/free runs/);
-    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    const nav = screen.getByRole("navigation", { name: "Main navigation" }).closest("header")!;
     expect(nav.querySelector("a[href^='/.auth/login']")?.className).not.toMatch(/bg-primary/);
   });
 });
@@ -402,16 +402,16 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
   it("offers a section menu where the nav links don't fit, closed after a link is followed", async () => {
     const user = userEvent.setup();
     render(<HostedApp call={requester((path) => path === "/v1/account" ? account : result)} />);
-    const menu = screen.getByText("Sections").closest("details")!;
-    await user.click(screen.getByText("Sections"));
+    const menu = screen.getByText("Menu").closest("details")!;
+    await user.click(screen.getByText("Menu"));
     expect(menu).toHaveAttribute("open");
     await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
     expect(menu).not.toHaveAttribute("open");
-    await user.click(screen.getByText("Sections"));
+    await user.click(screen.getByText("Menu"));
     await user.keyboard("{Escape}");
     expect(menu).not.toHaveAttribute("open");
-    expect(screen.getByText("Sections").closest("summary")).toHaveFocus();
-    await user.click(screen.getByText("Sections"));
+    expect(screen.getByText("Menu").closest("summary")).toHaveFocus();
+    await user.click(screen.getByText("Menu"));
     await user.click(screen.getByRole("heading", { level: 1 }));
     expect(menu).not.toHaveAttribute("open");
   });
@@ -444,7 +444,7 @@ describe("landing recovery and keyboard navigation (LAB-1540)", () => {
 
   it("closes when keyboard focus leaves and focuses the destination after following a section", async () => {
     const user = userEvent.setup(); render(<HostedApp call={requester(() => account)} />);
-    const toggle = screen.getByText("Sections").closest("summary")!;
+    const toggle = screen.getByText("Menu").closest("summary")!;
     const menu = toggle.closest("details")!;
     await user.click(toggle);
     await user.tab({ shift: true });
@@ -475,5 +475,23 @@ describe("hosted recovery copy", () => {
     }
     expect(recovery(new ApiError(404, "not_found", "x"))).not.toMatch(/Reconnect/);
     expect(recovery(new ApiError(404, "not_found", "x"), "site")).not.toMatch(/Reconnect/);
+  });
+});
+
+describe("public footer", () => {
+  it("links the official brand marks once by name and preserves useful destinations", () => {
+    render(<HostedApp call={requester(() => account)} />);
+    const footer = screen.getByRole("navigation", { name: "Footer" }).closest("footer")!;
+    const links = [...footer.querySelectorAll("a")];
+    for (const [name, href, src] of [["Watt Mind", "https://watt-mind.com/", "/brands/watt-mind.svg"], ["GitHub", "https://github.com/watt-mind/pii-guard", "/brands/github.svg"]] as const) {
+      const a = links.find((el) => el.textContent?.includes(name))!;
+      expect(a).toHaveAccessibleName(name);
+      expect(a).toHaveAttribute("href", href);
+      expect(a).not.toHaveAttribute("target");
+      expect(a.querySelector("img")).toHaveAttribute("alt", "");
+      expect(a.querySelector("img")).toHaveAttribute("src", src);
+    }
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(expect.arrayContaining(["#data", "https://github.com/watt-mind/pii-guard#try-it", "https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations/README.md", "https://github.com/watt-mind/pii-guard/issues"]));
+    expect(footer).toHaveTextContent("Apache-2.0");
   });
 });
