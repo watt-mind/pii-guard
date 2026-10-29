@@ -15,6 +15,7 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
+import { COMPARISON, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, SETS } from "./proof";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -30,6 +31,7 @@ const MODEL_CARD = `${NER_MODEL}#model-card`;
 // stays small (Lighthouse, LAB-1466).
 const ImageShowcase = lazy(() => import("./ImageShowcase"));
 const ResultsChart = lazy(() => import("./ResultsChart"));
+const HeroImage = lazy(() => import("./HeroImage"));
 
 // TODO(owner): operator name, privacy notice URL and contact address. Until they are set the
 // footer says they are being finalised; never invent a legal entity here.
@@ -44,25 +46,6 @@ const EXAMPLES = {
 };
 type Language = keyof typeof EXAMPLES;
 const LANGUAGES = [{ value: "en", label: "English" }, { value: "hu", label: "Hungarian" }] as const;
-
-// The dated proof points, copied from docs/benchmarks.md (fictional data, runs of 27–28 Oct 2026).
-const MEASURED = "Fictional German, English and Hungarian data · measured 27–28 Oct 2026";
-const PROOF = [
-  { value: "0.0 %", label: "Leak, hand-written set (51 docs)" },
-  { value: "94.3 %", label: "F1, same set" },
-  { value: "0.4 %", label: "Leak, CEE-PII public set (451 docs)" },
-] as const;
-const LATENCY = { value: "~34 ms", label: "Gateway overhead per request (p50, CPU)" } as const;
-// Leak and F1 (%), from docs/benchmarks.md: hand-written `smoke` (51 docs; pii-guard 2026-10-28,
-// the others 2026-10-27) and the public test splits CEE-PII (451) and Nemotron-PII (300) (pii-guard
-// 2026-10-28, the others 2026-10-27).
-const COMPARISON = [
-  { system: "pii-guard fast", leak: ["0.0", "0.4", "0.7"], f1: ["94.3", "82.6", "89.4"], ours: true },
-  { system: "PrivAiTe", leak: ["12.7", "4.4", "4.0"], f1: ["55.2", "34.2", "80.8"] },
-  { system: "Presidio", leak: ["24.3", "36.5", "12.8"], f1: ["64.9", "41.4", "66.4"] },
-  { system: "LLM Guard", leak: ["45.1", "75.8", "28.8"], f1: ["53.2", "24.7", "72.9"] },
-];
-const SETS = ["Hand-written de + en + hu (51)", "CEE-PII (451)", "Nemotron-PII (300)"];
 
 const initialLanguage = (): Language => (globalThis.navigator?.language ?? "").toLowerCase().startsWith("hu") ? "hu" : "en";
 const link = "underline underline-offset-4 hover:text-ink";
@@ -173,9 +156,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />pii-guard</a>
         <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
           <a className="hidden text-muted hover:text-ink md:inline" href="#demo">Demo</a>
-          <a className="hidden text-muted hover:text-ink md:inline" href="#how">How it works</a>
+          <a className="hidden text-muted hover:text-ink md:inline" href="#images">Images</a>
           <a className="hidden text-muted hover:text-ink md:inline" href="#results">Results</a>
-          <a className="hidden text-muted hover:text-ink md:inline" href="#data">Your data</a>
+          <a className="hidden text-muted hover:text-ink md:inline" href="#how">How it works</a>
+          <a className="hidden text-muted hover:text-ink lg:inline" href="#data">Your data</a>
           <a className="hidden text-muted hover:text-ink md:inline" href={SELF_HOST}>Self-host</a>
           {signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Open console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Sign in with Google</ButtonLink>}
         </nav>
@@ -187,10 +171,15 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <div className="min-w-0 space-y-6">
           <p className="font-mono text-2xs text-muted">Open source · OpenAI-compatible · Built on Meta models</p>
           <h1 id="intro-heading" className="text-3xl leading-tight font-medium text-balance text-ink sm:text-5xl"><span className="block">Send the work to the model.</span><span className="block">Keep the people out of it.</span></h1>
-          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">An OpenAI-compatible privacy gateway for AI agents. Names, emails and IDs become placeholders before the request leaves; the real values come back in the answer.</p>
+          <p className="max-w-2xl text-sm text-pretty text-muted sm:text-base">An OpenAI-compatible privacy gateway for AI agents. Names, emails and IDs in text, and faces in images, become placeholders before the request leaves; the real values come back in the answer.</p>
+          <ul aria-label="What makes it different" className="grid max-w-2xl gap-3 sm:grid-cols-3">
+            <Differentiator href="#images" title="Images too">Faces, ID photos and printed details are covered before an image is sent.</Differentiator>
+            <Differentiator href="#how" title="No LLM in the masking path">Rules and a small encoder NER run on the gateway itself.</Differentiator>
+            <Differentiator href="#how" title="Your agent keeps working">Codex, OpenCode, Muse Code, pi or the OpenAI SDK: change one base URL.</Differentiator>
+          </ul>
           <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo">{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
           <div className="space-y-2">
-            <dl className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">{PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} />)}</dl>
+            <dl aria-label="Measured results" className="grid max-w-2xl grid-cols-3 gap-3 sm:gap-4">{PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
             <p className="text-xs text-muted">{MEASURED} · <a className={link} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
           </div>
           <p className="max-w-2xl text-sm text-muted">Answers by Meta’s <span className="font-medium text-ink">{modelOr("model")}</span>. Detection by our <a className={link} href={NER_MODEL}>open NER on Hugging Face ↗</a>, fine-tuned from Meta’s <span className="font-medium text-ink">XLM-RoBERTa</span>.</p>
@@ -247,25 +236,63 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
       </section>
 
-      <section id="for" aria-labelledby="for-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. pii-guard lets the agent use the model without handing over the person." />
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
-          <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
-          <Card title="HR" headingLevel={3}><p className="text-muted">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</p></Card>
-          <Card title="Finance and back office" headingLevel={3}><p className="text-muted">Work through invoices and account correspondence. Bank accounts and tax IDs are caught by validated rules.</p></Card>
+      <section id="images" aria-labelledby="images-heading" className="scroll-mt-6 space-y-6">
+        <SectionHead id="images-heading" title="Images too: faces are covered before they leave." lead="A gateway that only reads text passes screenshots and scans on untouched. pii-guard reads the image itself: a segmenter finds faces and ID photos, OCR and the text detectors find printed names and numbers, and all of it is covered before the image goes on." />
+        <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
+        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card. Through the gateway, the masked image goes to the model in place of the original. In the hosted preview, masking runs on the service and the masked image comes back to you; it isn’t sent to a model, and signatures and stamps stay visible, as here. A self-hosted install masks them too. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <Card title="Measured on 65 official specimen ID documents from 24 countries" headingLevel={3} subtitle="Self-hosted run with SAM 3.1, Tesseract OCR and the rules, 27 Oct 2026. A region counts as covered when the mask overlaps it at IoU ≥ 0.5.">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
+          <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/benchmarks.md#image-masking`}>Image benchmark details ↗</a></p>
+        </Card>
+      </section>
+
+      <section id="results" aria-labelledby="results-heading" className="scroll-mt-6 space-y-6">
+        <SectionHead id="results-heading" title="Among the best at keeping personal data out." lead="The lowest leak rate of the tools we compared on every set in the table below. It is not the lowest everywhere: on Gretel finance, Presidio leaks slightly less (18.8 % against 19.0 %). Fictional data only, from committed run records of 27–28 October 2026. The sets are small: a few points’ difference is noise." />
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+            <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better; each tool’s time was measured where it ran.">
+              <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
+            </Card>
+          <Card title="Where it’s weaker" headingLevel={3}>
+            <ul className="grid gap-3">
+              <Point title="Finance text.">19.0 % leak on Gretel finance, level with Presidio (18.8 %).</Point>
+              <Point title="Over-masking.">It can mask too much: reference numbers without a cue word can be masked as IDs (26.4 % over-masking on CEE-PII).</Point>
+              <Point title="Other EU languages.">Trained on Hungarian, German and English. On EU legal text in 21 languages it leaks 8.5 % (MAPA EUR-Lex, 42 docs).</Point>
+            </ul>
+            <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
+          </Card>
+          </div>
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+            <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better).">
+              <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
+                <table className="w-full min-w-[28rem] border-collapse text-sm">
+                  <caption className="sr-only">Leak rate and F1 in percent, by dataset, for pii-guard and three comparison tools</caption>
+                  <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
+                  <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
+                </table>
+              </div>
+              <div className="space-y-5 sm:hidden">{SETS.map((set, i) => <ResultTable key={set} caption={set} columns={["Leak", "F1"]} rows={COMPARISON.map((row) => ({ name: row.system, ours: row.ours, values: [row.leak[i]!, row.f1[i]!] }))} />)}</div>
+              <p className="mt-3 text-xs text-muted">pii-guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits pii-guard was not trained on.</p>
+            </Card>
+            <Card title="Our NER against other open PII models" headingLevel={3} subtitle="The same rules and the same 51 hand-written documents; only the NER model differs. Over-masking: text masked that wasn’t personal data.">
+              <ResultTable hideCaption caption="Leak, F1 and over-masking in percent, by NER model, with the same rules" columns={["Leak", "F1", "Over-masking"]} rows={OPEN_MODELS.map((m) => ({ name: m.model, title: m.id, ours: "ours" in m, values: [m.leak, m.f1, m.over] }))} />
+              <p className="mt-3 text-xs text-muted">Runs of 28 Oct 2026. The closest, bardsai multilang v1, leaks 1.2 % but masks about nine times as much text that isn’t personal data. <a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
+            </Card>
+          </div>
         </div>
       </section>
 
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-6 space-y-6">
         <SectionHead id="how-heading" title="Change one base URL. The model gets placeholders." lead="pii-guard sits between your agent and the model provider. It speaks the OpenAI Chat Completions and Responses APIs." />
         <ol className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
-          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted">Validated rules for identifiers, plus an open multilingual NER for names, addresses and dates, run inside pii-guard with no API call.</p></Card></li>
+          <li><Card as="div" title="1 · Detect" headingLevel={3} className="h-full"><p className="text-muted"><span className="font-medium text-ink">No LLM in the masking path.</span> Validated rules for identifiers, plus our open multilingual NER, a small encoder model, for names, addresses and dates. Both run inside pii-guard, with no API call. An LLM detector is an opt-in audit mode, off by default.</p></Card></li>
           <li><Card as="div" title="2 · Swap" headingLevel={3} className="h-full"><p className="text-muted">Each value becomes a keyed placeholder such as <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />. The same person gets the same placeholder for the whole session, and the mapping stays in pii-guard.</p></Card></li>
           <li><Card as="div" title="3 · Restore" headingLevel={3} className="h-full"><p className="text-muted">The answer comes back with the real values, chunk by chunk as it streams.</p></Card></li>
         </ol>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-          <Card title="One line in your client" headingLevel={3} subtitle="Works with the OpenAI SDK, Codex, Muse Code and pi.">
+          <Card title="One line in your client" headingLevel={3} subtitle="Tested with Codex, OpenCode, Muse Code, pi and the OpenAI SDK.">
             <pre tabIndex={0} aria-label="Python client example" className="overflow-x-auto rounded-md border border-line bg-surface-2 px-3 py-2 font-mono text-ui text-ink"><code>{"from openai import OpenAI\n\nclient = OpenAI(\n    base_url=\"https://<your-pii-guard>/v1\",\n    api_key=\"…\",\n)"}</code></pre>
+            <dl className="mt-4"><Metric label={LATENCY.label} value={LATENCY.value} hint={LATENCY.hint} /></dl>
             <p className="mt-3 text-xs text-muted"><a className={link} href={`${DOCS}/integrations/README.md`}>Integration guides ↗</a></p>
           </Card>
           <Card title="Made for agents" headingLevel={3}>
@@ -273,17 +300,20 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
               <Point title="Tool calls too.">Tool definitions, arguments and results are masked, not just the prompt.</Point>
               <Point title="Streaming.">Placeholders are restored mid-stream, even when one is split across chunks.</Point>
               <Point title="Grammar-aware.">In Hungarian a name changes with every case. The ending stays outside the placeholder, so the model still writes correct sentences.</Point>
-              <Point title="Images.">Faces, ID photos and printed personal data are covered before an image goes anywhere (see below).</Point>
+              <Point title="Images.">Faces, ID photos and printed personal data are covered before an image goes anywhere (see above).</Point>
               <Point title="Fails closed.">If anything can’t be masked, the request isn’t sent.</Point>
             </ul>
           </Card>
         </div>
       </section>
 
-      <section id="images" aria-labelledby="images-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="images-heading" title="Images too: faces are covered before they leave." lead="A gateway that only reads text passes images on untouched. pii-guard reads the image itself: faces and ID photos are found by a segmenter, printed names and numbers by OCR and the same detectors as text, and all of it is covered before the image goes to the model." />
-        <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
-        <p className="max-w-3xl text-xs text-muted">A fictional specimen ID card; the regions were recorded on 27 Oct 2026 from a run with SAM 3.1 and OCR. In the hosted preview, signatures and stamps stay visible, as shown here. A self-hosted install can mask them too, with SAM 3.1. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+      <section id="for" aria-labelledby="for-heading" className="scroll-mt-6 space-y-6">
+        <SectionHead id="for-heading" title="Built for agents that work on people’s files." lead="The useful input is personal data: a case file, an HR folder, a client’s letter. Sending it to a third-party model is the risk; not sending it means the agent can’t do the job. pii-guard lets the agent use the model without handing over the person." />
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
+          <Card title="Legal" headingLevel={3}><p className="text-muted">Draft from case files and correspondence; the model sees <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" />, not your client.</p></Card>
+          <Card title="HR" headingLevel={3}><p className="text-muted">Summarise employee folders and write replies, with names, IDs and addresses masked on the way out.</p></Card>
+          <Card title="Finance and back office" headingLevel={3}><p className="text-muted">Work through invoices and account correspondence. Bank accounts and tax IDs are caught by validated rules.</p></Card>
+        </div>
       </section>
 
       <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-6 space-y-6">
@@ -296,37 +326,6 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             { key: "sam", label: <span className="font-medium text-ink">SAM 3.1</span>, value: "Finds signatures so a self-hosted install can mask them too." },
             { key: "open", label: <span className="font-medium text-ink">Muse Spark Open</span>, value: "The optional audit mode and the red team." },
           ]} />
-        </Card>
-      </section>
-
-      <section id="results" aria-labelledby="results-heading" className="scroll-mt-6 space-y-6">
-        <SectionHead id="results-heading" title="Among the best at keeping personal data out." lead="The lowest leak rate of the tools we compared on every set in the table below. It is not the lowest everywhere: on Gretel finance, Presidio leaks slightly less (18.8 % against 19.0 %). Fictional data only, from committed run records of 27–28 October 2026. The sets are small: a few points’ difference is noise." />
-        <Card aria-label="Headline results">
-          <dl className="grid grid-cols-2 gap-6 lg:grid-cols-4">{[...PROOF, LATENCY].map((p) => <Metric key={p.label} label={p.label} value={p.value} />)}</dl>
-          <p className="mt-4 text-xs text-muted">{MEASURED}</p>
-        </Card>
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
-          <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better; each tool’s time was measured where it ran.">
-            <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
-          </Card>
-          <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labelled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better).">
-            <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="overflow-x-auto rounded-md">
-              <table className="w-full min-w-[28rem] border-collapse text-sm">
-                <caption className="sr-only">Leak rate and F1 in percent, by dataset, for pii-guard and three comparison tools</caption>
-                <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
-                <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
-              </table>
-            </div>
-            <p className="mt-3 text-xs text-muted">pii-guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits pii-guard was not trained on.</p>
-          </Card>
-        </div>
-        <Card title="Where it’s weaker" headingLevel={3}>
-          <ul className="grid gap-3 md:grid-cols-3">
-            <Point title="Finance text.">19.0 % leak on Gretel finance, level with Presidio (18.8 %).</Point>
-            <Point title="Over-masking.">It can mask too much: reference numbers without a cue word can be masked as IDs (26.4 % over-masking on CEE-PII).</Point>
-            <Point title="Other EU languages.">Trained on Hungarian, German and English. On EU legal text in 21 languages it leaks 8.5 % (MAPA EUR-Lex, 42 docs).</Point>
-          </ul>
-          <p className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{signedIn && hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
         </Card>
       </section>
 
@@ -425,6 +424,20 @@ function SectionHead({ id, title, lead }: { id: string; title: string; lead?: st
   return <div className="max-w-3xl"><h2 id={id} className="text-2xl font-medium text-balance text-ink">{title}</h2>{lead && <p className="mt-2 text-sm text-pretty text-muted sm:text-base">{lead}</p>}</div>;
 }
 
+/** One of the hero's three differences: a short lead that links to the section that shows it. */
+function Differentiator({ href, title, children }: { href: string; title: string; children: ReactNode }) {
+  return <li className="border-l-2 border-guard/40 pl-3 text-xs text-muted sm:text-sm"><a href={href} className="block rounded-sm font-medium text-ink hover:underline">{title}</a><span className="mt-0.5 block">{children}</span></li>;
+}
+
+/** A small results table: one row per system, values in percent; ours in ink. Fits a phone. */
+function ResultTable({ caption, hideCaption = false, columns, rows }: { caption: string; hideCaption?: boolean; columns: string[]; rows: { name: string; title?: string; ours?: boolean; values: readonly string[] }[] }) {
+  return <table className="w-full border-collapse text-sm">
+    <caption className={hideCaption ? "sr-only" : "pb-1 text-left text-xs font-medium text-ink"}>{caption}</caption>
+    <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-1.5 pr-3 text-left font-normal">System</th>{columns.map((c) => <th key={c} scope="col" className="py-1.5 pl-2 text-right font-normal">{c}</th>)}</tr></thead>
+    <tbody>{rows.map((row) => <tr key={row.name} className="border-b border-line last:border-0"><th scope="row" title={row.title} className={["py-1.5 pr-3 text-left", row.ours ? "font-medium text-ink" : "font-normal text-ink"].join(" ")}>{row.name}</th>{row.values.map((v, i) => <td key={i} className={["py-1.5 pl-2 text-right whitespace-nowrap tabular-nums", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;%</td>)}</tr>)}</tbody>
+  </table>;
+}
+
 /** One list item with its lead in ink. */
 function Point({ title, children }: { title: string; children: ReactNode }) {
   return <li className="text-muted"><span className="font-medium text-ink">{title}</span> {children}</li>;
@@ -434,13 +447,15 @@ function Point({ title, children }: { title: string; children: ReactNode }) {
 function MiniFlow({ model, name }: { model: string | null; name: string }) {
   const masked = metaFor("PERSON");
   return <figure className="hidden min-w-0 space-y-2 lg:block" aria-labelledby="mini-flow-caption">
-    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back.</figcaption>
+    <figcaption id="mini-flow-caption" className="sr-only">One name, there and back: you send it, the model sees only a placeholder, and you get the real name back. Below it, a fictional ID card before and after masking: the face and ID details are covered in black.</figcaption>
     <div aria-hidden="true" className="space-y-2">
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You send</p><p className="doc mt-1">Name: <mark className={["rounded-md px-0.5 -mx-0.5 ring-1 ring-inset", masked.mark].join(" ")}>{name}</mark></p></div>
       <p className="text-center font-mono text-2xs text-guard">↓ pii-guard masks</p>
       <div className="rounded-xl border border-model/25 bg-model-soft/60 px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-model">{model ?? "The model"} sees</p><p className="doc mt-1">Name: <Placeholder text="[[PERSON_3f9a1c]]" entityType="PERSON" /></p></div>
       <p className="text-center font-mono text-2xs text-guard">↓ pii-guard restores</p>
       <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">You get back</p><p className="doc mt-1">Dear <mark className="rounded-md bg-restored-soft px-0.5 -mx-0.5 text-ink ring-1 ring-restored/45 ring-inset">{name}</mark>, …</p></div>
+      <p className="text-center font-mono text-2xs text-guard">↓ and in images</p>
+      <div className="rounded-xl border border-line bg-surface px-4 py-3 sm:px-5"><p className="font-mono text-2xs text-guard">Faces and ID details covered</p><div className="mt-2"><Suspense fallback={<div className="aspect-[3/1] rounded-md bg-surface-2" />}><HeroImage /></Suspense></div></div>
     </div>
   </figure>;
 }
