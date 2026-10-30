@@ -614,6 +614,10 @@ class VaultSession:
         # never issued later, so a token the caller wrote can't turn into a masked value.
         # Bounded (LAB-1565): at most _MAX_RESERVED, oldest forgotten first (see above).
         self._reserved: OrderedDict[str, None] = OrderedDict()
+        # Placeholder -> (value text, JSON number literal) when it has only ever replaced a
+        # whole JSON number leaf; ``None`` once it also replaced a whole string (LAB-1361).
+        # Bounded: issued placeholders only.
+        self._json_numbers: dict[str, tuple[str, str] | None] = {}
         self._closed = False
         self._expires_at = clock() + ttl_seconds
         self._known = KnownValues()
@@ -664,6 +668,7 @@ class VaultSession:
             self._by_placeholder.clear()
             self._identifiers.clear()
             self._reserved.clear()
+            self._json_numbers.clear()
             self._known.clear()
             self._folds.clear()
             self._folded_chars = 0
@@ -717,6 +722,7 @@ class VaultSession:
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
             fork._identifiers = copy.deepcopy(self._identifiers, memo)
             fork._reserved = OrderedDict(self._reserved)
+            fork._json_numbers = dict(self._json_numbers)
             fork._generation = self._generation
             fork._masked = None  # its journal is replayed in full anyway
             fork._known = self._known
@@ -1359,6 +1365,29 @@ class VaultSession:
             if length >= MAX_ID_LENGTH:  # pragma: no cover - a full SHA-256 collision
                 raise MaskingError(f"could not derive a unique {entity_type.value} placeholder")
             length = min(length + 2, MAX_ID_LENGTH)
+
+    # --- JSON leaf types (LAB-1361) ------------------------------------------------------
+
+    def note_json_leaf(self, placeholder: str, number: tuple[str, str] | None) -> None:
+        """Record that ``placeholder`` replaced a whole JSON leaf: a number (``number`` is
+        its value text and JSON literal, ``("8123456786", "8123456786.0")``) or a string
+        (``None``). A placeholder of a session-issued value only; any mix of the two, or of
+        two literals, makes it a string for good (fail closed)."""
+        with self._lock:
+            self._check_alive()
+            if placeholder not in self._by_placeholder:
+                return
+            if placeholder not in self._json_numbers:
+                self._json_numbers[placeholder] = number
+            elif self._json_numbers[placeholder] != number:
+                self._json_numbers[placeholder] = None
+
+    def json_number(self, placeholder: str) -> tuple[str, str] | None:
+        """``(value text, JSON literal)`` if ``placeholder`` only ever replaced whole JSON
+        number leaves of that one literal; else ``None`` (restore it as a string)."""
+        with self._lock:
+            self._check_alive()
+            return self._json_numbers.get(placeholder)
 
     # --- re-identification ---------------------------------------------------------------
 

@@ -47,7 +47,7 @@ from pii_guard.gateway.shell_context import (
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, RestoreBudget, UnmaskResult, VaultSession
 from pii_guard.vault.inflection import MAX_SUFFIX_LENGTH, following_suffix
-from pii_guard.vault.placeholders import MAX_PLACEHOLDER_LENGTH
+from pii_guard.vault.placeholders import MAX_PLACEHOLDER_LENGTH, is_placeholder_prefix
 
 __all__ = [
     "JsonEscapingSession",
@@ -436,7 +436,28 @@ class JsonEscapingSession:
 
     @staticmethod
     def hold_from(buffer: str) -> int:
-        return min(_JSON_ESCAPE.hold_from(buffer), _encoded_hold_from(buffer))
+        hold = min(_JSON_ESCAPE.hold_from(buffer), _encoded_hold_from(buffer))
+        return min(hold, _quote_hold_from(buffer))
+
+    def _number(self, text: str, item: _Restored) -> str | None:
+        """The JSON literal to write for ``item`` in place of ``"value"``, or ``None``.
+
+        Only a plain placeholder that is a whole JSON string value (its opening quote read
+        just now, in this text, and its closing quote right after it) and that the session
+        recorded as a masked JSON number of exactly this value (LAB-1361)."""
+        if (
+            item.value is None
+            or item.suffix
+            or text[item.start : item.end] != item.placeholder
+            or text[item.end : item.end + 1] != '"'
+            or text[item.start - 1 : item.start] != '"'
+            or not self._context.at_value_start
+        ):
+            return None
+        number = self._session.json_number(item.placeholder)
+        if number is None or number[0] != item.value:
+            return None
+        return number[1]
 
     def _plain(self, text: str, budget: RestoreBudget) -> UnmaskResult:
         unresolved: dict[str, None] = {}
@@ -444,6 +465,13 @@ class JsonEscapingSession:
         cursor = 0
         for item in _restorations(self._session, text, budget, _ENCODED_RE):
             self._context.feed(text[cursor : item.start])
+            if item.start > cursor and (literal := self._number(text, item)) is not None:
+                # ``"[[NATIONAL_ID_HU_TAX_x]]"`` -> ``8123456786``: drop both quotes.
+                parts.append(text[cursor : item.start - 1])
+                parts.append(literal)
+                self._context.feed(text[item.start : item.end + 1])
+                cursor = item.end + 1
+                continue
             parts.append(text[cursor : item.start])
             cursor = item.end
             if item.value is None:
@@ -456,6 +484,25 @@ class JsonEscapingSession:
         self._context.feed(text[cursor:])
         parts.append(text[cursor:])
         return UnmaskResult("".join(parts), tuple(unresolved))
+
+
+def _quote_hold_from(buffer: str) -> int:
+    """Hold back a trailing ``"`` followed by at most a placeholder (or a prefix of one): if it
+    turns out to open a whole-value placeholder of a masked number, both quotes are dropped
+    (LAB-1361), so the opening quote must not be emitted yet."""
+    window = max(0, len(buffer) - MAX_PLACEHOLDER_LENGTH - 2)
+    start = buffer.rfind('"', window)
+    if start < 0:
+        return len(buffer)
+    tail = buffer[start + 1 :]
+    if not tail:
+        opening = buffer.rfind('"', window, start)
+        if opening >= 0 and PLACEHOLDER_RE.fullmatch(buffer, opening + 1, start):
+            return len(buffer)  # ``"[[TYPE_id]]"`` is complete: release it whole
+        return start
+    if is_placeholder_prefix(tail) or PLACEHOLDER_RE.fullmatch(tail):
+        return start
+    return len(buffer)
 
 
 @dataclass

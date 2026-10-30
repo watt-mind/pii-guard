@@ -98,7 +98,8 @@ def test_held_back_function_call_tail_is_flushed_at_finish() -> None:
     ]
     events = _run(SseRestorer(session), payloads)
     assert events[-1]["choices"][0]["finish_reason"] == "function_call"
-    assert events[-1]["choices"][0]["delta"]["function_call"]["arguments"] == NAME
+    # The opening quote is held with it: it may open a masked number (LAB-1361).
+    assert events[-1]["choices"][0]["delta"]["function_call"]["arguments"] == '"' + NAME
 
 
 # --- chat completions: custom tool input -------------------------------------------------
