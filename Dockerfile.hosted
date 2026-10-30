@@ -1,14 +1,16 @@
 # syntax=docker/dockerfile:1
 # Hosted build: text plus local-only image masking (ADR 0014). Keep the self-hosted Dockerfile
 # independent. Images use Tesseract, the on-device YuNet segmenter and the pinned YOLOS-tiny
-# signature detector only; never SAM (ADR 0014, LAB-1444).
+# signature detector only; never SAM (ADR 0014, LAB-1444). The `sam` extra (Meta's SAM 3.1
+# output parser, LAB-1665) is installed so the image matches the self-hosted one; it makes no
+# calls and does not enable SAM.
 # python-deps ends with the dependency-only venv. The runtime copies it as its own layer, which
 # keeps its digest across src-only changes; only the small project layer changes (LAB-1449).
 FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim@sha256:bf889bda77474aa50c351caf1538b855ef2b7a30add45f26ca50dcb6ade06402 AS python-deps
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --extra sam --no-install-project
 
 # The pinned NER checkpoint (about 1 GB) is fetched before `COPY src`, from only the modules that
 # hold its pin and SHA-256 verifier, so a change elsewhere in src/ reuses this layer from the
@@ -30,7 +32,7 @@ COPY docs/benchmarks/config.json docs/benchmarks/colours.json ./docs/benchmarks/
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=deploy/azure/venv_layer.py,target=/tmp/venv_layer.py \
     --mount=type=bind,from=python-deps,source=/app/.venv,target=/tmp/venv-deps \
-    UV_COMPILE_BYTECODE=0 uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --no-editable \
+    UV_COMPILE_BYTECODE=0 uv sync --locked --no-dev --extra ner --extra hosted-azure --extra ocr --extra local-vision --extra sam --no-editable \
     && .venv/bin/python -m compileall -q -j 0 .venv/lib/python3.12/site-packages/pii_guard \
     && .venv/bin/python /tmp/venv_layer.py /tmp/venv-deps /app/.venv /app/venv-project \
     && .venv/bin/python -m pii_guard.eval.report_cli --print-index > /app/benchmarks-index.json

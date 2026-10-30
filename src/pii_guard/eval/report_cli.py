@@ -16,8 +16,13 @@ function of the inputs so ``--check`` compares them byte for byte:
 - ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`), plus
   ``validity-<set>.svg`` for each set with a number-validity breakdown;
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
-- the results block of ``README.md`` (:mod:`pii_guard.eval.report_readme`), when the config
-  has a ``readme`` section;
+- the results and intro blocks of ``README.md`` (:mod:`pii_guard.eval.report_readme`), when
+  the config has a ``readme`` section;
+- the shareable images (:mod:`pii_guard.eval.report_share`), when the config has a ``share``
+  section: ``docs/benchmarks/<name>[-<size>][-dark].svg`` and a ``.png`` of each, rasterized
+  without a browser (:mod:`pii_guard.eval.report_raster`). A PNG is compared by the stamp it
+  carries (the SHA-256 of its SVG, of the fonts and the renderer), so ``--check`` needs no
+  rasterizer;
 - ``docs/benchmarks/colours.json``: the append-only color registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
   needs a color;
@@ -57,9 +62,11 @@ from pii_guard.eval.report_journey import (
     load_entries,
 )
 from pii_guard.eval.report_journey import render as render_journey
+from pii_guard.eval.report_raster import Raster
 from pii_guard.eval.report_readme import parse_spec as parse_readme_spec
-from pii_guard.eval.report_readme import render_block as render_readme_block
-from pii_guard.eval.report_readme import splice as splice_readme
+from pii_guard.eval.report_readme import render_readme
+from pii_guard.eval.report_share import parse_spec as parse_share_spec
+from pii_guard.eval.report_share import render_all as render_share
 from pii_guard.eval.stats import fmt_duration, fmt_pct
 
 __all__ = [
@@ -773,7 +780,7 @@ def build_outputs(
     docs_dir: Path = DEFAULT_DOCS_DIR,
     colours: Path = DEFAULT_REGISTRY,
     readme: Path = DEFAULT_README,
-) -> dict[Path, str]:
+) -> dict[Path, str | Raster]:
     """Every generated file and its content, from the records in ``runs_dir``.
 
     ``colours`` is the append-only color registry; it is an output too, so a new system's
@@ -791,7 +798,7 @@ def build_outputs(
         raise RecordError(f"{config}: headline_set {headline!r} has no runs")
     index["headline_set"] = headline  # the UI opens on it
     systems = index["featured"]
-    outputs = {
+    outputs: dict[Path, str | Raster] = {
         colours: dumps_registry(registry),
         index_path: json.dumps(index, indent=2, ensure_ascii=False) + "\n",
     }
@@ -815,6 +822,13 @@ def build_outputs(
     outputs[docs_dir / "benchmarks.md"] = render_page(
         index, headline_set=headline, featured=systems, datasets_section=_datasets_section(counts)
     )
+    raw_share = _read_config(config).get("share")
+    if raw_share is not None:
+        share = parse_share_spec(raw_share, str(config))
+        fonts = docs_dir / "benchmarks" / "fonts"
+        for stem, svg in render_share(index, share).items():
+            outputs[docs_dir / "benchmarks" / f"{stem}.svg"] = svg
+            outputs[docs_dir / "benchmarks" / f"{stem}.png"] = Raster(svg, fonts)
     raw_readme = _read_config(config).get("readme")
     if raw_readme is not None:
         spec = parse_readme_spec(raw_readme, str(config))
@@ -829,8 +843,7 @@ def build_outputs(
             doc = readme.read_text(encoding="utf-8")
         except OSError as exc:
             raise RecordError(f"{readme}: {exc}") from exc
-        block = render_readme_block(index, counts, spec)
-        outputs[readme] = splice_readme(doc, block, str(readme))
+        outputs[readme] = render_readme(doc, index, counts, spec, str(readme))
     return outputs
 
 
@@ -861,7 +874,7 @@ def current_index(root: Path = Path(".")) -> dict[str, Any]:
         colours=root / DEFAULT_REGISTRY,
         readme=root / DEFAULT_README,
     )
-    index: dict[str, Any] = json.loads(outputs[index_path])
+    index: dict[str, Any] = json.loads(str(outputs[index_path]))
     return index
 
 
@@ -956,6 +969,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _current(path: Path, content: str | Raster) -> bool:
+    """Whether the committed ``path`` matches: text byte for byte, a PNG by its stamp."""
+    if isinstance(content, Raster):
+        return content.is_current(path)
+    return path.is_file() and path.read_text(encoding="utf-8") == content
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     ui_index = args.ui_index if args.ui_index is not None and str(args.ui_index) != "." else None
@@ -972,7 +992,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Always rendered, so a broken entry fails every mode; written or compared only on
         # --journey, so pull requests that add an entry never touch docs/journey.md.
         if args.print_index:
-            sys.stdout.write(compact_index(json.loads(outputs[args.index])) + "\n")
+            sys.stdout.write(compact_index(json.loads(str(outputs[args.index]))) + "\n")
             return 0
         journey = journey_output(args.journey_doc, args.journey_dir)
     except (OSError, json.JSONDecodeError, RecordError) as exc:
@@ -987,11 +1007,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.journey and journey is not None:
         outputs[journey[0]] = journey[1]
-    stale = [
-        path
-        for path, content in outputs.items()
-        if not path.is_file() or path.read_text(encoding="utf-8") != content
-    ]
+    stale = [path for path, content in outputs.items() if not _current(path, content)]
     if args.check:
         stale = [p for p in stale if p not in local]
         if stale:
@@ -1004,10 +1020,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         checked = len(outputs) - len(local)
         print(f"pii-guard eval report: {checked} generated files are up to date")
         return 0
-    for path in stale:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(outputs[path], encoding="utf-8")
-        print(f"wrote {path}")
+    try:
+        for path in stale:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            content = outputs[path]
+            if isinstance(content, Raster):
+                path.write_bytes(content.render())
+            else:
+                path.write_text(content, encoding="utf-8")
+            print(f"wrote {path}")
+    except RecordError as exc:
+        print(f"pii-guard eval report: {exc}", file=sys.stderr)
+        return 2
     if not stale:
         print(f"pii-guard eval report: {len(outputs)} generated files already up to date")
     return 0

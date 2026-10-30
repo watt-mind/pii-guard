@@ -1899,6 +1899,7 @@ class Vault:
         self._leases: Counter[VaultSession] = Counter()
         self._identity_leases: Counter[str] = Counter()
         self._sessions: dict[str, VaultSession] = {}
+        self._earliest_expiry = float("inf")
 
     @classmethod
     def from_settings(cls, settings: Settings, **kwargs: Any) -> Vault:
@@ -1928,7 +1929,7 @@ class Vault:
     def __len__(self) -> int:
         """Number of live sessions."""
         with self._lock:
-            self._purge_locked()
+            self._purge_locked(force=True)
             return len(self._sessions)
 
     def session(
@@ -2073,6 +2074,8 @@ class Vault:
             max_restored_chars=self._max_restored,
         )
         self._sessions[session_id] = session
+        if session._expires_at < self._earliest_expiry:
+            self._earliest_expiry = session._expires_at
         return session
 
     def drop(self, session_id: str) -> None:
@@ -2093,7 +2096,7 @@ class Vault:
         until eviction (LAB-1364).
         """
         with self._lock:
-            return self._purge_locked()
+            return self._purge_locked(force=True)
 
     def _evict_locked(self, keep: int) -> None:
         """Close the least recently used sessions until at most ``keep`` are left."""
@@ -2116,7 +2119,13 @@ class Vault:
             session.close()
         logger.info("vault: evicted %d least recently used session(s)", len(oldest))
 
-    def _purge_locked(self) -> int:
+    def _purge_locked(self, *, force: bool = False) -> int:
+        if (
+            not force
+            and not self._generations
+            and (not self._sessions or self._clock() < self._earliest_expiry)
+        ):
+            return 0
         stale = [sid for sid, session in self._sessions.items() if session.expired]
         for sid in stale:
             self._sessions.pop(sid).close()
@@ -2128,4 +2137,7 @@ class Vault:
             ]
             for base in gone:
                 del self._generations[base]
+        self._earliest_expiry = min(
+            (s._expires_at for s in self._sessions.values()), default=float("inf")
+        )
         return len(stale)
