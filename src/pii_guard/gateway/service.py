@@ -173,6 +173,9 @@ class RequestStats:
     seeded: int = 0
     spans: Counter[str] = field(default_factory=Counter)
     masked: Counter[str] = field(default_factory=Counter)
+    #: Spans whose masked type a detector forced over a keep-type rule (LAB-1248, LAB-1228):
+    #: counts by entity type only, never values.
+    forced: Counter[str] = field(default_factory=Counter)
     detect_ms: float = 0.0
     detector_ms: dict[str, float] = field(default_factory=dict)
     upstream_status: int | None = None
@@ -225,6 +228,7 @@ class RequestStats:
             "cache_hits": self.cache_hits,
             "cache_misses": self.cache_misses,
             "masked": _counts(self.masked),
+            "forced": _counts(self.forced),
             "detect_ms": f"{self.detect_ms:.0f}",
         }
         if self.outbound is not None:
@@ -763,6 +767,7 @@ class Gateway:
             stats.detector_ms[KNOWN_DETECTOR] = stats.detector_ms.get(KNOWN_DETECTOR, 0) + elapsed
         for spans in out:
             stats.spans.update(s.entity_type.value for s in spans)
+            stats.forced.update(s.entity_type.value for s in spans if s.forced_by)
         return out
 
     @staticmethod
@@ -943,11 +948,13 @@ class Gateway:
         max_text_chars: int | None = None,
         received_at: float | None = None,
         path_session: str | None = None,
+        request_id: str | None = None,
     ) -> tuple[Response, RequestStats]:
         """Mask, forward, restore. ``received_at`` (``perf_counter``) starts the timer;
-        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL."""
+        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL. ``request_id``
+        is the id the route assigned up front (LAB-1179); generated here when absent."""
         timer = RequestTimer(received_at)
-        trace = CallTrace(self.observability, timer, body)
+        trace = CallTrace(self.observability, timer, body, request_id=request_id)
         try:
             response, stats = await self._with_session_lease(
                 self._chat_completions(

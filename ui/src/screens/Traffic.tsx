@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 import { LABELLED_SCENARIOS, labelledScenarioFor, sendDemoTraffic, type DemoProgress, type LabelledMatch } from "../api/demoTraffic";
 import { ApiError } from "../api/http";
 import type { TrafficConnectOptions, TrafficEvent, TrafficStatus } from "../api/traffic";
@@ -88,6 +88,9 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
       ),
     [t.events, filters],
   );
+  // Backend restarts noticed while these calls arrived: the divider renders above the
+  // first call of each new run (LAB-1366). A filtered-out first call hides its divider too.
+  const breaksById = useMemo(() => new Map(t.runBreaks.map((b) => [b.beforeId, b])), [t.runBreaks]);
   const modes = useMemo(() => modeOrder([...new Set(t.events.map((e) => e.mode ?? "unknown"))]), [t.events]);
   const types = useMemo(
     () => [...new Set(t.events.flatMap((e) => [...Object.keys(e.entities?.detected ?? {}), ...Object.keys(maskedCounts(e))]))].sort() as EntityType[],
@@ -222,9 +225,16 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
           ) : (
             <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[calc(100dvh-10rem)]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
-                <li key={e.id}>
-                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} showEndpoint={!endpointSelected} />
-                </li>
+                <Fragment key={e.id}>
+                  {breaksById.get(e.id) && (
+                    <li>
+                      <RestartDivider at={breaksById.get(e.id)!.time} />
+                    </li>
+                  )}
+                  <li>
+                    <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} showEndpoint={!endpointSelected} />
+                  </li>
+                </Fragment>
               ))}
             </ul>
           )}
@@ -485,6 +495,19 @@ export function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
 }
 
 // --- List ---------------------------------------------------------------------------------
+
+/** A backend restart between two shown runs (LAB-1366): numbering restarts at 1 and
+session refs change, because sessions are keyed per server process. */
+function RestartDivider({ at }: { at: string }) {
+  return (
+    <div role="separator" aria-label="Server restarted" className="bg-warn-soft px-4 py-2 text-center sm:px-5">
+      <p className="text-xs font-medium text-warn">
+        Server restarted{at ? ` · ${clock(new Date(at).toISOString())}` : ""} — calls below are from the new run
+      </p>
+      <p className="mt-0.5 text-2xs text-muted">Numbering restarts at 1, and session refs changed: sessions are keyed per server process.</p>
+    </div>
+  );
+}
 
 function OutcomeBadge({ outcome }: { outcome: string }) {
   if (outcome === "ok") return null;

@@ -578,6 +578,28 @@ jobs:
             exit 1
           fi
 
+  # A red nightly run files an issue (LAB-1288): the schedule has no reviewer, so without
+  # this it would sit red unnoticed. PRs, pushes and the merge queue never notify.
+  nightly-notify:
+    name: nightly-notify
+    if: >-
+      always() && github.event_name == 'schedule' &&
+      needs.ci-ok.result != 'success' && needs.ci-ok.result != 'skipped'
+    needs: [ci-ok]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File an issue for the red nightly run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --repo "${{ github.repository }}" \
+            --title "Nightly CI failed on develop (${{ github.sha }})" \
+            --body "The scheduled full run failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Triage the failure and file follow-ups in Linear (project PII Guard, team LAB)."
+
   # Disabled until reviewed identity, network, durable budget and release gates are configured.
   # No PR/merge-group/nightly/manual test run can enter this credential-bearing flow.
   hosted-deployment:

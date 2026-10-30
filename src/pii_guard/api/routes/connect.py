@@ -186,7 +186,8 @@ async def connect_snippets(
     base = str(request.base_url).rstrip("/")
     gateway_url = f"{base}/v1"
     session_url = f"{base}/s/{session}/v1"
-    mock = bool(getattr(getattr(state, "up_status", None), "mock", False))
+    up_mock = bool(getattr(getattr(state, "up_status", None), "mock", False))
+    mock = up_mock or settings.upstream_mock
     configured = settings.upstream_base_url
     origin = None if mock else upstream_origin(configured)
     preset = None if mock else by_url(configured)

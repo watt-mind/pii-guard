@@ -13,7 +13,6 @@ See ``docs/contracts.md`` (Vault).
 
 from pii_guard.vault.inflection import (
     ExactMatcher,
-    HungarianSuffixMatcher,
     InflectionMatcher,
     inflection_for,
     register_inflection,
@@ -42,7 +41,6 @@ __all__ = [
     "DEFAULT_TTL_SECONDS",
     "PLACEHOLDER_RE",
     "ExactMatcher",
-    "HungarianSuffixMatcher",
     "InflectionMatcher",
     "RestoreBudget",
     "SessionEntryLimitError",
