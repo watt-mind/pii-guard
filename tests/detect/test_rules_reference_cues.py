@@ -158,7 +158,7 @@ def test_card_with_a_cue_or_without_a_reference_is_masked(text: str) -> None:
     ],
 )
 def test_card_in_a_csv_field_is_masked(text: str) -> None:
-    assert E.BANK_ACCOUNT in _types(text)
+    assert E.PAYMENT_CARD in _types(text)
 
 
 @pytest.mark.parametrize(

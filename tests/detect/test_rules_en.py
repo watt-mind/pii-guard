@@ -171,6 +171,17 @@ def test_card_property(payload: str) -> None:
     assert [(s.entity_type, s.text) for s in spans] == [(E.PAYMENT_CARD, grouped(value))]
 
 
+@pytest.mark.parametrize("language", ["en", "hu"])
+def test_grouped_card_that_is_also_a_valid_giro_is_a_card(
+    detector: RuleDetector, language: str
+) -> None:
+    # LAB-1102: this Visa number also passes the Hungarian giro checks, with the same span and
+    # score. The card rule runs first and wins the tie on every run (it used to follow the
+    # string hash seed, so test_card_property failed on some CI runs).
+    value = "4338 2761 9000 4003"
+    assert found(detector, f"Dear tenant: {value} ok", language) == [(E.PAYMENT_CARD, value)]
+
+
 # --- US SSN -----------------------------------------------------------------
 
 
