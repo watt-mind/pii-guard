@@ -3686,6 +3686,26 @@ identifiers, and the number checks were tuned on it alone.
 
 Leak rose on no set. MAPA was not run (its text is not on this machine).
 
+### 105. NER v4.1: the address and Hungarian fixes work, birth dates take their place (2026-10-30)
+
+LAB-1547.
+
+v4 candidate A (LAB-1535) leaked a third fewer MAPA names than v2.0 but failed three gates. v4.1
+kept its recipe (v2.0 warm start, 1 epoch, lr 1e-5) and changed the data: the loose
+`ADDRESS` spans of OpenPII and kiji kept out of the loss (A1) or taught as `O` (A2), plus the
+court-style, phase-1b, regenerated lv/lt/hr/sl and Hugging Face sets, and template documents
+for the two misses (a Hungarian accusative name, a Maltese birth date). The protocol was frozen
+before training.
+
+- **Fixed:** `ADDRESS` false alarms on agent text 3 → 0; the Hungarian smoke name is found; the
+  Maltese gate passes and both candidates pass the eu gate (A1 leaks 1 of 315 values, v2.0 3).
+- **MAPA-21 (report-only):** leak 8.2 → 5.9 % (A1) and 5.3 % (A2), over-masking 55 → 47 %.
+- **Still failing:** agent-traffic-dev over-masking 3.21 / 2.70 % against v2.0's 1.66 %, now
+  from `DATE_OF_BIRTH` (2 → 21-29), and one German smoke name. **v2.0 stays**; nothing was
+  published. *(eval/results/2026-10-30-lab-1547-ner-v41)*.
+- **Cost:** Modal $1.00 (two A10G runs, 24 min of training each), Fireworks ~$4.55 (Glimmer
+  labelling, deployments deleted), Meta API ~$2.49 (Muse rerun).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

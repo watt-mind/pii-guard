@@ -158,9 +158,9 @@ export function AccountSummary({ active = true, calls = 0 }: { active?: boolean;
         <span className="text-xs text-muted">Signed in with Google · {account.tier} tier</span>
       </div>
       <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-        <Metric label="Requests today" value={account.usage.requests_today} suffix={typeof perDay === "number" ? `of ${perDay}` : undefined} />
+        <Metric label="Requests today (all features)" value={account.usage.requests_today} suffix={typeof perDay === "number" ? `of ${perDay}` : undefined} />
         <Metric label="Allowance resets" value={<span className="text-sm font-normal">{time(account.usage.resets_at)}</span>} />
-        <Metric label="Provider connections" value={account.connections.length} />
+        {account.connections.length > 0 && <Metric label="Provider connections" value={account.connections.length} />}
       </dl>
       <div className="mt-4"><Limits account={account} /></div>
       {error && (
@@ -169,7 +169,7 @@ export function AccountSummary({ active = true, calls = 0 }: { active?: boolean;
         </Notice>
       )}
       <SetupChecklist call={session.call} account={account} active={active} calls={calls} />
-      <p className="mt-3 text-xs text-muted">Sessions and provider connections are temporary. A guard restart loses ephemeral state. Every section shows only your own projects, activity and sessions.</p>
+      <p className="mt-3 text-xs text-muted">Sessions and provider connections are temporary. If the service restarts, sessions are lost. Every section shows only your own projects, activity and sessions.</p>
     </section>
   );
 }

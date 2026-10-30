@@ -5,7 +5,7 @@ import { ApiError } from "../api/http";
 import { TEXT_ENTITY_TYPES } from "../api/types";
 import type { Requester } from "../hosted/api";
 import { ENTITY_META } from "../lib/entities";
-import type { Endpoint, PolicyVersion } from "./api";
+import { pendingPolicyEdit, requestPolicyEdit, type Endpoint, type PolicyVersion } from "./api";
 import { Workspace } from "./Workspace";
 
 const first: PolicyVersion = { id: "policy-family", policy_id: "policy-family", policy_version_id: "version-one", name: "Default protection", version: 1, language: "hu", mode: "fast", detection_profile: "standard", entity_policies: Object.fromEntries(TEXT_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy])) as PolicyVersion["entity_policies"] };
@@ -51,9 +51,12 @@ describe("project workspace", () => {
     // Policies exist: no "create a policy first", and a new project name is optional.
     expect(screen.queryByText(/Create a policy first/)).toBeNull();
     expect(screen.getByLabelText("New project name")).not.toBeRequired();
+    // One row per policy: its latest version, older versions folded under it (LAB-1626).
     const v2 = screen.getByRole("heading", { name: /Default protection · v2/ });
     expect(within(v2).getByText("Latest")).toBeInTheDocument();
-    expect(within(screen.getByRole("heading", { name: /Default protection · v1/ })).queryByText("Latest")).toBeNull();
+    expect(screen.queryByRole("heading", { name: /Default protection · v1/ })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^New version of/ })).toHaveLength(1);
+    expect(screen.getByText("Older versions (1)")).toBeInTheDocument();
     // The endpoint pins v1 while v2 exists.
     expect(screen.getByText("v2 available")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit Synthetic support" }));
@@ -88,7 +91,7 @@ describe("project workspace", () => {
 
   it("creates a new policy version without updating endpoints", async () => {
     const call = fixture(); const user = userEvent.setup(); render(<Workspace call={call} hosted />);
-    await user.click(await screen.findByRole("button", { name: "New version of Default protection v1" }));
+    await user.click(await screen.findByRole("button", { name: "New version of Default protection" }));
     expect(screen.getByText(/Synthetic support \(v1\)/)).toBeInTheDocument();
     expect(screen.getByText(/No endpoint changes automatically/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Detection mode")).not.toBeInTheDocument();
@@ -105,7 +108,7 @@ describe("project workspace", () => {
 
   it("sets image actions and SAM 3.1 detection, and warns that on-device detection cannot mask stamps", async () => {
     const call = fixture(); const user = userEvent.setup(); render(<Workspace call={call} />);
-    await user.click(await screen.findByRole("button", { name: "New version of Default protection v1" }));
+    await user.click(await screen.findByRole("button", { name: "New version of Default protection" }));
     const form = screen.getByRole("form", { name: "New version of Default protection" });
     expect(within(form).getByText(/found on the guard's CPU/)).toBeInTheDocument();
     await user.selectOptions(within(form).getByLabelText("Stamp"), "mask");
@@ -149,8 +152,11 @@ describe("project workspace", () => {
     expect(vi.mocked(call).mock.calls.some(([, , method]) => method === "DELETE")).toBe(false);
     await user.click(within(confirm).getByRole("button", { name: "Revoke key" }));
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/endpoint-one/keys/key-one", undefined, "DELETE"));
-    const list = await screen.findByRole("list", { name: "Endpoint keys" });
+    // Revoked keys move out of the active list, into their own folded list (LAB-1626).
+    const list = await screen.findByRole("list", { name: "Revoked endpoint keys" });
     expect(within(list).getByText("Synthetic integration")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Endpoint keys" })).not.toBeInTheDocument();
+    expect(screen.getByText("Show 1 revoked key")).toBeInTheDocument();
     expect(within(list).getByText("Revoked")).toBeInTheDocument();
     expect(within(list).queryByRole("button", { name: /Revoke/ })).not.toBeInTheDocument();
     expect(screen.queryByText("synthetic-once-only-key")).not.toBeInTheDocument();
@@ -185,7 +191,9 @@ describe("project workspace", () => {
     expect(screen.getByRole("button", { name: "Disable and revoke keys" })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "Disable and revoke keys" }));
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/projects/project-one/endpoints/endpoint-one", { name: endpoint.name, provider: endpoint.provider, model: endpoint.model, policy_version_id: endpoint.policy_version_id, enabled: false }, "PUT"));
-    await screen.findByText(/· Disabled/);
+    await screen.findByText("Disabled");
+    // A disabled endpoint has no keys to manage (LAB-1626).
+    expect(screen.queryByRole("button", { name: "Connect & keys for Synthetic support" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit Synthetic support" }));
     await user.click(screen.getByRole("checkbox", { name: "Re-enable this endpoint; create a new endpoint key afterward" }));
     await user.click(screen.getByRole("button", { name: "Save endpoint" }));
@@ -230,13 +238,57 @@ describe("project workspace", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Gateway endpoints" })).toHaveFocus());
   });
 
+  it("closes an inline form with Escape and returns focus to its row's button (LAB-1626)", async () => {
+    const user = userEvent.setup(); render(<Workspace call={fixture()} />);
+    await user.click(await screen.findByRole("button", { name: "Edit Synthetic support" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("form", { name: "Edit Synthetic support" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Synthetic support" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "New version of Default protection" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("form", { name: "New version of Default protection" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New version of Default protection" })).toHaveFocus();
+  });
+
+  it("lists active keys newest first, revoked ones folded apart, and disabled endpoints last (LAB-1626)", async () => {
+    const off: Endpoint = { ...endpoint, id: "endpoint-off", name: "Old integration", enabled: false };
+    const keys = [
+      { id: "k1", name: "oldest", created_at: "2026-10-01T00:00:00Z" },
+      { id: "k2", name: "gone", created_at: "2026-10-02T00:00:00Z", revoked_at: "2026-10-03T00:00:00Z" },
+      { id: "k3", name: "newest", created_at: "2026-10-04T00:00:00Z" },
+    ];
+    const base = fixture();
+    const call = vi.fn(async (path: string, body?: unknown, method?: string) => {
+      if (path.endsWith("/endpoints") && !body) return { endpoints: [off, endpoint] };
+      if (path.endsWith("/keys") && !body && !method) return { keys };
+      return base(path, body, method as "GET");
+    }) as unknown as Requester;
+    const user = userEvent.setup(); render(<Workspace call={call} />);
+    await screen.findByText("Synthetic support");
+    const names = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(names.indexOf("Synthetic support")).toBeLessThan(names.indexOf("Old integrationDisabled"));
+    await user.click(screen.getByRole("button", { name: "Connect & keys for Synthetic support" }));
+    const active = await screen.findByRole("list", { name: "Endpoint keys" });
+    expect(within(active).getAllByRole("listitem").map((li) => li.querySelector("p")?.firstChild?.textContent)).toEqual(["newest", "oldest"]);
+    expect(within(screen.getByRole("list", { name: "Revoked endpoint keys" })).getByText("gone")).toBeInTheDocument();
+  });
+
+  it("opens a new version of the policy Connect asked to tune, with its form focused (LAB-1626)", async () => {
+    requestPolicyEdit(first.policy_id);
+    render(<Workspace call={fixture()} />);
+    expect(await screen.findByRole("form", { name: "New version of Default protection" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New version of Default protection" })).toHaveFocus();
+    expect(pendingPolicyEdit()).toBeNull();
+  });
+
   it("names the page Projects, writes providers and policies as words, and pluralises counts", async () => {
     render(<Workspace call={fixture()} />);
     expect(screen.getByRole("heading", { level: 1, name: "Projects" })).toBeInTheDocument();
     await screen.findByText("Synthetic support");
     expect(screen.getByText(/^OpenAI ·/)).toBeInTheDocument();
-    expect(screen.getByText("Hungarian · fast mode · 1 endpoint")).toBeInTheDocument();
-    expect(screen.getByText("Hungarian · fast mode · 0 endpoints")).toBeInTheDocument();
+    // The family row counts every endpoint on any of its versions; the older version, its own.
+    expect(screen.getByText("Hungarian · fast mode · 1 endpoint · 2 versions")).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.tagName === "LI" && el.textContent === "v1 · Hungarian · fast mode · 1 endpoint")).toBeInTheDocument();
   });
 
   it("preselects the only policy version, and says why Create endpoint waits for a policy", async () => {

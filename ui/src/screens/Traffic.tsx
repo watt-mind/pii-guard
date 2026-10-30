@@ -36,6 +36,9 @@ import { useHostedSession } from "../hosted/session";
 import { setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 import { TimingWaterfall } from "./TrafficCharts";
 
+/** Language codes in words (LAB-1626). */
+const LANGUAGE_NAME: Record<string, string> = { hu: "Hungarian", en: "English", de: "German" };
+
 export interface TrafficProps {
   /** Replay the recorded demo traffic (the header's engine is set to Demo engine). */
   forceFixture?: boolean;
@@ -69,7 +72,7 @@ type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 let reopenAfterSwitch: string | null = null;
 
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
-export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession">) {
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession" | "focus">) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }
@@ -120,11 +123,20 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
 
   // A call opened from the Overview: select it, with the filters cleared so it is in the list.
   const [focused, setFocused] = useState<number | null>(null);
+  // Focus follows to the call once it is in the list (Connect's test request, LAB-1626), never to <body>.
+  const [focusTo, setFocusTo] = useState<{ id: string; nonce: number } | null>(null);
+  const focusedFor = useRef<number | null>(null);
   if (focus && focus.nonce !== focused) {
     setFocused(focus.nonce);
     setSelectedId(focus.id);
+    setFocusTo(focus);
     setFilters({ mode: "all", type: "all", problems: false });
   }
+  useEffect(() => {
+    if (!focusTo || focusedFor.current === focusTo.nonce || selected?.id !== focusTo.id) return;
+    focusedFor.current = focusTo.nonce;
+    document.getElementById("detail-title")?.focus();
+  }, [focusTo, selected?.id]);
 
   const overheads = filtered.map((e) => e.timing.overhead_ms);
   const p50 = percentile(overheads, 50);
@@ -736,7 +748,7 @@ function CallDetail({
           {e.endpoint && <Meta label="Endpoint" value={e.endpoint.name} />}
           <Meta label="Mode" value={e.mode ?? "–"} />
           <Meta label="Model" value={modelOf(e, mockUpstream)} />
-          <Meta label="Language" value={e.language ?? "auto"} />
+          <Meta label="Language" value={e.language ? (LANGUAGE_NAME[e.language] ?? e.language) : "auto"} />
           <Meta label="Session" value={e.session_ref ? `${e.session_new ? "new" : "continued"} · ${e.session_ref}` : "–"} />
           <Meta label="Session from" value={e.session_source ? (SESSION_SOURCE_LABEL[e.session_source] ?? e.session_source) : "–"} />
           <Meta label="Outbound check" value={outboundCheckLabel(e.outbound_check)} />

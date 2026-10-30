@@ -193,6 +193,14 @@
       "color": "#D55E00",
       "shape": "circle"
     },
+    "rules+ner:pii-guard-ner-xlmr-base-v41-a1": {
+      "color": "#332288",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v41-a2": {
+      "color": "#999933",
+      "shape": "circle"
+    },
     "rules+ner:wismut-nym@decoder=word": {
       "color": "#117733",
       "shape": "circle"
@@ -247,6 +255,10 @@
     },
     "rules+ner:xlmr-base-v2-hn@rescore=lab-1535": {
       "color": "#CC79A7",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@rescore=lab-1547": {
+      "color": "#882255",
       "shape": "circle"
     },
     "rules+ner:xlmr-base-v2-hn@thresholds_file=eval/results/2026-10-29-ner-v33/thresholds-h.json,thresholds_sha256=97afe86b2e5fcc45ba687d46ab8da23a556f22880a00e0bdf3b6f821e199206b": {

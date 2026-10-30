@@ -35,9 +35,10 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
 
   return (
     <div className="space-y-6">
+      {/* Hosted, the client setup below has its own lead: one, not two saying the same (LAB-1626). */}
       <PageHeader
         title="Connect"
-        lead="Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back restored."
+        lead={clientSetup ? undefined : "Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back restored."}
       />
 
       {clientSetup ? (

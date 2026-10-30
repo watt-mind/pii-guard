@@ -240,16 +240,23 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
 
   // A document handed over from the Mask screen starts a new conversation and is sent at once.
   const conversationRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    if (!draft || draft.nonce === lastDraft.current) return;
-    lastDraft.current = draft.nonce;
-    setLanguage(draft.language);
-    setSessionId(draft.sessionId ?? null);
-    setHandedOver(Boolean(draft.sessionId));
-    void send({ text: draft.text, language: draft.language, sessionId: draft.sessionId ?? null });
+  // Chat mounting with the draft already set waits for the model list first (LAB-1626): with no
+  // model yet, send() would drop the document. No model at all: the document waits in the composer.
+  const modelsLoading = models.status === "loading";
+  const takeDraft = (handed: ChatDraft) => {
+    lastDraft.current = handed.nonce;
+    setLanguage(handed.language);
+    setSessionId(handed.sessionId ?? null);
+    setHandedOver(Boolean(handed.sessionId));
+    if (needsModel) return setText(handed.text);
+    void send({ text: handed.text, language: handed.language, sessionId: handed.sessionId ?? null });
     requestAnimationFrame(() => conversationRef.current?.focus({ preventScroll: true }));
+  };
+  useEffect(() => {
+    if (!draft || draft.nonce === lastDraft.current || (needsModel && modelsLoading)) return;
+    takeDraft(draft);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per handed-over draft
-  }, [draft]);
+  }, [draft, needsModel, modelsLoading]);
 
   return (
     <div className="space-y-6">

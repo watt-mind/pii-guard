@@ -53,7 +53,8 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
     triggerProps.ref.current?.focus();
   }, [list, triggerProps.ref]);
 
-  if (!list) return null;
+  // Hosted, the switcher always arrives: hold its place meanwhile, so the header doesn't shift (CLS, LAB-1626).
+  if (!list) return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <div data-header-item aria-hidden="true" className="h-9 w-40 max-w-full min-w-0 rounded-lg border border-line bg-surface pointer-coarse:h-11" /> : null;
   const currentId = selected ?? list.default_project_id;
   const current = list.projects.find((p) => p.id === currentId);
   const currentEndpoint = endpoints.find((e) => e.id === endpoint);

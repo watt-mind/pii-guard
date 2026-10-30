@@ -99,7 +99,8 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
 
       {/* Your server's setup, never mixed into the recorded demo's numbers. */}
       {!recorded && serverSetup && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        // Alone in its row (hosted: no upstream panel) it spans the row instead of half of it (LAB-1626).
+        <div className={["grid gap-6", !server || server.upstream ? "lg:grid-cols-2" : ""].join(" ")}>
           {/* A hosted owner's status has no upstream: the owner's endpoints pick their own. */}
           {(!server || server.upstream) && (
             <Panel title="Upstream" note="Where the gateway forwards masked requests.">
