@@ -233,7 +233,8 @@ export const DETECTOR_TYPES: Record<string, { types: readonly EntityType[]; part
     types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "PAYMENT_CARD", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE", "SECRET"],
     partly: ["ADDRESS"],
   },
-  ner: { types: ["PERSON", "ORGANIZATION", "ADDRESS"] },
+  // The NER reports dates of birth too (pii_guard.detect.ner NER_V1_ENTITY_TYPES, LAB-1684).
+  ner: { types: ["PERSON", "ORGANIZATION", "ADDRESS", "DATE_OF_BIRTH"] },
   llm: { types: TEXT_TYPES },
 };
 

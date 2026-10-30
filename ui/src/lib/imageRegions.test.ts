@@ -52,7 +52,10 @@ describe("image regions", () => {
     expect(rulesOnly[0]).toMatch(/\(Rules \+ checksum\) do not look for names, dates of birth, organization names and parcel numbers/);
     expect(rulesOnly[1]).toMatch(/^Addresses are found only by pattern/);
     expect(coverageGaps(analysis({ detectors: ["rules", "llm"], models: { llm: "muse-spark-1.3" } }))).toEqual([]);
-    expect(coverageGaps(analysis({ detectors: ["rules", "ner"] }))[0]).toMatch(/do not look for dates of birth and parcel numbers/);
+    // The NER finds dates of birth: with it on, only parcel numbers are out of scope (LAB-1684).
+    const withNer = coverageGaps(analysis({ detectors: ["rules", "ner"] }));
+    expect(withNer[0]).toMatch(/do not look for parcel numbers, so/);
+    expect(withNer[0]).not.toMatch(/dates of birth/);
     expect(samTargets(analysis({}))).toBe("faces, signatures, ID photos and stamps");
   });
 });
