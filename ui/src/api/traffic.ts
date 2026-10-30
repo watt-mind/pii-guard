@@ -58,7 +58,7 @@ export interface TrafficEvent {
   time: string;
   level: TrafficLevel;
   outcome: TrafficOutcome | string;
-  error: { code: string; status: number | null; entity_types?: Partial<Record<EntityType, number>> } | null;
+  error: { code: string; status: number | null; message?: string | null; entity_types?: Partial<Record<EntityType, number>> } | null;
   mode: string | null;
   language: string | null;
   stream: boolean;

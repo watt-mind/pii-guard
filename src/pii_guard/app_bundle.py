@@ -373,7 +373,7 @@ def _image_hints(gaps: list[str]) -> list[str]:
         hints.append(f"restart with: {launcher(','.join(extras))} up")
     if "segmenter" in gaps:
         hints.append(
-            "faces also need the YuNet model (python -m pii_guard.visual.segment fetch) or "
+            f"faces also need the YuNet model ({launcher()} models fetch yunet) or "
             "META_API_KEY for SAM 3.1 (docs/operations.md)"
         )
     return hints
