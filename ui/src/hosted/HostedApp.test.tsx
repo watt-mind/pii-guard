@@ -342,7 +342,7 @@ describe("positioning and copy (LAB-1466)", () => {
     render(<HostedApp call={call} />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Send the work to the model.Keep the people out of it.");
     await screen.findByText(/Runs on Muse Spark 1.3/);
-    expect(screen.getAllByText(/measured 27–28 Oct 2026/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/measured 27–30 Oct 2026/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Run the live demo" })).toHaveAttribute("href", "#demo");
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/sponsor|Llama|GDPR[- ]compliant|compliant with GDPR|anonymi[sz]ed data|privacy firewall|Hungarian first|coming soon/i);
@@ -355,7 +355,7 @@ describe("positioning and copy (LAB-1466)", () => {
     expect(screen.getByRole("list", { name: "Meta models and what each does" })).toHaveTextContent(/XLM-RoBERTa.*Muse Glimmer 30B.*served on Modal.*The teacher.*Muse Spark Open.*on Baseten.*SAM 3\.1.*Muse Spark 1\.3/);
     expect(text).not.toMatch(/LoRA|being finali[sz]ed|not a live run|Checking availability|written by hand/);
     expect(text).not.toMatch(/Claude Code/);
-    expect(screen.getByText(/^Next best: PrivAiTe 12\.7\s%$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Next best: PrivAiTe 13\.0\s%$/)).toBeInTheDocument();
   });
   it("doesn't name a model the server didn't report", async () => {
     const call = requester((path) => path === "/v1/account" ? { ...account, included_model: undefined } : result);

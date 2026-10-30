@@ -50,6 +50,7 @@ SETS: dict[str, list[str]] = {
         "eval/fixtures/hu-smoke.jsonl",
         "eval/fixtures/en-smoke.jsonl",
         "eval/fixtures/de-smoke.jsonl",
+        "eval/fixtures/pl-smoke.jsonl",
     ],
     "inflection": ["eval/fixtures/hu-inflection.jsonl"],
     "agent-traffic-dev": [
