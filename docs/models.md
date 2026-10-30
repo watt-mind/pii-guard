@@ -588,6 +588,11 @@ upload in one step once downloads are allowed for the key.
   `muse-image-1.0`, `muse-voice-transcribe-1.0` and `sam-3.1` (plus `-contributor` variants).
   **SAM 3.1** is served on the same API through `POST /v1/responses` (not exercised here).
 - Do not use the `-contributor` model variants: their tier allows the provider to use traffic.
+  **One exception: the corpus generator** (`pii-guard eval generate`, `PII_GUARD_CORPUS_MODEL`)
+  defaults to `muse-spark-1.3-contributor`, because everything it sends is fictional: seeded
+  identities from `pii_guard.eval.identities`, never real or masked text. The detector, the
+  gateway and anything else that can see user data stay on non-contributor or open-weights
+  models.
 
 **Privacy rule for the hosted API.** Hosted Meta API models only ever see **fictional or
 masked** data: tests, fixtures and the corpus generator send synthetic text only. Real data is

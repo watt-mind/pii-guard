@@ -224,6 +224,21 @@ def test_a_span_over_a_field_separator_is_split_into_fields() -> None:
     assert detect(text, ("SO2354538,94541.22", "ID_DOCUMENT")) == [(E.ID_DOCUMENT, "SO2354538")]
 
 
+def test_a_phone_span_over_a_field_separator_is_split_into_fields() -> None:
+    # LAB-1380 (en-agent-traffic-dev-0084): the NER PHONE span runs over the CSV comma
+    # between the phone and the national-id columns; each field is judged by its own header.
+    text = 'name,phone,national_id\n"Louise Petit",07700900316,703371441\n'
+    found = detect(text, ("07700900316,703", "PHONE"))
+    # The tagged span is snapped to whole tokens first, then split at the comma.
+    assert found == [(E.PHONE, "07700900316"), (E.PHONE, "703371441")]
+
+
+def test_a_single_field_phone_span_is_untouched() -> None:
+    # No separator runs through it: not even a negative label next to it drops it (LAB-1380).
+    text = '{"order": "07700900316"}'
+    assert detect(text, ("07700900316", "PHONE")) == [(E.PHONE, "07700900316")]
+
+
 def test_other_types_are_untouched() -> None:
     text = '{"order": "Ann Smith", "sku": "12"}'
     assert detect(text, ("Ann Smith", "PERSON"), ("12", "PHONE")) == [

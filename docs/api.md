@@ -94,7 +94,7 @@ There are two kinds of credential, and neither is ever a provider key. Send eith
 | | API token | Endpoint key |
 |---|---|---|
 | What it is | Self-hosted: the server's `PII_GUARD_API_TOKEN`. Hosted: a guard API key (`pg_...`, 24 hours, at most five) from the console | `pg_ep_...`, issued per project endpoint, shown once |
-| Where it works | The root gateway and the native text routes. Also accepted as `X-PII-Guard-Token` | Only its own `/e/<endpoint-id>/v1/chat/completions`, `/responses` and `/models` |
+| Where it works | The root gateway and the native text routes. Also accepted as `X-PII-Guard-Token` | Only its own `/e/<endpoint-id>/v1/chat/completions`, `/responses` and `/models`, and its Muse Code catalog (`/e/<endpoint-id>/muse-code/models`, also at the root `/muse-code/models`, where Muse reads it) |
 | What it picks | Self-hosted: the server's upstream. Hosted: the sponsored model, or a saved provider connection (`X-PII-Guard-Connection`) | Everything is pinned by the endpoint: provider, model (unless pass-through), policy version, language, mode |
 | Can't | Hosted: manage keys or connections (that needs the signed-in Google session) | Manage projects, inspect the vault, call native routes or another endpoint |
 
