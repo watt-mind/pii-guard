@@ -664,6 +664,38 @@ def _family_firm_word(text: str, start: int, end: int) -> bool:
     return family_word_in_firm(text, start, end)
 
 
+def _path_or_filename_vetoed(text: str, start: int, end: int, entity_type: EntityType) -> bool:
+    """File-name and path checks (module rule 3 and npm package segment in rule 6)."""
+    ts, te = _token(text, start, end)
+    token = text[ts:te]
+    last = max(token.rfind("/"), token.rfind("\\"))
+    dot = _extension(token[last + 1 :])
+    path = _is_path(token)
+    if dot is None and not path:
+        return False
+    if dot is not None and end > ts + last + 1 + dot:
+        return True  # the hit covers the extension (or its dot)
+    if entity_type in _NUMBER_LIKE:
+        return True
+    if entity_type in _NAME_LIKE and path:
+        ss, se = _segment(text, ts, te, start, end)
+        return any(ch.isdigit() for ch in text[ss:se]) or _npm_package_segment(text, ts, ss)
+    return False
+
+
+def _code_context_vetoed(text: str, start: int, end: int, entity_type: EntityType) -> bool:
+    """Code identifier and inline-code checks (module rule 4)."""
+    if entity_type not in _NAME_LIKE and entity_type is not EntityType.EMAIL:
+        return False
+    if _code_identifier(text, start, end):
+        return True
+    return (
+        entity_type in _NAME_LIKE
+        and not _name_shaped(text[start:end])
+        and _in_inline_code(text, start, end)
+    )
+
+
 def _vetoed(
     text: str,
     start: int,
@@ -677,9 +709,11 @@ def _vetoed(
         return True
     if entity_type is EntityType.ADDRESS and _bare_number_address(text, start, end, addresses):
         return True
-    if _fence_info(text, start, end):
-        return True
-    if _in_uuid(text, start, end) or _json_literal(text, start, end):
+    if (
+        _fence_info(text, start, end)
+        or _in_uuid(text, start, end)
+        or _json_literal(text, start, end)
+    ):
         return True
     if entity_type in _NUMBER_LIKE and _epoch_in_time_field(text, start, end):
         return True
@@ -689,29 +723,10 @@ def _vetoed(
         ch.isalpha() for ch in text[start:end]
     ):
         return True
-    ts, te = _token(text, start, end)
-    token = text[ts:te]
-    last = max(token.rfind("/"), token.rfind("\\"))
-    dot = _extension(token[last + 1 :])
-    path = _is_path(token)
-    if dot is not None or path:
-        if dot is not None and end > ts + last + 1 + dot:
-            return True  # the hit covers the extension (or its dot)
-        if entity_type in _NUMBER_LIKE:
-            return True
-        if entity_type in _NAME_LIKE and path:
-            ss, se = _segment(text, ts, te, start, end)
-            if any(ch.isdigit() for ch in text[ss:se]) or _npm_package_segment(text, ts, ss):
-                return True
-    if entity_type in _NAME_LIKE or entity_type is EntityType.EMAIL:
-        if _code_identifier(text, start, end):
-            return True
-        if (
-            entity_type in _NAME_LIKE
-            and not _name_shaped(text[start:end])
-            and _in_inline_code(text, start, end)
-        ):
-            return True
+    if _path_or_filename_vetoed(text, start, end, entity_type) or _code_context_vetoed(
+        text, start, end, entity_type
+    ):
+        return True
     return entity_type is EntityType.PERSON and (
         _software_context(text, start, end, language, persons)
         or _eponym(text, start, end, persons)
