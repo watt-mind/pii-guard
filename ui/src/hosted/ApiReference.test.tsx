@@ -60,6 +60,7 @@ describe("the renderer's configuration (LAB-1586)", () => {
       agent: { disabled: true },
       forceDarkModeState: "light",
       hideDarkModeToggle: true,
+      documentDownloadType: "none",
     });
     expect(config).not.toHaveProperty("proxyUrl");
     expect(config).not.toHaveProperty("proxy");
@@ -117,8 +118,8 @@ describe("links to the reference", () => {
     render(<HostedApp call={requester(anonymous)} console={consoleStub} />);
     const footer = await screen.findByRole("navigation", { name: "Footer" });
     expect(within(footer).getByRole("link", { name: "API reference" })).toHaveAttribute("href", "#api");
-    // The Resources menu lists it.
-    const links = within(screen.getByRole("navigation", { name: "Main navigation" })).getAllByRole("link", { name: "API reference" });
+    // The wide nav and the phone menu both list it.
+    const links = within(screen.getByRole("navigation", { name: "Main navigation" })).getAllByRole("link", { name: "API" });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) expect(link).toHaveAttribute("href", "#api");
   });

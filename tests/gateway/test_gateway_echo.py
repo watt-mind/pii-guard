@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 from gateway_helpers import MockUpstream, conversation_turn_one, leaked_values, make_app
 
+import pii_guard.gateway.stream as stream_module
 from pii_guard.vault import PLACEHOLDER_RE
 
 ECHO = {"X-PII-Guard-Echo": "masked"}
@@ -64,6 +66,40 @@ def test_streaming_echo_frames_the_upstream_stream() -> None:
         if c.get("choices")
     )
     assert "Teszt Elek" in restored
+
+
+def test_streaming_echo_marks_an_over_cap_choice_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
+    # LAB-1581: a choice past the retention cap is marked, not silently left out.
+    monkeypatch.setattr(stream_module, "MAX_MASKED_CONTENT_CHARS", 8)
+    upstream = MockUpstream(stream_chunks=lambda t: [t[i : i + 4] for i in range(0, len(t), 4)])
+    with TestClient(make_app(upstream)) as http:
+        response = http.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": conversation_turn_one(), "stream": True},
+            headers=ECHO,
+        )
+    events = _events(response.text)
+    last = json.loads(events[-2])
+    assert last["object"] == "pii_guard.masked_answer"
+    assert last["choices"] == [{"index": 0, "content": None, "truncated": True}]
+    restored = "".join(
+        c["choices"][0]["delta"].get("content") or ""
+        for c in map(json.loads, events[1:-2])
+        if c.get("choices")
+    )
+    assert "Teszt Elek" in restored  # the client's answer is whole; only the echo copy is cut
+
+
+def test_streaming_echo_of_a_short_answer_is_not_marked_truncated() -> None:
+    upstream = MockUpstream(stream_chunks=lambda t: [t])
+    with TestClient(make_app(upstream)) as http:
+        response = http.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": conversation_turn_one(), "stream": True},
+            headers=ECHO,
+        )
+    last = json.loads(_events(response.text)[-2])
+    assert [sorted(c) for c in last["choices"]] == [["content", "index"]]
 
 
 def test_without_the_header_nothing_is_echoed() -> None:

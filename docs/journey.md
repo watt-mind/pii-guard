@@ -1400,6 +1400,36 @@ with the detector's own prompts as input, on Fireworks' free Serverless Training
 - **Verdict:** fast but leaky. Fast mode (rules + NER: 96.1 F1, 0.13 % leak, 0.02 s) stays
   the product; the fine-tune stays an experiment.
 
+### 47. Timestamps and tracking numbers stop reading as accounts on CEE text (2026-10-30)
+
+LAB-1344. After LAB-1293, fast mode still over-masked 26 % of its masked spans on `cee-pii`,
+mostly reference numbers the NER model tags as `BANK_ACCOUNT` or `ID_DOCUMENT`. `cee-pii` is a
+test split, so its spans were not read. A new synthetic dev split, `cee-dev` (240 hu/en
+documents: bank lines, chats, tickets, forms, OCR fragments), puts epoch-millisecond and
+`yyyymmddhhmmss` references, UPS and UPU tracking numbers and CEE invoice formats next to real
+identifiers, and the number checks were tuned on it alone.
+
+- **What changed:** a positive cue word no longer reaches over another number (`card 4699 …,
+  TR2026…`), a span is cut at newlines and around a tracking token the model joined to its
+  neighbour, and recent timestamps, year/serial and 3-7-7 order numbers are dropped when no
+  cue says otherwise. A valid Romanian CNP, which can look like epoch milliseconds, is kept.
+- **Guard:** an older 13-digit value (2016) is a gold ID on Ai4Privacy, so only 2020-2035
+  stamps count as references.
+
+| Fast mode, % | over-masking before | after | leak before | after |
+|---|---:|---:|---:|---:|
+| cee-dev (tuned on) | 22.0 | 7.8 | 0.49 | 0.32 |
+| cee-pii (test) | 26.4 | 12.3 | 0.40 | 0.40 |
+| agent-traffic (test) | 1.46 | 1.30 | 0.25 | 0.25 |
+| agent-traffic-dev | 1.66 | 1.66 | 0.13 | 0.13 |
+| smoke | 0.87 | 0.87 | 0.0 | 0.0 |
+| ai4privacy | 1.21 | 1.21 | 2.43 | 2.43 |
+| nemotron-pii | 1.14 | 1.14 | 0.72 | 0.72 |
+| gretel-finance | 21.50 | 21.55 | 19.07 | 19.07 |
+| pl-pii-bench | 11.21 | 11.21 | 3.52 | 3.52 |
+
+Leak rose on no set. MAPA was not run (its text is not on this machine).
+
 ## How pii-guard uses Meta's models
 
 One rule decides where each model runs: **anything that sees real personal data is an

@@ -35,6 +35,7 @@ export function PublicEvaluation({ loginUrl, hash }: { loginUrl: string; hash: s
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-10">
           <p className="text-xs text-muted">Published benchmark results, the same for every visitor. No account data is shown here.</p>
+          <a className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap text-xs text-muted hover:text-ink pointer-coarse:min-h-11" href="#api">API reference</a>
         </div>
       </footer>
     </div>

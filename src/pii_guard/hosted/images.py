@@ -18,6 +18,12 @@ What differs from the self-hosted ``POST /v1/mask/image`` is decided here and no
 
 Admission (signed-in Google owner, same origin, the per-owner daily image count reserved
 before the body is read) lives in :mod:`pii_guard.hosted.middleware`.
+
+Inline images in hosted chat (``/v1/chat/completions`` and ``/v1/responses``, LAB-1439) are
+opt-in (``PII_GUARD_HOSTED_CHAT_IMAGES``) and use the same local-only pipeline and the same
+one-job pool. They go only to the owner's own connection, never the sponsored route, and
+each one reserves a fixed provider input charge (``hosted_image_input_tokens``) plus room
+for its masked transcript; the text token bound never covers image bytes.
 """
 
 from __future__ import annotations
@@ -44,8 +50,14 @@ from pii_guard.visual.segmenters import (
 )
 
 __all__ = [
+    "IMAGE_ANNOTATION_BYTES",
     "IMAGE_COMPUTE_TOKENS",
     "IMAGE_PATH",
+    "ChatImageCharge",
+    "chat_body_limit",
+    "chat_image_charge",
+    "chat_images_enabled",
+    "count_chat_images",
     "hosted_image_limits",
     "hosted_visual_policies",
     "image_body_limit",
@@ -64,12 +76,66 @@ IMAGE_PATH = "/v1/mask/image"
 IMAGE_COMPUTE_TOKENS = 16_384
 #: Room for the JSON fields around a base64 image (language, session_id, render, expiry).
 _JSON_OVERHEAD_BYTES = 16_384
+#: The masked transcript and summary text part the gateway adds after each chat image. It is
+#: text sent upstream, so it is part of the payload bound and of the input token charge; a
+#: longer one makes the gateway refuse the request (413) rather than send it.
+IMAGE_ANNOTATION_BYTES = 32_768
+#: The JSON around one inline image part (``{"type": ..., "image_url": {"url": "data:..."}}``).
+_IMAGE_PART_OVERHEAD_BYTES = 256
+_CHAT_PATHS = frozenset({"/v1/chat/completions", "/v1/responses"})
 _lock = threading.Lock()
 
 
 def image_body_limit(settings: Settings) -> int:
     """The most bytes the hosted ingress reads for an image request: base64 in JSON."""
     return math.ceil(settings.hosted_max_image_bytes / 3) * 4 + _JSON_OVERHEAD_BYTES
+
+
+def chat_images_enabled(settings: Settings) -> bool:
+    """Whether the operator offers inline images in hosted chat (both switches on)."""
+    return bool(settings.hosted_images and settings.hosted_chat_images)
+
+
+def chat_body_limit(settings: Settings) -> int:
+    """The most bytes hosted chat reads with images on: the text limit plus base64 images.
+
+    A body without an image part is still held to ``hosted_max_body_bytes`` once parsed."""
+    per_image = math.ceil(settings.hosted_max_image_bytes / 3) * 4 + _IMAGE_PART_OVERHEAD_BYTES
+    return settings.hosted_max_body_bytes + settings.hosted_chat_max_images * per_image
+
+
+def count_chat_images(canonical: str, body: dict[str, Any]) -> tuple[int, int]:
+    """``(images, base64 bytes)`` of the inline images in a chat or Responses body.
+
+    The byte count is the base64 length of the decoded images, never more than their data
+    URLs take in the body, so ``len(body) - bytes`` over-counts the text: conservative."""
+    from pii_guard.gateway.request import collect_texts
+    from pii_guard.gateway.responses_request import collect_response_texts
+
+    if canonical not in _CHAT_PATHS:
+        return 0, 0
+    collect = collect_response_texts if canonical == "/v1/responses" else collect_texts
+    images = collect(body).images
+    return len(images), sum(math.ceil(len(image.data) / 3) * 4 for image in images)
+
+
+class ChatImageCharge:
+    """What one hosted chat request with ``images`` inline images is admitted for.
+
+    ``payload_bytes`` bounds the masked upstream payload without the masked images' own data
+    URLs (the gateway leaves those out of its check); ``input_tokens`` is that bound plus a
+    fixed provider charge per image, so image input is never paid from the text bound."""
+
+    __slots__ = ("images", "input_tokens", "payload_bytes")
+
+    def __init__(self, images: int, payload_bytes: int, input_tokens: int) -> None:
+        self.images, self.payload_bytes, self.input_tokens = images, payload_bytes, input_tokens
+
+
+def chat_image_charge(settings: Settings, images: int, text_payload_bound: int) -> ChatImageCharge:
+    """The charge for ``images`` inline images on top of the text's payload bound."""
+    payload = text_payload_bound + images * IMAGE_ANNOTATION_BYTES
+    return ChatImageCharge(images, payload, payload + images * settings.hosted_image_input_tokens)
 
 
 def hosted_image_limits(settings: Settings) -> tuple[int, float]:

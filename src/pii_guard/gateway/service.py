@@ -138,10 +138,13 @@ UPSTREAM_PAYLOAD_LIMIT: ContextVar[int | None] = ContextVar(
 )
 
 
-def check_upstream_payload(payload: bytes) -> None:
-    """Refuse a masked payload larger than the bound its admission was charged for."""
+def check_upstream_payload(payload: bytes, image_bytes: int = 0) -> None:
+    """Refuse a masked payload larger than the bound its admission was charged for.
+
+    ``image_bytes`` (the masked images' data URLs the gateway wrote) is left out: hosted
+    admission charges each image a fixed provider price instead of its bytes (LAB-1439)."""
     limit = UPSTREAM_PAYLOAD_LIMIT.get()
-    if limit is not None and len(payload) > limit:
+    if limit is not None and len(payload) - max(0, image_bytes) > limit:
         raise PayloadTooLargeError("the masked request is larger than its admitted size bound")
 
 
@@ -181,6 +184,8 @@ class RequestStats:
     image_kept: Counter[str] = field(default_factory=Counter)
     image_ocr: bool | None = None
     image_ms: float = 0.0
+    #: Characters of the masked image data URLs written into the body (not rendered).
+    image_payload_bytes: int = 0
     session_source: SessionSource | None = None
     #: The placeholder note went upstream with the request (LAB-1471).
     note: bool = False
@@ -922,7 +927,9 @@ class Gateway:
             stats.image_masked.update({t.value: n for t, n in outcome.counts(Policy.MASK).items()})
             stats.image_kept.update({t.value: n for t, n in outcome.counts(Policy.KEEP).items()})
         for number, (slot, outcome) in enumerate(zip(images, outcomes, strict=True), start=1):
-            slot.write("data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii"))
+            url = "data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii")
+            slot.write(url)
+            stats.image_payload_bytes += len(url)
             if outcome.summary is not None:
                 slot.annotate(image_annotation(number, outcome))
 
@@ -1042,7 +1049,7 @@ class Gateway:
         forwarding = time.perf_counter()
         payload = self._forwarded(body, session, stats, add_chat_note)
         try:
-            check_upstream_payload(payload)
+            check_upstream_payload(payload, stats.image_payload_bytes)
         except PayloadTooLargeError:
             stats.log("blocked")
             raise
@@ -1179,12 +1186,18 @@ class Gateway:
 
         def answer_event() -> bytes:
             content = restorer.masked_content()
+            # A choice past the retention cap has no copy; mark it rather than omit it, so
+            # a truncated echo is not mistaken for a short answer (LAB-1581).
+            truncated = restorer.masked_truncated()
+            choices = [
+                {"index": i, "content": None, "truncated": True}
+                if i in truncated
+                else {"index": i, "content": content[i]}
+                for i in sorted({*content, *truncated})
+            ]
             return sse_event(
                 json.dumps(
-                    {
-                        "object": "pii_guard.masked_answer",
-                        "choices": [{"index": i, "content": content[i]} for i in sorted(content)],
-                    },
+                    {"object": "pii_guard.masked_answer", "choices": choices},
                     ensure_ascii=False,
                 )
             )
