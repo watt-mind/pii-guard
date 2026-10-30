@@ -142,7 +142,7 @@ class Settings(BaseSettings):
     # NER detector (the "ner" extra): hub id or local directory, hub revision, and device
     # (auto|cpu|mps|cuda). A set model makes a missing "ner" extra stop startup (ADR 0006).
     # Unset, fast mode resolves (pii_guard.detect.ner_resolve, docs/models.md): the published
-    # pii-guard checkpoint ("repo" or "repo@revision"; the default repo is pinned to v2.0), else
+    # pii-guard checkpoint ("repo" or "repo@revision"; the default repo is pinned to v4.2), else
     # the public fallback (a stop-gap), fetched once into ~/.cache/pii-guard/models
     # (PII_GUARD_MODELS_DIR).
     # ner_fallback: "download" fetches it on first use, "cached" only uses it when already

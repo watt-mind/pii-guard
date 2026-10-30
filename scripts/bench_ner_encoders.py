@@ -75,7 +75,10 @@ SETS: dict[str, list[str]] = {
     ],
 }
 
-_OURS = ner_resolve.PUBLISHED
+#: pii-guard NER v2.0, the baseline these comparisons were run against: pinned explicitly, so
+#: the harness keeps scoring v2.0 after the v4.2 pin swap (LAB-1625).
+_OURS = ner_resolve.PREVIOUS_PUBLISHED
+_OURS_PIN = f"{_OURS.repo_id}@{_OURS.revision}"
 _OURS_DETECTOR = {
     "name": "ner",
     "model": "xlmr-base-v2-hn",
@@ -180,6 +183,7 @@ def _score(args: argparse.Namespace) -> int:
             os.environ[ner_resolve.MODEL_ENV_VAR] = str(_FALLBACK.local_dir())
         else:
             os.environ.pop(ner_resolve.MODEL_ENV_VAR, None)
+            os.environ[ner_resolve.PUBLISHED_ENV_VAR] = _OURS_PIN
         analyzer = DetectorAnalyzer(names)
         if analyzer.skipped:
             print(f"{config}: detector unavailable: {analyzer.skipped}", file=sys.stderr)
@@ -279,6 +283,8 @@ def _latency(args: argparse.Namespace) -> int:
     transformers.AutoTokenizer  # noqa: B018
 
     spec, cls = MODELS[args.model]
+    os.environ.pop(ner_resolve.MODEL_ENV_VAR, None)
+    os.environ[ner_resolve.PUBLISHED_ENV_VAR] = _OURS_PIN  # NerDetector() below loads v2.0
     msgs = _messages(args.fixtures, args.chars, args.n)
     models: dict[str, Any] = {}
     info: dict[str, dict[str, Any]] = {}

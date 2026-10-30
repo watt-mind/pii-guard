@@ -1,0 +1,721 @@
+{
+  "v20": {
+    "metrics": {
+      "smoke": {
+        "leak": 0.0,
+        "over": 1.08,
+        "leaked": 0,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 2.0,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.13,
+        "over": 1.66,
+        "leaked": 2,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.55,
+        "over": 2.06,
+        "leaked": 1,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 1.65,
+        "over": 1.64,
+        "leaked": 2,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 8.24,
+        "over": 55.46,
+        "leaked": 61,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 4.0,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 12.9,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 4.0,
+          "over": 7.69,
+          "leaked": 1,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.95,
+        "over": 1.82,
+        "leaked": 3,
+        "values": 315
+      }
+    },
+    "selection_v42": {
+      "leak": 0,
+      "over": 6.63,
+      "leaked": 0,
+      "values": 1868,
+      "over_masked": 137,
+      "masked": 2066
+    }
+  },
+  "v42-b1": {
+    "metrics": {
+      "smoke": {
+        "leak": 0.0,
+        "over": 1.63,
+        "leaked": 0,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.13,
+        "over": 1.19,
+        "leaked": 2,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 0.83,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 8.78,
+        "over": 45.5,
+        "leaked": 65,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.32,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 315
+      }
+    },
+    "gates": {
+      "smoke_leak": true,
+      "smoke_over": false,
+      "inflection_leak": true,
+      "latency": null,
+      "eu_per_language": true,
+      "eu_failed_languages": [],
+      "eu_total_lower": true,
+      "beats_v20": true,
+      "all_gates": false
+    },
+    "p95_ratio": null,
+    "selection_v42": {
+      "leak": 0,
+      "over": 1.83,
+      "leaked": 0,
+      "values": 1868,
+      "over_masked": 36,
+      "masked": 1964
+    }
+  },
+  "v42-b2": {
+    "metrics": {
+      "smoke": {
+        "leak": 0.0,
+        "over": 2.16,
+        "leaked": 0,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.13,
+        "over": 1.25,
+        "leaked": 2,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 0.83,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 9.32,
+        "over": 45.49,
+        "leaked": 69,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.32,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 315
+      }
+    },
+    "gates": {
+      "smoke_leak": true,
+      "smoke_over": false,
+      "inflection_leak": true,
+      "latency": null,
+      "eu_per_language": true,
+      "eu_failed_languages": [],
+      "eu_total_lower": true,
+      "beats_v20": true,
+      "all_gates": false
+    },
+    "p95_ratio": null,
+    "selection_v42": {
+      "leak": 0,
+      "over": 1.83,
+      "leaked": 0,
+      "values": 1868,
+      "over_masked": 36,
+      "masked": 1964
+    }
+  },
+  "v42-b3": {
+    "metrics": {
+      "smoke": {
+        "leak": 0.0,
+        "over": 1.09,
+        "leaked": 0,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.13,
+        "over": 0.66,
+        "leaked": 2,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 0.83,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 8.51,
+        "over": 44.72,
+        "leaked": 63,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.32,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 315
+      }
+    },
+    "gates": {
+      "smoke_leak": true,
+      "smoke_over": true,
+      "inflection_leak": true,
+      "latency": true,
+      "eu_per_language": true,
+      "eu_failed_languages": [],
+      "eu_total_lower": true,
+      "beats_v20": true,
+      "all_gates": true
+    },
+    "p95_ratio": 0.9419354838709677,
+    "selection_v42": {
+      "leak": 0,
+      "over": 1.58,
+      "leaked": 0,
+      "values": 1868,
+      "over_masked": 31,
+      "masked": 1959
+    }
+  },
+  "v42-b4": {
+    "metrics": {
+      "smoke": {
+        "leak": 0.0,
+        "over": 1.09,
+        "leaked": 0,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.19,
+        "over": 1.2,
+        "leaked": 3,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.0,
+        "over": 0.53,
+        "leaked": 0,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 0.83,
+        "over": 0.82,
+        "leaked": 1,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 5.54,
+        "over": 48.52,
+        "leaked": 41,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 6.9,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.32,
+        "over": 0.61,
+        "leaked": 1,
+        "values": 315
+      }
+    },
+    "gates": {
+      "smoke_leak": true,
+      "smoke_over": true,
+      "inflection_leak": true,
+      "latency": null,
+      "eu_per_language": true,
+      "eu_failed_languages": [],
+      "eu_total_lower": true,
+      "beats_v20": false,
+      "all_gates": true
+    },
+    "p95_ratio": null,
+    "selection_v42": {
+      "leak": 0,
+      "over": 3.46,
+      "leaked": 0,
+      "values": 1868,
+      "over_masked": 69,
+      "masked": 1997
+    }
+  },
+  "selected": "v42-b3"
+}

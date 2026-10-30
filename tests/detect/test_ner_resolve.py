@@ -77,6 +77,18 @@ def test_public_fallback_is_pinned_and_licence_checked() -> None:
     assert Settings().ner_published_model == ner_resolve.PUBLISHED_REPO
 
 
+def test_v2_rollback_stays_pinned_with_its_weights_hash() -> None:
+    # LAB-1625 swapped the pin to v4.2; naming v2.0's revision rolls back with the hash checked.
+    prev = ner_resolve.PREVIOUS_PUBLISHED
+    assert ner_resolve.PUBLISHED_RELEASE == "v4.2"
+    assert ner_resolve.PREVIOUS_RELEASE == "v2.0"
+    assert prev.revision != ner_resolve.PUBLISHED.revision
+    assert len(prev.revision) == 40
+    assert len(prev.weights_sha256) == 64
+    assert ner_resolve._published(f"{prev.repo_id}@{prev.revision}") is prev
+    assert ner_resolve._published(ner_resolve.PUBLISHED_REPO) is ner_resolve.PUBLISHED
+
+
 def test_models_dir_default_and_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("PII_GUARD_MODELS_DIR")
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
