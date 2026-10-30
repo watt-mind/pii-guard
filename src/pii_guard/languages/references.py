@@ -77,7 +77,7 @@ def parse_references(text: str) -> tuple[Reference, ...]:
     line or an entry listed twice.
     """
     out: list[Reference] = []
-    seen: dict[str, int] = {}
+    seen: dict[tuple[str, bool, bool, str], int] = {}
     for number, raw in enumerate(text.splitlines(), 1):
         line = raw.strip()
         if not line or line.startswith("#"):
