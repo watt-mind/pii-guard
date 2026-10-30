@@ -25,6 +25,18 @@ Cues are language-pack data, a ``cues.tsv`` next to ``captions.tsv``::
 - dates, amounts (a currency right after the value) and numbers that continue into a longer
   run are rejected, like everywhere else in the rules.
 
+A third column ``after`` marks a cue that follows its value, as Hungarian puts it
+(LAB-1199)::
+
+    számon	PHONE	after
+    számú útlevél*	ID_DOCUMENT	after
+
+The value must stand right before the cue, separated by spaces only (``a +36 30 123 4567
+számon``, ``a KA652524 számú útlevelére``), with the same shapes, score and rejections. A
+phone before a post-value cue must also start with ``+`` or ``0`` (an international or trunk
+prefix): ``a 2026/4471 számon iktatott`` is a file number. A bare ``számú`` is never a cue
+(``a 4500123456 számú szerződés``); it names a type only together with its noun.
+
 Hits score :data:`CUED_SCORE` (0.6), below every validated rule (0.7-0.99), and the rule
 detector drops a cued hit that overlaps a validated one, so a checksum-valid identifier keeps
 its validated span. Every pack's cues run for every text, like a pack's ``everywhere`` rules
@@ -133,6 +145,8 @@ class Cue:
     entity_type: EntityType | None
     language: str
     suffix: bool = False
+    #: The cue follows its value (``a +36 30 123 4567 számon``) instead of preceding it.
+    after: bool = False
 
     @property
     def key(self) -> str:
@@ -145,6 +159,8 @@ _CUE_TEXT_RE = re.compile(r"^[^\W\d_](?:(?:[^\W\d]|[ .'\u2019/#-])*(?:[^\W\d_]|[
 def parse_cues(text: str, language: str) -> tuple[Cue, ...]:
     """Parse a ``cues.tsv``: ``cue<TAB>ENTITY_TYPE`` or ``cue<TAB>-``; ``#`` comments.
 
+    A third column ``after`` marks a cue that follows its value (it must name a type).
+
     Raises :class:`ValueError` (with the line number) on a malformed line, an entity type
     without a value shape in :data:`SHAPES`, or a cue listed twice.
     """
@@ -155,9 +171,14 @@ def parse_cues(text: str, language: str) -> tuple[Cue, ...]:
         if not line or line.startswith("#"):
             continue
         parts = [p.strip() for p in raw.split("\t")]
-        if len(parts) != 2 or not parts[0] or not parts[1]:
+        if len(parts) not in (2, 3) or not all(parts):
             raise ValueError(f"line {number}: expected 'cue<TAB>ENTITY_TYPE' or 'cue<TAB>-'")
-        cue_text, type_name = parts
+        cue_text, type_name = parts[:2]
+        after = len(parts) == 3
+        if after and parts[2] != "after":
+            raise ValueError(f"line {number}: expected 'after' or nothing in the third column")
+        if after and type_name == "-":
+            raise ValueError(f"line {number}: an 'after' cue must name an entity type")
         suffix = cue_text.endswith("*")
         cue_text = cue_text.removesuffix("*").strip()
         if not _CUE_TEXT_RE.match(cue_text):
@@ -173,7 +194,7 @@ def parse_cues(text: str, language: str) -> tuple[Cue, ...]:
                 raise ValueError(
                     f"line {number}: {type_name} has no value shape (cues may name {known})"
                 )
-        cue = Cue(cue_text, entity_type, language, suffix)
+        cue = Cue(cue_text, entity_type, language, suffix, after)
         if cue.key in seen:
             raise ValueError(f"line {number}: cue already listed on line {seen[cue.key]}")
         seen[cue.key] = number
@@ -242,6 +263,8 @@ _DATE_RE = re.compile(
 )
 _CURRENCY_AFTER_RE = re.compile(r"[ \t\u00a0]?(?:Ft|HUF|forint|EUR|USD|GBP|CHF|€|\$|£)(?!\w)")
 _CURRENCY_BEFORE = ("$", "€", "£")
+#: How far back from a post-value cue a value may start (the longest shape plus separators).
+_MAX_VALUE_LENGTH = 48
 
 
 def _scan_value(text: str, pos: int, shape: Shape) -> int | None:
@@ -333,15 +356,52 @@ class CueMatcher:
         if self._re is None:
             return
         matches = list(self._re.finditer(fold(text)))
+        seen: set[tuple[int, int]] = set()
         for index, m in enumerate(matches):
             cue = self._cue_for(m.group())
             if cue is None or cue.entity_type is None:
                 continue
-            # The window ends where the next cue starts: that one names what follows.
-            limit = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-            hit = self._value_after(text, m.end(), limit, cue.entity_type)
-            if hit is not None:
+            if cue.after:
+                hit = self._value_before(text, m.start(), cue.entity_type)
+            else:
+                # The window ends where the next cue starts: that one names what follows.
+                limit = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+                hit = self._value_after(text, m.end(), limit, cue.entity_type)
+            if hit is not None and (hit.start, hit.end) not in seen:
+                seen.add((hit.start, hit.end))
                 yield hit
+
+    def _value_before(self, text: str, cue_start: int, entity_type: EntityType) -> _Hit | None:
+        """The value ending right before a post-value cue, spaces between (the longest one)."""
+        shape = SHAPES[entity_type]
+        end = cue_start
+        while end > 0 and text[end - 1] in " \t\u00a0":
+            end -= 1
+        if end == cue_start or end == 0:
+            return None
+        # Walk back over the characters a value of this shape may hold, then take the
+        # leftmost start whose value ends exactly at ``end``.
+        allowed = shape.separators + ("+()" if shape.plus else "")
+        lo = max(0, end - _MAX_VALUE_LENGTH)
+        first = end
+        while first > lo and (
+            (text[first - 1].isascii() and text[first - 1].isalnum()) or text[first - 1] in allowed
+        ):
+            first -= 1
+        for start in range(first, end):
+            if start and (text[start - 1].isalnum() or text[start - 1] in "+("):
+                continue
+            if start >= 2 and text[start - 1] in "-./," and text[start - 2].isdigit():
+                continue  # the tail of a longer number
+            hit = self._value_at(text, start, shape, entity_type)
+            if hit is None or hit.end != end:
+                continue
+            if entity_type is EntityType.PHONE and text[start] not in "+0(":
+                return None
+            if entity_type is EntityType.PHONE and text[start] == "(" and text[start + 1] != "0":
+                return None
+            return hit
+        return None
 
     def _value_after(self, text: str, pos: int, limit: int, entity_type: EntityType) -> _Hit | None:
         shape = SHAPES[entity_type]
