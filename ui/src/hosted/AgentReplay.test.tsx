@@ -9,8 +9,15 @@ import { RECORD, replayValues, streamAt } from "./replayData";
 
 const VALUES = ["Robin Example", "robin.example@example.com", "DE89 3704 0044 0532 0130 00"];
 
-describe("agent-turn replay (LAB-1499)", () => {
+describe("agent-turn replay (LAB-1499, Muse Spark LAB-1524)", () => {
   afterEach(() => vi.useRealTimers());
+
+  it("is a recorded Muse Spark run, labeled as one", () => {
+    expect(recording.model).toMatch(/^muse-spark/);
+    expect(recording.how).not.toMatch(/stand-in/);
+    render(<AgentReplay />);
+    expect(screen.getByText("Real gateway · Muse Spark · fictional data")).toBeInTheDocument();
+  });
 
   it("the recording is value-free and every placeholder resolves to the fictional record", () => {
     const text = JSON.stringify(recording);
@@ -27,11 +34,12 @@ describe("agent-turn replay (LAB-1499)", () => {
       expect(stream.agent.join("")).toBe(stream.upstream.join(""));
       // The gateway never releases half a placeholder.
       for (const piece of stream.agent) expect(piece.replace(placeholderRegex(), "")).not.toMatch(/\[\[|\]\]/);
-      // Somewhere mid-stream a placeholder is split and held.
-      const held = stream.upstream.map((_, k) => streamAt(stream.upstream, stream.agent, k + 1).held);
-      expect(held.some((h) => h.includes("["))).toBe(true);
       expect(streamAt(stream.upstream, stream.agent, stream.upstream.length)).toMatchObject({ held: "", agent: stream.upstream.join("") });
     }
+    // In the model's closing text (streamed in tokens) a placeholder is split and held mid-stream.
+    const { upstream, agent } = recording.answer;
+    const held = upstream.map((_, k) => streamAt(upstream, agent, k + 1).held);
+    expect(held.some((h) => h.includes("["))).toBe(true);
   });
 
   it("plays to the end, with restored values on the agent's side and placeholders on the model's", async () => {
@@ -54,7 +62,9 @@ describe("agent-turn replay (LAB-1499)", () => {
     try {
       const { container } = render(<AgentReplay />);
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
-      expect(container.textContent).toContain("that the refund is on its way.");
+      const values = replayValues();
+      const restored = recording.answer.upstream.join("").replace(placeholderRegex(), (p) => values.get(p) ?? p);
+      expect(container.textContent).toContain(restored);
     } finally { window.matchMedia = original; }
   });
 
