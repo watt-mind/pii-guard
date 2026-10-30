@@ -16,7 +16,7 @@ const takeRefocus = () => { const wanted = refocusAfterSwitch; refocusAfterSwitc
  * projects with a check on the current one, the endpoints whose activity and vault the console
  * inspects, and a way to the Projects screen.
  */
-export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
+export function ProjectSwitcher({ manage = true, enabled = true }: { manage?: boolean; enabled?: boolean }) {
   const selected = useSelectedProject();
   const endpoint = useSelectedEndpoint();
   const [revision, setRevision] = useState(0);
@@ -27,6 +27,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
   const endpointsHeading = useId();
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     void request<ProjectList>("/v1/projects").then((data) => {
       if (!active || !Array.isArray(data.projects)) return;
@@ -34,7 +35,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
       if (!selected) setSelectedProject(data.default_project_id);
     }).catch(() => { /* Older/offline guards keep their existing local console. */ });
     return () => { active = false; };
-  }, [selected]);
+  }, [selected, enabled]);
   useEffect(() => {
     const update = () => setRevision((n) => n + 1);
     window.addEventListener("pii-guard-project-configuration", update);
@@ -42,12 +43,12 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
   }, []);
   useEffect(() => {
     let active = true;
-    if (!selected) return;
+    if (!enabled || !selected) return;
     void request<{ endpoints: Endpoint[] }>(`/v1/projects/${encodeURIComponent(selected)}/endpoints`).then((data) => {
       if (active && Array.isArray(data.endpoints)) setEndpoints(data.endpoints);
     }).catch(() => { /* Endpoint management can still be retried in Projects. */ });
     return () => { active = false; };
-  }, [selected, revision]);
+  }, [selected, revision, enabled]);
   useEffect(() => {
     if (!list || !takeRefocus()) return;
     triggerProps.ref.current?.focus();

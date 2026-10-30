@@ -2,7 +2,6 @@ import type { ChatDraft } from "./screens/Chat";
 import type { TrafficProps } from "./screens/Traffic";
 import { useOwnerRevision } from "./api/localOwner";
 import { getSelectedEndpoint, getSelectedProject, setSelectedProject, useSelectedScope } from "./projects/selection";
-import { HostedApp } from "./hosted/HostedApp";
 import { AccountSummary, ProviderConnections } from "./hosted/AccountPanels";
 import { useSetupPending } from "./hosted/setup";
 import { ClientSetup } from "./hosted/ClientSetup";
@@ -38,6 +37,8 @@ import { knownSignatureOf, type KnownSession } from "./lib/run";
 import { newKnownRow } from "./lib/knownRows";
 import { Overview } from "./screens/Overview";
 import { Logs } from "./screens/Traffic";
+// Keep HostedApp and its recorded demo / agent replay fixtures out of the local console entry.
+const HostedApp = lazy(() => import("./hosted/HostedApp").then((module) => ({ default: module.HostedApp })));
 // Keep Evaluation and its charts out of the console entry: first-visit mounting alone
 // defers its data requests, but an eager import still downloads that code on every route.
 const Benchmarks = lazy(() => import("./screens/Benchmarks").then((module) => ({ default: module.Benchmarks })));
@@ -71,7 +72,13 @@ export interface AppProps {
 
 /** Hosted deployment is an explicit build choice; the local console remains the default. */
 export function App(props: AppProps) {
-  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? <HostedApp console={(session) => <SignedInConsole session={session} {...props} />} /> : <LocalConsole {...props} />;
+  return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? (
+    <Suspense fallback={null}>
+      <HostedApp console={(session) => <SignedInConsole session={session} {...props} />} />
+    </Suspense>
+  ) : (
+    <LocalConsole {...props} />
+  );
 }
 
 /** A signed-in hosted owner gets the same console; the server's capabilities decide its sections. */
@@ -331,7 +338,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
       />
 
       <div className={["min-w-0", settled ? "" : "invisible"].join(" ")} data-settled={settled || undefined}>
-        <HeaderBar route={route} caps={caps} apiOpen={apiOpen} />
+        <HeaderBar route={route} caps={caps} apiOpen={apiOpen} projectsEnabled={caps.accounts || engine.engine === "api"} />
         {engine.engine === "mock" && (
           <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
             <p className="mx-auto max-w-[1280px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
@@ -567,7 +574,7 @@ function statusDetailOf(s: ServerStatus): string {
 /** The bar above every section, over the accent hairline: where you are on the left (from
  *  1024 px; below it the menu's top bar names the section) and, on the right, the project
  *  switcher and, for a signed-in hosted owner, the profile menu. */
-function HeaderBar({ route, caps, apiOpen = false }: { route: Route; caps: Capabilities; apiOpen?: boolean }) {
+function HeaderBar({ route, caps, apiOpen = false, projectsEnabled = true }: { route: Route; caps: Capabilities; apiOpen?: boolean; projectsEnabled?: boolean }) {
   const section = SECTIONS.find((s) => s.id === route.section)!;
   const tab = route.section === "playground" ? PLAYGROUND_TABS.find((t) => t.id === route.tab) : undefined;
   const session = useHostedSession();
@@ -592,7 +599,7 @@ function HeaderBar({ route, caps, apiOpen = false }: { route: Route; caps: Capab
               API
             </a>
           )}
-          <ProjectSwitcher manage={caps.projects} />
+          <ProjectSwitcher manage={caps.projects} enabled={projectsEnabled} />
           {caps.accounts && session && <ProfileMenu session={session} />}
         </div>
       </div>

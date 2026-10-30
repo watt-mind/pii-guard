@@ -6,7 +6,7 @@ import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type EntityType } from "../api/
 import { NerHint } from "../components/NerHint";
 import { Button, ButtonLink, Card, KeyValues, Notice, PageHeader } from "../components/ui";
 import type { ServerStatusState } from "../hooks/useServerStatus";
-import { ENTITY_META, metaFor, type Policy as EntityPolicy } from "../lib/entities";
+import { metaFor, type Policy as EntityPolicy } from "../lib/entities";
 import { detectorName } from "../lib/traffic";
 
 /** Language codes in words (LAB-1626). */
@@ -274,12 +274,13 @@ function PolicyTable({ title, types, policies }: { title: string; types: readonl
       </thead>
       <tbody>
         {types.map((t) => {
-          const policy = (policies?.[t] ?? ENTITY_META[t]?.policy ?? "mask") as EntityPolicy;
-          const changed = policies && ENTITY_META[t] && ENTITY_META[t].policy !== policy;
+          const meta = metaFor(t);
+          const policy = (policies?.[t] ?? meta.policy) as EntityPolicy;
+          const changed = Boolean(policies && meta.policy !== policy);
           return (
             <tr key={t} className="border-b border-line last:border-0">
               <th scope="row" className="py-1.5 pr-3 text-left font-normal">
-                <span className="text-ink">{metaFor(t).label}</span> <span className="font-mono text-2xs text-faint">{t}</span>
+                <span className="text-ink">{meta.label}</span> <span className="font-mono text-2xs text-faint">{t}</span>
               </th>
               <td className="py-1.5 text-right">
                 <span className={["inline-block rounded-md px-1.5 py-px text-xs font-medium ring-1 ring-inset", POLICY_CLASS[policy]].join(" ")}>{POLICY_TEXT[policy]}</span>

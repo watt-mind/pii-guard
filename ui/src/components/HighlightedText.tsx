@@ -30,6 +30,9 @@ export function HighlightedText({ text, spans, activeKey, onActivate }: Props) {
         onMouseLeave={() => onActivate(null)}
         onFocus={(e) => onActivate(key, e.currentTarget)}
         onBlur={() => onActivate(null)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onActivate(null);
+        }}
         className={[
           "rounded-md px-0.5 -mx-0.5 ring-1 ring-inset transition-shadow cursor-help",
           meta.mark,

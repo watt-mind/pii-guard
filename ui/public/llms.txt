@@ -1,13 +1,44 @@
 # PII Guard
 
-> PII Guard is an open-source privacy firewall for AI agents. It detects personal data in text and images, replaces it with reversible placeholders before a request reaches the model, then puts the real values back in the answer. Hungarian first, other EU languages next. Apache-2.0.
+> PII Guard is an open-source privacy firewall and OpenAI-compatible gateway for AI agents. It detects personal data in text and images, replaces it with reversible placeholders before a request reaches the model, and restores the real values in the response. Hungarian first, other EU languages next. Licensed under Apache-2.0.
 
-This site is the hosted preview: a public worked example, and sign-in with Google for your own text. All examples on it are fictional. Pseudonymisation is not anonymisation, and PII Guard does not by itself make a deployment GDPR or EU AI Act compliant.
+This site (`https://guard.watt-mind.com/`) is the hosted preview: an interactive public walkthrough on synthetic data, and Google sign-in for testing with your own text and provider keys. All public examples on this site are fictional. Pseudonymization is not anonymization, and PII Guard does not by itself make a deployment GDPR or EU AI Act compliant.
 
-## Docs
+## Key Capabilities
 
-- [Source code and quick start](https://github.com/watt-mind/pii-guard): self-host the guard, console and vault
-- [Hosted processing and retention](https://github.com/watt-mind/pii-guard/blob/develop/docs/hosted.md): what this hosted preview processes, where, and for how long
-- [Privacy model](https://github.com/watt-mind/pii-guard/blob/develop/docs/privacy-model.md): who PII Guard protects data from, and the trust boundary
-- [Benchmarks](https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md): measured recall and leak rate on synthetic data
-- [NER model](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base): the open detection model on Hugging Face
+- **Bidirectional pseudonymization**: Replace sensitive entities with consistent, reversible placeholders (`POST /v1/mask` / `POST /v1/pseudonymize`) and restore original values in model outputs (`POST /v1/unmask` / `POST /v1/depseudonymize`).
+- **OpenAI-compatible privacy proxy**: Drop-in gateway for `POST /v1/chat/completions`, `POST /v1/responses`, and `POST /v1/messages` with streaming support and session-scoped vaults.
+- **Policy enforcement**: Per-entity and per-project actions (`pseudonymize`, `redact`, `allow`, `block`) across 62 PII entity types in 7 categories.
+- **Hybrid local detection**: Deterministic checksum-aware regex and lexicon rules combined with local ONNX / DeBERTa-v3 and XLM-RoBERTa NER models, plus on-device OCR and face/signature image masking (`POST /v1/mask/image`), with sub-15ms p50 CPU latency on rules + fast paths.
+
+## Public Pages
+
+- [PII Guard Hosted Preview](https://guard.watt-mind.com/): Interactive walkthrough of bidirectional pseudonymization, image masking, and live agent replay
+- [Interactive Demo](https://guard.watt-mind.com/#demo): Worked text and image masking examples on synthetic Hungarian and English inputs
+- [Data & Privacy Boundary](https://guard.watt-mind.com/#trust): What the hosted preview processes, retention limits, and trust boundaries
+- [Technical Architecture](https://guard.watt-mind.com/#technical): Hybrid detection pipeline, Meta model integration, and European language support
+- [Benchmark Evaluation](https://guard.watt-mind.com/#evaluation): Interactive recall, precision, F1, and leak-rate charts across datasets and models
+- [OpenAPI Reference](https://guard.watt-mind.com/#api): Full HTTP contract for the gateway, vault, and masking endpoints
+- [Pricing & Quotas](https://guard.watt-mind.com/pricing): Hosted preview allowances, bring-your-own-key (BYOK) usage, and self-hosting options
+- [Security](https://guard.watt-mind.com/security): Security architecture, isolation guarantees, and vulnerability reporting
+- [Privacy Notice](https://guard.watt-mind.com/privacy): Data processing, ephemeral in-memory state, and cookie policy
+- [Terms of Service](https://guard.watt-mind.com/terms): Acceptable use and hosted preview terms
+- [Imprint](https://guard.watt-mind.com/imprint): Operator and project contact information
+
+## Documentation
+
+- [Source Code & Quick Start](https://github.com/watt-mind/pii-guard): Self-host PII Guard, the web console, and the reversible vault via Docker or Python
+- [Hosted Processing & Retention](https://github.com/watt-mind/pii-guard/blob/develop/docs/hosted.md): What the hosted preview processes, where, and for how long
+- [Privacy Model](https://github.com/watt-mind/pii-guard/blob/develop/docs/privacy-model.md): Threat model, trust boundaries, and what PII Guard protects against
+- [API Contracts](https://github.com/watt-mind/pii-guard/blob/develop/docs/contracts.md): Detailed request/response schemas and session semantics
+- [EU Regulation Context](https://github.com/watt-mind/pii-guard/blob/develop/docs/eu-regulation.md): GDPR and EU AI Act considerations for pseudonymization gateways
+
+## API Endpoints
+
+- [OpenAPI Specification](https://guard.watt-mind.com/#api): Interactive API reference for `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/messages`, `POST /v1/analyze`, `POST /v1/mask` (`POST /v1/pseudonymize`), `POST /v1/unmask` (`POST /v1/depseudonymize`), `POST /v1/mask/image`, and `GET /healthz`
+
+## Models & Benchmarks
+
+- [Benchmarks Documentation](https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md): Methodology, datasets, recall, and leak-rate evaluations on synthetic data
+- [Agent Harness Matrix](https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations/harness-matrix-2026-10-29.md): Compatibility and round-trip verification across AI coding harnesses
+- [NER Model on Hugging Face](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base): Open multilingual token-classification checkpoint (`watt-mind/pii-guard-ner-xlmr-base`)

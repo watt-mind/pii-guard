@@ -6,10 +6,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, SignedInConsole } from "../App";
 import { createMockChat } from "../api/chat";
-import type { HttpGuardClient } from "../api/http";
+import { UnreachableError, type HttpGuardClient } from "../api/http";
 import { createMockClient } from "../api/mock";
 import type { StatusResult } from "../api/status";
 import type { Account, Requester } from "../hosted/api";
+import { localRequest } from "../projects/request";
 import { getSelectedEndpoint, getSelectedProject, setSelectedEndpoint, setSelectedProject } from "../projects/selection";
 
 const projects = {
@@ -36,6 +37,10 @@ const account: Account = {
 function liveApi(): HttpGuardClient {
   const backend = createMockClient();
   return { health: () => Promise.resolve({ status: "ok", version: "0.1.0" }), analyze: backend.analyze, mask: backend.mask, unmask: backend.unmask };
+}
+function offlineApi(): HttpGuardClient {
+  const down = () => Promise.reject(new UnreachableError());
+  return { health: down, analyze: down, mask: down, unmask: down };
 }
 const noStatus = () => Promise.resolve<StatusResult>({ state: "offline" });
 
@@ -64,6 +69,7 @@ beforeEach(() => {
   localStorage.clear();
   history.replaceState(null, "", "#overview");
   window.matchMedia ??= vi.fn().mockReturnValue({ matches: false, addEventListener() {}, removeEventListener() {} });
+  vi.mocked(localRequest).mockClear();
 });
 afterEach(() => { setSelectedEndpoint(null); setSelectedProject(null); });
 
@@ -216,5 +222,11 @@ describe("local console", () => {
     await user.click(manage);
     await act(async () => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
     expect(location.hash).toBe("#projects");
+  });
+
+  it("skips querying /v1/projects when the local API is offline", async () => {
+    render(<App api={offlineApi()} mock={createMockClient()} traffic={{ connect: () => ({ close() {} }) }} loadStatus={noStatus} />);
+    await screen.findByText("API not reachable.");
+    expect(vi.mocked(localRequest)).not.toHaveBeenCalled();
   });
 });

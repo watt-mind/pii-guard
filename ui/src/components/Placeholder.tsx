@@ -32,6 +32,13 @@ export function Placeholder({ text, entityType, active, unresolved, onActivate, 
       onMouseLeave={onActivate ? () => onActivate(null) : undefined}
       onFocus={onActivate ? (e) => onActivate(text, e.currentTarget) : undefined}
       onBlur={onActivate ? () => onActivate(null) : undefined}
+      onKeyDown={
+        onActivate
+          ? (e) => {
+              if (e.key === "Escape") onActivate(null);
+            }
+          : undefined
+      }
       className={[
         "inline rounded-md px-1 py-px ring-1 ring-inset font-mono font-medium whitespace-nowrap box-decoration-clone",
         unresolved

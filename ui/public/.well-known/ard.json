@@ -1,0 +1,28 @@
+{
+  "entries": [
+    {
+      "identifier": "urn:air:watt-mind.com:pii-guard:gateway",
+      "displayName": "PII Guard OpenAI-Compatible Privacy Gateway",
+      "type": "application/openapi+json",
+      "url": "https://github.com/watt-mind/pii-guard",
+      "description": "PII Guard is an open-source OpenAI-compatible privacy gateway that detects personal data in text and images, replaces it with reversible placeholders before prompts leave, and restores the original values in model responses.",
+      "representativeQueries": [
+        "Pseudonymize PII before sending prompts to an LLM",
+        "Restore placeholders in model responses back to original values",
+        "Configure per-entity redaction and pseudonymization policies"
+      ]
+    },
+    {
+      "identifier": "urn:air:watt-mind.com:pii-guard:docs",
+      "displayName": "PII Guard LLM Documentation",
+      "type": "application/ai-catalog+json",
+      "url": "https://guard.watt-mind.com/llms.txt",
+      "description": "Machine-readable overview of PII Guard capabilities, public pages, OpenAI-compatible gateway endpoints, privacy boundaries, and benchmark evaluations.",
+      "representativeQueries": [
+        "How does PII Guard mask and restore personal data in AI agent traffic?",
+        "What API endpoints and entity policies does PII Guard support?",
+        "Where can I find PII Guard benchmark results and self-hosting documentation?"
+      ]
+    }
+  ]
+}

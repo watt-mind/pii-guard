@@ -72,6 +72,13 @@ export function RestoredText({ segments, activeKey = null, onActivate, freshFrom
             onMouseLeave={onActivate ? () => onActivate(null) : undefined}
             onFocus={onActivate ? (e) => onActivate(seg.placeholder, e.currentTarget) : undefined}
             onBlur={onActivate ? () => onActivate(null) : undefined}
+            onKeyDown={
+              onActivate
+                ? (e) => {
+                    if (e.key === "Escape") onActivate(null);
+                  }
+                : undefined
+            }
             className={[
               "rounded-md px-0.5 -mx-0.5 ring-1 ring-inset",
               outgoing ? meta.mark : "bg-restored-soft text-ink ring-restored/45",

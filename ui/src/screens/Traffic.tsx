@@ -10,7 +10,7 @@ import { Pane } from "../components/Pane";
 import { Button, Card, Checkbox, Metric, PageHeader, Select } from "../components/ui";
 import { errorCopy } from "../lib/errorCopy";
 import { useTraffic, type TrafficHandle, type TrafficSource } from "../hooks/useTraffic";
-import { ENTITY_META, metaFor } from "../lib/entities";
+import { metaFor } from "../lib/entities";
 import { tokenize } from "../lib/placeholders";
 import {
   OUTCOME_LABEL,
@@ -209,11 +209,14 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
             <span className="w-44">
               <Select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters["type"] })}>
                 <option value="all">All types</option>
-                {types.map((ty) => (
-                  <option key={ty} value={ty}>
-                    {ENTITY_META[ty]?.label ?? ty}
-                  </option>
-                ))}
+                {types.map((ty) => {
+                  const meta = metaFor(ty);
+                  return (
+                    <option key={ty} value={ty}>
+                      {meta.label === "Unknown type" ? ty : meta.label}
+                    </option>
+                  );
+                })}
               </Select>
             </span>
           </label>

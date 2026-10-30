@@ -183,7 +183,7 @@ export const UNKNOWN_META: EntityMeta = withClasses({
   group: "identifier",
 });
 
-export function groupOf(type: EntityType | null | undefined) {
+export function groupOf(type: EntityType | string | null | undefined) {
   const id = metaFor(type).group;
   return ENTITY_GROUPS.find((g) => g.id === id)!;
 }
@@ -209,8 +209,8 @@ export function subtypeLabel(subtype: string | null | undefined): string | null 
   return SUBTYPE_LABEL[subtype] ?? subtype.replace(/_/g, " ");
 }
 
-export function metaFor(type: EntityType | null | undefined): EntityMeta {
-  return type ? ENTITY_META[type] : UNKNOWN_META;
+export function metaFor(type: EntityType | string | null | undefined): EntityMeta {
+  return (type && (ENTITY_META as Record<string, EntityMeta | undefined>)[type]) || UNKNOWN_META;
 }
 
 /** Rule detections of these types are validated by a checksum; other rule hits are patterns. */
