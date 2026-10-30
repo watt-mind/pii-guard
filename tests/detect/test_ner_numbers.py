@@ -256,3 +256,72 @@ def test_check_numbers_keeps_an_untouched_span_as_is() -> None:
 
 def test_number_verdict_is_fail_closed_on_unknown_shapes() -> None:
     assert number_verdict("Hello AB123456 bye", 6, 14) is True
+
+
+# --- reference and tracking shapes (LAB-1344, tuned on the cee-dev split) -------------------
+
+
+def _cnp(head: str) -> str:
+    """A Romanian personal number (CNP) with a valid check digit: 13 digits, may start 17/18."""
+    total = sum(int(d) * int(w) for d, w in zip(head, "279146358279", strict=True))
+    return head + str(1 if total % 11 == 10 else total % 11)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("BESZEDES ref 1761734400123 519 200 Ft", "1761734400123"),  # epoch milliseconds
+        ("reference: 20261029141749\n", "20261029141749"),  # yyyymmddhhmmss
+        ("tranzakció TR20261029141749 kész", "TR20261029141749"),
+        ("ID: PAY20251020130750", "PAY20251020130750"),
+        ("ref K-20260612013631 |", "20260612013631"),
+        ("ref 2O261029141749 x", "2O261029141749"),  # an OCR O for a 0
+        ("TRANSFER UA222O53650HU 5576", "UA222O53650HU"),  # S10 with an OCR O
+        ("ref EE459378323AT", "EE459378323AT"),
+        ("ID: 2025/098820\n", "2025/098820"),  # year / serial
+        ("invoice VSZ 2024/09146, x", "2024/09146"),
+        ("FV 2026/06039, ok", "FV 2026/06039"),
+        ("ID: 448-1813374-1068055 |", "448-1813374-1068055"),  # 3-7-7 order number
+    ],
+)
+def test_reference_and_tracking_shapes_are_dropped(text: str, value: str) -> None:
+    assert detect(text, (value, "BANK_ACCOUNT")) == []
+    assert detect(text, (value, "ID_DOCUMENT")) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("card 5247 1154 0172 4326, ID: 1ZTBVH129952639626.", "1ZTBVH129952639626"),
+        ("kártya 4699 7028 7967 2896, TR20260117040802.", "TR20260117040802"),
+        ("DIRECT DEBIT 2026-10-17 ref 1ZEF83LC8611052895 £19,647.3", "1ZEF83LC8611052895"),
+        ("Account: GB12 KQZF 9822 0076 6235 99 | reference: 1817380329666", "1817380329666"),
+    ],
+)
+def test_a_positive_cue_does_not_reach_over_another_number(text: str, value: str) -> None:
+    assert detect(text, (value, "BANK_ACCOUNT")) == []
+
+
+def test_a_span_is_cut_at_newlines_and_around_tracking_tokens() -> None:
+    iban = "GB64 DQLG 1272 1511 3909 60"
+    text = f"Account: {iban}\n1ZSB6LZX5311962777\nref x"
+    assert detect(text, (f"{iban}\n1ZSB6LZX5311962777", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, iban)]
+    text = f"TRANSFER CP279078509AT {CARD}\n"
+    assert detect(text, (f"CP279078509AT {CARD}", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, CARD)]
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        (f"Hello {_cnp('175031512345')} bye", _cnp("175031512345")),  # a valid CNP
+        ("Hello 3761734400123 bye", "3761734400123"),  # 13 digits, no epoch
+        ("Hello 1464872278652 bye", "1464872278652"),  # 2016: too old for a fresh reference
+        ("Hello 20261399141749 bye", "20261399141749"),  # month 13: no stamp
+        ("Hello 20261029141799 bye", "20261029141799"),  # second 99: no stamp
+        ("Hello 2025/0988201234 bye", "2025/0988201234"),  # serial too long
+        ("Passport TR20261029141749", "TR20261029141749"),  # a positive label still wins
+        (f"card {_cnp('175031512345')}", _cnp("175031512345")),
+    ],
+)
+def test_near_misses_of_the_reference_shapes_are_kept(text: str, value: str) -> None:
+    assert detect(text, (value, "ID_DOCUMENT")) == [(E.ID_DOCUMENT, value)]

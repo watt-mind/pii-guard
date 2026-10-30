@@ -11,13 +11,16 @@ numbers, an amount glued to the field before it, or a few digits cut out of a lo
 detector, plus a split-only pass over :data:`_SPLIT_TYPES` (``PHONE``). Every other type
 passes untouched. For each span:
 
-1. **Fields.** A span that runs over a field separator (``,`` ``;`` ``|`` ``=`` a quote or a
-   tab, as in ``SO4760429,77445.68``) is cut into its fields, and each field is judged on its
-   own. A ``PHONE`` span is only ever split: one without a separator passes untouched.
+1. **Fields.** A span that runs over a field separator (``,`` ``;`` ``|`` ``=`` a quote, a
+   tab or a newline, as in ``SO4760429,77445.68``) is cut into its fields, and a tracking or
+   reference token inside a field (``CP279078509AT 5576 0184 …``) is cut out of it; each piece
+   is judged on its own. A ``PHONE`` span is only ever split at separators: one without a
+   separator passes untouched.
 2. **Machine ids: drop.** A lowercase hexadecimal id with letters and digits
    (``"id": "40aebd349d7fcb76"``, ``call_…``, ``req=…``), or any piece of one, whatever its key.
 3. **Positive cue: keep.** An identity, account, card, tax or phone word in the column header
-   of a CSV row, or anywhere in the line before the value (a JSON or YAML key, a label), keeps
+   of a CSV row, or in the line before the value with no other number between (a JSON or YAML
+   key, a label), keeps
    the field whatever its shape. The typed cues of every language pack (``cues.tsv``) count,
    plus the field names in :data:`_POSITIVE`.
 4. **Negative cue: drop.** The column header, or a label right before the value (at most one
@@ -28,6 +31,10 @@ passes untouched. For each span:
 5. **No cue: the shape decides.** Dropped only when the shape rules personal data out:
 
    - a UPS (``1Z`` + 16) or UPU S10 (``LX123456785GB``) tracking number;
+   - a timestamp-style reference (LAB-1344): a ``yyyymmddhhmmss`` stamp or epoch milliseconds
+     from 2020-2035 that is no valid Romanian CNP, after an optional letter prefix
+     (``TR20261029141749``); a year and serial (``2025/098820``); a 3-7-7 order number. An OCR
+     ``O`` for a ``0`` counts as the digit. Tuned on the synthetic ``cee-dev`` split only;
    - an amount, or part of one: a decimal (``48170.94``), the digits before ``.94``, the cents.
 
    Everything else is kept (fail closed). Two more drop rules were tried on a fresh synthetic
@@ -42,6 +49,7 @@ The rules are unchanged, and a validated rule span still wins in the resolver.
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Sequence
@@ -103,7 +111,7 @@ _GENERIC = frozenset({"number", "nummer", "szam", "szama", "numer", "mit", "der"
 #: How far before a value the nearest cue is looked for, on the same line.
 _WINDOW = 60
 
-_FIELD_SEPARATORS = ",;|=\"'\t"
+_FIELD_SEPARATORS = ",;|=\"'\t\n"
 _WORD_RE = re.compile(r"[^\W\d_]+")
 _WORD_OR_NUMBER_RE = re.compile(r"[^\W\d_]+|\d+")
 #: Words of a label that don't count as words between it and its value ("order number").
@@ -112,7 +120,13 @@ _FILLER = frozenset({"number", "no", "nr", "num", "nummer", "numer", "szam", "sz
 _LABEL_WORDS = 2
 _HEX_RE = re.compile(r"(?:[a-z]+_)?(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{8,}")
 _UPS_RE = re.compile(r"1Z[0-9A-Z]{16}")
-_S10_RE = re.compile(r"[A-Z]{2}\d{9}[A-Z]{2}")
+# The serial of an S10 id may hold an OCR "O" for a "0" (``UA222O53650HU``).
+_S10_RE = re.compile(r"[A-Z]{2}[0-9O]{9}[A-Z]{2}")
+#: A ``yyyymmddhhmmss`` stamp, or 13-digit epoch milliseconds, after an optional short letter
+#: prefix (``TR…``, ``PAY…``): checked by :func:`_stamp` and :func:`_epoch_ms`.
+_STAMP_RE = re.compile(r"(?:[A-Z]{1,4}-?)?([0-9O]{13,14})")
+_YEAR_SERIAL_RE = re.compile(r"(?:[A-Z]{1,4} )?(?:19|20)\d{2}/\d{3,6}")
+_ORDER_377_RE = re.compile(r"\d{3}-\d{7}-\d{7}")
 _DECIMAL_RE = re.compile(r"\d{1,3}(?:[ ,.]\d{3})*[.,]\d{2}|\d+[.,]\d{2}")
 _DECIMAL_AFTER_RE = re.compile(r"[.,]\d{1,2}(?![\w.,])")
 _TOKEN_CHAR = re.compile(r"[0-9A-Za-z_]")
@@ -178,10 +192,12 @@ def cue_before(text: str, start: int, *, label_words: int = _LABEL_WORDS) -> boo
     """The cue for a value at ``start``: True positive, False negative, None none.
 
     A CSV row's column header decides first. Then the words before the value on its line,
-    nearest first, within :data:`_WINDOW` characters: a positive word anywhere keeps the value;
-    a negative word drops it only as its label, fewer than :data:`_LABEL_WORDS` words before it
-    with no other number between (``"order": "…"``, ``Rendelés módosítása …``), so a reference
-    word earlier in a sentence ("for my order, my number is …") does not drop it.
+    nearest first, within :data:`_WINDOW` characters: a positive word keeps the value when no
+    other number stands between them (``card 4699 …, TR2026…``: the card cue is the card's, not
+    the reference's; LAB-1344); a negative word drops it only as its label, fewer than
+    :data:`_LABEL_WORDS` words before it with no other number between (``"order": "…"``,
+    ``Rendelés módosítása …``), so a reference word earlier in a sentence ("for my order, my
+    number is …") does not drop it.
     """
     header = _csv_header(text, start)
     if header is not None:
@@ -197,7 +213,7 @@ def cue_before(text: str, start: int, *, label_words: int = _LABEL_WORDS) -> boo
             label = False  # another value stands between: no longer this one's label
             continue
         verdict = _classify_word(m.group())
-        if verdict is True:
+        if verdict is True and label:
             return True
         if verdict is False and label and words < label_words:
             return False
@@ -332,6 +348,54 @@ def _amount(text: str, start: int, end: int) -> bool:
     return end - start <= 2 and start >= 2 and text[start - 1] in ".," and text[start - 2].isdigit()
 
 
+def _is_cnp(digits: str) -> bool:
+    """True for a Romanian personal number (CNP): sex digit, birth month and day, check digit."""
+    if digits[0] == "0" or not ("01" <= digits[3:5] <= "12" and "01" <= digits[5:7] <= "31"):
+        return False
+    total = sum(int(d) * int(w) for d, w in zip(digits, "279146358279", strict=False))
+    check = total % 11
+    return digits[-1] == str(1 if check == 10 else check)
+
+
+def _stamp(digits: str) -> bool:
+    """True for a ``yyyymmddhhmmss`` stamp in 2000-2039."""
+    try:
+        t = dt.datetime.strptime(digits, "%Y%m%d%H%M%S")
+    except ValueError:
+        return False
+    return 2000 <= t.year < 2040
+
+
+def _epoch_ms(digits: str) -> bool:
+    """True for epoch milliseconds in 2020-2035 that are no valid CNP (``17…`` is a 1970s birth).
+
+    The window is recent on purpose: a reference is minted now, and an older value (``14…``,
+    2016) is as likely a 13-digit identity number.
+    """
+    return 1_577_836_800_000 <= int(digits) < 2_082_758_400_000 and not _is_cnp(digits)
+
+
+def _reference(value: str) -> bool:
+    """True if ``value`` is a tracking number or a timestamp-style or CEE order reference.
+
+    UPS ``1Z…``, UPU S10 (``LX123456785GB``), a ``yyyymmddhhmmss`` stamp or epoch milliseconds
+    with an optional letter prefix (``TR20261029141749``), a year and serial (``2025/098820``,
+    ``FV 2026/06039``), a 3-7-7 order number. An OCR ``O`` for a ``0`` counts as the digit.
+    """
+    if _UPS_RE.fullmatch(value) or _S10_RE.fullmatch(value):
+        return _S10_RE.fullmatch(value) is None or sum(c.isdigit() for c in value) >= 7
+    if _YEAR_SERIAL_RE.fullmatch(value) or _ORDER_377_RE.fullmatch(value):
+        return True
+    m = _STAMP_RE.fullmatch(value)
+    if m is None:
+        return False
+    digits = m.group(1)
+    if digits.count("O") > 1:
+        return False
+    digits = digits.replace("O", "0")
+    return _stamp(digits) if len(digits) == 14 else _epoch_ms(digits)
+
+
 def number_verdict(text: str, start: int, end: int) -> bool:
     """True to keep the NER number ``text[start:end]``, False to drop it."""
     tok_start, tok_end = _token(text, start, end)
@@ -350,7 +414,7 @@ def number_verdict(text: str, start: int, end: int) -> bool:
     cue = cue_before(text, run_start, label_words=_LABEL_WORDS if letters else 1)
     if cue is not None:
         return cue
-    if _UPS_RE.fullmatch(token) or _S10_RE.fullmatch(token):
+    if any(_reference(v) for v in {token, tail, text[start:end]}):
         return False
     return not (_amount(text, start, end) or _amount(text, tok_start, tok_end))
 
@@ -374,6 +438,31 @@ def _fields(text: str, start: int, end: int) -> list[tuple[int, int]]:
     return out
 
 
+def _cut_references(text: str, start: int, end: int) -> list[tuple[int, int]]:
+    """A field cut around the whitespace-separated tokens that are a reference on their own.
+
+    The model joins neighbours into one span (``CP279078509AT 5576 0184 …``, a UPU id and a
+    card); the reference is judged alone and the rest stays one piece.
+    """
+    tokens = [(m.start(), m.end()) for m in re.finditer(r"\S+", text[start:end])]
+    if len(tokens) < 2 or _reference(text[start:end]):
+        return [(start, end)]
+    out: list[tuple[int, int]] = []
+    run: tuple[int, int] | None = None
+    for a, b in tokens:
+        a, b = start + a, start + b
+        if _reference(text[a:b]):
+            if run is not None:
+                out.append(run)
+                run = None
+            out.append((a, b))
+        else:
+            run = (run[0], b) if run is not None else (a, b)
+    if run is not None:
+        out.append(run)
+    return out
+
+
 def check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
     """``spans`` with the NER numbers that fail :func:`number_verdict` removed or cut down."""
     token = _INDEX.set(_CsvIndex(text))
@@ -390,9 +479,12 @@ def _check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
             out.append(span)
             continue
         fields = _fields(text, span.start, span.end)
-        if span.entity_type not in NUMBER_TYPES and len(fields) <= 1:
-            out.append(span)  # one field: no separator ran through it, leave it alone
-            continue
+        if span.entity_type not in NUMBER_TYPES:
+            if len(fields) <= 1:
+                out.append(span)  # one field: no separator ran through it, leave it alone
+                continue
+        else:
+            fields = [c for f in fields for c in _cut_references(text, *f)]
         kept = [f for f in fields if number_verdict(text, f[0], f[1])]
         if kept == [(span.start, span.end)]:
             out.append(span)
