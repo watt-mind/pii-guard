@@ -1934,9 +1934,13 @@ is (LAB-1658). A provider-side tool inside a namespace is refused like one at th
 and so is a `tools` array holding more than 512 definitions or nesting namespaces more than 4
 deep. Once the response stream has closed, a paid reservation is settled down, never up, to
 what it used (LAB-1662): the upstream's reported usage; without one (an aborted stream, an
-error answer) the masked payload's bytes as input plus every byte the upstream returned as
-output; nothing when no upstream call happened (a refusal, a timeout or a disconnect before
-it). Settlement refunds tokens and money once per request, never the request count.
+error answer, a timeout or transport error after the send) the masked payload's bytes as
+input and the full output reservation, because muse-spark-1.3 bills hidden reasoning inside
+its output tokens without streaming anything for it; nothing when no upstream call happened
+(a refusal, a timeout or a disconnect before it). Sponsored chat streams always ask the
+upstream for `stream_options.include_usage`; the usage chunk is removed from the client's
+stream unless the client asked for it. Settlement refunds tokens and money once per
+request, never the request count.
 Concurrency releases only after the response stream and cleanup.
 There are no automatic upstream retries. Monetary units are integer microdollars, and configured
 per-token rates must upper-bound every permitted model and all reasoning charges. The rate
@@ -2013,7 +2017,18 @@ process that charged it settles the charge down to actual usage with one refund,
 same ETag compare-and-swap, at most once per request id (an unknown write outcome is never
 retried). Refunds are their own monotonic totals (`refunded_total`, `daily_refunded`, absent
 until the first refund), so the ceilings apply to charged minus refunded and rollback detection
-is unchanged. A failed refund leaves the full charge.
+is unchanged. A failed refund leaves the full charge; a refund whose caller timed out is
+stopped before its write when it can be, and is otherwise logged as `refund_outcome=unknown`.
+
+**Rollback runbook.** A release without settlement parses only the original nine fields, so
+after the first refund it fails closed: sponsored requests answer `503
+sponsored_unavailable` (BYOK keeps working). To roll back, either accept that until the
+allocation is replaced, or have a budget owner fold the refunds in while the app is stopped:
+set `charged_total` to `charged_total - refunded_total` and `daily_charged` to
+`daily_charged - daily_refunded`, remove both refund fields, and write the blob with the
+read ETag as `If-Match`. Both totals only fall by money that was never spent, so no
+authority is created; restart the app afterwards, since a running process treats the lower
+totals as a rollback.
 
 Only a known HTTP 412 precondition conflict may retry, at most three attempts. SDK retries
 are disabled. Connection/read timeouts and a ten-second admission deadline bound I/O; a

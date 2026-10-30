@@ -22,7 +22,13 @@ import pytest
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
-from pii_guard.gateway.meter import UPSTREAM_METER, UpstreamMeter, record_usage, scan_usage
+from pii_guard.gateway.meter import (
+    UPSTREAM_METER,
+    UpstreamMeter,
+    client_chunk,
+    record_usage,
+    scan_usage,
+)
 from pii_guard.hosted.middleware import HostedMiddleware, settled_tokens
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits, SponsoredUnavailableError
 from pii_guard.hosted.runtime import HostedService
@@ -143,6 +149,16 @@ def test_refund_retries_conflicts_and_an_unknown_outcome_never_refunds_twice() -
     assert store.document()["refunded_total"] == 2000
 
 
+def test_a_refund_cancelled_before_its_write_leaves_the_charge() -> None:
+    spend, store, _ = durable()
+    spend.charge(1000, threading.Event(), "req-a")
+    cancelled = threading.Event()
+    cancelled.set()
+    with pytest.raises(SponsoredUnavailableError):
+        spend.refund("req-a", 0, cancelled)
+    assert "refunded_total" not in store.document()
+
+
 def test_failed_refund_leaves_the_charge_in_full() -> None:
     spend, store, _ = durable()
     spend.charge(1000, threading.Event(), "req-a")
@@ -232,10 +248,12 @@ def test_reservation_settles_down_once_and_keeps_the_request_count() -> None:
 def test_settled_tokens_rules() -> None:
     meter = UpstreamMeter()
     assert settled_tokens(500, 100, meter, fixed_input=False) == (0, 0, "no_upstream")
-    meter.forwarded, meter.payload_bytes, meter.received_bytes = True, 320, 40
-    assert settled_tokens(500, 100, meter, fixed_input=False) == (320, 40, "estimated")
-    meter.received_bytes = 10_000  # never above the reservation
+    meter.forwarded, meter.payload_bytes = True, 320
+    # No usage: the input estimate, and the whole output reservation (hidden reasoning).
     assert settled_tokens(500, 100, meter, fixed_input=False) == (320, 100, "estimated")
+    meter.payload_bytes = 10_000  # never above the reservation
+    assert settled_tokens(500, 100, meter, fixed_input=False) == (500, 100, "estimated")
+    meter.payload_bytes = 320
     meter.input_tokens, meter.output_tokens = 90, 12
     assert settled_tokens(500, 100, meter, fixed_input=False) == (90, 12, "usage")
     assert settled_tokens(500, 100, meter, fixed_input=True) == (500, 12, "usage")
@@ -261,6 +279,29 @@ def test_meter_reads_chat_and_responses_usage_and_ignores_garbage() -> None:
     finally:
         UPSTREAM_METER.reset(token)
     record_usage({"prompt_tokens": 1, "completion_tokens": 1})  # no meter: a no-op
+
+
+def test_client_chunk_hides_only_the_usage_settlement_asked_for() -> None:
+    usage_only = '{"id":"c","choices":[],"usage":{"prompt_tokens":7,"completion_tokens":3}}'
+    riding = '{"id":"c","choices":[{"index":0,"delta":{}}],"usage":{"prompt_tokens":7}}'
+    content = '{"id":"c","choices":[{"index":0,"delta":{"content":"hi"}}],"usage":null}'
+    assert client_chunk(usage_only) == usage_only  # no meter: untouched
+    token = UPSTREAM_METER.set(UpstreamMeter(strip_usage=False))
+    try:
+        assert client_chunk(usage_only) == usage_only  # the client asked for it
+    finally:
+        UPSTREAM_METER.reset(token)
+    token = UPSTREAM_METER.set(UpstreamMeter(strip_usage=True))
+    try:
+        assert client_chunk(usage_only) is None
+        assert json.loads(client_chunk(riding) or "") == {
+            "id": "c",
+            "choices": [{"index": 0, "delta": {}}],
+        }
+        assert client_chunk(content) == content
+        assert client_chunk("[DONE]") == "[DONE]"
+    finally:
+        UPSTREAM_METER.reset(token)
 
 
 # --- end to end through the hosted app ------------------------------------------------------
@@ -439,74 +480,173 @@ def test_completion_settles_to_reported_usage(
         assert secret not in line
 
 
-def test_upstream_5xx_settles_to_the_masked_input_estimate(monkeypatch: pytest.MonkeyPatch) -> None:
+def net(store: Store | None) -> int:
+    assert store is not None
+    doc = store.document()
+    return doc["charged_total"] - doc.get("refunded_total", 0)
+
+
+def run(app: Any, service: HostedService, payload: bytes, **kwargs: Any) -> list[dict[str, Any]]:
+    async def exercise() -> list[dict[str, Any]]:
+        try:
+            return await call(app, payload, **kwargs)
+        finally:
+            await service.close()
+
+    return asyncio.run(exercise())
+
+
+def test_upstream_5xx_refunds_input_only(monkeypatch: pytest.MonkeyPatch) -> None:
     error = b'{"error":{"message":"synthetic overload"}}'
     app, service, store, sent = hosted_app(
         monkeypatch, lambda request: httpx.Response(503, content=error), with_durable=True
     )
-
-    async def exercise() -> list[dict[str, Any]]:
-        try:
-            return await call(app, body())
-        finally:
-            await service.close()
-
-    messages = asyncio.run(exercise())
-    assert status(messages) == 503
-    assert store is not None and len(sent) == 1
+    assert status(run(app, service, body())) == 503
     reserved_in, reserved_out = reserved(service)
-    # Input: the masked payload's bytes (never under its tokens); output: the error bytes.
-    settled = cost(len(sent[0]), len(error))
-    doc = store.document()
-    assert doc["charged_total"] == cost(reserved_in, reserved_out)
-    assert doc["charged_total"] - doc["refunded_total"] == settled
-    assert next(iter(service.quotas._users.values())).tokens == len(sent[0]) + len(error)
+    assert len(sent) == 1 and len(sent[0]) < reserved_in
+    # No usage: input is the masked payload's bytes; output stays at the reservation.
+    assert store is not None
+    assert store.document()["charged_total"] == cost(reserved_in, reserved_out)
+    assert net(store) == cost(len(sent[0]), reserved_out)
+    assert next(iter(service.quotas._users.values())).tokens == len(sent[0]) + reserved_out
 
 
-def test_stream_without_usage_aborted_by_the_client_settles_to_what_streamed(
+def test_timeout_between_send_and_first_byte_keeps_the_output_charge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    streamed: list[bytes] = []
+    async def silent(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(5)  # the upstream is still (invisibly) reasoning
+        return answer({"prompt_tokens": 1, "completion_tokens": 1})
 
-    async def chunks() -> AsyncIterator[bytes]:
-        for index in range(1000):
-            chunk = (
-                "data: "
-                + json.dumps(
-                    {
-                        "id": "chatcmpl-synthetic",
-                        "object": "chat.completion.chunk",
-                        "choices": [{"index": 0, "delta": {"content": f"part {index} "}}],
-                    }
-                )
-                + "\n\n"
-            ).encode()
-            streamed.append(chunk)
-            yield chunk
-            await asyncio.sleep(0.01)
+    sent: list[bytes] = []
+
+    async def upstream(request: httpx.Request) -> httpx.Response:
+        sent.append(request.content)
+        return await silent(request)
+
+    monkeypatch.setattr(
+        "pii_guard.hosted.runtime.SecureTransport", lambda: httpx.MockTransport(upstream)
+    )
+    app = create_app(settings(hosted_request_timeout=0.3))
+    service: HostedService = app.state.hosted
+    service.quotas = memory_ledger()
+    service.spend, store, _ = durable()
+    assert status(run(app, service, body())) == 504
+    assert len(sent) == 1
+    assert net(store) == cost(len(sent[0]), service.settings.hosted_max_output_tokens)
+
+
+def test_transport_error_after_the_payload_was_built_keeps_the_output_charge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def broken(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadError("synthetic connection reset")
+
+    app, service, store, sent = hosted_app(monkeypatch, broken, with_durable=True)
+    assert status(run(app, service, body())) == 502
+    assert len(sent) == 1
+    assert net(store) == cost(len(sent[0]), service.settings.hosted_max_output_tokens)
+
+
+def sse(document: dict[str, Any] | str) -> bytes:
+    data = document if isinstance(document, str) else json.dumps(document)
+    return f"data: {data}\n\n".encode()
+
+
+def content_chunk(text: str) -> dict[str, Any]:
+    return {
+        "id": "chatcmpl-synthetic",
+        "object": "chat.completion.chunk",
+        "model": MODEL,
+        "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}],
+    }
+
+
+def usage_chunk(prompt: int, completion: int) -> dict[str, Any]:
+    return {
+        "id": "chatcmpl-synthetic",
+        "object": "chat.completion.chunk",
+        "model": MODEL,
+        "choices": [],
+        "usage": {
+            "prompt_tokens": prompt,
+            "completion_tokens": completion,
+            "total_tokens": prompt + completion,
+        },
+    }
+
+
+def test_abort_before_the_usage_event_of_a_reasoning_only_stream_refunds_no_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def reasoning_then_usage() -> AsyncIterator[bytes]:
+        # Hidden reasoning: no content events at all, then usage reporting 8000 output.
+        await asyncio.sleep(5)
+        yield sse(usage_chunk(40, 8000))
+        yield sse("[DONE]")
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=chunks())
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=reasoning_then_usage()
+        )
 
     app, service, store, sent = hosted_app(monkeypatch, handler, with_durable=True)
 
-    async def exercise() -> list[dict[str, Any]]:
-        try:
-            return await call(app, body(stream=True), gone_after_chunks=5)
-        finally:
-            await service.close()
+    async def exercise() -> None:
+        task = asyncio.create_task(call(app, body(stream=True)))
+        for _ in range(200):
+            if sent:
+                break
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
+        task.cancel()  # the client went away; the server cancels the request
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        await service.close()
 
-    with contextlib.suppress(Exception):  # the disconnect surfaces as ClientDisconnect
-        asyncio.run(exercise())
-    assert store is not None
-    reserved_in, reserved_out = reserved(service)
-    received = sum(len(chunk) for chunk in streamed)
-    assert 0 < received < reserved_out
-    doc = store.document()
-    net = doc["charged_total"] - doc["refunded_total"]
-    # At most what was streamed (a chunk may be in flight when the stream closed).
-    assert cost(len(sent[0]), 1) <= net <= cost(len(sent[0]), received)
-    assert net < cost(reserved_in, reserved_out)
+    asyncio.run(exercise())
+    reserved_out = service.settings.hosted_max_output_tokens
+    assert len(sent) == 1 and reserved_out > 8000
+    assert net(store) == cost(len(sent[0]), reserved_out)  # no output refund
+    assert next(iter(service.quotas._users.values())).tokens == len(sent[0]) + reserved_out
+
+
+@pytest.mark.parametrize("client_asked", [False, True])
+def test_sponsored_streams_ask_for_usage_and_settle_to_it_without_changing_the_client_stream(
+    monkeypatch: pytest.MonkeyPatch, client_asked: bool
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        events = [sse(content_chunk("Synthetic ")), sse(content_chunk("reply"))]
+        if json.loads(request.content).get("stream_options", {}).get("include_usage"):
+            events.append(sse(usage_chunk(40, 900)))
+        events.append(sse("[DONE]"))
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=b"".join(events)
+        )
+
+    app, service, store, sent = hosted_app(monkeypatch, handler, with_durable=True)
+    request = json.loads(body(stream=True))
+    if client_asked:
+        request["stream_options"] = {"include_usage": True}
+    messages = run(app, service, json.dumps(request).encode())
+    assert status(messages) == 200
+    upstream = json.loads(sent[0])
+    assert upstream["stream_options"] == {"include_usage": True}
+    streamed = b"".join(m.get("body", b"") for m in messages if m["type"] == "http.response.body")
+    events = [
+        line[len(b"data: ") :] for line in streamed.split(b"\n") if line.startswith(b"data: ")
+    ]
+    assert events[-1] == b"[DONE]"
+    shown = [json.loads(event) for event in events[:-1]]
+    usage_events = [event for event in shown if event.get("usage")]
+    assert len(usage_events) == (1 if client_asked else 0)
+    assert (
+        "".join(
+            choice["delta"].get("content", "") for event in shown for choice in event["choices"]
+        )
+        == "Synthetic reply"
+    )
+    assert net(store) == cost(40, 900)
 
 
 def test_no_upstream_call_refunds_the_whole_reservation() -> None:

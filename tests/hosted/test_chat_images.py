@@ -240,9 +240,8 @@ def test_owner_connection_gets_a_masked_image_and_a_fixed_image_charge(hosted: H
     text = upstream_payload_bound(len(json.dumps(body).encode()) - image_chars)
     output = client.app.state.hosted.settings.hosted_max_output_tokens
     expected = text + IMAGE_ANNOTATION_BYTES + 16_384 + output
-    # The middleware adds the output field before measuring: a few bytes, twice. Settlement
-    # (LAB-1662) keeps the fixed image input charge and lowers output to what came back.
-    assert expected - output - 512 < charged < expected - output + 2048
+    # The middleware adds the output field before measuring: a few bytes, twice.
+    assert expected - 512 < charged <= expected + 512
     # A much larger image costs the same: its bytes are never charged as text tokens.
     large = noisy_card()
     assert len(large) > 20 * len(card())

@@ -59,7 +59,7 @@ from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, w
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
-from pii_guard.gateway.meter import meter_response, record_payload, record_usage, scan_usage
+from pii_guard.gateway.meter import client_chunk, record_payload, record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import IssuedIds, upstream_ids, without_opaque_ids
 from pii_guard.gateway.outbound import (
     OUTBOUND_CHECK_HEADER,
@@ -470,7 +470,6 @@ class Gateway:
                 raise UpstreamError("Upstream response exceeds hosted size limit")
         else:
             response.stream = BoundedResponseStream(response.stream)
-        meter_response(response)
 
     @property
     def detectors(self) -> dict[Mode, ModeDetector]:
@@ -1275,11 +1274,15 @@ class Gateway:
                     )
                 )
             async for data in iter_sse_data(timed_lines()):
-                unmasking = time.perf_counter()
-                outs = restorer.process(data)
-                timer.add("unmask", time.perf_counter() - unmasking)
                 trace.scan_usage(data)
                 scan_usage(data)
+                # A usage chunk only settlement asked for never reaches the client.
+                shown = client_chunk(data)
+                if shown is None:
+                    continue
+                unmasking = time.perf_counter()
+                outs = restorer.process(shown)
+                timer.add("unmask", time.perf_counter() - unmasking)
                 for out in outs:
                     timer.mark_first_event()
                     if out == DONE and echo and not echoed_answer:

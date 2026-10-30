@@ -74,17 +74,18 @@ def settled_tokens(
     """The (input, output) tokens a finished request is settled to, and how they were found.
 
     Never above the reservation. No upstream call: nothing. Reported usage: that usage.
-    Otherwise (an aborted stream, an error answer): the masked payload's bytes as input (a
-    byte-level tokenizer never emits more tokens than bytes, so this never underestimates
-    the real input) and every byte the upstream returned as output, which bounds the output
-    tokens it streamed.
+    Otherwise (an aborted stream, an error answer, a timeout or transport error after the
+    send) the masked payload's bytes as input (a byte-level tokenizer never emits more tokens
+    than bytes, so this never underestimates the real input) and the full output reservation:
+    muse-spark-1.3 bills hidden reasoning inside its output tokens and streams nothing for
+    it, so no output seen is no evidence of no output billed.
     """
     if not meter.forwarded:
         return 0, 0, "no_upstream"
     if meter.input_tokens is not None and meter.output_tokens is not None:
         tokens_in, tokens_out, outcome = meter.input_tokens, meter.output_tokens, "usage"
     else:
-        tokens_in, tokens_out, outcome = meter.payload_bytes, meter.received_bytes, "estimated"
+        tokens_in, tokens_out, outcome = meter.payload_bytes, reserved_output, "estimated"
     if fixed_input:
         tokens_in = reserved_input
     return min(tokens_in, reserved_input), min(tokens_out, reserved_output), outcome
@@ -219,6 +220,7 @@ class HostedMiddleware:
         streaming: str | None = None
         payload_limit = None
         settlement: _Settlement | None = None
+        strip_usage = False
         state: dict[str, Any] = dict(scope.get("state", {}))
 
         async def tracked_send(message: Message) -> None:
@@ -566,6 +568,18 @@ class HostedMiddleware:
                         raise HostedRequestError("Output token limit is outside hosted limits")
                     maximum = min(maximum, value)
                 body[output_field] = maximum
+                if (
+                    sponsored_route
+                    and canonical == "/v1/chat/completions"
+                    and body.get("stream") is True
+                ):
+                    # Sponsored chat streams always ask for the usage chunk (api.meta.ai
+                    # accepts it: eval/results/2026-10-28-lab-1372-meta-reasoning), so they
+                    # settle to real usage; the gateway hides it unless the client asked.
+                    options = body.get("stream_options", {})
+                    if isinstance(options, dict):
+                        strip_usage = options.get("include_usage") is not True
+                        body["stream_options"] = {**options, "include_usage": True}
                 raw = bytearray(json.dumps(body).encode())
                 output_limit = maximum
             else:
@@ -626,7 +640,7 @@ class HostedMiddleware:
                         output_tokens=output_tokens,
                         durable=sponsored and self.service.spend is not None,
                         fixed_input=bool(inline_images),
-                        meter=UpstreamMeter(),
+                        meter=UpstreamMeter(strip_usage=strip_usage),
                     )
                 if sponsored and self.service.spend is not None:
                     try:
@@ -743,7 +757,12 @@ class HostedMiddleware:
                         self.service.leave_stream(streaming)
 
     async def _settle(self, settlement: _Settlement) -> None:
-        """Settle one paid reservation down to its usage and log one line. Never raises."""
+        """Settle one paid reservation down to its usage and log one line.
+
+        Raises no ``Exception``: a failed refund leaves the charge in full. A cancellation
+        (``CancelledError``) during the durable refund still propagates, after the log line
+        (``refund_outcome=cancelled``; the refund may or may not have committed).
+        """
         tokens_in, tokens_out, outcome = settled_tokens(
             settlement.input_tokens,
             settlement.output_tokens,
@@ -757,25 +776,32 @@ class HostedMiddleware:
         )
         reserved = reservation.spend
         settled = reservation.spend - refunded_spend
-        if settlement.durable:
-            reserved = self.service.spend_cost(settlement.input_tokens, settlement.output_tokens)
-            refunded_spend = await self.service.refund_spend(
-                settlement.request_id, tokens_in, tokens_out
+        refund_outcome = "memory" if reservation.spend else "none"
+        try:
+            if settlement.durable:
+                reserved = self.service.spend_cost(
+                    settlement.input_tokens, settlement.output_tokens
+                )
+                settled, refund_outcome = reserved, "cancelled"
+                refunded_spend, refund_outcome = await self.service.refund_spend(
+                    settlement.request_id, tokens_in, tokens_out
+                )
+                settled = reserved - refunded_spend
+        finally:
+            # Counts and an opaque per-user digest only: no payload text, identity or key.
+            settlement_logger.info(
+                "settlement route=%s user=%s outcome=%s sponsored=%s refund_outcome=%s "
+                "reserved_tokens=%d settled_tokens=%d refunded_tokens=%d "
+                "reserved_microdollars=%d settled_microdollars=%d refunded_microdollars=%d",
+                settlement.route,
+                settlement.user,
+                outcome,
+                "durable" if settlement.durable else ("memory" if reservation.spend else "no"),
+                refund_outcome,
+                settlement.input_tokens + settlement.output_tokens,
+                tokens_in + tokens_out,
+                refunded_tokens,
+                reserved,
+                settled,
+                refunded_spend if refund_outcome != "cancelled" else 0,
             )
-            settled = reserved - refunded_spend
-        # Counts and an opaque per-user digest only: no payload text, identity or key.
-        settlement_logger.info(
-            "settlement route=%s user=%s outcome=%s sponsored=%s reserved_tokens=%d "
-            "settled_tokens=%d refunded_tokens=%d reserved_microdollars=%d "
-            "settled_microdollars=%d refunded_microdollars=%d",
-            settlement.route,
-            settlement.user,
-            outcome,
-            "durable" if settlement.durable else ("memory" if reservation.spend else "no"),
-            settlement.input_tokens + settlement.output_tokens,
-            tokens_in + tokens_out,
-            refunded_tokens,
-            reserved,
-            settled,
-            refunded_spend,
-        )

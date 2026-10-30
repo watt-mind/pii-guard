@@ -381,24 +381,32 @@ class HostedService:
         finally:
             cancelled.set()
 
-    async def refund_spend(self, request_id: str, input_tokens: int, output_tokens: int) -> int:
-        """Settle one durable charge down to these token counts; 0 when nothing refunded.
+    async def refund_spend(
+        self, request_id: str, input_tokens: int, output_tokens: int
+    ) -> tuple[int, str]:
+        """Settle one durable charge down to these token counts: (refunded, outcome).
 
-        Runs even after the kill switch (a refund only lowers spend). Any failure, timeout
-        included, leaves the charge in full and returns 0: settlement is best effort.
+        Outcomes: ``refunded``; ``nothing`` (no open charge, or no difference); ``failed``
+        (the charge stays in full); ``unknown`` (timed out: the worker is told to stop before
+        its write, but a write already in flight may still commit). Runs even after the kill
+        switch (a refund only lowers spend). Settlement is best effort: never raises an
+        ``Exception``.
         """
         if self.spend is None:
-            return 0
+            return 0, "nothing"
         settled = self.spend_cost(input_tokens, output_tokens)
         cancelled = threading.Event()
         try:
             async with asyncio.timeout(10):
-                return await self._spend_workers.run(
+                amount = await self._spend_workers.run(
                     self.spend.refund, request_id, settled, cancelled
                 )
+            return amount, "refunded" if amount else "nothing"
+        except TimeoutError:
+            return 0, "unknown"
         except Exception:
-            # Timeout, a closed worker pool, or the ledger's own sanitized refusal.
-            return 0
+            # A closed worker pool, or the ledger's own sanitized refusal.
+            return 0, "failed"
         finally:
             cancelled.set()
 

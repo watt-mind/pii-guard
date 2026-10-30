@@ -354,7 +354,8 @@ class DurableSpend:
                         daily_refunded=state.daily_refunded + (amount if daily else 0),
                     )
                     try:
-                        if self._store is None:
+                        # A caller that gave up (timeout) must not see a late refund land.
+                        if self._store is None or cancelled.is_set():
                             raise SponsoredUnavailableError
                         self._store.compare_and_swap(updated.encoded(), etag)
                     except Conflict:

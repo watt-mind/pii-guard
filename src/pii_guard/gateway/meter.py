@@ -1,9 +1,9 @@
 """What one request actually sent upstream and got back, for hosted settlement (LAB-1662).
 
 Hosted admission reserves a conservative bound before any work starts. Once the request has
-finished, the hosted middleware settles that reservation down to what this meter saw: the
-masked payload that was forwarded, the bytes the upstream returned and the usage it reported.
-The meter only counts; it never holds payload text, so it carries no PII.
+finished, the hosted middleware settles that reservation down to what this meter saw: whether
+a masked payload was forwarded, its size, and the usage the upstream reported. The meter only
+counts; it never holds payload text, so it carries no PII.
 
 A request outside hosted admission has no meter and every hook is a no-op.
 """
@@ -11,12 +11,8 @@ A request outside hosted admission has no meter and every hook is a no-op.
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
-
-import httpx
 
 
 @dataclass(slots=True)
@@ -25,12 +21,13 @@ class UpstreamMeter:
     forwarded: bool = False
     #: Bytes of that masked payload, without the inline images charged at a fixed price.
     payload_bytes: int = 0
-    #: Raw bytes the upstream returned (status line excluded), stream or whole body.
-    received_bytes: int = 0
     #: Token usage the upstream reported, or None when it reported none (aborted stream,
     #: error answer, a chat stream without ``include_usage``).
     input_tokens: int | None = None
     output_tokens: int | None = None
+    #: The hosted middleware asked the upstream for a usage chunk the client did not ask
+    #: for: the gateway takes it out of the client's stream.
+    strip_usage: bool = False
 
 
 UPSTREAM_METER: ContextVar[UpstreamMeter | None] = ContextVar(
@@ -83,27 +80,23 @@ def scan_usage(data: str, *, nested: bool = False) -> None:
     record_usage(parsed.get("usage"))
 
 
-class MeteredStream(httpx.AsyncByteStream):
-    """Count the upstream's raw response bytes as they are read."""
+def client_chunk(data: str) -> str | None:
+    """The chat stream chunk the client sees, after :func:`scan_usage` has read it.
 
-    def __init__(self, stream: Any, meter: UpstreamMeter) -> None:
-        self._stream, self._meter = stream, meter
-
-    async def __aiter__(self) -> AsyncIterator[bytes]:
-        async for chunk in self._stream:
-            self._meter.received_bytes += len(chunk)
-            yield chunk
-
-    async def aclose(self) -> None:
-        await self._stream.aclose()
-
-
-def meter_response(response: httpx.Response) -> None:
-    """Attach the current request's meter (if any) to an upstream response."""
+    When usage was requested for settlement only, a usage-only chunk (``choices: []``) is
+    dropped and a ``usage`` riding on a content chunk is removed, so the client's stream
+    keeps the shape it asked for. Anything else passes through byte for byte.
+    """
     meter = UPSTREAM_METER.get()
-    if meter is None:
-        return
-    if response.is_stream_consumed:
-        meter.received_bytes += len(response.content)
-    else:
-        response.stream = MeteredStream(response.stream, meter)
+    if meter is None or not meter.strip_usage or '"usage"' not in data:
+        return data
+    try:
+        parsed = json.loads(data)
+    except ValueError:
+        return data
+    if not isinstance(parsed, dict) or parsed.get("usage") is None:
+        return data
+    if parsed.get("choices") == []:
+        return None
+    del parsed["usage"]
+    return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
