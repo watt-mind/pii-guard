@@ -223,12 +223,11 @@ Capabilities and evidence: [docs/why-pii-guard.md](docs/why-pii-guard.md).
 ## See it
 
 <p align="center">
-  <img src="docs/assets/demo/demo.webp" alt="Console tour in the light theme with fictional English data: Overview, a support email masked in the Playground, the same session in Chat, Logs and Connect" width="100%">
+  <img src="docs/assets/demo/demo.webp" alt="Console tour in the dark theme, recorded in fast mode (rules + NER) with fictional English data: Overview, a support email masked in the Playground with names replaced by placeholders, the same session in Chat, Logs and Connect" width="100%">
 </p>
 
-<p align="center"><sub>Console tour, recorded in rules-only mode (no NER), so free-text names
-stay readable in it; fast mode, the one measured above, masks them. More screens:
-<a href="ui/README.md#screens">ui/README.md</a>.</sub></p>
+<p align="center"><sub>Console tour, recorded in fast mode (rules + NER) with fictional data.
+More screens: <a href="ui/README.md#screens">ui/README.md</a>.</sub></p>
 
 > **Status:** built for the Meta Global AI Developer Hackathon (October 26 – November 4, 2026)
 > and running in production at [guard.watt-mind.com](https://guard.watt-mind.com). Known gaps:
