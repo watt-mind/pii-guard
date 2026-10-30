@@ -25,7 +25,7 @@ export interface ImageRecordings {
 // region response. Labels-mode placeholders and transcript belong to the landing showcase,
 // not this replay. The bundled SAM-era entry for the Hungarian card left the surname
 // without a region box; the fresh local-detector recording covers both name lines.
-const stripToRegions = (recording: typeof englishRecording) => ({
+const stripToRegions = (recording: typeof englishRecording | typeof hungarianRecording) => ({
   media_type: recording.image.media_type,
   width: recording.image.width,
   height: recording.image.height,
