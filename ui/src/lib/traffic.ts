@@ -330,6 +330,7 @@ export const OUTCOME_LABEL: Record<string, string> = {
   blocked: "Blocked",
   refused: "Refused",
   upstream_error: "Upstream error",
+  upstream_failed: "Upstream failed",
   stream_error: "Stream error",
   error: "Error",
 };

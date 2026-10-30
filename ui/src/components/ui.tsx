@@ -488,7 +488,7 @@ export function SecretReveal({
   return (
     <div role="alert" aria-labelledby={titleId} className="rounded-lg border border-warn/40 bg-warn-soft p-3 sm:p-4">
       <p id={titleId} className="text-sm font-medium text-warn">
-        Copy {label} now. It is shown only once.
+        Shown only once: copy {label} and store it now.
       </p>
       <p className="mt-1 text-sm text-ink">
         PII Guard keeps only a hash, so this value can't be shown again.{envName && <> Store it as <code className="font-mono text-xs">{envName}</code>.</>}

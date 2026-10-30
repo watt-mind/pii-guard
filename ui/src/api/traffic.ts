@@ -28,7 +28,20 @@ import type { EntityType } from "./types";
 import { ApiError, UnreachableError } from "./http";
 
 export type TrafficLevel = "masked" | "full";
-export type TrafficOutcome = "ok" | "blocked" | "refused" | "upstream_error" | "stream_error" | "error";
+export type TrafficOutcome = "ok" | "blocked" | "refused" | "upstream_error" | "upstream_failed" | "stream_error" | "error";
+
+/** `upstream_*` codes raised before anything was forwarded: those calls stay `refused`. */
+const NOT_FORWARDED_UPSTREAM = new Set(["upstream_not_configured", "upstream_destination_not_allowed"]);
+
+/**
+ * The event's outcome, with servers from before LAB-1629 read like newer ones: they logged a
+ * forwarded call whose upstream then failed as `refused` with an `upstream_*` code.
+ */
+export function readOutcome(outcome: unknown, code: unknown): string {
+  if (typeof outcome !== "string") return "ok";
+  if (outcome === "refused" && typeof code === "string" && code.startsWith("upstream_") && !NOT_FORWARDED_UPSTREAM.has(code)) return "upstream_failed";
+  return outcome;
+}
 
 export interface TrafficTiming {
   total_ms: number;
@@ -138,7 +151,7 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     seq: raw.seq,
     time: typeof raw.time === "string" ? raw.time : new Date().toISOString(),
     level: raw.level === "full" ? "full" : "masked",
-    outcome: typeof raw.outcome === "string" ? raw.outcome : "ok",
+    outcome: readOutcome(raw.outcome, isRecord(raw.error) ? raw.error.code : undefined),
     error: isRecord(raw.error) && typeof raw.error.code === "string" ? (raw.error as TrafficEvent["error"]) : null,
     mode: typeof raw.mode === "string" ? raw.mode : null,
     language: typeof raw.language === "string" ? raw.language : null,

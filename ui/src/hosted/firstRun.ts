@@ -125,13 +125,15 @@ export interface TestRoundTrip {
  * One request through the endpoint, as the owner (same-origin session, no endpoint key): the
  * gateway masks it, the endpoint's model answers, and the echo shows what the model saw.
  */
-export async function sendTestRequest(endpointId: string, doFetch: typeof fetch = (...a) => fetch(...a), signal?: AbortSignal): Promise<TestRoundTrip> {
+export async function sendTestRequest(endpointId: string, doFetch: typeof fetch = (...a) => fetch(...a), signal?: AbortSignal, policyVersionId?: string): Promise<TestRoundTrip> {
   const started = performance.now();
   const response = await doFetch(`/e/${encodeURIComponent(endpointId)}/v1/chat/completions`, {
     method: "POST",
     credentials: "same-origin",
     headers: { Accept: "application/json", "Content-Type": "application/json", "X-PII-Guard-Echo": "masked" },
-    body: JSON.stringify({ messages: [{ role: "user", content: TEST_PROMPT }], stream: false }),
+    // One vault session per policy version (`prompt_cache_key`, LAB-1629): a value masked in an
+    // earlier test stays masked in that session, so a version that keeps it would look unapplied.
+    body: JSON.stringify({ messages: [{ role: "user", content: TEST_PROMPT }], stream: false, ...(policyVersionId ? { prompt_cache_key: `pii-guard-connect-test:${policyVersionId}` } : {}) }),
     signal,
   });
   let payload: unknown = null;

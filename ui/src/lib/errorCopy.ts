@@ -65,6 +65,12 @@ export function errorCopy(code: string | undefined, status: number | null = null
         title: "The upstream could not be reached, or its answer was unusable.",
         body: "PII Guard masked the request before forwarding it; the upstream didn't give a usable answer. Nothing unmasked left PII Guard. Retry, or check the upstream URL.",
       };
+    case "upstream_did_not_stream":
+      return {
+        kind: "upstream",
+        title: "The model answered without streaming.",
+        body: "The masked request reached the model, which sent a whole answer instead of a stream; PII Guard doesn't pass that on. Nothing unmasked left PII Guard. Retry; a client can also call without streaming.",
+      };
     case "stream_failed":
       return {
         kind: "stream",

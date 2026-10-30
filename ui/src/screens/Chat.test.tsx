@@ -158,7 +158,9 @@ describe("Chat error copy per code (LAB-1335)", () => {
     expect(alert).toHaveTextContent("Nothing unmasked left PII Guard.");
     expect(alert).not.toHaveTextContent("Nothing was sent to the model");
     expect(alert).not.toHaveTextContent("fails closed");
-    expect(screen.getByText("The masked request was sent; the upstream refused it before answering.")).toBeInTheDocument();
+    // Said once beside the masked side, the reason only in the notice (LAB-1629).
+    expect(screen.getByText(/The masked request was forwarded; no answer came back\./)).toBeInTheDocument();
+    expect(screen.queryByText(/refused it before answering/)).toBeNull();
   });
 
   it("detection_failed keeps the fail-closed text", async () => {
@@ -205,8 +207,8 @@ describe("Chat detection modes (LAB-1435)", () => {
     const { client, calls } = liveChat();
     render(<Chat client={client} live draft={null} modes={["fast"]} />);
     await screen.findByRole("combobox", { name: "Model" });
-    expect(radios()).toEqual(["Fast"]);
-    expect(screen.getByRole("radio", { name: "Fast" })).toBeChecked();
+    // One mode: no one-option control (LAB-1629).
+    expect(screen.queryByRole("radiogroup", { name: "Detection mode" })).toBeNull();
     await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]!.mode).toBe("fast");

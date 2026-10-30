@@ -47,7 +47,7 @@ function summarize(events: readonly TrafficEvent[]) {
     masked: events.reduce((n, e) => n + totalMasked(e), 0),
     blocked: events.filter((e) => BLOCKED.has(e.outcome)).length,
     failed: events.filter((e) => e.outcome !== "ok" && !BLOCKED.has(e.outcome)).length,
-    upstreamErrors: events.filter((e) => e.outcome === "upstream_error").length,
+    upstreamErrors: events.filter((e) => e.outcome === "upstream_error" || e.outcome === "upstream_failed").length,
     types: [...types.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
     stages,
     overhead: { p50: percentile(overhead, 50), p95: percentile(overhead, 95) },

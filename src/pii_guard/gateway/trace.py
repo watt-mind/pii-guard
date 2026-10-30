@@ -15,6 +15,10 @@ keeps it only once that check has passed: the outbound re-check ran and found no
 refused, blocked or failed call gets :data:`MODEL_WITHHELD` instead, in ``model`` and in the
 ``full`` original alike (LAB-1358). The upstream's reported model is kept only when the request
 model was and it is model-id shaped.
+
+``outcome`` is ``refused`` only when the guard stopped the call; a masked request that was
+forwarded and then failed upstream (unreachable, unusable answer, no event stream) is
+``upstream_failed``, its ``error.code`` still the ``upstream_*`` code (LAB-1629).
 """
 
 from __future__ import annotations
@@ -140,10 +144,19 @@ class CallTrace:
 
     def fail(self, exc: BaseException) -> None:
         from pii_guard.gateway.outbound import OutboundCheckFailedError
+        from pii_guard.gateway.service import UpstreamError
 
         if isinstance(exc, PiiGuardError):
             blocked = isinstance(exc, BlockedEntityError | OutboundCheckFailedError)
-            outcome = "blocked" if blocked else "refused"
+            # The masked request was forwarded and the upstream failed (unreachable, unusable
+            # answer, no event stream): not a refusal, nothing stopped in the guard (LAB-1629).
+            # ``error.code`` keeps its ``upstream_*`` value, so older consumers still match it.
+            if blocked:
+                outcome = "blocked"
+            elif isinstance(exc, UpstreamError):
+                outcome = "upstream_failed"
+            else:
+                outcome = "refused"
             # The message names types and counts only, never values (the same redaction
             # rule as API error bodies, LAB-1314). Anything else may echo the request.
             error = {"code": exc.code, "status": exc.status_code, "message": exc.message}

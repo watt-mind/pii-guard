@@ -417,9 +417,14 @@ function TurnView({
       <Bubble side="model" label="What the model received">
         {turn.status === "error" && turn.maskedUser === null ? (
           <p className="text-sm text-muted">
-            {turn.error && reachedUpstream(turn.error)
-              ? "The masked request was sent; the upstream refused it before answering."
-              : "Nothing was sent."}
+            {/* One line here; the notice below says why (LAB-1629). */}
+            {turn.error && reachedUpstream(turn.error) ? (
+              <>
+                The masked request was forwarded; no answer came back. Its masked text is in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>.
+              </>
+            ) : (
+              "Nothing was sent."
+            )}
           </p>
         ) : turn.maskedUser === null ? (
           <Pending
@@ -519,7 +524,9 @@ function Bubble({ side, label, children, className = "" }: { side: "you" | "mode
         className,
       ].join(" ")}
     >
-      <h3
+      {/* A label, not a heading: the section is already named, and an h3 under no h2 broke heading order (LAB-1629). */}
+      <p
+        aria-hidden="true"
         className={[
           "mb-1.5 font-mono text-2xs",
           side === "model" ? "text-model" : "text-guard",
@@ -527,7 +534,7 @@ function Bubble({ side, label, children, className = "" }: { side: "you" | "mode
       >
         {side === "model" ? "Model side · " : "Your side · "}
         {label}
-      </h3>
+      </p>
       {children}
     </section>
   );
@@ -611,18 +618,21 @@ function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, lan
         className="doc block"
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <span className="flex items-center gap-2">
-          <span aria-hidden="true" className="text-sm text-muted">
-            Detection
+        {/* One mode available: nothing to choose, so no one-option control (LAB-1629). */}
+        {MODES.filter((m) => modes.includes(m.id)).length > 1 && (
+          <span className="flex items-center gap-2">
+            <span aria-hidden="true" className="text-sm text-muted">
+              Detection
+            </span>
+            <SegmentedControl
+              label="Detection mode"
+              name="chat-mode"
+              value={mode}
+              onChange={onMode}
+              options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: hintOf(m) }))}
+            />
           </span>
-          <SegmentedControl
-            label="Detection mode"
-            name="chat-mode"
-          value={mode}
-          onChange={onMode}
-          options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: hintOf(m) }))}
-          />
-        </span>
+        )}
         <label className="flex items-center gap-2 text-sm text-muted">
           Language
           <span className="w-32">

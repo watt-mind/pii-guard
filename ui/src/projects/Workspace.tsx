@@ -8,7 +8,7 @@ import { request, recovery, type Requester } from "../hosted/api";
 import { useHostedSession } from "../hosted/session";
 import { dateTime, relativeTime } from "../lib/time";
 import { setSelectedEndpoint } from "./selection";
-import { exampleModel, projectPath, pendingPolicyEdit, requestPolicyEdit, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
+import { exampleModel, projectPath, pendingPolicyEdit, pendingPolicyEndpoint, requestPolicyEdit, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
 
@@ -81,12 +81,40 @@ function policyFamilies(policies: PolicyVersion[]): { latest: PolicyVersion; old
   });
 }
 
-/** Escape closes an inline form like Cancel (a confirmation inside it handles its own Escape first). */
-const escapeTo = (onCancel: () => void, busy: boolean) => (e: { key: string; defaultPrevented: boolean; preventDefault: () => void }) => {
-  if (e.key !== "Escape" || e.defaultPrevented || busy) return;
-  e.preventDefault();
-  onCancel();
-};
+/**
+ * Escape closes an inline form like Cancel (a confirmation inside it handles its own Escape first).
+ * Once something in the form was changed, Escape asks before discarding it (LAB-1629).
+ */
+function useEscapeGuard(onCancel: () => void, busy: boolean) {
+  const [touched, setTouched] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const returnTo = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (asking) keepRef.current?.focus();
+  }, [asking]);
+  const keep = () => {
+    setAsking(false);
+    const back = returnTo.current;
+    requestAnimationFrame(() => back?.focus());
+  };
+  const onKeyDown = (e: { key: string; defaultPrevented: boolean; preventDefault: () => void }) => {
+    if (e.key !== "Escape" || e.defaultPrevented || busy) return;
+    e.preventDefault();
+    if (asking) return keep();
+    if (!touched) return onCancel();
+    returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setAsking(true);
+  };
+  const prompt = asking ? (
+    <div role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm">
+      <p className="w-full font-medium text-warn sm:w-auto sm:flex-1">Discard your changes?</p>
+      <Button size="sm" variant="danger" onClick={onCancel}>Discard changes</Button>
+      <Button size="sm" ref={keepRef} onClick={keep}>Keep editing</Button>
+    </div>
+  ) : null;
+  return { onKeyDown, onChange: () => setTouched(true), prompt };
+}
 
 /** A panel opened from a row (edit, new version, keys) renders inside that row, below it (LAB-1619). */
 const INLINE = "w-full basis-full pt-1";
@@ -187,6 +215,11 @@ type Notified = { area: "endpoints" | "policies"; text: string; endpointId?: str
 interface EndpointBody { name: string; provider: string; model: string | null; policy_version_id: string; enabled: boolean; base_url?: string; api_key?: string }
 interface PolicyBody { name: string; entity_policies: Record<TextEntityType, Policy> & Record<VisualEntityType, "mask" | "keep">; language: string; mode: string; visual_detection: VisualDetection }
 
+/** The endpoint as saved, with another policy version or enabled state; the stored credential stays (omitted). */
+function endpointBody(endpoint: Endpoint, change: Partial<Pick<EndpointBody, "policy_version_id" | "enabled">>): EndpointBody {
+  return { name: endpoint.name, provider: endpoint.provider, model: endpoint.model, policy_version_id: endpoint.policy_version_id, enabled: endpoint.enabled, ...(endpoint.provider === "custom" ? { base_url: endpoint.base_url } : {}), ...change };
+}
+
 function ProjectConfiguration({ project, call, hosted }: { project: Project; call: Requester; hosted: boolean }) {
   const [policies, setPolicies] = useState<PolicyVersion[]>([]);
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
@@ -228,8 +261,28 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
   };
   const inspected = endpoints.find((e) => e.id === inspect);
   const latest = latestVersions(policies);
+  /** The family's latest version when it is newer than the one this endpoint pins. */
+  const newerVersion = (endpoint: Endpoint): PolicyVersion | undefined => {
+    const v = latest.get(endpoint.policy_id) ?? 0;
+    return v > endpoint.policy_version ? policies.find((p) => p.policy_id === endpoint.policy_id && p.version === v) : undefined;
+  };
+  const applyLatest = (endpoint: Endpoint) => action(async () => {
+    const next = newerVersion(endpoint);
+    if (!next) return;
+    await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, endpointBody(endpoint, { policy_version_id: next.policy_version_id }), "PUT");
+    await reload();
+    setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' now uses ${next.name} v${next.version}. The next request uses it.` });
+    focusLater(byId(ENDPOINTS_TITLE));
+  });
+  const deleteEndpoint = (endpoint: Endpoint) => action(async () => {
+    await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, undefined, "DELETE");
+    await reload();
+    setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' deleted.` });
+    focusLater(byId(ENDPOINTS_TITLE));
+  });
   // Opened from Connect's "Tune what is masked": a new version of that policy, its form focused.
   const [wantedEdit] = useState(pendingPolicyEdit);
+  const [wantedEndpoint] = useState(pendingPolicyEndpoint);
   const [openedWanted, setOpenedWanted] = useState(false);
   if (wantedEdit && loaded && !openedWanted) {
     setOpenedWanted(true);
@@ -243,14 +296,26 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
       key={`policy-form-${policyEdit === "new" ? "new" : policyEdit.policy_version_id}`}
       policy={policyEdit === "new" ? undefined : policyEdit}
       endpoints={endpoints}
+      preferred={policyEdit !== "new" && policyEdit.policy_id === wantedEdit ? wantedEndpoint : null}
       hosted={hosted}
       busy={busy}
       onCancel={closePolicyForm}
-      onSave={(body) => action(async () => {
-        await call(policyEdit === "new" ? `${base}/policies` : `${base}/policies/${encodeURIComponent(policyEdit.policy_id)}`, body, policyEdit === "new" ? "POST" : "PUT");
+      onSave={(body, applyTo) => action(async () => {
+        const saved = await call<Partial<PolicyVersion> | undefined>(policyEdit === "new" ? `${base}/policies` : `${base}/policies/${encodeURIComponent(policyEdit.policy_id)}`, body, policyEdit === "new" ? "POST" : "PUT");
+        // "Save and apply": the endpoints move to the version just saved (LAB-1629).
+        const versionId = saved?.policy_version_id;
+        if (applyTo.length && versionId) {
+          for (const target of applyTo) await call(`${base}/endpoints/${encodeURIComponent(target.id)}`, endpointBody(target, { policy_version_id: versionId }), "PUT");
+        }
         await reload();
         setPolicyEdit(null);
-        setNotice({ area: "policies", text: `Policy '${body.name}' saved.` });
+        const version = saved?.version ? ` v${saved.version}` : "";
+        setNotice({
+          area: "policies",
+          text: applyTo.length && versionId
+            ? `Policy '${body.name}'${version} saved and applied to ${listNames(applyTo)}. The next request uses it.`
+            : `Policy '${body.name}'${version} saved.`,
+        });
         focusLater(byId(POLICIES_TITLE));
       })}
     />
@@ -277,7 +342,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
         focusLater(byId(ENDPOINTS_TITLE));
       })}
       onDisable={endpointEdit === "new" ? undefined : () => action(async () => {
-        await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, { name: endpointEdit.name, provider: endpointEdit.provider, model: endpointEdit.model, policy_version_id: endpointEdit.policy_version_id, enabled: false, ...(endpointEdit.provider === "custom" ? { base_url: endpointEdit.base_url } : {}) }, "PUT");
+        await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, endpointBody(endpointEdit, { enabled: false }), "PUT");
         await reload();
         setEndpointEdit(null); setInspect("");
         setNotice({ area: "endpoints", text: `Endpoint '${endpointEdit.name}' disabled. Its endpoint keys are revoked.` });
@@ -387,10 +452,27 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
                   <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · {endpoint.model ? <span className="font-mono text-xs">{endpoint.model}</span> : "Client chooses the model"}</p>
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
                     {policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}
-                    {(latest.get(endpoint.policy_id) ?? 0) > endpoint.policy_version && <Badge>v{latest.get(endpoint.policy_id)} available</Badge>}
+                    {endpoint.enabled && newerVersion(endpoint) && <Badge>v{newerVersion(endpoint)!.version} available</Badge>}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {endpoint.enabled && newerVersion(endpoint) && (
+                    <Button size="sm" busy={busy} aria-label={`Apply v${newerVersion(endpoint)!.version} to ${endpoint.name}`} onClick={() => applyLatest(endpoint)}>
+                      Apply v{newerVersion(endpoint)!.version}
+                    </Button>
+                  )}
+                  {!endpoint.enabled && (
+                    <ConfirmAction
+                      size="sm"
+                      trigger="Delete"
+                      triggerLabel={`Delete ${endpoint.name}`}
+                      title={`Delete endpoint '${endpoint.name}'?`}
+                      body="Its configuration is removed; its endpoint keys are already revoked."
+                      confirm="Delete endpoint"
+                      busy={busy}
+                      onConfirm={() => deleteEndpoint(endpoint)}
+                    />
+                  )}
                   {endpoint.enabled && (
                     <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
                       Connect & keys
@@ -492,10 +574,11 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
   const selected = policies.find((p) => p.policy_version_id === policyId);
   const requiresCredential = provider !== "sponsored" && (!endpoint?.credential_configured || endpoint.provider !== provider);
   const keyLabel = requiresCredential ? "Provider API key" : "Replace provider API key (optional)";
+  const guard = useEscapeGuard(onCancel, busy);
   const blockedReason = isSponsored && !model ? "Choose a model to save." : !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
   return (
-    // Escape anywhere in the form, its focused heading included, is Cancel (LAB-1626).
-    <div onKeyDown={escapeTo(onCancel, busy)}>
+    // Escape anywhere in the form, its focused heading included, is Cancel (LAB-1626), asking first once edited.
+    <div onKeyDown={guard.onKeyDown}>
     <Card
       title={endpoint ? `Edit ${endpoint.name}` : "Create endpoint"}
       titleId={titleId}
@@ -504,6 +587,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
       <form
         aria-labelledby={titleId}
         className="space-y-4"
+        onChange={guard.onChange}
         onSubmit={(e) => { e.preventDefault(); const apiKey = secret; setSecret(""); void onSave({ name, provider, model: model.trim() || null, policy_version_id: policyId, enabled: endpoint ? endpoint.enabled || reenable : true, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(apiKey ? { api_key: apiKey } : {}) }); }}
       >
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
@@ -585,6 +669,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
             <Checkbox className="mt-3" checked={reviewed} disabled={busy} onChange={(e) => setReviewed(e.target.checked)} label={`Apply ${selected?.name} v${selected?.version} to this endpoint`} />
           </div>
         )}
+        {guard.prompt}
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" type="submit" busy={busy} disabled={!busy && Boolean(blockedReason)}>{busy ? "Saving…" : endpoint ? "Save endpoint" : "Create endpoint"}</Button>
           <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
@@ -607,7 +692,13 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
   );
 }
 
-function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCancel }: { policy?: PolicyVersion; template?: PolicyVersion; endpoints: Endpoint[]; hosted: boolean; busy: boolean; onSave: (body: PolicyBody) => Promise<void>; onCancel: () => void }) {
+/** "A", "A and B", "3 endpoints". */
+function listNames(items: { name: string }[]): string {
+  if (items.length > 2) return `${items.length} endpoints`;
+  return items.map((e) => `'${e.name}'`).join(" and ");
+}
+
+function PolicyForm({ policy, template, endpoints, preferred = null, hosted, busy, onSave, onCancel }: { policy?: PolicyVersion; template?: PolicyVersion; endpoints: Endpoint[]; /** The endpoint Connect's "Tune" came from: the one "Save and apply" moves. */ preferred?: string | null; hosted: boolean; busy: boolean; onSave: (body: PolicyBody, applyTo: Endpoint[]) => Promise<void>; onCancel: () => void }) {
   const [name, setName] = useState(policy?.name ?? "");
   const [entities, setEntities] = useState({ ...(policy?.entity_policies ?? template?.entity_policies ?? defaults) });
   const [language, setLanguage] = useState(policy?.language ?? template?.language ?? "hu");
@@ -623,12 +714,17 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
   const titleId = useId();
   useFocusOnOpen(titleId);
   const affected = endpoints.filter((e) => e.enabled && e.policy_id === policy?.policy_id);
+  // "Save and apply" (LAB-1629): the endpoint Tune came from, else every endpoint on this policy.
+  const fromTune = affected.filter((e) => e.id === preferred);
+  const applyTo = fromTune.length ? fromTune : affected;
+  const guard = useEscapeGuard(onCancel, busy);
+  const body = (): PolicyBody => ({ name, entity_policies: { ...entities, ...visual }, language, mode, visual_detection: detection });
   return (
-    <div onKeyDown={escapeTo(onCancel, busy)}>
+    <div onKeyDown={guard.onKeyDown}>
     <Card title={policy ? `New version of ${policy.name}` : "Create policy"} titleId={titleId} subtitle="Mask replaces detected values with reversible placeholders. Keep sends them unchanged. Block refuses the entire request when that type is detected.">
-      <form aria-labelledby={titleId} className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSave({ name, entity_policies: { ...entities, ...visual }, language, mode, visual_detection: detection }); }}>
+      <form aria-labelledby={titleId} className="space-y-4" onChange={guard.onChange} onSubmit={(e) => { e.preventDefault(); void onSave(body(), policy ? applyTo : []); }}>
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Policy name" required>
+          <Field label="Policy name" required={!policy}>
             <Input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Language">
@@ -691,16 +787,22 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
           )}
         </fieldset>
         <div className={REVIEW}>
-          <p>{policy ? "Saving creates a new version. No endpoint changes automatically." : "The new policy is available to endpoints in this project."}</p>
+          <p>{policy ? "Saving creates a new version." : "The new policy is available to endpoints in this project."}</p>
           {policy && (
-            <>
-              <p className="mt-1">Endpoints using this policy family: {affected.length ? affected.map((e) => `${e.name} (v${e.policy_version})`).join(", ") : "none"}.</p>
-              <p className="mt-1">To apply the saved version, edit an endpoint and review its policy assignment.</p>
-            </>
+            <p className="mt-1">
+              Endpoints using this policy: {affected.length ? affected.map((e) => `${e.name} (v${e.policy_version})`).join(", ") : "none"}.
+              {applyTo.length > 0 && <> Save and apply moves {listNames(applyTo)} to the new version; Save only keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version.</>}
+            </p>
           )}
         </div>
+        {guard.prompt}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" type="submit" busy={busy}>{busy ? "Saving…" : policy ? "Save new version" : "Save policy"}</Button>
+          <Button variant="primary" type="submit" busy={busy}>
+            {busy ? "Saving…" : !policy ? "Save policy" : applyTo.length ? `Save and apply to ${listNames(applyTo)}` : "Save new version"}
+          </Button>
+          {policy && applyTo.length > 0 && (
+            <Button disabled={busy} onClick={() => void onSave(body(), [])}>Save only</Button>
+          )}
           <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
         </div>
       </form>
@@ -745,7 +847,7 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
     focusLater(byId(keysTitle));
   });
   return (
-    <Card ref={panel} tabIndex={-1} aria-label={`Connect ${endpoint.name}`} title={`Connect ${endpoint.name}`} subtitle="Endpoint keys authorize only this endpoint. Provider credentials are managed by the guard." className="focus:outline-none">
+    <Card ref={panel} tabIndex={-1} aria-label={`Connect ${endpoint.name}`} title={`Connect ${endpoint.name}`} subtitle={`Endpoint keys authorize only this endpoint. Your provider key stays ${hosted ? "on the PII Guard server" : "in the guard"}; apps never see it.`} className="focus:outline-none">
       <div className="space-y-4">
         <Field label="OpenAI-compatible base URL">
           <Input readOnly value={url} className="font-mono" />
