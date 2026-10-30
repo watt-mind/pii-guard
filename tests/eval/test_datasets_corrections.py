@@ -114,6 +114,9 @@ def test_a_dataset_run_records_the_published_ner_by_its_hub_id(
         ner_resolve, "resolve", lambda **_: ner_resolve.NerChoice("published", "x", None)
     )
     det = run._ner_detector()
-    assert det["model"] == "xlmr-base-v2-hn"  # the same system key as the published rows
-    assert det["model_ref"].startswith(f"{ner_resolve.PUBLISHED_REPO} v2.0, revision 95f612a9")
+    release = ner_resolve.PUBLISHED_RELEASE
+    assert det["model"] == f"xlmr-base-{release}"  # one system key per published release
+    assert det["model_ref"].startswith(
+        f"{ner_resolve.PUBLISHED_REPO} {release}, revision {ner_resolve.PUBLISHED.revision[:12]}"
+    )
     assert det["revision"] == f"sha256:{ner_resolve.PUBLISHED.weights_sha256}"

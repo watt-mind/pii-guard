@@ -138,6 +138,10 @@ TICKETS = {
 }
 
 
+#: Candidates that name v2.0 itself: scored on the pinned v2.0 release, not on PUBLISHED.
+V20_CANDIDATES = ("v20", "ner-v20")
+
+
 def _paths(name: str) -> list[str]:
     out: list[str] = []
     for p in SETS[name]:
@@ -150,11 +154,13 @@ def _detector(candidate: str, model: str | None) -> dict[str, Any]:
     from pii_guard.eval.stats import sha256_file
 
     if not model:
-        pub = ner_resolve.PUBLISHED
+        v20 = candidate in V20_CANDIDATES
+        pub = ner_resolve.PREVIOUS_PUBLISHED if v20 else ner_resolve.PUBLISHED
+        release = ner_resolve.PREVIOUS_RELEASE if v20 else ner_resolve.PUBLISHED_RELEASE
         return {
             "name": "ner",
-            "model": "xlmr-base-v2-hn",
-            "model_ref": f"{pub.repo_id} v2.0, revision {pub.revision[:12]}",
+            "model": "xlmr-base-v2-hn" if v20 else f"xlmr-base-{release}",
+            "model_ref": f"{pub.repo_id} {release}, revision {pub.revision[:12]}",
             "revision": f"sha256:{pub.weights_sha256}",
             "settings": {},
             "serving": "local PyTorch, CPU",
@@ -173,6 +179,11 @@ def _detector(candidate: str, model: str | None) -> dict[str, Any]:
 def _score(args: argparse.Namespace) -> int:
     if args.model:
         os.environ["PII_GUARD_NER_MODEL"] = args.model
+    elif args.candidate in V20_CANDIDATES:  # v2.0 stays the baseline after the v4.2 pin swap
+        from pii_guard.detect import ner_resolve
+
+        prev = ner_resolve.PREVIOUS_PUBLISHED
+        os.environ[ner_resolve.PUBLISHED_ENV_VAR] = f"{prev.repo_id}@{prev.revision}"
     thresholds: dict[str, Any] = {}
     if args.thresholds:  # LAB-1512 path 4: a dev-calibrated table (thresholds_v33.py)
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -353,7 +364,9 @@ def main(argv: list[str] | None = None) -> int:
         "--detectors", default="rules,ner", help="rules,ner (fast mode) or ner (model alone)"
     )
     lat = sub.add_parser("latency")
-    lat.add_argument("--model", action="append", required=True, help="name=dir (empty: v2.0)")
+    lat.add_argument(
+        "--model", action="append", required=True, help="name=dir (empty: the published release)"
+    )
     lat.add_argument("--n", type=int, default=150)
     lat.add_argument("--threads", type=int, default=8)
     lat.add_argument("--json", type=Path)
