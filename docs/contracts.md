@@ -1550,8 +1550,8 @@ accepts directories (default `eval/fixtures`). Unloadable detectors are skipped 
 warning. Markdown goes to stdout. Exit codes: 0 ok, 1 a detector or the vault failed during the
 run (fail closed, no scorecard), 2 bad arguments, fixtures or no loadable detector.
 
-The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version, detectors,
-skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
+The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag and `dirty_paths`,
+version, detectors, skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
 contains document text or labeled values.

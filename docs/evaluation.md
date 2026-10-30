@@ -182,8 +182,12 @@ validated in the tests. A record says:
 - **on what**: each fixture file with its SHA-256, language, fixture set (`smoke`,
   `synth-sample` …), `origin` (`hand-written`, `generated` with the generator model, or
   `specimens`) and document count;
-- **where and when**: commit, dirty flag, package version, date, hardware, and cost (tokens,
-  GPU minutes, US dollars, whether estimated, and which runs a shared cost covers);
+- **where and when**: commit, dirty flag (and `dirty_paths`, the changed files), package
+  version, date, hardware, and cost (tokens, GPU minutes, US dollars, whether estimated, and
+  which runs a shared cost covers). A run is dirty only when a tracked file under `src/`,
+  `eval/fixtures/`, `scripts/`, `pyproject.toml` or `uv.lock` differs from the commit: docs and
+  results regenerated while runs are recorded, and untracked models or scratch files, don't
+  count. Records made before LAB-1496 counted any tracked change, so most of them say dirty;
 - **what came out**: per language and overall, P/R/F1 exact and overlap, macro F1, leak and
   partial leak, over-masking, round trip and placeholder consistency when the system has them,
   detection and masking latency p50/p95, and per-entity-type counts. All counts are kept, so
