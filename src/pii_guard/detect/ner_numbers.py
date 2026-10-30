@@ -113,6 +113,8 @@ _GENERIC = frozenset({"number", "nummer", "szam", "szama", "numer", "mit", "der"
 _WINDOW = 60
 
 _FIELD_SEPARATORS = ",;|=\"'\t\n"
+#: A piece of a number span on a later line shorter than this is dropped (LAB-1604).
+_MIN_PIECE = 4
 _WORD_RE = re.compile(r"[^\W\d_]+")
 _WORD_OR_NUMBER_RE = re.compile(r"[^\W\d_]+|\d+")
 #: Words of a label that don't count as words between it and its value ("order number").
@@ -500,6 +502,16 @@ def check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
         _INDEX.reset(token)
 
 
+def _line_remainder(text: str, span_start: int, field: tuple[int, int]) -> bool:
+    """Whether ``field`` is a short piece the span picked up past a newline (LAB-1604).
+
+    The model runs a number over the line break into the next row (``…7654 32\n2``, the next
+    CSV row's id). A piece that short on a later line is no number of these types.
+    """
+    a, b = field
+    return b - a < _MIN_PIECE and text.find("\n", span_start, a) >= 0
+
+
 def _check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
     out: list[Span] = []
     for span in spans:
@@ -507,8 +519,11 @@ def _check_numbers(text: str, spans: Sequence[Span]) -> list[Span]:
             out.append(span)
             continue
         fields = _fields(text, span.start, span.end)
+        split = len(fields) > 1
+        if split:
+            fields = [f for f in fields if not _line_remainder(text, span.start, f)]
         if span.entity_type not in NUMBER_TYPES:
-            if len(fields) <= 1:
+            if not split:
                 out.append(span)  # one field: no separator ran through it, leave it alone
                 continue
         else:
