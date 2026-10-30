@@ -38,6 +38,7 @@ import random
 import unicodedata
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any
 
 from pii_guard.eval.datasets.spec import Dataset
 from pii_guard.eval.datasets.synthetic import (
@@ -196,7 +197,7 @@ class Negatives:
 
 Register = Callable[[Values, Negatives, random.Random], list[Piece]]
 
-_TEXT = {
+_TEXT: dict[str, dict[str, Any]] = {  # str or tuple[str, ...] per key
     "hu": {
         "statement": ("ÁTUTALÁS", "KÁRTYÁS VÁSÁRLÁS", "BESZEDÉS", "JÓVÁÍRÁS"),
         "chat_hi": "Szia",
