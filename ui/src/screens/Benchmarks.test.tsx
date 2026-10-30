@@ -118,7 +118,20 @@ describe("Benchmarks screen", () => {
     const names = rowNames(table);
     const partial = names.findIndex((n) => / only$/.test(n!));
     if (partial >= 0) expect(names.slice(partial).every((n) => / only$/.test(n!))).toBe(true);
-    const f1s = names.filter((n) => !/ only$/.test(n!)).map((n) => parseFloat(cell(table, n!, "F1")));
+    // Read each row in place: re-scores of one model share a display name (LAB-1547).
+    const f1Col = within(table)
+      .getAllByRole("columnheader")
+      .findIndex((h) => h.textContent?.replace(/[▲▼]/g, "").trim() === "F1");
+    const f1s = within(table)
+      .getAllByRole("row")
+      .filter((r) => {
+        const n = nameOf(within(r).queryByRole("rowheader"));
+        return n && !/ only$/.test(n);
+      })
+      .map((r) => {
+        const cells = [within(r).getByRole("rowheader"), ...within(r).getAllByRole("cell")];
+        return parseFloat(cells[f1Col]!.textContent!);
+      });
     expect(f1s).toEqual([...f1s].sort((a, b) => b - a));
 
     for (const box of within(panel).getAllByRole("checkbox")) {

@@ -151,7 +151,9 @@ def main(argv: list[str] | None = None) -> int:
         report["probe"] = counts
         shutil.rmtree(probe_out)
         failed = counts.get("documents_without_teacher", 0)
-        if not counts.get("documents") or failed > 0.1 * (failed + counts["documents"]):
+        # One transient DetectionError in a probe of one document per file is tolerated (the
+        # full run retries failures); more than that, or more than 10 %, stops (LAB-1547).
+        if not counts.get("documents") or failed > max(1, 0.1 * (failed + counts["documents"])):
             raise SystemExit(f"probe failed: {counts}")
         for corpus in corpora:
             cmd = [
