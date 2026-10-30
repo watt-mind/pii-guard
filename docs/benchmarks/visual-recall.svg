@@ -3,7 +3,7 @@
 <desc id="d">Grouped bars of region recall per region type for each visual run.</desc>
 <rect width="1600" height="900" fill="#FFFFFF"/>
 <text x="56" y="70" font-size="40" fill="#1B1B1F" font-weight="700">Visual recall on image documents</text>
-<text x="56" y="112" font-size="24" fill="#4A4A52">Share of labelled image regions masked (IoU &gt;= 0.5), by region type; in each group, fictional-specimens | specimens</text>
+<text x="56" y="112" font-size="24" fill="#4A4A52">Share of labeled image regions masked (IoU &gt;= 0.5), by region type; in each group, fictional-specimens | specimens</text>
 <rect x="56" y="140" width="22" height="22" fill="#0072B2"/>
 <text x="86" y="159" font-size="21" fill="#1B1B1F">eka</text>
 <rect x="156.65" y="140" width="22" height="22" fill="#332288"/>
@@ -18,7 +18,7 @@
 <text x="1238.2" y="159" font-size="21" fill="#1B1B1F">presidio-image-tuned</text>
 <rect x="56" y="172" width="22" height="22" fill="#117733"/>
 <text x="86" y="191" font-size="21" fill="#1B1B1F">rules</text>
-<rect x="169.25" y="172" width="22" height="22" fill="#0072B2"/>
+<rect x="169.25" y="172" width="22" height="22" fill="#AA4499"/>
 <text x="199.2" y="191" font-size="21" fill="#1B1B1F">rules + llm:muse-spark-open</text>
 <line x1="150" y1="680" x2="1540" y2="680" stroke="#E3E3E8" stroke-width="2"/>
 <text x="134" y="687" font-size="20" fill="#4A4A52" text-anchor="end">0%</text>
@@ -33,155 +33,88 @@
 <rect x="165" y="230" width="9.5" height="450" fill="#0072B2"/>
 <text x="169.7" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="180.5" y="230" width="9.5" height="450" fill="#332288"/>
-<text x="185.2" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="196" y="230" width="9.5" height="450" fill="#44AA99"/>
-<text x="200.7" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="211.5" y="230" width="9.5" height="450" fill="#CC6677"/>
-<text x="216.2" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="257.9" y="230" width="9.5" height="450" fill="#117733"/>
-<text x="262.7" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
-<rect x="273.4" y="230" width="9.5" height="450" fill="#0072B2"/>
-<text x="278.2" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
+<rect x="273.4" y="230" width="9.5" height="450" fill="#AA4499"/>
 <rect x="295.1" y="423.9" width="9.5" height="256.1" fill="#0072B2"/>
-<text x="299.8" y="413.9" font-size="18" fill="#1B1B1F" text-anchor="middle">57</text>
 <rect x="310.6" y="430.8" width="9.5" height="249.2" fill="#332288"/>
-<text x="315.3" y="420.8" font-size="18" fill="#1B1B1F" text-anchor="middle">55</text>
 <rect x="326.1" y="271.5" width="9.5" height="408.5" fill="#44AA99"/>
-<text x="330.8" y="261.5" font-size="18" fill="#1B1B1F" text-anchor="middle">91</text>
 <rect x="341.6" y="271.5" width="9.5" height="408.5" fill="#CC6677"/>
-<text x="346.3" y="261.5" font-size="18" fill="#1B1B1F" text-anchor="middle">91</text>
 <rect x="388" y="271.5" width="9.5" height="408.5" fill="#117733"/>
-<text x="392.8" y="261.5" font-size="18" fill="#1B1B1F" text-anchor="middle">91</text>
-<rect x="403.5" y="271.5" width="9.5" height="408.5" fill="#0072B2"/>
-<text x="408.3" y="261.5" font-size="18" fill="#1B1B1F" text-anchor="middle">91</text>
+<rect x="403.5" y="271.5" width="9.5" height="408.5" fill="#AA4499"/>
 <text x="289" y="714" font-size="21" fill="#1B1B1F" text-anchor="middle" font-weight="600">portrait</text>
 <text x="289" y="740" font-size="19" fill="#4A4A52" text-anchor="middle">n=18 / 65</text>
 <rect x="443" y="290" width="9.5" height="390" fill="#0072B2"/>
-<text x="447.7" y="280" font-size="18" fill="#1B1B1F" text-anchor="middle">87</text>
 <rect x="458.5" y="290" width="9.5" height="390" fill="#332288"/>
-<text x="463.2" y="280" font-size="18" fill="#1B1B1F" text-anchor="middle">87</text>
 <rect x="474" y="230" width="9.5" height="450" fill="#44AA99"/>
 <text x="478.7" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="489.5" y="230" width="9.5" height="450" fill="#CC6677"/>
-<text x="494.2" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="535.9" y="230" width="9.5" height="450" fill="#117733"/>
-<text x="540.7" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
-<rect x="551.4" y="230" width="9.5" height="450" fill="#0072B2"/>
-<text x="556.2" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
+<rect x="551.4" y="230" width="9.5" height="450" fill="#AA4499"/>
 <rect x="573.1" y="473.2" width="9.5" height="206.8" fill="#0072B2"/>
-<text x="577.8" y="463.2" font-size="18" fill="#1B1B1F" text-anchor="middle">46</text>
 <rect x="588.6" y="461.1" width="9.5" height="218.9" fill="#332288"/>
-<text x="593.3" y="451.1" font-size="18" fill="#1B1B1F" text-anchor="middle">49</text>
 <rect x="604.1" y="303" width="9.5" height="377" fill="#44AA99"/>
-<text x="608.8" y="293" font-size="18" fill="#1B1B1F" text-anchor="middle">84</text>
 <rect x="619.6" y="303" width="9.5" height="377" fill="#CC6677"/>
-<text x="624.3" y="293" font-size="18" fill="#1B1B1F" text-anchor="middle">84</text>
 <rect x="666" y="303" width="9.5" height="377" fill="#117733"/>
-<text x="670.8" y="293" font-size="18" fill="#1B1B1F" text-anchor="middle">84</text>
-<rect x="681.5" y="303" width="9.5" height="377" fill="#0072B2"/>
-<text x="686.3" y="293" font-size="18" fill="#1B1B1F" text-anchor="middle">84</text>
+<rect x="681.5" y="303" width="9.5" height="377" fill="#AA4499"/>
 <text x="567" y="714" font-size="21" fill="#1B1B1F" text-anchor="middle" font-weight="600">signature</text>
 <text x="567" y="740" font-size="19" fill="#4A4A52" text-anchor="middle">n=15 / 37</text>
 <rect x="721" y="680" width="9.5" height="1" fill="#0072B2"/>
-<text x="725.7" y="670" font-size="18" fill="#1B1B1F" text-anchor="middle">0</text>
 <rect x="736.5" y="680" width="9.5" height="1" fill="#332288"/>
-<text x="741.2" y="670" font-size="18" fill="#1B1B1F" text-anchor="middle">0</text>
 <rect x="752" y="230" width="9.5" height="450" fill="#44AA99"/>
 <text x="756.7" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="767.5" y="230" width="9.5" height="450" fill="#CC6677"/>
-<text x="772.2" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
 <rect x="783" y="680" width="9.5" height="1" fill="#88CCEE"/>
-<text x="787.7" y="670" font-size="18" fill="#1B1B1F" text-anchor="middle">0</text>
 <rect x="798.4" y="680" width="9.5" height="1" fill="#DDCC77"/>
-<text x="803.2" y="670" font-size="18" fill="#1B1B1F" text-anchor="middle">0</text>
 <rect x="813.9" y="230" width="9.5" height="450" fill="#117733"/>
-<text x="818.7" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
-<rect x="829.4" y="230" width="9.5" height="450" fill="#0072B2"/>
-<text x="834.2" y="220" font-size="18" fill="#1B1B1F" text-anchor="middle">100</text>
+<rect x="829.4" y="230" width="9.5" height="450" fill="#AA4499"/>
 <rect x="851.1" y="650" width="9.5" height="30" fill="#0072B2"/>
-<text x="855.8" y="640" font-size="18" fill="#1B1B1F" text-anchor="middle">7</text>
 <rect x="866.6" y="635" width="9.5" height="45" fill="#332288"/>
-<text x="871.3" y="625" font-size="18" fill="#1B1B1F" text-anchor="middle">10</text>
 <rect x="882.1" y="305" width="9.5" height="375" fill="#44AA99"/>
-<text x="886.8" y="295" font-size="18" fill="#1B1B1F" text-anchor="middle">83</text>
 <rect x="897.6" y="320" width="9.5" height="360" fill="#CC6677"/>
-<text x="902.3" y="310" font-size="18" fill="#1B1B1F" text-anchor="middle">80</text>
 <rect x="913" y="680" width="9.5" height="1" fill="#88CCEE"/>
-<text x="917.8" y="670" font-size="18" fill="#1B1B1F" text-anchor="middle">0</text>
 <rect x="928.5" y="680" width="9.5" height="1" fill="#DDCC77"/>
-<text x="933.3" y="670" font-size="18" fill="#1B1B1F" text-anchor="middle">0</text>
 <rect x="944" y="335" width="9.5" height="345" fill="#117733"/>
-<text x="948.8" y="325" font-size="18" fill="#1B1B1F" text-anchor="middle">77</text>
-<rect x="959.5" y="335" width="9.5" height="345" fill="#0072B2"/>
-<text x="964.3" y="325" font-size="18" fill="#1B1B1F" text-anchor="middle">77</text>
+<rect x="959.5" y="335" width="9.5" height="345" fill="#AA4499"/>
 <text x="845" y="714" font-size="21" fill="#1B1B1F" text-anchor="middle" font-weight="600">mrz</text>
 <text x="845" y="740" font-size="19" fill="#4A4A52" text-anchor="middle">n=6 / 30</text>
 <rect x="999" y="266.8" width="9.5" height="413.2" fill="#0072B2"/>
-<text x="1003.7" y="256.8" font-size="18" fill="#1B1B1F" text-anchor="middle">92</text>
 <rect x="1014.5" y="250.5" width="9.5" height="429.5" fill="#332288"/>
-<text x="1019.2" y="240.5" font-size="18" fill="#1B1B1F" text-anchor="middle">95</text>
 <rect x="1030" y="287.3" width="9.5" height="392.7" fill="#44AA99"/>
-<text x="1034.7" y="277.3" font-size="18" fill="#1B1B1F" text-anchor="middle">87</text>
 <rect x="1045.5" y="234.1" width="9.5" height="445.9" fill="#CC6677"/>
 <text x="1050.2" y="224.1" font-size="18" fill="#1B1B1F" text-anchor="middle">99</text>
 <rect x="1061" y="450.9" width="9.5" height="229.1" fill="#88CCEE"/>
-<text x="1065.7" y="440.9" font-size="18" fill="#1B1B1F" text-anchor="middle">51</text>
 <rect x="1076.4" y="450.9" width="9.5" height="229.1" fill="#DDCC77"/>
-<text x="1081.2" y="440.9" font-size="18" fill="#1B1B1F" text-anchor="middle">51</text>
 <rect x="1091.9" y="524.5" width="9.5" height="155.5" fill="#117733"/>
-<text x="1096.7" y="514.5" font-size="18" fill="#1B1B1F" text-anchor="middle">35</text>
-<rect x="1107.4" y="279.1" width="9.5" height="400.9" fill="#0072B2"/>
-<text x="1112.2" y="269.1" font-size="18" fill="#1B1B1F" text-anchor="middle">89</text>
+<rect x="1107.4" y="279.1" width="9.5" height="400.9" fill="#AA4499"/>
 <rect x="1129.1" y="533.8" width="9.5" height="146.2" fill="#0072B2"/>
-<text x="1133.8" y="523.8" font-size="18" fill="#1B1B1F" text-anchor="middle">32</text>
 <rect x="1144.6" y="533.8" width="9.5" height="146.2" fill="#332288"/>
-<text x="1149.3" y="523.8" font-size="18" fill="#1B1B1F" text-anchor="middle">32</text>
 <rect x="1160.1" y="586.4" width="9.5" height="93.6" fill="#44AA99"/>
-<text x="1164.8" y="576.4" font-size="18" fill="#1B1B1F" text-anchor="middle">21</text>
 <rect x="1175.6" y="548.6" width="9.5" height="131.4" fill="#CC6677"/>
-<text x="1180.3" y="538.6" font-size="18" fill="#1B1B1F" text-anchor="middle">29</text>
 <rect x="1191" y="591.3" width="9.5" height="88.7" fill="#88CCEE"/>
-<text x="1195.8" y="581.3" font-size="18" fill="#1B1B1F" text-anchor="middle">20</text>
 <rect x="1206.5" y="601.2" width="9.5" height="78.8" fill="#DDCC77"/>
-<text x="1211.3" y="591.2" font-size="18" fill="#1B1B1F" text-anchor="middle">18</text>
 <rect x="1222" y="673.4" width="9.5" height="6.6" fill="#117733"/>
-<text x="1226.8" y="663.4" font-size="18" fill="#1B1B1F" text-anchor="middle">1</text>
-<rect x="1237.5" y="555.2" width="9.5" height="124.8" fill="#0072B2"/>
-<text x="1242.3" y="545.2" font-size="18" fill="#1B1B1F" text-anchor="middle">28</text>
+<rect x="1237.5" y="555.2" width="9.5" height="124.8" fill="#AA4499"/>
 <text x="1123" y="714" font-size="21" fill="#1B1B1F" text-anchor="middle" font-weight="600">text</text>
 <text x="1123" y="740" font-size="19" fill="#4A4A52" text-anchor="middle">n=110 / 274</text>
 <rect x="1277" y="281.3" width="9.5" height="398.7" fill="#0072B2"/>
-<text x="1281.7" y="271.3" font-size="18" fill="#1B1B1F" text-anchor="middle">89</text>
 <rect x="1292.5" y="269.2" width="9.5" height="410.8" fill="#332288"/>
-<text x="1297.2" y="259.2" font-size="18" fill="#1B1B1F" text-anchor="middle">91</text>
 <rect x="1308" y="272.3" width="9.5" height="407.7" fill="#44AA99"/>
-<text x="1312.7" y="262.3" font-size="18" fill="#1B1B1F" text-anchor="middle">91</text>
 <rect x="1323.5" y="233" width="9.5" height="447" fill="#CC6677"/>
 <text x="1328.2" y="223" font-size="18" fill="#1B1B1F" text-anchor="middle">99</text>
 <rect x="1339" y="510.9" width="9.5" height="169.1" fill="#88CCEE"/>
-<text x="1343.7" y="500.9" font-size="18" fill="#1B1B1F" text-anchor="middle">38</text>
 <rect x="1354.4" y="507.8" width="9.5" height="172.2" fill="#DDCC77"/>
-<text x="1359.2" y="497.8" font-size="18" fill="#1B1B1F" text-anchor="middle">38</text>
 <rect x="1369.9" y="447.4" width="9.5" height="232.6" fill="#117733"/>
-<text x="1374.7" y="437.4" font-size="18" fill="#1B1B1F" text-anchor="middle">52</text>
-<rect x="1385.4" y="266.2" width="9.5" height="413.8" fill="#0072B2"/>
-<text x="1390.2" y="256.2" font-size="18" fill="#1B1B1F" text-anchor="middle">92</text>
+<rect x="1385.4" y="266.2" width="9.5" height="413.8" fill="#AA4499"/>
 <rect x="1407.1" y="519.3" width="9.5" height="160.7" fill="#0072B2"/>
-<text x="1411.8" y="509.3" font-size="18" fill="#1B1B1F" text-anchor="middle">36</text>
 <rect x="1422.6" y="518.2" width="9.5" height="161.8" fill="#332288"/>
-<text x="1427.3" y="508.2" font-size="18" fill="#1B1B1F" text-anchor="middle">36</text>
 <rect x="1438.1" y="489.4" width="9.5" height="190.6" fill="#44AA99"/>
-<text x="1442.8" y="479.4" font-size="18" fill="#1B1B1F" text-anchor="middle">42</text>
 <rect x="1453.6" y="465" width="9.5" height="215" fill="#CC6677"/>
-<text x="1458.3" y="455" font-size="18" fill="#1B1B1F" text-anchor="middle">48</text>
 <rect x="1469" y="620.1" width="9.5" height="59.9" fill="#88CCEE"/>
-<text x="1473.8" y="610.1" font-size="18" fill="#1B1B1F" text-anchor="middle">13</text>
 <rect x="1484.5" y="624.6" width="9.5" height="55.4" fill="#DDCC77"/>
-<text x="1489.3" y="614.6" font-size="18" fill="#1B1B1F" text-anchor="middle">12</text>
 <rect x="1500" y="550.3" width="9.5" height="129.7" fill="#117733"/>
-<text x="1504.8" y="540.3" font-size="18" fill="#1B1B1F" text-anchor="middle">29</text>
-<rect x="1515.5" y="470.5" width="9.5" height="209.5" fill="#0072B2"/>
-<text x="1520.3" y="460.5" font-size="18" fill="#1B1B1F" text-anchor="middle">47</text>
+<rect x="1515.5" y="470.5" width="9.5" height="209.5" fill="#AA4499"/>
 <text x="1401" y="714" font-size="21" fill="#1B1B1F" text-anchor="middle" font-weight="600">all</text>
 <text x="1401" y="740" font-size="19" fill="#4A4A52" text-anchor="middle">n=149 / 406</text>
 <line x1="150" y1="680" x2="1540" y2="680" stroke="#8A8A93" stroke-width="2"/>

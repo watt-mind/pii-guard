@@ -2,7 +2,7 @@
 
 A **run record** (``eval/results/runs/<YYYY-MM-DD>-<slug>.json``) says what ran (the system:
 pii-guard detectors with their models and settings, or a comparison tool), on what (fixture
-files with their SHA-256, the fixture set, whether it was hand-written or generated), at which
+files with their SHA-256, the fixture set and origin (hand-written, generated, public), at which
 commit, on which hardware, at what cost, and what came out (per-language and per-entity-type
 counts and ratios). The format is specified by ``eval/results/schema/run.schema.json``
 (``schema_version`` 1) and documented in ``docs/evaluation.md``.
@@ -329,7 +329,9 @@ def _origin_from_file(path: Path) -> tuple[str, str | None, int | None, list[str
                 generators.add(str(meta["model"]))
         if record.get("language"):
             languages.add(str(record["language"]))
-    origin = "generated" if synthetic else "hand-written"
+    origin = (  # converted third-party benchmarks live under public/
+        "public" if "public" in path.parts else ("generated" if synthetic else "hand-written")
+    )
     generator = ", ".join(sorted(generators)) or None
     return origin, generator, len(lines), sorted(languages)
 
@@ -340,7 +342,8 @@ def fixture_info(
     """Describe fixture files: path, SHA-256, language, set name, hand-written or generated.
 
     The origin comes from the file (a record whose ``meta`` names a generator or
-    ``source: synthetic`` makes the file *generated*); when the file isn't available (a
+    ``source: synthetic`` makes the file *generated*; a file under a ``public/`` directory
+    is a converted third-party benchmark, origin *public*); when the file isn't available (a
     generated split that isn't committed), a set name starting with ``synth`` or ``distill`` is
     taken as generated and anything else as unknown. A file edited since the run (another
     SHA-256) still says whether the set is hand-written, but not how many documents ran.

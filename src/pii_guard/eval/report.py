@@ -10,7 +10,7 @@ Layout (``schema_version`` 1)::
      "languages": {"hu": <block>, "en": <block>}}
 
 A ``<block>`` is :func:`pii_guard.eval.scorer.summarize`'s output. Nothing in the scorecard
-contains a labelled value or a document text: only ids, types, counts and ratios.
+contains a labeled value or a document text: only ids, types, counts and ratios.
 """
 
 from __future__ import annotations
@@ -309,7 +309,7 @@ def render_markdown(scorecard: dict[str, Any]) -> str:
     lines += [
         "",
         "All ratios in %. P/R/F1 are span-level micro averages; macro F1 is over entity types "
-        "(overlap match). Leak = labelled values of mask-policy types surviving the masked "
+        "(overlap match). Leak = labeled values of mask-policy types surviving the masked "
         "text in any surface form; partial = an identifying token survives. Consistency = "
         "gold entities whose occurrences (all surface forms) are masked by one placeholder.",
         "",

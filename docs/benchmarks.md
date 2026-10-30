@@ -22,7 +22,7 @@ Headline fixture set: **smoke** (hand-written; documents: de 10 + en 10 + hu 31)
 
 ## How to read this
 
-- **Leak rate** is the share of labelled values that still appear, in any surface form, in
+- **Leak rate** is the share of labeled values that still appear, in any surface form, in
   the text the model would receive after masking (case- and whitespace-insensitive, through
   the language's inflected forms, structured identifiers by their letters and digits with any
   separators). Lower is safer; it is the number that matters most. **Partial leak** counts
@@ -37,9 +37,10 @@ Headline fixture set: **smoke** (hand-written; documents: de 10 + en 10 + hu 31)
   (comparison tools that can't unmask show —).
 - **Hand-written vs generated sets.** `smoke` is written by hand with inline labels and has
   adversarial look-alikes; `synth-*` sets are written by a Meta Muse model around fictional
-  identities and labelled automatically. **Generated sets flatter Muse-based detectors**: the
+  identities and labeled automatically. **Muse-generated sets flatter Muse-based detectors**: the
   same model family wrote the text and reads it, so its phrasing and its idea of what an
-  entity is match. The headline charts use the hand-written set for that reason.
+  entity is match. Converted third-party (`public`) sets carry no such advantage.
+  The headline charts use the hand-written set for that reason.
 - **Small sets.** The sets have tens of documents per language: differences of a few points
   are noise. Every number below says which set, which run date and which commit it came from.
 - **Latency** is detection time per document (p50) on the hardware in the run log; it is not
@@ -1787,7 +1788,7 @@ Featured systems run on every language of the current fixture files, pooled (mic
 
 ## Image masking
 
-Share of labelled regions masked with IoU >= 0.5. `specimens` are official specimen ID documents published by their issuers; `fictional-specimens` are specimen-style documents built from Muse Image output (LAB-1121). The two sets hold different documents, so compare runs within a set.
+Share of labeled regions masked with IoU >= 0.5. `specimens` are official specimen ID documents published by their issuers; `fictional-specimens` are specimen-style documents built from Muse Image output (LAB-1121). The two sets hold different documents, so compare runs within a set.
 
 | Run | Set | Images | Countries | portrait | signature | mrz | text | All regions | Over-masking (mean) |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -1900,6 +1901,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-29 | `2026-10-29-lab-1380-validated-id-authoritative` | pii-guard rules + ner | agent-traffic-dev | de, en, hu | recorded | `132b01e` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1223-unscored-ai4privacy` | pii-guard rules | ai4privacy | de, en, hu | recorded | `7ce6b8e` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1381-card-csv-field-smoke` | pii-guard rules | smoke | de, en, hu | recorded | `f7b384f` (dirty) | — | — |
+| 2026-10-29 | `2026-10-29-de-smoke-rules` | pii-guard rules | smoke | de | recorded | `37afe96` | — | — |
 | 2026-10-29 | `2026-10-29-lab-1476-postcode-lsla-smoke` | pii-guard rules | smoke | de, en, hu | recorded | `f7b384f` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1147-underscore-leak` | pii-guard rules | ai4privacy | de, en, hu | recorded | `9174636` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1535-eu-inflection-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | eu-inflection | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `4c4ad56` (dirty) | — | — |

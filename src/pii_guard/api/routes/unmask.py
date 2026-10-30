@@ -75,8 +75,10 @@ def unmask(
     owner, gets the same 404 as a missing session. Unbound sessions (``/v1/mask``) and
     anonymous-owned ones restore as before; unmasking never binds."""
     check_text_size(request, body.text)
-    session = vault.session(body.session_id)
-    check_owner(session, client_identity(request.headers))
+    identity = client_identity(request.headers)
+    # The owner check runs before the TTL is extended: a refused caller can't keep another
+    # owner's session alive (LAB-1584).
+    session = vault.session(body.session_id, authorize=lambda s: check_owner(s, identity))
     result = session.unmask_with_report(body.text)
     log_extra(request, unresolved=len(result.unresolved))
     return {"text": result.text, "unresolved": list(result.unresolved)}

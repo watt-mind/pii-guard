@@ -111,7 +111,7 @@
         "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16,64}$"},
         "set": {"type": "string", "minLength": 1},
         "language": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/language"}]},
-        "origin": {"enum": ["hand-written", "generated", "specimens", "unknown"], "description": "generated sets were written by a Muse model, which flatters Muse-based detectors."},
+        "origin": {"enum": ["hand-written", "generated", "public", "specimens", "unknown"], "description": "generated sets were written by a Muse model, which flatters Muse-based detectors; public sets are third-party benchmarks converted to fixtures."},
         "generator": {"type": ["string", "null"]},
         "documents": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/count"}]}
       }

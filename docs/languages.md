@@ -271,12 +271,11 @@ prompt, and exact matching in the vault.
 
 ## German smoke results
 
-`uv run pii-guard eval --fixtures eval/fixtures/de-smoke.jsonl` (rules detector, 10 documents
-with 40 labels, 2 of them hard negatives without any):
-
-| Detector | P overlap | R overlap | R exact | Leak | Round trip |
-|---|---:|---:|---:|---:|---:|
-| `rules` | 100.0 | 52.5 | 50.0 | 43.2 | 100.0 |
+Recorded as [`2026-10-29-de-smoke-rules`](../eval/results/runs/2026-10-29-de-smoke-rules.json)
+(`uv run pii-guard eval --fixtures eval/fixtures/de-smoke.jsonl --detectors rules`;
+see the [run log](benchmarks.md#run-log) for the current numbers): rules overlap precision
+100.0, overlap recall 52.5, exact recall 50.0, leak 43.2, round trip 100.0 on 10 documents
+with 40 labels (2 of them hard negatives without any).
 
 Every structured identifier is found (addresses, emails, phones, Steuer-IDs,
 Sozialversicherungsnummern, IBANs: 100 % overlap recall); the misses are the names, dates of
