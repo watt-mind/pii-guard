@@ -323,6 +323,43 @@ def test_consistency_groups_surface_forms_and_needs_one_placeholder() -> None:
     assert "Anna" not in repr(report)
 
 
+def test_consistency_keeps_case_differing_secrets_apart() -> None:
+    """LAB-1382: two SECRET tokens that differ only in case are two credentials (LAB-1350)."""
+    doc = _doc(
+        f"a={label('SECRET', 'FakeTok0000Abc')} b={label('SECRET', 'faketok0000abc')} "
+        f"c={label('SECRET', 'FakeTok0000Abc')} {label('PERSON', 'Teszt Elek')} "
+        f"{label('PERSON', 'TESZT ELEK')}"
+    )
+    upper, lower, again, elek, elek_caps = sorted(doc.spans, key=lambda sp: sp.start)
+    replacements = [
+        (upper.start, upper.end, "[[SECRET_aaaa]]"),
+        (lower.start, lower.end, "[[SECRET_bbbb]]"),
+        (again.start, again.end, "[[SECRET_aaaa]]"),
+        (elek.start, elek.end, "[[PERSON_cccc]]"),
+        (elek_caps.start, elek_caps.end, "[[PERSON_cccc]]"),
+    ]
+    report = consistency_report(doc, replacements)
+    by_occurrences = sorted((r.entity_type.value, r.occurrences, r.consistent) for r in report)
+    assert by_occurrences == [
+        ("PERSON", 2, True),  # names stay case-insensitive
+        ("SECRET", 1, True),
+        ("SECRET", 2, True),  # the repeated token, one placeholder
+    ]
+
+
+def test_leak_counts_case_differing_secrets_as_two_values() -> None:
+    """LAB-1382: dedup by exact value for SECRET, and only the exact casing is a leak."""
+    doc = _doc(
+        f"a={label('SECRET', 'FakeTok0000Abc')} b={label('SECRET', 'faketok0000abc')} "
+        f"{label('PERSON', 'Teszt Elek')} {label('PERSON', 'TESZT ELEK')}"
+    )
+    masked = "a=[[SECRET_aaaa]] b=faketok0000abc [[PERSON_cccc]] [[PERSON_cccc]]"
+    report = leak_report(doc, masked)
+    secrets = sorted((r.value, r.leaked) for r in report if r.entity_type is EntityType.SECRET)
+    assert secrets == [("FakeTok0000Abc", False), ("faketok0000abc", True)]
+    assert [r.occurrences for r in report if r.entity_type is P] == [2]
+
+
 def test_consistency_needs_each_occurrence_fully_covered() -> None:
     """LAB-1355: one masked character is not a masked occurrence."""
     doc = _doc(f"{label('PERSON', 'Teszt Elek')} írt, {label('PERSON', 'Teszt Elek')} válaszolt.")
