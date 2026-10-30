@@ -250,8 +250,8 @@ def _fit(text: str, size: float, width: float, *, weight: int = 400, floor: floa
 
 
 def pct(rate: float | None) -> str:
-    """``0.2 %``: one decimal of the percentage, as the README tables round."""
-    return "—" if rate is None else f"{rate * 100:.1f} %"
+    """``0.2%``: one decimal of the percentage, as the README tables round."""
+    return "—" if rate is None else f"{rate * 100:.1f}%"
 
 
 def _snap(index: Mapping[str, Any], fixture_set: str, system: str) -> Mapping[str, Any]:
@@ -668,7 +668,7 @@ def card(
     big = t(150) if not square else t(190)
     if (w, h) == (1200, 630):
         big = t(140)
-    num = pct(leak[own]).replace(" %", "%")
+    num = pct(leak[own])
     ny = y + bs * 0.9 + big * 0.95
     body.append(_text(t.m - big * 0.04, ny, num, size=big, fill=theme.own_ink, weight=700))
     nx = t.m + text_width(num, big, weight=700) + t(28)
@@ -689,7 +689,7 @@ def card(
     short = {k: str(spec.get("short_names", {}).get(k, _name(spec, k))) for k in systems}
     label_w = max(text_width(short[k], label_s, weight=700) for k in systems) + t(24)
     label_w = min(label_w, w * 0.34)
-    note_w = text_width("16.6 %  over-masking 35.2 %", label_s * 0.95) + t(16)
+    note_w = text_width("16.6%  over-masking 35.2%", label_s * 0.95) + t(16)
     bx0 = t.m + label_w
     bx1 = w - t.m - note_w
     vmax = max(leak.values()) or 1.0
@@ -815,7 +815,7 @@ def by_set(
     val_s = min(t(17), bar * 0.95)
     for p, (title_p, idx) in enumerate((("Leak", 0), ("Over-masking", 1))):
         x0 = t.m + label_w + p * (pw + panel_gap)
-        x1 = x0 + pw - text_width("88.8 %", val_s) - t(8)
+        x1 = x0 + pw - text_width("88.8%", val_s) - t(8)
         vmax = max(0.1, -(-max(v[idx] for v in data.values()) * 10 // 1) / 10)
         body.append(
             _text(x0, gtop + label_s * 0.2, title_p, size=label_s * 1.1, fill=theme.ink, weight=700)
@@ -929,7 +929,7 @@ def open_ner(
     row_h = (y1 - y0) / len(rows)
     name_s = min(t(22), row_h * 0.34)
     bar_h = row_h * 0.32
-    note = "100.0 %  over-masking 10.0 % · F1 99.9 %"
+    note = "100.0%  over-masking 10.0% · F1 99.9%"
     x0 = t.m
     x1 = w - t.m - text_width(note, name_s * 0.9) - t(16)
     vmax = max(0.05, -(-max(r[1] for r in rows) * 20 // 1) / 20)
@@ -992,7 +992,7 @@ def _lowest(values: Sequence[float]) -> set[int]:
 
 
 def _short_pct(rate: float) -> str:
-    return pct(rate).replace(" %", "%")
+    return pct(rate)
 
 
 def results_table(
