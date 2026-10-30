@@ -41,7 +41,7 @@ loaded and any inference error raise `DetectionError` (fail closed).
 |---|---|---|
 | Model (hub id or directory) | `PII_GUARD_NER_MODEL` | unset: the published checkpoint, else the public fallback ([below](#which-ner-model-fast-mode-runs)) |
 | Revision | `PII_GUARD_NER_REVISION` | pinned for the published and fallback models |
-| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `watt-mind/pii-guard-ner-xlmr-base`, pinned to release `v2.0` (LAB-1306); `repo` or `repo@revision` |
+| Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `watt-mind/pii-guard-ner-xlmr-base`, pinned to release `v4.2` (LAB-1625; rollback to `v2.0` [below](#which-ner-model-fast-mode-runs)); `repo` or `repo@revision` |
 | Fallback | `PII_GUARD_NER_FALLBACK` | `download`: fetch it on first use; `cached`: only if already downloaded; `off`: never |
 | Model cache | `PII_GUARD_MODELS_DIR` | `~/.cache/pii-guard/models` |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
