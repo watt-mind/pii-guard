@@ -13,6 +13,17 @@ from the built ``index.html`` at startup: the theme script's text depends on the
 (``%VITE_PII_GUARD_HOSTED%``), so a hash committed by hand would go stale. No
 ``'unsafe-inline'`` and no ``'unsafe-eval'``.
 
+The API reference at ``#api`` (Scalar, LAB-1586) adds styles at runtime that no build of
+``index.html`` contains (LAB-1588): three ``<style>`` elements (the toast styles, their
+override and the base theme) and a few ``style`` attributes written as HTML (a scrollbar
+probe, and the line count of each code example). Their texts are fixed by the Scalar
+release, so their hashes are listed here, pinned to :data:`SCALAR_VERSION`: a test fails
+when ``ui/package.json`` moves to another release, and ``tests/test_csp_api_browser.py``
+loads the built page in a headless browser to find the new ones. The attribute hashes need
+``'unsafe-hashes'``, which allows those exact attribute values only, and only in
+``style-src-attr``. These allowances go on HTML responses only, the documents a policy
+governs: API responses keep the short policy.
+
 ``Referrer-Policy`` is ``same-origin``, not ``no-referrer``: under ``no-referrer`` the Fetch
 standard serializes the ``Origin`` of a non-GET request as ``null`` (Chromium does it for form
 posts), and the hosted API refuses a browser write whose ``Origin`` is not its own
@@ -35,6 +46,26 @@ __all__ = ["SecurityHeadersMiddleware", "content_security_policy", "inline_hashe
 #: keep the framing and plugin restrictions but not the script and style allowlist.
 DOCS_PATHS = ("/docs", "/redoc")
 DOCS_CSP = "frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
+
+#: The ``@scalar/api-reference-react`` release the hashes below were taken from (ui/package.json).
+SCALAR_VERSION = "0.9.80"
+
+#: The ``<style>`` elements Scalar adds: the empty element its theme style starts as, the toast
+#: styles (vue-sonner), their override, and the base theme (``theme: "none"``, light and dark).
+SCALAR_STYLE_HASHES = (
+    "'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='",
+    "'sha256-ZW1GSuo0pKyEx5Ar7ZC5Dflb/mjatjeTW9aVx0iZAzE='",
+    "'sha256-DLlkYCuDYGe6ME23YkUFB7Tc36rGDeo4mVBFbZX3uaU='",
+    "'sha256-nT0S1Qe6I3DXxjh7v5KM5jmdlxs04kQiH5PEGYxqKcU='",
+)
+
+#: The ``style`` attributes Scalar writes as markup: its scrollbar-width probe, and each code
+#: example's line count (``@scalar/code-highlight``), for examples of up to 99 lines.
+SCALAR_STYLE_ATTRIBUTES = (
+    "width:30px;height:30px;overflow-y:scroll;",
+    "width:100%;height:40px",
+    *(f"--line-count: {n}; --line-digits: {len(str(n))};" for n in range(1, 100)),
+)
 
 #: Powerful features the UI never uses, switched off for the page and anything it embeds.
 PERMISSIONS_POLICY = ", ".join(
@@ -96,9 +127,15 @@ def inline_hashes(page: str) -> tuple[list[str], list[str]]:
     return scripts, styles
 
 
-def content_security_policy(page: str = "") -> str:
-    """The policy for ``page`` (the served ``index.html``): same origin, plus its inline hashes."""
+def content_security_policy(page: str = "", *, document: bool = True) -> str:
+    """The policy for ``page`` (the served ``index.html``): same origin, plus its inline hashes.
+
+    ``document`` (an HTML response) adds the API reference's runtime styles; without it the
+    policy is the same minus those allowances, for API responses.
+    """
     scripts, styles = inline_hashes(page)
+    if document:
+        styles = list(dict.fromkeys([*styles, *SCALAR_STYLE_HASHES]))
     directives = {
         "default-src": ["'self'"],
         "script-src": ["'self'", *scripts],
@@ -115,19 +152,26 @@ def content_security_policy(page: str = "") -> str:
         "form-action": ["'self'"],
         "frame-ancestors": ["'none'"],
     }
+    if document:
+        attributes = [_sha256(a) for a in SCALAR_STYLE_ATTRIBUTES]
+        directives["style-src-attr"] = ["'unsafe-hashes'", *attributes]
     return "; ".join(f"{name} {' '.join(values)}" for name, values in directives.items())
 
 
-def security_headers(page: str = "") -> list[tuple[str, str]]:
+def security_headers(page: str = "", *, document: bool = True) -> list[tuple[str, str]]:
     """Every header the middleware adds, lower-case names, for ``page``."""
     return [
-        ("content-security-policy", content_security_policy(page)),
+        ("content-security-policy", content_security_policy(page, document=document)),
         ("x-content-type-options", "nosniff"),
         ("x-frame-options", "DENY"),
         ("referrer-policy", "same-origin"),
         ("permissions-policy", PERMISSIONS_POLICY),
         ("cross-origin-opener-policy", "same-origin"),
     ]
+
+
+def _encoded(headers: list[tuple[str, str]]) -> list[tuple[bytes, bytes]]:
+    return [(k.encode("latin-1"), v.encode("latin-1")) for k, v in headers]
 
 
 class SecurityHeadersMiddleware:
@@ -138,9 +182,8 @@ class SecurityHeadersMiddleware:
     ) -> None:
         self.app = app
         self.docs_paths = tuple(docs_paths)
-        self.headers = [
-            (k.encode("latin-1"), v.encode("latin-1")) for k, v in security_headers(page)
-        ]
+        self.headers = _encoded(security_headers(page))
+        self.api_headers = _encoded(security_headers(page, document=False))
         self.docs_headers = [
             (k, DOCS_CSP.encode("latin-1") if k == b"content-security-policy" else v)
             for k, v in self.headers
@@ -152,12 +195,16 @@ class SecurityHeadersMiddleware:
             return
         path = scope.get("path", "")
         docs = any(path == p or path.startswith(p + "/") for p in self.docs_paths)
-        extra = self.docs_headers if docs else self.headers
 
         async def send_with_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
                 present = {name.lower() for name, _ in headers}
+                html = any(
+                    name.lower() == b"content-type" and value.lower().startswith(b"text/html")
+                    for name, value in headers
+                )
+                extra = self.docs_headers if docs else self.headers if html else self.api_headers
                 headers.extend((k, v) for k, v in extra if k not in present)
                 message = {**message, "headers": headers}
             await send(message)
