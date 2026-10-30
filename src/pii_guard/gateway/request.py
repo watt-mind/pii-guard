@@ -150,6 +150,10 @@ class TextSlot:
     #: The index of the chat message whose whole ``content`` string this is, else ``None``
     #: (the echo's kept spans are offsets into it, LAB-1180).
     message: int | None = None
+    #: A JSON number leaf's literal (``<NUMBER>``, ``<NUMBER>.0``); ``None``: a string.
+    #: The vault records it when the leaf masks to one placeholder, so a tool call that echoes
+    #: that placeholder as a whole string gets the number back (LAB-1361).
+    number: str | None = field(default=None, repr=False)
 
     def __repr__(self) -> str:  # never the text
         return f"TextSlot(kind={self.kind!r}, length={len(self.text)})"
@@ -837,7 +841,8 @@ def _collect_json(
         out.slots.append(TextSlot(value, _setter(container, key), kind))
     elif (number := _number_text(value)) is not None:
         # Numeric JSON fields can hold identifiers; a masked number becomes a string.
-        out.slots.append(TextSlot(number, _number_setter(container, key), kind))
+        literal = json.dumps(value)
+        out.slots.append(TextSlot(number, _number_setter(container, key), kind, number=literal))
     elif isinstance(value, list):
         for i in range(len(value)):
             _collect_json(value, i, out, kind)

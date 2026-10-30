@@ -195,7 +195,24 @@ def _close(block: list[_Line]) -> list[MrzZone]:
 
 
 def _close_single(line: _Line) -> MrzZone:
-    return MrzZone(Region(EntityType.ID_DOCUMENT, line.box, SCORE, SOURCE), (line.text,))
+    return MrzZone(Region(EntityType.ID_DOCUMENT, _grown(line), SCORE, SOURCE), (line.text,))
+
+
+def _grown(line: _Line) -> Box:
+    """A lone surviving line grown by its missing lines (LAB-1160): Tesseract often reads
+    only one line of a zone (a GR heading, a faded line). The format is the nearest MRZ
+    length (TD1: 3 x 30, TD2/TD3: 2 lines); a line starting with a document code is the
+    first one and grows down, any other line grows up, each by a line height per missing
+    line. Deliberately vertical only: widening would swallow neighbouring captions.
+
+    OCR-B-specific preprocessing (crop/upscale/binarise) is deferred: the generic upscale
+    and small-text tiles in :mod:`pii_guard.visual.ocr` already enlarge these lines, and a
+    binarised retry would cost a pass on every image for zones the layout finder misses."""
+    size = min(MRZ_LENGTHS, key=lambda n: abs(n - line.length))
+    extra = ((3 if size == min(MRZ_LENGTHS) else 2) - 1) * line.box.height
+    if _DOC_CODE_RE.match(line.text) is not None:
+        return Box(line.box.x1, line.box.y1, line.box.x2, line.box.y2 + extra)
+    return Box(line.box.x1, max(0, line.box.y1 - extra), line.box.x2, line.box.y2)
 
 
 # --- reading a zone ------------------------------------------------------------------------
@@ -219,6 +236,9 @@ class MrzData:
     surname: str
     given: str
     valid: bool
+    #: The document-number check digit as read (``""`` when unreadable). Lets the caller
+    #: retry OCR confusions in the number until the digit passes (LAB-1197).
+    number_check: str = ""
 
     @property
     def name(self) -> str:
@@ -307,4 +327,5 @@ def parse_mrz(lines: Sequence[str]) -> MrzData | None:
         surname,
         given,
         valid,
+        number_check if len(number_check) == 1 and number_check.isdigit() else "",
     )

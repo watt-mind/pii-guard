@@ -79,6 +79,7 @@ from pii_guard.gateway.sessions import (
     SESSION_HEADER,
     SESSION_SOURCE_HEADER,
     SessionSource,
+    client_identity,
     resolve_session,
 )
 from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_data, sse_event
@@ -91,7 +92,13 @@ from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PayloadTooLargeError, PiiGuardError, Span
-from pii_guard.vault import UnmaskOutputTooLargeError, Vault, VaultSession, normalize_value
+from pii_guard.vault import (
+    PLACEHOLDER_RE,
+    UnmaskOutputTooLargeError,
+    Vault,
+    VaultSession,
+    normalize_value,
+)
 from pii_guard.vault.known import KnownValues
 from pii_guard.visual.masking import (
     ImageMasker,
@@ -133,6 +140,13 @@ _UNSET: Any = object()
 
 #: The largest masked upstream payload (bytes) the current request was admitted for. Hosted
 #: admission charges this bound in advance (hosted/quotas.py); None means no bound (local).
+#: The vault leases (session, client identity) the current request holds, set by
+#: :meth:`Gateway._with_session_lease` (module-level, LAB-1584: a ContextVar per gateway
+#: instance is never collected).
+_REQUEST_SESSIONS: ContextVar[list[tuple[VaultSession, str]] | None] = ContextVar(
+    "pii_guard_request_sessions", default=None
+)
+
 UPSTREAM_PAYLOAD_LIMIT: ContextVar[int | None] = ContextVar(
     "pii_guard_upstream_payload_limit", default=None
 )
@@ -377,9 +391,6 @@ class Gateway:
         # Session id -> the requests masking into it now (LAB-1316): a refused request drops
         # the session it created only once no other request holds it and none succeeded.
         self._session_holds: dict[str, _SessionHold] = {}
-        self._request_sessions: ContextVar[list[VaultSession] | None] = ContextVar(
-            "request_sessions", default=None
-        )
         self._holds_lock = threading.Lock()
         # Fixed headers added to every upstream call of this gateway (the hosted sponsored
         # route's attribution, LAB-1461); they never override content type or credentials.
@@ -536,15 +547,17 @@ class Gateway:
 
         The request holds the session until :meth:`_release_session`, which every caller
         must call once masking finished or failed."""
+        identity = client_identity(headers)
         with self._holds_lock:
             session, created, source = self.vault.acquire_session(
-                lambda: resolve_session(self.vault, headers, body, path_session)
+                lambda: resolve_session(self.vault, headers, body, path_session),
+                identity=identity,
             )
-            sessions = self._request_sessions.get()
+            sessions = _REQUEST_SESSIONS.get()
             if sessions is None:
-                self.vault.release_session(session)
+                self.vault.release_session(session, identity=identity)
                 raise RuntimeError("session resolution requires a request lease scope")
-            sessions.append(session)
+            sessions.append((session, identity))
             previous = self._session_incarnations.get(session.session_id)
             if previous is not None and previous() is not session:
                 # New incarnation of this id: start clean (LAB-1565).
@@ -565,12 +578,13 @@ class Gateway:
         self, work: Coroutine[Any, Any, tuple[Response, RequestStats]]
     ) -> tuple[Response, RequestStats]:
         """Keep request pins through upstream work and the stream's final cleanup."""
-        sessions: list[VaultSession] = []
-        token = self._request_sessions.set(sessions)
+        sessions: list[tuple[VaultSession, str]] = []
+        token = _REQUEST_SESSIONS.set(sessions)
 
         def release() -> None:
             while sessions:
-                self.vault.release_session(sessions.pop())
+                session, identity = sessions.pop()
+                self.vault.release_session(session, identity=identity)
 
         try:
             response, stats = await work
@@ -603,7 +617,7 @@ class Gateway:
             release()
             raise
         finally:
-            self._request_sessions.reset(token)
+            _REQUEST_SESSIONS.reset(token)
 
     def _release_session(self, session: VaultSession, created: bool, *, masked: bool) -> None:
         """End the hold :meth:`_session` took, once masking finished (``masked``) or failed.
@@ -864,6 +878,14 @@ class Gateway:
             ):
                 text = slot.text
             slot.write(text)
+            if text != slot.text:
+                # Record each placeholder's JSON type for restore (LAB-1361): a number only
+                # when a number leaf masked to exactly it; inside a longer text, or as a whole
+                # string, it is a string (any ambiguity keeps the string form).
+                whole = slot.number is not None and PLACEHOLDER_RE.fullmatch(text)
+                for match in PLACEHOLDER_RE.finditer(text):
+                    number = (slot.text, slot.number) if whole and slot.number else None
+                    session.note_json_leaf(match.group(0), number)
 
     @staticmethod
     def _recheck(

@@ -202,6 +202,9 @@ class Settings(BaseSettings):
     # Most placeholders in one get-or-create gateway session (the URL path, prompt_cache_key
     # and default sessions, LAB-1286); a full one moves on to a new generation.
     vault_max_entries: int = Field(default=10_000, ge=1)
+    # Most in-flight gateway requests (streams included) one client identity holds vault
+    # sessions for (LAB-1584); over it that client gets 503 vault_capacity_exhausted.
+    vault_max_leases_per_identity: int = Field(default=1_000, ge=1)
     # The console's vault inspector (GET /v1/vault/sessions, LAB-1328): "masked" lists sessions
     # and placeholders with redacted hints, never an original; "full" can also reveal originals,
     # on a loopback bind only (like PII_GUARD_TRAFFIC_LOG=full); "off": the routes answer 404.

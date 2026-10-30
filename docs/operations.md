@@ -390,8 +390,8 @@ image parts are refused with `503 ocr_unavailable` (fail closed, ADR 0006): set
 `PII_GUARD_IMAGE_REQUIRE_OCR=false` only if SAM-only masking is acceptable, which leaves text in
 images unchecked (`X-PII-Guard-Image-OCR: off`). pytesseract hands Tesseract the image through
 a temp file, so the read-only `api` and `demo-api` containers mount a `tmpfs` on `/tmp`; a
-read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck checks `/healthz`
-and OCR availability, and prints `ocr on|off` (`docker inspect --format
+read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck reads `/healthz`
+(`"ocr"` plus `"image_require_ocr"`), and prints `ocr on|off` (`docker inspect --format
 '{{json .State.Health}}' <container>`). For `make demo` outside Docker: `brew install
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
@@ -468,6 +468,7 @@ Every limit fails closed with a JSON error and no value in it:
 | Image time | `PII_GUARD_GATEWAY_IMAGE_TIMEOUT` (120 s, per request) and `PII_GUARD_IMAGE_TIMEOUT` (120 s, `/v1/mask/image`) | `503 detection_failed`. The deadline goes into the work: Tesseract gets the remaining time as its subprocess timeout (killed, not left running) and every stage checks it, so the rest of the request's images are not started. |
 | Image size | `PII_GUARD_IMAGE_MAX_PIXELS` (16 000 000) | `413 payload_too_large`, read from the image header before decoding. OCR time and memory grow with pixels: a 221 KB PNG of 7900 x 5000 took 33 to 73 s and about 1 GB, depending on the machine. The decoder's own cap is 40 MP. |
 | Vault sessions | `PII_GUARD_VAULT_MAX_SESSIONS` (10 000) | Creating one more **evicts the least recently used session** (the one whose sliding TTL ends first). Eviction rather than `429` keeps the service up under a flood of `/v1/mask` calls without `session_id`; a later use of an evicted session is `404 session_not_found`, and the client starts a new one. |
+| Leases per client | `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` (1 000) in-flight gateway requests (streams included) per client identity (`Authorization` hash, or `anonymous`) | `503 vault_capacity_exhausted` for that client only, before any session is created; other clients still get a slot. Without it, one client holding about `PII_GUARD_VAULT_MAX_SESSIONS` long streams (up to 600 s each) pinned every slot and everyone else got the 503 (LAB-1584). |
 | Restored characters | `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` (1 000 000, five times the 200 000-character text limit) per `/v1/unmask` call and per gateway response (every choice, field and tool call, streamed or not) | `413 unmask_output_too_large`; a stream ends with an `unmask_output_too_large` error event. Counted before each value is written, so the output never grows past it. Without it, a short text repeating the placeholder of a long secret (a PEM key) expanded about 93 times (LAB-1350). |
 
 Image values are registered in the vault session only when the whole request succeeded: the

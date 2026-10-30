@@ -53,9 +53,9 @@
 <polygon points="1264.3,537.7 1279.3,552.7 1264.3,567.7 1249.3,552.7" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
 <text x="1268.3" y="530.7" font-size="22" fill="#1B1B1F" font-weight="600">PrivAiTe 12.7%</text>
 <circle cx="66" cy="151" r="10" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<text x="86" y="158" font-size="20" fill="#4A4A52">pii-guard (filled, one colour per configuration)</text>
-<rect x="538.5" y="142.5" width="17" height="17" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
-<text x="567" y="158" font-size="20" fill="#4A4A52">open-source comparison tools (hollow, grey)</text>
+<text x="86" y="158" font-size="20" fill="#4A4A52">pii-guard (filled, one color per configuration)</text>
+<rect x="527.5" y="142.5" width="17" height="17" fill="#FFFFFF" stroke="#595959" stroke-width="4"/>
+<text x="556" y="158" font-size="20" fill="#4A4A52">open-source comparison tools (hollow, grey)</text>
 <text x="56" y="780" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), de + en + hu pooled (micro-averaged). Small sets: a few points of difference is noise.</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Not shown, not run on every current fixture file (de + en + hu): rules + Muse Spark Open (Baseten), rules + Muse Glimmer (low).</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">Latency measured where each system ran (remote API, H100, laptop CPU): see docs/benchmarks.md; not a like-for-like speed test.</text>

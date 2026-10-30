@@ -120,8 +120,9 @@ def test_sse_restorer_flushes_tool_calls_on_finish_into_a_new_entry() -> None:
             out.append(json.loads(payload)["choices"][0]["delta"]["tool_calls"][0])
     final = restorer.process(json.dumps({"choices": [{"index": 0, "finish_reason": "stop"}]}))
     calls = json.loads(final[0])["choices"][0]["delta"]["tool_calls"]
-    assert calls == [{"index": 2, "function": {"arguments": "[["}}]
-    joined = "".join(c["function"]["arguments"] for c in out) + "[["
+    # The quote before a possible placeholder is held too: it may open a number (LAB-1361).
+    assert calls == [{"index": 2, "function": {"arguments": '"[['}}]
+    joined = "".join(c["function"]["arguments"] for c in out) + '"[['
     assert joined == '{"a": "Teszt Elek", "b": "[['
 
 

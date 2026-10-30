@@ -7,6 +7,7 @@ client's default session. Fictional values only (ADR 0005).
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from typing import Any
 
@@ -32,6 +33,7 @@ from pii_guard.gateway.sessions import (
     client_identity,
     resolve_session,
 )
+from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, SessionNotFoundError, Vault
 
 KEY_A = bytes.fromhex(TEST_TENANT_KEY)
@@ -610,3 +612,78 @@ def test_unmask_of_unbound_and_anonymous_sessions_is_unchanged() -> None:
             assert http.post("/v1/unmask", json=anon, headers=headers).status_code == 200
         # Still anonymous-owned (unmask didn't bind BEARER_1): an anonymous turn works.
         assert chat(http, "/s/anon-box/v1/chat/completions").status_code == 200
+
+
+def test_a_refused_unmask_does_not_extend_the_owners_ttl() -> None:
+    """LAB-1584: ``/v1/unmask`` checks the owner before the lookup slides the TTL, so another
+    identity's refused unmask can't keep the owner's session alive."""
+    clock = _Clock()
+    upstream = MockUpstream()
+    app = make_app(upstream)
+    app.state.vault = vault = Vault(KEY_A, clock=clock, ttl_seconds=60.0)
+    with TestClient(app) as http:
+        assert chat(http, "/s/ttl-box/v1/chat/completions", **BEARER_1).status_code == 200
+        masked = upstream.bodies[-1]["messages"][-1]["content"]
+        victim = vault.session("ttl-box")
+        expiry = victim._expires_at
+        body = {"session_id": "ttl-box", "text": masked}
+        for headers in (BEARER_2, {}):
+            clock.now += 25.0
+            refused = http.post("/v1/unmask", json=body, headers=headers)
+            assert refused.status_code == 404
+            assert victim._expires_at == expiry
+        clock.now += 10.0
+        assert victim.expired  # the owner's TTL ran out on schedule despite the refusals
+
+
+@pytest.mark.parametrize("source", ["header", "path"])
+def test_a_refused_identity_does_not_extend_the_victims_ttl(source: str) -> None:
+    """LAB-1584: the binding refuses before the lookup slides the TTL, so presenting another
+    identity's session id can't keep that session alive."""
+    clock = _Clock()
+    vault = Vault(KEY_A, clock=clock, ttl_seconds=60.0)
+    if source == "header":
+        victim = vault.session()
+        resolve_session(vault, {"X-PII-Guard-Session": victim.session_id, **BEARER_1}, {}, None)
+        stranger = ({"X-PII-Guard-Session": victim.session_id, **BEARER_2}, None)
+    else:
+        victim = resolve_session(vault, BEARER_1, {}, "victim-box")[0]
+        stranger = (BEARER_2, "victim-box")
+    expiry = victim._expires_at
+    for _ in range(2):
+        clock.now += 25.0
+        with pytest.raises(SessionNotFoundError):
+            resolve_session(vault, stranger[0], {}, stranger[1])
+        assert victim._expires_at == expiry
+    clock.now += 10.0
+    assert victim.expired  # A's TTL ran out on schedule despite B's requests
+
+
+def test_a_refused_identity_cannot_rotate_a_full_path_session() -> None:
+    vault = Vault(KEY_A, max_entries=1)
+    victim = resolve_session(vault, BEARER_1, {}, "full-box")[0]
+    email = "teszt.elek@example.com"
+    victim.mask(email, [Span(0, len(email), EntityType.EMAIL, email, 1.0, "test")])
+    assert victim.entry_count == 1
+    sessions_before = len(vault)
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, BEARER_2, {}, "full-box")
+    assert len(vault) == sessions_before  # no new generation for the refused identity
+
+
+def test_request_lease_context_var_is_module_level() -> None:
+    from contextvars import ContextVar
+
+    from pii_guard.gateway import service
+
+    assert isinstance(service._REQUEST_SESSIONS, ContextVar)
+    assert service._REQUEST_SESSIONS.get() is None  # set only inside a request lease scope
+    assert "ContextVar(" not in inspect.getsource(service.Gateway.__init__)
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now

@@ -232,6 +232,12 @@ def resolve_session(
     ``body`` is the request before masking (its ``prompt_cache_key`` as the client sent it).
     """
     identity = client_identity(headers)
+
+    def bind(session: VaultSession) -> None:
+        # Runs inside the vault lookup, before the TTL is extended (LAB-1584): a refused
+        # identity can't keep another identity's session alive by presenting its id.
+        check_and_bind(session, identity)
+
     raw = headers.get(SESSION_HEADER)
     if raw is not None and raw.strip():
         if not SESSION_RE.match(raw.strip()):
@@ -239,22 +245,22 @@ def resolve_session(
         # Unknown or expired -> SessionNotFoundError (404). Start a new conversation without
         # the header; the mapping is gone, so a silent new session would be a different one.
         # LAB-1565: a different identity than the recorded creator gets the same 404.
-        session = vault.session(raw.strip())
-        check_and_bind(session, identity)
+        session = vault.session(raw.strip(), authorize=bind)
         return session, False, SessionSource.HEADER
     if path_session is not None:
         if not SESSION_RE.match(path_session):  # the middleware checked it already
             raise InvalidChatRequestError("the session in the URL path is malformed")
-        session, created = vault.session_or_create(path_session)
-        check_and_bind(session, identity)
+        session, created = vault.session_or_create(path_session, authorize=bind)
         return session, created, SessionSource.PATH
     key = body.get("prompt_cache_key")
     if isinstance(key, str) and key:
-        session, created = vault.session_or_create(_cache_key_session_id(vault, identity, key))
-        check_and_bind(session, identity)
+        session, created = vault.session_or_create(
+            _cache_key_session_id(vault, identity, key), authorize=bind
+        )
         return session, created, SessionSource.PROMPT_CACHE_KEY
-    session, created = vault.session_or_create(vault.derive_session_id(f"default:{identity}"))
-    check_and_bind(session, identity)
+    session, created = vault.session_or_create(
+        vault.derive_session_id(f"default:{identity}"), authorize=bind
+    )
     return session, created, SessionSource.DEFAULT
 
 
