@@ -603,6 +603,16 @@ recorded test fixtures in `tests/detect/fixtures/` are responses to fictional te
 Tests mock HTTP with recorded responses; `uv run pytest -m live` runs the live checks against
 the Meta Model API (with `META_API_KEY` set) and Baseten (with `BASETEN_API_KEY` set).
 
+### SAM 3.1 response format
+
+SAM 3.1 is served on the Meta Model API through `POST /v1/responses` (one request per
+concept prompt, `"store": false`). The observed output format is documented in the
+`pii_guard.visual.sam` module docstring (the source of truth): a single `output_text` token
+string (`<0f>` frame marker, `<|box;...|>` pixel boxes, `<|mask;...;data=H,W,~base85|>` bitmaps;
+empty text means nothing was found, no confidence scores, one noun phrase per request).
+Configure it with `PII_GUARD_SAM_URL` (default `https://api.meta.ai/v1`), `PII_GUARD_SAM_API_KEY`
+(else `META_API_KEY`) and `PII_GUARD_SAM_MODEL` (default `sam-3.1`).
+
 ## Local segmentation
 
 LAB-1229 asked whether faces, ID photos and signatures can be found **on the device** instead of

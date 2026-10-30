@@ -189,7 +189,6 @@ codes (`429 quota_exceeded`, `abuse_throttled`, `sign_in_required`, `hosted_capa
 | 422 | `upstream_destination_not_allowed` | Hosted upstream destinations must use public HTTPS on port 443. | endpoint keys |
 | 500 | `internal_error` | Anything unexpected. No exception text is returned. | every route |
 | 500 | `masking_failed` | Masking or re-identification could not complete. | `mask`, `unmask` |
-| 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. | `analyze`, `chat/completions`, `mask`, `responses`, `sessions`, `unmask` |
 | 501 | `responses_unsupported` | The upstream has no Responses API (it answered 404 or 405). | `responses` |
 | 502 | `upstream_credential_rejected` | The provider refused the API key while listing its models (HTTP 401/403). | endpoint keys |
 | 502 | `upstream_did_not_stream` | `stream: true`, but the upstream answered without an event stream; retry without `stream`. | `chat/completions` |
@@ -201,6 +200,7 @@ codes (`429 quota_exceeded`, `abuse_throttled`, `sign_in_required`, `hosted_capa
 | 503 | `project_storage_unavailable` | The project configuration store is unavailable. | endpoint keys |
 | 503 | `upstream_not_configured` | The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). | `chat/completions`, `models`, `responses` |
 | 503 | `vault_capacity_exhausted` | A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes. | `chat/completions`, `responses` |
+| 503 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. | `analyze`, `chat/completions`, `mask`, `responses`, `sessions`, `unmask` |
 <!-- END error-codes -->
 
 ## Keeping the reference current

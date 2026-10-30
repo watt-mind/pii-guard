@@ -1,0 +1,38 @@
+# Reference words: labels that make a number a business number, not personal data
+# (order, invoice, tracking ...). One entry per line, `#` comments, blank lines ignored.
+# A trailing `*` lets the word take suffixes (`faktur*`: `faktura`, `faktury`).
+# Entries are written as the historical lists spelled them (accents where they had them);
+# the rules check matches both spellings, the NER check folds entries like text.
+# A trailing `.` matches with or without the dot (`sygn`/`sygn.`); an entry may hold a space
+# (`sygn. akt`). Truncated stems (`zamowien*`, `zgloszen*`, `sledzeni*`) fold to the
+# historical negative-cue stems they replace. Optional second column: `both` (the default:
+# the rules check and the NER check read it), `rules` (the rules check only) or `ner`
+# (the NER check only), `weak` (LAB-1293: a poor negative cue such as an amount or generic
+# reference word, honored by the rules check only; the NER check ignores it, as before).
+faktur*
+zamówieni*	rules
+zamowien*	ner
+paragon*
+przesylk*	ner
+przesyłk*
+przesyłek
+sygn.
+sygn akt
+sygn. akt
+sygnatur*
+zlecen*
+rezerwacj*
+paczk*
+zgłoszeni*	rules
+zgłoszen*	ner
+zgloszen*	ner
+transakcj*
+uchwał*	rules
+klienta	rules
+sledzeni*	ner
+artykuł*	ner
+artykul*	ner
+kwot*	weak
+suma	weak
+saldo	weak
+referencyjn*	weak

@@ -228,6 +228,7 @@ def build_manifest(
         "file_sha256": FILE_SHA256,
         "license": LICENSE,
         "attribution": ATTRIBUTION,
+        "synthetic": True,
         "rows_committed": False,
         "seed": seed,
         "requested": {"train": dict(train), "dev": dict(dev)},

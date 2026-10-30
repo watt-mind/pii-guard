@@ -156,7 +156,7 @@ GATEWAY_ERRORS: dict[str, tuple[str, str | None]] = {
         "existing sessions are refused too); retry once a request finishes.",
     ),
     "vault_not_configured": (
-        "pii_guard.types:MaskingError",
+        "pii_guard.types:VaultNotConfiguredError",
         None,
     ),
     "detection_failed": (

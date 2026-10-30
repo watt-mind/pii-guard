@@ -8,6 +8,8 @@ export interface Route {
   section: Section;
   /** The Playground's sub-tab; only meaningful when `section` is "playground". */
   tab: PlaygroundTab;
+  /** The open vault session's ref; only meaningful when `section` is "vault". */
+  ref?: string;
 }
 
 export const SECTIONS: readonly { id: Section; label: string; hint: string }[] = [
@@ -43,7 +45,11 @@ const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 const TAB_IDS = new Set<string>(PLAYGROUND_TABS.map((t) => t.id));
 
 export function hashOf(route: Route): string {
-  return route.section === "playground" ? `#playground/${route.tab}` : `#${route.section}`;
+  if (route.section === "playground") return `#playground/${route.tab}`;
+  // A vault session deep link; refs change on restart, so a stale one lands on the
+  // existing "session is gone" state (LAB-1333).
+  if (route.section === "vault" && route.ref) return `#vault/${route.ref}`;
+  return `#${route.section}`;
 }
 
 /**
@@ -55,17 +61,29 @@ export function parseHash(hash: string): { route: Route; redirect: boolean } | n
   if (legacy) return { route: legacy, redirect: true };
   // No hash, and the skip link's #main, are not routes: the section stays as it is.
   if (hash === "" || hash === "#" || hash === "#main") return null;
-  const m = /^#([a-z]+)(?:\/([a-z]+))?$/.exec(hash);
+  const m = /^#([a-z]+)(?:\/([^/]+))?$/.exec(hash);
   // Any other unknown hash lands on the Overview, with the URL cleaned up.
   if (!m || !SECTION_IDS.has(m[1]!)) return { route: DEFAULT_ROUTE, redirect: true };
   const section = m[1] as Section;
-  if (section !== "playground") return { route: { section, tab: "text" }, redirect: m[2] !== undefined };
-  const tab = m[2] && TAB_IDS.has(m[2]) ? (m[2] as PlaygroundTab) : "text";
-  return { route: { section, tab }, redirect: m[2] !== tab };
+  if (section === "playground") {
+    const tab = m[2] && TAB_IDS.has(m[2]) ? (m[2] as PlaygroundTab) : "text";
+    return { route: { section, tab }, redirect: m[2] !== tab };
+  }
+  // #vault/<ref> deep-links an open session (LAB-1333); anything else after a section
+  // is not a route and rewrites to the section.
+  if (section === "vault") {
+    if (m[2] === undefined) return { route: { section, tab: "text" }, redirect: false };
+    if (/^s_[0-9a-f]{1,32}$/i.test(m[2])) return { route: { section, tab: "text", ref: m[2] }, redirect: false };
+    return { route: { section, tab: "text" }, redirect: true };
+  }
+  return { route: { section, tab: "text" }, redirect: m[2] !== undefined };
 }
 
 export function routeFromLocation(): Route {
   return parseHash(globalThis.location?.hash ?? "")?.route ?? DEFAULT_ROUTE;
 }
 
-export const sameRoute = (a: Route, b: Route) => a.section === b.section && (a.section !== "playground" || a.tab === b.tab);
+export const sameRoute = (a: Route, b: Route) =>
+  a.section === b.section &&
+  (a.section !== "playground" || a.tab === b.tab) &&
+  (a.section !== "vault" || a.ref === b.ref);
