@@ -1031,9 +1031,16 @@ Treatments:
   schematic placeholder notation; an
   integral float in its integer form): a number with detected personal data is replaced by
   the placeholder **string** (`"[[NATIONAL_ID_HU_TAX]]"`), because a JSON number can't
-  carry a placeholder; any other number is forwarded as the same number. A restored value
-  comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
-  string, not a number (LAB-1348). If distinct object keys mask to the same key (including
+  carry a placeholder; any other number is forwarded as the same number (LAB-1348). The
+  session records that the placeholder replaced a JSON number and its literal. When the
+  answer's tool-call arguments (chat `function.arguments` and legacy `function_call`,
+  Responses `function_call.arguments`; whole and streamed) hold that placeholder as a whole
+  string value (`"tax_id": "[[NATIONAL_ID_HU_TAX]]"`), it is restored as the original
+  number literal (`<NUMBER>`, or `<NUMBER>.0` for a float), quotes dropped (LAB-1361).
+  It stays a string inside a longer string, as an object key, in message text, and whenever
+  the same placeholder also replaced a whole string or a different number literal
+  (fail closed). The restored value is charged to the restore budget as usual. In a stream
+  the `"` before a possible placeholder is held back with it. If distinct object keys mask to the same key (including
   case or Unicode variants), the request fails closed with `400 invalid_request`, at any
   nesting depth. No values are merged or silently dropped, and nothing is forwarded
   (LAB-1568).

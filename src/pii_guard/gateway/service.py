@@ -91,7 +91,13 @@ from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PayloadTooLargeError, PiiGuardError, Span
-from pii_guard.vault import UnmaskOutputTooLargeError, Vault, VaultSession, normalize_value
+from pii_guard.vault import (
+    PLACEHOLDER_RE,
+    UnmaskOutputTooLargeError,
+    Vault,
+    VaultSession,
+    normalize_value,
+)
 from pii_guard.vault.known import KnownValues
 from pii_guard.visual.masking import (
     ImageMasker,
@@ -864,6 +870,14 @@ class Gateway:
             ):
                 text = slot.text
             slot.write(text)
+            if text != slot.text:
+                # Record each placeholder's JSON type for restore (LAB-1361): a number only
+                # when a number leaf masked to exactly it; inside a longer text, or as a whole
+                # string, it is a string (any ambiguity keeps the string form).
+                whole = slot.number is not None and PLACEHOLDER_RE.fullmatch(text)
+                for match in PLACEHOLDER_RE.finditer(text):
+                    number = (slot.text, slot.number) if whole and slot.number else None
+                    session.note_json_leaf(match.group(0), number)
 
     @staticmethod
     def _recheck(
