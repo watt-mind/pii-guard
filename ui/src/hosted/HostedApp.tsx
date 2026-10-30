@@ -329,7 +329,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on each test set below." lead="Committed runs of 27–28 Oct 2026 on fictional and public data. Leak: personal values that still reach the model; F1 also counts over-masking. The sets are small, so treat a gap of a point or two as noise; where PII Guard is weaker is under Limits." />
         <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 lg:grid-cols-2">
-          <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
+          <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English, Hungarian and Polish set (62 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
             <DeferredSection anchor="results" className="min-h-[340px]"><ResultsChart /></DeferredSection>
           </Card>
           <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labeled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better)." className="flex flex-col">

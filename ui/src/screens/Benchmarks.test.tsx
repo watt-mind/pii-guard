@@ -212,7 +212,7 @@ describe("Benchmarks screen, round E1 (LAB-1493)", () => {
     const best = Math.min(...tools.map((s) => s.all.leak ?? 1));
     expect(head).toHaveTextContent(new RegExp(`fast mode lets ${pct(fast.all.leak).replace(".", "\\.")} of personal values through`));
     expect(head).toHaveTextContent(new RegExp(`lets ${pct(best).replace(".", "\\.")} through`));
-    expect(head).toHaveTextContent(/hand-written German, English and Hungarian documents/);
+    expect(head).toHaveTextContent(/hand-written German, English, Hungarian and Polish documents/);
     expect(head).not.toHaveTextContent(/pii-guard/);
     // The production row is marked in the table.
     const row = within(resultsTable(panel)).getAllByRole("row").find((r) => within(r).queryByText("fast mode"));
