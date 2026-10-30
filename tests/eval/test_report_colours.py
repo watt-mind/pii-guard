@@ -21,6 +21,7 @@ from pii_guard.eval.report_colours import (
     load_registry,
 )
 from pii_guard.eval.report_index import PALETTE_OURS
+from pii_guard.eval.report_raster import Raster
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNS = Path("eval/results/runs")
@@ -122,6 +123,9 @@ def test_regenerating_without_changes_is_byte_identical(
     for path, content in first.items():
         if path == INDEX:
             continue  # a local build output, not committed (LAB-1269)
+        if isinstance(content, Raster):  # a PNG: compared by its stamp (LAB-1663)
+            assert content.is_current(path), path
+            continue
         assert path.read_text(encoding="utf-8") == content, path  # committed == generated
     assert build_outputs() == first
 

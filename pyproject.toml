@@ -88,7 +88,14 @@ packages = ["src/pii_guard"]
 artifacts = ["src/pii_guard/_ui/**"]
 
 [dependency-groups]
+# PNG copies of the generated benchmark images (pii_guard.eval.report_raster, LAB-1663): pinned,
+# because another resvg version may draw different pixels. `pii-guard eval report --check`
+# compares stamps and does not need it.
+report = [
+    "resvg-py==0.5.0",
+]
 dev = [
+    { include-group = "report" },
     "hypothesis>=6.170.12",
     "mypy>=2.4.0",
     "openai>=3.39.0",
