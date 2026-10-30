@@ -14,8 +14,10 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from pii_guard.types import EntityType
+from pii_guard.vault.entry import _Entry
 from pii_guard.vault.placeholders import normalize_value
-from pii_guard.vault.vault import Vault, VaultSession, _Entry
+from pii_guard.vault.session import VaultSession
+from pii_guard.vault.vault import Vault
 
 __all__ = [
     "EntryView",
@@ -77,34 +79,31 @@ class KnownView:
 
 def live_sessions(vault: Vault) -> list[VaultSession]:
     """The sessions that are neither expired nor closed, without purging or touching any."""
-    with vault._lock:
-        sessions = list(vault._sessions.values())
-    return [s for s in sessions if not s.expired]
+    return vault.live_sessions()
 
 
 def ttl_of(vault: Vault) -> float:
     """The vault's sliding session TTL, in seconds."""
-    return vault._ttl
+    return vault.ttl_seconds
 
 
 def view_of(session: VaultSession) -> SessionView | None:
     """Counts and timings of ``session``, or ``None`` once it has expired."""
-    with session._lock:
-        if session.expired:
-            return None
-        now = session._clock()
-        ttl_left = max(0.0, session._expires_at - now)
-        counts = Counter(e.entity_type.value for e in session._by_placeholder.values())
-        return SessionView(
-            session_id=session.session_id,
-            entries=len(session._by_placeholder),
-            occurrences=sum(e.count for e in session._by_placeholder.values()),
-            known_values=len(session._known),
-            entity_counts=dict(sorted(counts.items())),
-            idle_seconds=max(0.0, session._ttl - ttl_left),
-            ttl_left_seconds=ttl_left,
-            generation=session._generation,
-        )
+    summary = session.peek_summary()
+    if summary is None:
+        return None
+    entries, known_values, idle_seconds, ttl_left, generation = summary
+    counts = Counter(e.entity_type.value for e in entries)
+    return SessionView(
+        session_id=session.session_id,
+        entries=len(entries),
+        occurrences=sum(e.count for e in entries),
+        known_values=known_values,
+        entity_counts=dict(sorted(counts.items())),
+        idle_seconds=idle_seconds,
+        ttl_left_seconds=ttl_left,
+        generation=generation,
+    )
 
 
 def _forms(entry: _Entry) -> tuple[str, ...]:
@@ -118,24 +117,24 @@ def _forms(entry: _Entry) -> tuple[str, ...]:
 def entries_of(session: VaultSession) -> tuple[list[EntryView], list[KnownView]]:
     """Every placeholder of ``session`` (variants after their value) and the known values
     nothing matched yet. Both empty once the session has expired."""
-    with session._lock:
-        if session.expired:
-            return [], []
-        known = session._known.values()
-        known_keys = {(k.entity_type, normalize_value(k.value)) for k in known}
-        views: list[EntryView] = []
-        for (entity_type, normalized), entry in session._by_key.items():
-            origin: Origin = "known" if (entity_type, normalized) in known_keys else "detected"
-            views.append(_view(entry, origin))
-            for variant in entry.variants.values():
-                views.append(_view(variant, origin, variant_of=entry.placeholder))
-        issued = set(session._by_key)
-        pending = [
-            KnownView(k.entity_type, k.value)
-            for k in known
-            if (k.entity_type, normalize_value(k.value)) not in issued
-        ]
-        return views, pending
+    snapshot = session.peek_entries()
+    if snapshot is None:
+        return [], []
+    by_key, known = snapshot
+    known_keys = {(k.entity_type, normalize_value(k.value)) for k in known}
+    views: list[EntryView] = []
+    for (entity_type, normalized), entry in by_key:
+        origin: Origin = "known" if (entity_type, normalized) in known_keys else "detected"
+        views.append(_view(entry, origin))
+        for variant in entry.variants.values():
+            views.append(_view(variant, origin, variant_of=entry.placeholder))
+    issued = {key for key, _ in by_key}
+    pending = [
+        KnownView(k.entity_type, k.value)
+        for k in known
+        if (k.entity_type, normalize_value(k.value)) not in issued
+    ]
+    return views, pending
 
 
 def _view(entry: _Entry, origin: Origin, variant_of: str | None = None) -> EntryView:
