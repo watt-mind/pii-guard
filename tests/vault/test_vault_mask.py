@@ -24,6 +24,7 @@ from pii_guard.vault import (
     normalize_value,
     register_inflection,
 )
+from pii_guard.vault import session as session_module
 from pii_guard.vault import vault as vault_module
 from pii_guard.vault.placeholders import derive_id, is_placeholder_prefix
 
@@ -89,7 +90,7 @@ def test_collision_extends_the_id(vault: Vault, monkeypatch: pytest.MonkeyPatch)
     def colliding(key: bytes, sid: str, et: EntityType, norm: str, length: int = 6) -> str:
         return ("abcd" + hashlib.sha256(norm.encode()).hexdigest())[:length]
 
-    monkeypatch.setattr(vault_module, "derive_id", colliding)
+    monkeypatch.setattr(session_module, "derive_id", colliding)
     session = vault_module.Vault(TEST_KEY, id_length=4).session()
     text = f"{NAME} és {OTHER_NAME}"
     masked = session.mask(
@@ -520,7 +521,7 @@ def test_remask_since_changes_no_output(
         return masked, [session.unmask(t) for t in masked], session.entries_scanned
 
     fast = run()
-    monkeypatch.setattr(vault_module, "_REMASK_SINCE", False)
+    monkeypatch.setattr(session_module, "_REMASK_SINCE", False)
     full = run()
     assert fast[0] == full[0]  # the same session id and key: byte-identical placeholders
     assert fast[1] == full[1]
@@ -572,14 +573,14 @@ def test_remask_since_matches_a_full_remask(
 ) -> None:
     outputs = []
     for shortcut in (True, False):
-        previous = vault_module._REMASK_SINCE
-        vault_module._REMASK_SINCE = shortcut
+        previous = session_module._REMASK_SINCE
+        session_module._REMASK_SINCE = shortcut
         try:
             session = _session(case_sensitive)
             masked = _requests(session, turns, len(turns))
             outputs.append((masked, [session.unmask(t) for t in masked], session.entities()))
         finally:
-            vault_module._REMASK_SINCE = previous
+            session_module._REMASK_SINCE = previous
     assert outputs[0] == outputs[1]
 
 
@@ -634,11 +635,11 @@ def test_alias_entry_created_mid_scan_is_newer_than_the_text(vault: Vault) -> No
     result = session.mask_with_report(text, [])
     assert session.generation > result.generation
     remasked = session.mask(result.text, [], remask=True, since=result.generation)
-    vault_module._REMASK_SINCE = False
+    session_module._REMASK_SINCE = False
     try:
         assert session.mask(result.text, [], remask=True) == remasked
     finally:
-        vault_module._REMASK_SINCE = True
+        session_module._REMASK_SINCE = True
 
 
 @pytest.mark.parametrize(
@@ -663,7 +664,7 @@ def test_remask_since_finds_matches_a_placeholder_boundary_opened(
     # placeholder put a word boundary; the shortcut must find it too.
     outputs = []
     for shortcut in (True, False):
-        vault_module._REMASK_SINCE = shortcut
+        session_module._REMASK_SINCE = shortcut
         try:
             session = Vault(TEST_KEY).session_or_create("s1")[0]
             session.mask(known, [span_of(known, known, "PERSON")])
@@ -672,7 +673,7 @@ def test_remask_since_finds_matches_a_placeholder_boundary_opened(
             remasked = session.mask(first.text, [], remask=True, since=first.generation)
             outputs.append((first.text, remasked))
         finally:
-            vault_module._REMASK_SINCE = True
+            session_module._REMASK_SINCE = True
     assert outputs[0] == outputs[1]
     assert outputs[1][0] != outputs[1][1]  # the full pass found more
 

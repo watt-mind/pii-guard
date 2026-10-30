@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from vault_helpers import TEST_KEY, FakeClock, span_of
 
-import pii_guard.vault.vault as vault_module
+import pii_guard.vault.session as session_module
 from pii_guard.config import Settings
 from pii_guard.types import EntityType, MaskingError
 from pii_guard.vault import SessionNotFoundError, Vault, VaultSession
@@ -237,7 +237,7 @@ def test_image_commit_does_not_deep_copy_the_memo_caches(
     fork = session.fork()
     fork.mask(EMAIL, [span_of(EMAIL, EMAIL, EntityType.EMAIL)])
     copied: list[int] = []
-    deepcopy = vault_module.copy.deepcopy
+    deepcopy = session_module.copy.deepcopy
 
     def spy(value: object, memo_: object = None) -> object:
         copied.append(id(value))
@@ -245,7 +245,7 @@ def test_image_commit_does_not_deep_copy_the_memo_caches(
             copied.extend(id(item) for item in value.values())
         return deepcopy(value, memo_)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(vault_module.copy, "deepcopy", spy)
+    monkeypatch.setattr(session_module.copy, "deepcopy", spy)
     session.commit(fork)
     monkeypatch.undo()
     assert copied, "commit stages a copy of the mask state"
