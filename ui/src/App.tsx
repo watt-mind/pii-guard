@@ -367,7 +367,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
             with the role, so switching keeps the element and the screens' state. */}
         <div id="main" role={apiOpen ? undefined : "main"} tabIndex={-1} className="mx-auto min-h-dvh max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
           {apiOpen && <ApiReference embedded />}
-          <div hidden={apiOpen}>
+          <div hidden={apiOpen} className="console-views">
           <section id="section-overview" aria-label="Overview" hidden={section !== "overview"}>
             {sectionOpened("overview") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading overview…</p>}>
             {trafficOpened && (

@@ -11,9 +11,9 @@ family, not an inversion. "System" stays available in the theme toggle.
 
 The look and feel follows the account console of a hosted inference provider
 (reference: https://app.fireworks.ai/account/home, measured 2026-10-28): a warm off-white canvas
-under white cards, warm neutrals, a plum primary, a magenta-plum accent family and a light neo-grotesk. Only
-the feel is shared. The name, logo, copy and fonts are PII Guard's own; no marks, logos or
-proprietary fonts of the reference are used.
+under white cards, warm neutrals and a light neo-grotesk. PII Guard uses its own teal/mint
+brand palette across the landing page and console. Only the feel is shared. The name, logo,
+copy and fonts are PII Guard's own; no marks, logos or proprietary fonts of the reference are used.
 
 ## Colour carries meaning
 
@@ -25,13 +25,13 @@ proprietary fonts of the reference are used.
 | `--muted`, `--faint` | `#57524d`, `#6b6762` | `#b3ada7`, `#948e88` | secondary text, hints and group labels |
 | `--line`, `--line-strong` | `#e6e1dc`, `#d6cfc8` | `#33302d`, `#45403c` | hairlines on cards and dividers (decorative, about 1.3:1); the stronger one for segment rings and secondary button borders |
 | `--field` | `#8f8780` | `#807973` | the outline of inputs, selects and text areas (3:1) |
-| `--primary` / `--on-primary` | `#5c0a3f` / white | `#b8468f` / white | the primary action: a plum button with white text in both themes |
-| `--accent` family | `#a71e7e` | `#ec7fc4` | brand only: badges, the wordmark, the header hairline; never a state, never a placeholder |
+| `--primary` / `--on-primary` | `#006b64` / white | `#4fdbc8` / `#003731` | the primary action: deep teal in light mode, mint with dark teal text in dark mode |
+| `--accent` family | `#007d73` | `#4fdbc8` | brand only: badges, the wordmark, the header hairline; never a state, never a placeholder |
 | `--guard` | `#047a56` (dot `#05aa77`) | `#3fd6a0` | protected: the boundary, a live connection, values put back |
 
-Every neutral is warm (red above blue): no pure greys. The header hairline is `--accent-gradient` (`#ff7c57` → `#a71e7e` → `#610a45`, 92°) at 35 %
-over a soft peach-pink wash, 4 px under the page header. The gradient is for the hero and the
-wordmark only, never a button.
+Every neutral is warm (red above blue): no pure greys. The header hairline is `--accent-gradient` (`#14b8a6` → `#006b64`, 92°) at 35 %
+over a soft teal wash, 4 px under the page header. The gradient is for brand decoration,
+including the header hairline, never a button.
 
 What happened to a value keeps its own tokens, so components never name a hue:
 
@@ -46,7 +46,7 @@ What happened to a value keeps its own tokens, so components never name a hue:
 | `--focus` | keyboard focus | neutral ink, so it never reads as a state |
 
 Status hues follow the reference family, darkened where they carry text: green `#05aa77`
-(dots) / `#047a56` (text), red `#c8331c` (an orange-red, so it never reads as the brand magenta), orange `#9a5300` (reference
+(dots) / `#047a56` (text), red `#c8331c` (orange-red, distinct from the teal brand), orange `#9a5300` (reference
 `#f98d00`), blue `#005fc7` (reference `#007aff`).
 
 Entity types are never told apart by hue: the type is always written (`[[EMAIL_…]]`, "Email").
@@ -72,10 +72,10 @@ formula.
 | muted on surface | 7.7 | 8.0 |
 | muted on canvas | 7.3 | 8.5 |
 | faint on surface-2 (worst case for hints) | 5.0 | 5.1 |
-| on-primary on primary (button text) | 13.4 | 4.9 |
-| on-primary on primary-hover | 10.7 | 5.8 |
-| white on accent (badge text) | 6.7 | n/a |
-| accent on surface (accent text) | 6.7 | 7.1 |
+| on-primary on primary (button text) | 6.4 | 7.7 |
+| on-primary on primary-hover | 8.6 | 8.7 |
+| white on accent (badge text) | 5.0 | n/a |
+| accent on surface (accent text) | 5.0 | 10.4 |
 | guard on surface (restored, protected text) | 5.4 | 9.6 |
 | model on model-soft (model pane labels) | 5.5 | 7.7 |
 | warn on warn-soft (blocked notices) | 5.3 | 8.8 |
@@ -162,7 +162,7 @@ controls; the hosted landing uses the same components. `className` on a componen
 only (width, margin, flex): it never changes colour, height or radius, because classes are not
 merged.
 
-- **`Button`** `variant`: `primary` (plum fill and white text in both themes, never the gradient, the one main action of a form or pane),
+- **`Button`** `variant`: `primary` (deep teal with white text in light mode, mint with dark teal text in dark mode, never the gradient, the one main action of a form or pane),
   `secondary` (surface, `--line-strong` border deepening to `--field` on hover), `ghost` (text
   only, low-weight actions inside a pane) and `danger` (red text and border: destructive actions
   and their confirmation). `size`: `sm` 32 px, `md` 36 px; both become 44 px on a coarse pointer
@@ -259,8 +259,14 @@ merged.
 
 ## Motion
 
-120 ms colour transitions on controls, `--ease-out`. Restored values flash once. Everything
-collapses under `prefers-reduced-motion`.
+120 ms colour transitions on controls, `--ease-out`. Buttons ease into a 1 px press in
+100 ms and release in 150 ms; disabled and busy buttons stay still. Header menus enter over
+180 ms with a 4 px translation and opacity, and public disclosure chevrons turn over 150 ms.
+Console sections and Playground tab panels use a 180 ms opacity-only entrance, without
+remounting views or losing drafts. Focus rings and keyboard focus remain immediate. The
+landing's agent replay provides its main explanatory motion; copy, metrics and cards stay
+still. Restored values flash once. New motion runs only with
+`prefers-reduced-motion: no-preference`; reduced motion keeps state changes immediate.
 
 ## Screenshots
 
@@ -294,10 +300,12 @@ names, decorative image alt text, and same-tab external navigation. The Watt Min
 retains its original colors on a small white mat in both themes; GitHub uses its mono mark.
 See that directory's README and license for provenance.
 
-The public pages scope their action palette with `public-teal-theme`: deep teal
+Public pages and the console inherit the same brand tokens from `src/index.css`: deep teal
 `#006b64` with white text in light mode, mint `#4fdbc8` with dark teal text in dark
-mode. The console retains its plum actions. Status colors for masked/restored values,
-warnings and errors remain shared. Public footer hover states use the teal accent.
+mode. There are no separate public palette overrides. The `public-teal-theme` class retains
+public navigation and footer styling. Status colors for masked/restored values, warnings
+and errors keep their existing meaning; labels and icons distinguish states from brand
+accents. Public footer hover states use the teal accent.
 
 The header contains a compact Appearance disclosure with the existing Light / System /
 Dark radio control, 44px option targets, and persisted preference. Escape restores the
