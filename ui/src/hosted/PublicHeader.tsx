@@ -50,7 +50,11 @@ function focusHashTarget(href: string, from: Element | null): void {
   target?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
 }
 
-function useDisclosureDismissal(disclosure: RefObject<HTMLDetailsElement | null>, sibling?: RefObject<HTMLDetailsElement | null>) {
+/**
+ * Closes the disclosure on outside pointer or focus, Escape, scroll and resize. Opening the other
+ * header disclosure is an outside pointer/focus event, so this alone keeps them mutually exclusive.
+ */
+function useDisclosureDismissal(disclosure: RefObject<HTMLDetailsElement | null>) {
   useEffect(() => {
     const menu = disclosure.current!;
     let openedAt = scrollY;
@@ -61,7 +65,6 @@ function useDisclosureDismissal(disclosure: RefObject<HTMLDetailsElement | null>
     };
     const toggle = () => {
       openedAt = scrollY;
-      if (menu.open) sibling?.current?.removeAttribute("open");
     };
     const scroll = () => {
       if (menu.open && Math.abs(scrollY - openedAt) > 48) close();
@@ -92,7 +95,7 @@ function useDisclosureDismissal(disclosure: RefObject<HTMLDetailsElement | null>
       document.removeEventListener("keydown", escape);
       window.removeEventListener("resize", resize);
     };
-  }, [disclosure, sibling]);
+  }, [disclosure]);
 }
 
 function PublicNavLink({ item, current, mobile = false, onClick }: { item: NavItem; current?: string | null; mobile?: boolean; onClick: (e: MouseEvent<HTMLAnchorElement>) => void }) {
@@ -134,8 +137,8 @@ export function PublicHeader({ current, accountHref, signedIn = false }: { curre
   const panelId = useId();
   const themePanelId = useId();
   const [theme, setTheme] = useTheme();
-  useDisclosureDismissal(disclosure, appearance);
-  useDisclosureDismissal(appearance, disclosure);
+  useDisclosureDismissal(disclosure);
+  useDisclosureDismissal(appearance);
 
   function navigate(e: MouseEvent<HTMLAnchorElement>) {
     if (!isPlainLeftClick(e)) return;

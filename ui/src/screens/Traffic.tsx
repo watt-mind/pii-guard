@@ -10,7 +10,7 @@ import { Pane } from "../components/Pane";
 import { Button, Card, Checkbox, Metric, PageHeader, Select } from "../components/ui";
 import { errorCopy } from "../lib/errorCopy";
 import { useTraffic, type TrafficHandle, type TrafficSource } from "../hooks/useTraffic";
-import { metaFor } from "../lib/entities";
+import { metaFor, UNKNOWN_META } from "../lib/entities";
 import { tokenize } from "../lib/placeholders";
 import {
   OUTCOME_LABEL,
@@ -67,7 +67,7 @@ type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 
 function entityOptionLabel(ty: EntityType | string): string {
   const meta = metaFor(ty);
-  return meta.label === "Unknown type" ? ty : meta.label;
+  return meta === UNKNOWN_META ? ty : meta.label;
 }
 
 function matchesLogFilters(e: TrafficEvent, filters: Filters): boolean {

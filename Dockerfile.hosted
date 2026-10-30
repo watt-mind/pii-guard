@@ -61,8 +61,9 @@ COPY ui ./
 # The #api reference bundles the generated spec from ../docs (LAB-1586).
 COPY docs/openapi.json /docs/openapi.json
 COPY --from=python-build /app/benchmarks-index.json /app/benchmarks-index.json
-# robots.txt: defaults to "allow" so crawlers can index the public landing; set "disallow" to opt out (docs/hosted.md).
-ARG VITE_PII_GUARD_ROBOTS=allow
+# robots.txt in the build stays "disallow": the hosted app answers /robots.txt per request host at
+# runtime, allowing crawlers only on guard.watt-mind.com (docs/hosted.md).
+ARG VITE_PII_GUARD_ROBOTS=disallow
 # The landing's demo video slot: hidden while the URL is empty (docs/hosted.md).
 ARG VITE_PII_GUARD_DEMO_VIDEO_URL=""
 ARG VITE_PII_GUARD_DEMO_VIDEO_POSTER=""

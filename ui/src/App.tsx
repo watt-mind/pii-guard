@@ -8,6 +8,9 @@ import { ClientSetup } from "./hosted/ClientSetup";
 import { loadFirstRun } from "./hosted/firstRun";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
 import { ApiReference } from "./hosted/ApiReference";
+// Eager on purpose: lazy-loading it behind `Suspense fallback={null}` left the hosted landing blank
+// until its chunk arrived. The hosted build is the only one that renders it.
+import { HostedApp } from "./hosted/HostedApp";
 import { isApiHash } from "./hosted/apiConfig";
 import { chatModesOf, offersDemoTraffic, offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
@@ -47,8 +50,6 @@ import type { VaultClient } from "./api/vault";
 import { newKnownRow, type KnownRow } from "./lib/knownRows";
 import { Overview } from "./screens/Overview";
 import { Logs } from "./screens/Traffic";
-// Keep HostedApp and its recorded demo / agent replay fixtures out of the local console entry.
-const HostedApp = lazy(() => import("./hosted/HostedApp").then((module) => ({ default: module.HostedApp })));
 // Keep Evaluation and its charts out of the console entry: first-visit mounting alone
 // defers its data requests, but an eager import still downloads that code on every route.
 const Benchmarks = lazy(() => import("./screens/Benchmarks").then((module) => ({ default: module.Benchmarks })));
@@ -83,9 +84,7 @@ export interface AppProps {
 /** Hosted deployment is an explicit build choice; the local console remains the default. */
 export function App(props: AppProps) {
   return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? (
-    <Suspense fallback={null}>
-      <HostedApp console={(session) => <SignedInConsole session={session} {...props} />} />
-    </Suspense>
+    <HostedApp console={(session) => <SignedInConsole session={session} {...props} />} />
   ) : (
     <LocalConsole {...props} />
   );

@@ -125,16 +125,17 @@ function benchmarksIndex(): Plugin {
 }
 
 /**
- * `robots.txt`, written at build time: defaults to `Allow: /` so crawlers can index the
- * public landing unless `VITE_PII_GUARD_ROBOTS=disallow` is set at build time (docs/hosted.md,
- * "Build and configuration").
+ * `robots.txt`, written at build time: `VITE_PII_GUARD_ROBOTS=allow` lets crawlers index the
+ * public landing (the production hosted build); anything else, the default, disallows all,
+ * so dev and local builds stay out of search results (docs/hosted.md, "Build and configuration").
+ * The hosted app does not serve this file: it answers `/robots.txt` per request host at runtime.
  */
 function robots(): Plugin {
   return {
     name: "pii-guard-robots",
     apply: "build",
     generateBundle() {
-      const allow = process.env.VITE_PII_GUARD_ROBOTS !== "disallow";
+      const allow = process.env.VITE_PII_GUARD_ROBOTS === "allow";
       this.emitFile({ type: "asset", fileName: "robots.txt", source: `User-agent: *\n${allow ? "Allow: /" : "Disallow: /"}\n` });
     },
   };
