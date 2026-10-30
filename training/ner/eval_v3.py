@@ -204,10 +204,11 @@ def _score(args: argparse.Namespace) -> int:
             "LAB-1494",
             "LAB-1512",
             "LAB-1535",
+            "LAB-1547",
         ):
             notes.append(
-                "Selection set. No v3.1, v3.2, v3.3 or v4 mix holds any agent-traffic generator "
-                "document, so it is unseen by every candidate, as it was for v2.0."
+                "Selection set. No v3.1, v3.2, v3.3, v4 or v4.1 mix holds any agent-traffic "
+                "generator document, so it is unseen by every candidate, as it was for v2.0."
             )
         records = build_records(
             card,
