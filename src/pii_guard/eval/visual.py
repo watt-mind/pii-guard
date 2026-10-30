@@ -83,6 +83,9 @@ DEFAULT_MAX_SIDE = 1600
 #: Planning estimate per SAM image call (USD); override with ``--sam-cost``.
 DEFAULT_SAM_COST = 0.0025
 REGION_TYPES: tuple[str, ...] = ("portrait", "signature", "mrz", "text")
+#: Label types a set may hold: the scored ones plus ``stamp``, which only the prompt study scores
+#: (``STAMP`` is ``keep`` by default, so the recall report leaves it out).
+LABEL_TYPES: tuple[str, ...] = (*REGION_TYPES, "stamp")
 IOU_THRESHOLD = 0.5
 COVERAGE_THRESHOLD = 0.9
 #: The visual types the eval segments (``STAMP`` is ``keep`` by default and not labelled).
@@ -96,6 +99,7 @@ PROMPT_TARGETS: dict[EntityType, tuple[str, ...]] = {
     EntityType.FACE: ("portrait",),
     EntityType.ID_PHOTO: ("portrait",),
     EntityType.SIGNATURE: ("signature",),
+    EntityType.STAMP: ("stamp",),
 }
 _LANGUAGE = {"HU": "hu"}
 #: Baselines get each document's own language where a tool has a model for it.
@@ -228,7 +232,7 @@ def load_specimens(
             continue
         regions = []
         for region in label["regions"]:
-            if region["type"] not in REGION_TYPES:
+            if region["type"] not in LABEL_TYPES:
                 raise ValueError(f"unknown region type {region['type']!r}")
             x1, y1, x2, y2 = (float(v) for v in region["box"])
             if not (0 <= x1 < x2 <= 1 and 0 <= y1 < y2 <= 1):
@@ -710,6 +714,8 @@ def prompt_study(
 
     Each entity type's prompts run on the specimens that contain one of its target region
     types (at most ``limit`` of them, evenly spread), so every prompt sees the same images.
+    Each row also breaks recall down by document type (``by_variant``; in the prompt-study set
+    the document type is the variant: scribble, script, scanned, ...).
     """
     from pii_guard.visual.masking import grow_face
 
@@ -734,6 +740,7 @@ def prompt_study(
         for prompt in prompts:
             client = sam_factory({entity_type: (prompt,)})
             scores: list[RegionScore] = []
+            by_variant: dict[str, list[RegionScore]] = {}
             found = errors = stray = 0
             calls_before = transport.live_calls + transport.cached_calls
             for specimen, data in prepared:
@@ -748,6 +755,7 @@ def prompt_study(
                 found += len(regions)
                 image_scores, _ = score_regions(expected, regions, size)
                 scores.extend(image_scores)
+                by_variant.setdefault(specimen.doc_type, []).extend(image_scores)
                 boxes = [e.to_pixels(*size) for e in expected]
                 stray += sum(1 for r in regions if all(iou(r.box, b) < 0.1 for b in boxes))
             group = _group(scores)
@@ -762,6 +770,7 @@ def prompt_study(
                     "stray_regions": stray,
                     "errors": errors,
                     "calls": transport.live_calls + transport.cached_calls - calls_before,
+                    "by_variant": {k: _group(v) for k, v in sorted(by_variant.items())},
                 }
             )
     return rows
@@ -782,6 +791,24 @@ def render_prompt_study(rows: Sequence[dict[str, Any]]) -> str:
             f"{fmt_pct(row['mean_coverage'])} | {row['regions_found']} | {row['stray_regions']} | "
             f"{row['errors']} |"
         )
+    variants = [row for row in rows if len(row.get("by_variant", {})) > 1]
+    if variants:
+        lines += [
+            "",
+            "## By variant",
+            "",
+            "| Type | Prompt | Variant | Regions | Recall@IoU≥0.5 % | Recall@cov≥0.9 % | "
+            "Mean coverage % |",
+            "|---|---|---|---:|---:|---:|---:|",
+        ]
+        for row in variants:
+            for variant, group in row["by_variant"].items():
+                lines.append(
+                    f"| {row['entity_type']} | `{row['prompt']}` | {variant} | "
+                    f"{group['regions']} | "
+                    f"{fmt_pct(group['recall_iou50'])} | {fmt_pct(group['recall_cov90'])} | "
+                    f"{fmt_pct(group['mean_coverage'])} |"
+                )
     return "\n".join(lines) + "\n"
 
 

@@ -57,7 +57,7 @@ from pii_guard.detect.rules._base import _Hit
 from pii_guard.lang import LexiconUnavailable, lexicon
 from pii_guard.types import EntityType
 
-__all__ = ["find_company_person"]
+__all__ = ["family_word_in_firm", "find_company_person"]
 
 _UPPER = "A-ZÁÉÍÓÖŐÚÜŰ"
 
@@ -221,6 +221,31 @@ def _trailing_person(words: Sequence[str], children: bool) -> tuple[int, float] 
     if children:
         return len(words) - 1, SCORE_WEAK
     return None
+
+
+# A family word's left and right context in a firm name: a connector right before it, then up
+# to two capitalised business words and a legal form after it ("és Fia Építő Kft.").
+_CONNECTOR_BEFORE_RE = re.compile(rf"(?<![\w\-]){_CONNECTOR}[ \t]+$")
+_WORDS_BEFORE_FORM_RE = re.compile(rf"[ \t]+(?:{_WORD}[ \t]+){{0,2}}")
+
+
+def family_word_in_firm(text: str, start: int, end: int) -> bool:
+    """Whether ``text[start:end]`` is the family word of a firm name (``és Fia Kkt.``).
+
+    ``Fia`` / ``Fiai`` / ``Társa`` in ``Balogh és Fia Kkt.`` say "and son(s)" / "and partner":
+    a relation, not a person's name (LAB-1220). True only for the bare word (any case), with
+    a connector (``és``, ``&``, ``+``) right before it and a legal form after it, optionally
+    after up to two capitalised business words (``és Lánya Építő Kft.``).
+    """
+    if text[start:end].casefold() not in _FAMILY | _CHILDREN:
+        return False
+    if _CONNECTOR_BEFORE_RE.search(text, max(0, start - 8), start) is None:
+        return False
+    gap = _WORDS_BEFORE_FORM_RE.match(text, end, min(len(text), end + 60))
+    if gap is None:
+        return False
+    form = _FORM_RE.match(text, gap.end())
+    return form is not None and _kind(form) in ("partnership", "company", "office")
 
 
 def _kind(form: re.Match[str]) -> str:
