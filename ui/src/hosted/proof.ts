@@ -7,8 +7,10 @@
  *   CEE-PII (451) and Nemotron-PII (300). pii-guard fast is the published NER v2.0
  *   (watt-mind/pii-guard-ner-xlmr-base) run of 2026-10-28, commit 72026a5; the comparison tools
  *   are the runs of 2026-10-27 (8944f96, cd119ae).
- * - Open models: `smoke`, "rules + <model> in place of pii-guard NER", runs of 2026-10-28
- *   (97ee284): the same rules, only the NER differs.
+ * - Open models: `smoke`, "rules + <model> in place of pii-guard NER", runs of 2026-10-30
+ *   (18edc24, LAB-1302): the same rules, only the NER differs.
+ * - `smoke` rows (ours and the comparison tools) are the LAB-1302 re-runs of 2026-10-30
+ *   (18edc24), after the hu/de phones moved to the ADR 0005 fictional ranges.
  * - Images: "Image masking", `specimens` (65 official specimen ID documents from 24 countries),
  *   runs `2026-10-27-image-baselines-specimens-*`.
  * - Latency: "Gateway latency", `2026-10-28-ner-concurrency-cpu-fast`, concurrency 1, no stream.
@@ -21,8 +23,8 @@ export const SETS = ["Hand-written de + en + hu (51)", "CEE-PII (451)", "Nemotro
 type Row = { system: string; leak: readonly string[]; f1: readonly string[]; ours?: boolean };
 export const COMPARISON: readonly Row[] = [
   { system: "PII Guard", leak: ["0.0", "0.4", "0.7"], f1: ["94.6", "82.7", "89.4"], ours: true },
-  { system: "PrivAiTe", leak: ["12.7", "4.4", "4.0"], f1: ["55.2", "34.2", "80.8"] },
-  { system: "Presidio", leak: ["24.3", "36.5", "12.8"], f1: ["64.9", "41.4", "66.4"] },
+  { system: "PrivAiTe", leak: ["12.7", "4.4", "4.0"], f1: ["54.7", "34.2", "80.8"] },
+  { system: "Presidio", leak: ["26.6", "36.5", "12.8"], f1: ["70.3", "41.4", "66.4"] },
   { system: "LLM Guard", leak: ["45.1", "75.8", "28.8"], f1: ["53.2", "24.7", "72.9"] },
 ];
 
@@ -49,12 +51,12 @@ export const LATENCY = { value: "~34 ms", label: "Gateway overhead per request",
 /** Our NER against other open PII models, the same rules around each. Sorted by leak. */
 export const OPEN_MODELS = [
   { model: "PII Guard NER v2.0", id: "watt-mind/pii-guard-ner-xlmr-base", leak: "0.0", f1: "94.6", over: "1.1", ours: true },
-  { model: "bardsai multilang v1", id: "bardsai/eu-pii-anonimization-multilang", leak: "1.2", f1: "93.4", over: "10.4" },
-  { model: "Wismut nym-pii", id: "Wismut/nym-pii-multilingual", leak: "4.0", f1: "90.6", over: "6.0" },
-  { model: "tabularisai eu-pii-safeguard", id: "tabularisai/eu-pii-safeguard", leak: "5.8", f1: "91.9", over: "4.6" },
-  { model: "Horizon-Labs pii-redactor-small", id: "Horizon-Labs/pii-redactor-small", leak: "8.7", f1: "85.4", over: "5.8" },
-  { model: "Horizon-Labs pii-redactor-base", id: "Horizon-Labs/pii-redactor-base", leak: "9.2", f1: "86.3", over: "4.7" },
-  { model: "bardsai multilang v3", id: "bardsai/eu-pii-anonimization-multilang-v3", leak: "9.8", f1: "89.7", over: "1.3" },
+  { model: "bardsai multilang v1", id: "bardsai/eu-pii-anonimization-multilang", leak: "1.2", f1: "93.2", over: "10.3" },
+  { model: "Wismut nym-pii", id: "Wismut/nym-pii-multilingual", leak: "3.5", f1: "90.1", over: "6.0" },
+  { model: "tabularisai eu-pii-safeguard", id: "tabularisai/eu-pii-safeguard", leak: "5.8", f1: "91.9", over: "4.0" },
+  { model: "Horizon-Labs pii-redactor-small", id: "Horizon-Labs/pii-redactor-small", leak: "8.7", f1: "85.9", over: "5.2" },
+  { model: "Horizon-Labs pii-redactor-base", id: "Horizon-Labs/pii-redactor-base", leak: "9.2", f1: "86.1", over: "4.7" },
+  { model: "bardsai multilang v3", id: "bardsai/eu-pii-anonimization-multilang-v3", leak: "9.8", f1: "90.2", over: "1.3" },
 ] as const;
 
 /** Same placeholder in text and image: `visual-placeholders`, fuzzy matching, run of 2026-10-27 (recall; precision 100.0 %). */

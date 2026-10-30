@@ -229,6 +229,10 @@
       "color": "#882255",
       "shape": "circle"
     },
+    "rules+ner:xlmr-base-v2-hn+llm:muse-spark-open@reasoning_effort=low": {
+      "color": "#332288",
+      "shape": "circle"
+    },
     "rules+ner:xlmr-base-v2-hn+ner_gliner:gliner-multi-v2.1@labels=pii_guard.detect.ner_gliner.GLINER_LABELS": {
       "color": "#332288",
       "shape": "circle"

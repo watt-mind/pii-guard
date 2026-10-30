@@ -85,13 +85,13 @@ with 95 % intervals there.
 |---|---:|---:|---:|---:|---:|---:|
 | **PII Guard fast** (rules + NER, on-device, $0) | **0.0 %** | **0.2 %** | **0.7 %** | **0.4 %** | 19.1 % | 0.4 % † |
 | PrivAiTe | 12.7 % | 2.4 % | 4.0 % | 4.4 % | 27.6 % | 9.5 % |
-| Presidio | 24.3 % | 12.4 % | 12.8 % | 36.5 % | **18.8 %** | 29.6 % |
+| Presidio | 26.6 % | 12.4 % | 12.8 % | 36.5 % | **18.8 %** | 29.6 % |
 | LLM Guard | 45.1 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 43.8 % ‡ |
 | PII Guard rules only (no name detection) | 41.0 % | 45.3 % | 56.0 % | 40.9 % | 80.7 % | 63.1 % |
 
-Detection p50 on the `smoke` set: fast 119 ms, PrivAiTe 105 ms, Presidio 131 ms, LLM Guard 69 ms (`*` averaged over several runs), each on the machine in its run record: compare loosely.
+Detection p50 on the `smoke` set: fast 17 ms, PrivAiTe 56 ms, Presidio 67 ms, LLM Guard 60 ms (`*` averaged over several runs), each on the machine in its run record: compare loosely.
 
-Records behind the fast row: [Hand-written](eval/results/runs/2026-10-30-lab-1199-post-value-cues-smoke-fast.json), [Agent traffic](eval/datasets/results/2026-10-28-datasets-agent-traffic-fast.json), [Nemotron-PII](eval/datasets/results/2026-10-28-datasets-nemotron-pii-fast.json), [CEE-PII](eval/datasets/results/2026-10-28-datasets-cee-pii-fast.json), [Gretel finance](eval/datasets/results/2026-10-28-datasets-gretel-finance-fast.json), [Ai4Privacy](eval/datasets/results/2026-10-28-datasets-ai4privacy-fast.json); every other cell is in the [run log](docs/benchmarks.md#run-log) and [eval/datasets/results/](eval/datasets/results/).
+Records behind the fast row: [Hand-written](eval/results/runs/2026-10-30-lab-1302-smoke-fast.json), [Agent traffic](eval/datasets/results/2026-10-28-datasets-agent-traffic-fast.json), [Nemotron-PII](eval/datasets/results/2026-10-28-datasets-nemotron-pii-fast.json), [CEE-PII](eval/datasets/results/2026-10-28-datasets-cee-pii-fast.json), [Gretel finance](eval/datasets/results/2026-10-28-datasets-gretel-finance-fast.json), [Ai4Privacy](eval/datasets/results/2026-10-28-datasets-ai4privacy-fast.json); every other cell is in the [run log](docs/benchmarks.md#run-log) and [eval/datasets/results/](eval/datasets/results/).
 <!-- results:end -->
 
 † **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
