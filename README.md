@@ -23,6 +23,12 @@ Open source (Apache-2.0), runs on your machine, built on Meta's open models.
 <p align="center"><sub>Lower-left is better. 990 fictional documents (de, en, hu), drawn by <code>pii-guard eval report</code> from the <a href="eval/results/runs/">run records</a>. <a href="#results">All sets</a> · <a href="docs/benchmarks/README.md">shareable PNGs</a></sub></p>
 <!-- intro:end -->
 
+| You are… | Start here |
+|---|---|
+| Judging the hackathon entry | [Results](#results), then [Meta models](#meta-models-large-ones-teach-a-small-open-one-runs) |
+| Putting an agent behind it | [Quickstart](#quickstart), then [How it works](#how-it-works) |
+| Checking the privacy and GDPR fit | [Threat model](docs/privacy-model.md) and [GDPR context](docs/eu-regulation.md) |
+
 ## Quickstart
 
 Needs [uv](https://docs.astral.sh/uv/). API and gateway on http://127.0.0.1:8787, with a mock
@@ -169,10 +175,27 @@ SAM 3.1 output is decoded with Meta's official `meta_sam_parser` (optional `sam`
 The gateway speaks the OpenAI Chat Completions and Responses APIs. It masks messages, **tool
 definitions, tool-call arguments, tool results** and images, restores placeholders in streams,
 keeps one placeholder per person per session, and fails closed on anything it can't mask; the
-mapping never leaves PII Guard. Coding agents (pi, OpenCode, Codex, Muse Code) run behind it
-unmodified ([harness matrix](docs/integrations/harness-matrix-2026-10-29.md)).
+mapping never leaves PII Guard. Four coding agents (pi, OpenCode, Codex, Muse Code) ran a two-turn task on a fictional
+customer file behind it, unmodified:
+
+- Across 115 agent requests, none of the 9 fictional values reached the model.
+- 8 of 10 turns finished, with the real values restored in the answers and on disk; refused
+  turns went from 7 of 15 to 0 of 10 after the placeholder note.
+- Ten turns is a small sample, not a benchmark ([harness matrix](docs/integrations/harness-matrix-2026-10-29.md)).
+
 [Architecture](docs/architecture.md) · [sessions and modes](docs/architecture-gateway.md) ·
 [threat model](docs/privacy-model.md) · [GDPR context](docs/eu-regulation.md)
+
+| Mode | Detection | What leaves your machine | Use it for |
+|---|---|---|---|
+| `fast` (default) | Rules + on-device NER, no model call | Only the masked request, to your LLM provider | Everyday agent traffic |
+| `fast` without the `ner` extra | Rules only; free-text names need known values | Only the masked request | Offline runs, CI, structured data |
+| `audit` (opt-in, `X-PII-Guard-Mode: audit`) | Rules + NER + an LLM detector; fails closed if that call fails | The original text, to the audit endpoint you configure | Measuring the upper bound and making training labels, not production traffic |
+
+**What it detects:** people, addresses, emails, phone numbers, dates of birth, national and
+document IDs (including Hungarian tax and TAJ numbers), bank accounts and payment cards,
+vehicle plates, parcel numbers and secrets such as API keys, plus faces, ID photos and
+signatures in images ([docs/entities.md](docs/entities.md)).
 
 ## Why PII Guard
 
@@ -205,8 +228,8 @@ Capabilities and evidence: [docs/why-pii-guard.md](docs/why-pii-guard.md).
 stay readable in it; fast mode, the one measured above, masks them. More screens:
 <a href="ui/README.md#screens">ui/README.md</a>.</sub></p>
 
-> **Status: hackathon build** for the Meta Global AI Developer Hackathon (October 26 –
-> November 4, 2026). It works end to end; it is not production-hardened yet. What is missing:
+> **Status:** built for the Meta Global AI Developer Hackathon (October 26 – November 4, 2026)
+> and running in production at [guard.watt-mind.com](https://guard.watt-mind.com). Known gaps:
 > [docs/why-pii-guard.md](docs/why-pii-guard.md#what-is-not-here-yet), [docs/roadmap.md](docs/roadmap.md).
 
 ## Contributing, security, license
