@@ -19,6 +19,7 @@ from gateway_helpers import TEST_TENANT_KEY, UPSTREAM_KEY, UPSTREAM_URL, MockUps
 from pii_guard.api.app import create_app
 from pii_guard.api.errors import ERROR_CODES
 from pii_guard.config import Settings
+from pii_guard.gateway.trace import MODEL_WITHHELD
 from pii_guard.observability import ObservabilitySettings
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -65,7 +66,8 @@ def test_messages_attempt_shows_in_logs_without_the_request_text() -> None:
     assert event["id"] == r.headers["x-pii-guard-request-id"]
     assert event["outcome"] == "refused"
     assert event["error"] == {"code": "unsupported_api", "status": 400}
-    assert event["model"] == "claude-test-model"
+    # A refused call never names its model in the log (LAB-1358).
+    assert event["model"] == MODEL_WITHHELD
     assert event["stream"] is True
     assert event["request"] is None or PERSONAL_TEXT not in str(event["request"])
     assert PERSONAL_TEXT not in str(event)
