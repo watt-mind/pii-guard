@@ -24,12 +24,16 @@ from pii_guard.eval.report_readme import (
 )
 from pii_guard.eval.report_share import (
     DARK,
+    IMAGES,
     LIGHT,
     SIZES,
+    STEPS,
     card,
     file_stem,
     hero,
+    how_it_works,
     render_all,
+    results_table,
     text_width,
 )
 from pii_guard.eval.report_share import parse_spec as parse_share
@@ -95,7 +99,8 @@ SHARE = {
 def test_every_image_in_every_size_and_theme_and_byte_stable() -> None:
     spec = parse_share(SHARE, "cfg")
     first = render_all(_index(), spec)
-    assert len(first) == 4 * len(SIZES) * 2
+    assert len(first) == 2 * sum(len(sizes) for _, sizes in IMAGES.values())
+    assert {"results-table-1200x630-dark", "how-it-works", "how-it-works-dark"} <= set(first)
     assert render_all(_index(), spec) == first
     for stem, svg in first.items():
         size_key = next((k for k in SIZES if k and k in stem), "")
@@ -119,9 +124,42 @@ def test_card_reads_without_context() -> None:
     assert "Rules only" not in svg  # the card compares tools, not our own baseline
 
 
+def test_results_table_prints_every_cell_and_bolds_the_lowest_per_metric() -> None:
+    spec = parse_share({**SHARE, "table_names": {OWN: "Ours fast"}}, "cfg")
+    svg = results_table(_index(), spec, (1600, 900), LIGHT)
+    assert "Ours fast" in svg and "lower is better" in svg
+    assert LIGHT.own_tint in svg  # the own column is highlighted
+    bold = re.findall(r'<tspan fill="[^"]+" font-weight="700">([^<]+)</tspan>', svg)
+    # Set A: ours lowest on both; set B: the tool on leak (18.8 < 19.0), ours on over-masking.
+    assert bold == ["0.2%", "0.7%", "24.0%", "18.8%"]
+    assert "Set B (5 docs · en): Ours fast leak 19.0 %, over-masking 24.0 %" in svg
+
+
+def test_how_it_works_shows_all_steps_and_only_placeholders_cross() -> None:
+    svg = how_it_works(_index(), parse_share(SHARE, "cfg"), (1600, 900), DARK)
+    for step in STEPS:
+        assert step in svg
+    assert "PROVIDER SIDE" in svg and "[[PERSON_968e29]]" in svg
+    assert DARK.bg in svg
+    with pytest.raises(RecordError, match="1600 x 900"):
+        how_it_works(_index(), parse_share(SHARE, "cfg"), (1200, 630), LIGHT)
+
+
+def test_committed_table_image_and_text_table_show_the_same_cells() -> None:
+    config = json.loads((ROOT / "docs" / "benchmarks" / "config.json").read_text())
+    share, readme = config["share"], config["readme"]
+    assert [s["fixture_set"] for s in share["sets"]] == [
+        c["fixture_set"] for c in readme["columns"]
+    ]
+    assert share["set_systems"] == [r["system"] for r in readme["rows"]]
+    assert readme["table_image"]["image"] == "results-table"
+
+
 def test_committed_images_carry_no_internal_ids() -> None:
     for svg in (ROOT / "docs" / "benchmarks").glob("*.svg"):
-        if svg.stem.startswith(("leak-vs-overmasking", "results-", "open-ner-models")):
+        if svg.stem.startswith(
+            ("leak-vs-overmasking", "results-", "open-ner-models", "how-it-works")
+        ):
             text = re.sub(r"<desc[^>]*>.*?</desc>", "", svg.read_text(), flags=re.S)
             assert not re.search(r"LAB-\d+|v42-b3", text), svg.name
 
@@ -226,6 +264,28 @@ def test_compact_block_bolds_the_lowest_per_row_and_metric() -> None:
     assert "- On b, 19.0 % against 18.8 % (5 docs, German and English)." in lines
     assert "<details><summary>How</summary>" in lines
     assert any(line.startswith("Records behind the Ours column:") for line in lines)
+
+
+def test_table_image_puts_the_text_table_in_a_details_block() -> None:
+    spec = parse_spec(
+        {
+            **README_SPEC,
+            "table_image": {
+                "image": "results-table",
+                "alt": 'Ours {leak:a:own} "q"',
+                "summary": "Table as text",
+            },
+        },
+        "cfg",
+    )
+    block = render_compact(_index(), spec)
+    assert 'srcset="docs/benchmarks/results-table-dark.svg"' in block
+    assert 'alt="Ours 0.2 % &quot;q&quot;"' in block
+    pic, details = block.index("<picture>"), block.index("<details><summary>Table as text")
+    table, end = block.index("| Leak · over-masking |"), block.index("</details>")
+    assert pic < details < table < end < block.index("Partial on a:")
+    with pytest.raises(RecordError, match="table_image"):
+        parse_spec({**README_SPEC, "table_image": {"image": "x"}}, "cfg")
 
 
 def test_intro_block_embeds_the_hero_in_both_themes() -> None:

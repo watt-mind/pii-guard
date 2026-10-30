@@ -89,6 +89,11 @@
       "lines": [
         "Every tool ran on the same documents (same fixture hashes) and was scored by the same code; comparison tools use their documented defaults ([configurations](eval/results/2026-10-27-comparison/README.md#systems)). All data is fictional. PII Guard fast is rules plus the published NER `v4.2` ([model card](training/ner/model-card.md)). The hand-written set pools {codes:smoke}; the full tables, per-language numbers, Ai4Privacy (in-distribution for the NER, so not a win) and the corrected finance labels are in [docs/benchmarks.md](docs/benchmarks.md#results-by-fixture-set)."
       ]
+    },
+    "table_image": {
+      "image": "results-table",
+      "alt": "Results table, leak · over-masking per fixture set for PII Guard fast, PrivAiTe, Presidio and LLM Guard; lower is better and the lowest per metric in each row is bold. PII Guard fast leaks {leak:smoke:own} on the hand-written set, {leak:agent-traffic:own} on agent traffic, {leak:nemotron-pii:own} on Nemotron-PII, {leak:cee-pii:own} on CEE-PII and {leak:gretel-finance:own} on Gretel finance (Presidio {leak:gretel-finance:presidio}). Every number is in the text table below the image.",
+      "summary": "Table as text"
     }
   },
   "share": {
@@ -106,6 +111,9 @@
     },
     "short_names": {
       "rules+ner:pii-guard-ner-xlmr-base-v42-b3": "PII Guard"
+    },
+    "table_names": {
+      "rules+ner:pii-guard-ner-xlmr-base-v42-b3": "PII Guard fast"
     },
     "headline": {
       "fixture_set": "agent-traffic",
