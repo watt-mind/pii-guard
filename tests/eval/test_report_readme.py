@@ -26,6 +26,7 @@ def _index() -> dict[str, Any]:
                 "documents": 3,
                 "detect_p50_ms": p50,
                 "latency_pooled": pooled,
+                "over_masking": 0.0112 if system == "fast" else 0.3,
             },
         }
 
@@ -41,7 +42,11 @@ def _counts(system: str, leak: float, run_id: str) -> dict[str, Any]:
         "run_id": run_id,
         "dataset": "public",
         "system": {"key": system},
-        "summary": {"documents": 7, "leak": {"value": leak}},
+        "summary": {
+            "documents": 7,
+            "leak": {"value": leak},
+            "over_masking": {"value": 0.278571},
+        },
     }
 
 
@@ -73,6 +78,17 @@ def test_block_takes_the_latest_numbers_bolds_the_best_and_links_records() -> No
     assert "[Hand-written](eval/results/runs/run-fast.json)" in block
     assert "[Public](eval/datasets/results/new-fast.json)" in block
     assert "old-fast" not in block
+
+
+def test_block_states_the_first_rows_over_masking_from_the_same_records() -> None:
+    """LAB-1598: the README's over-masking figures come from the table's records, not prose."""
+    counts = [_counts("fast", 0.02, "new-fast")]
+    block = render_block(_index(), counts, parse_spec(SPEC, "config"))
+    assert "Over-masking of the fast row: Hand-written 1.1 %, Public 27.9 %" in block
+    no_over = [{**c, "summary": {"documents": 7, "leak": {"value": 0.1}}} for c in counts]
+    assert "Over-masking of the fast row: Hand-written 1.1 % (" in render_block(
+        _index(), no_over, parse_spec(SPEC, "config")
+    )
 
 
 def test_a_caveat_mark_on_the_best_cell_drops_the_bold() -> None:
