@@ -16,7 +16,16 @@ from pii_guard.api.errors import error_headers, error_response
 from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
-from pii_guard.hosted.images import IMAGE_COMPUTE_TOKENS, IMAGE_PATH, image_body_limit
+from pii_guard.hosted.images import (
+    IMAGE_COMPUTE_TOKENS,
+    IMAGE_PATH,
+    chat_body_limit,
+    chat_image_charge,
+    chat_images_enabled,
+    count_chat_images,
+    image_body_limit,
+    require_image_capacity,
+)
 from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, upstream_payload_bound
 from pii_guard.hosted.runtime import HostedService
 from pii_guard.projects.middleware import endpoint_body, endpoint_path, prepare_project
@@ -294,12 +303,22 @@ class HostedMiddleware:
                         scope, receive, state, self.service.settings.hosted_max_body_bytes
                     )
                 headers = Headers(scope=scope)
-            # Text routes stay text-sized; the image route gets its own bounded limit.
-            body_limit = (
-                image_body_limit(self.service.settings)
-                if image
-                else self.service.settings.hosted_max_body_bytes
+            # Text routes stay text-sized; the image route gets its own bounded limit, and
+            # so does a signed-in owner's direct chat while the operator offers chat images
+            # (LAB-1439). A chat body without an image part is held to the text limit below.
+            chat_images = (
+                chat_images_enabled(self.service.settings)
+                and canonical in {"/v1/chat/completions", "/v1/responses"}
+                and principal.auth_method == "google"
+                and routed is None
             )
+            text_limit = self.service.settings.hosted_max_body_bytes
+            if image:
+                body_limit = image_body_limit(self.service.settings)
+            elif chat_images:
+                body_limit = chat_body_limit(self.service.settings)
+            else:
+                body_limit = text_limit
             raw = bytearray()
             if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}:
                 async with asyncio.timeout_at(deadline):
@@ -319,6 +338,8 @@ class HostedMiddleware:
                     principal.id, connection_id
                 )
             paid = canonical in {"/v1/chat/completions", "/v1/responses", "/v1/demo"}
+            image_charge = None
+            inline_images = image_bytes = 0
             if canonical in {"/v1/chat/completions", "/v1/responses"}:
                 try:
                     body = json.loads(raw)
@@ -340,6 +361,26 @@ class HostedMiddleware:
                     )
                 if body.get("n", 1) != 1:
                     raise HostedRequestError("Hosted requests allow one completion")
+                inline_images, image_bytes = (
+                    count_chat_images(canonical, body) if chat_images else (0, 0)
+                )
+                if not inline_images and len(raw) > text_limit:
+                    raise HostedRequestError("Hosted request body is too large")
+                if inline_images:
+                    # Images go to the owner's own provider only: the sponsored allowance
+                    # has no reconciled image price, so it never pays for image input.
+                    if not connection_id:
+                        raise HostedRequestError(
+                            "Images in hosted chat need your own connection; the sponsored "
+                            "route accepts text only"
+                        )
+                    if inline_images > self.service.settings.hosted_chat_max_images:
+                        raise HostedRequestError(
+                            "A hosted request may carry at most "
+                            f"{self.service.settings.hosted_chat_max_images} inline images"
+                        )
+                    # Before admission: a busy replica costs the owner nothing.
+                    require_image_capacity(self.service.image_workers)
                 maximum = self.service.settings.hosted_max_output_tokens
                 output_field = (
                     "max_output_tokens" if canonical == "/v1/responses" else "max_completion_tokens"
@@ -363,6 +404,16 @@ class HostedMiddleware:
                     # the bound, and output is the request's own (capped) token limit.
                     payload_limit = upstream_payload_bound(len(raw))
                     input_tokens, output_tokens = payload_limit, output_limit
+                    if inline_images:
+                        # The text bound leaves the image bytes out; each image adds its
+                        # transcript room and a fixed provider input charge (LAB-1439).
+                        image_charge = chat_image_charge(
+                            self.service.settings,
+                            inline_images,
+                            upstream_payload_bound(len(raw) - image_bytes),
+                        )
+                        payload_limit = image_charge.payload_bytes
+                        input_tokens = image_charge.input_tokens
                 else:
                     input_tokens, output_tokens = len(raw), 0
                 if image:
@@ -382,10 +433,12 @@ class HostedMiddleware:
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     sponsored=sponsored and self.service.spend is None,
-                    images=1 if image else 0,
+                    images=1 if image else (image_charge.images if image_charge else 0),
                 )
                 if sponsored and self.service.spend is not None:
                     await self.service.charge_spend(input_tokens, output_tokens)
+            # What the gateway may mask: only the images this admission charged for.
+            state["hosted_chat_images"] = image_charge.images if image_charge else 0
             if needs_runtime and canonical == "/v1/traffic/stream":
                 # A live stream trades its ingress slot for a bounded stream slot.
                 self.service.enter_stream(principal.id)
