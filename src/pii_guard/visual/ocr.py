@@ -173,6 +173,14 @@ SPARSE_TEXT = "--psm 11"
 #: whether an upside-down reading is worth a pass: the fictional card upside down reads 0.37,
 #: while half of the official specimens read below 0.53 upright.
 GOOD_READING = 0.7
+#: The upside-down discriminator (LAB-1305) reads the page turned 180 degrees at most this
+#: long side (px): enough for confident text, a fraction of a full pass. An upright page
+#: reads it as junk, so upright documents skip both the OSD call and the full extra pass;
+#: only a competitive upside-down reading proceeds, so turned-document recall is unchanged.
+ORIENT_MAX_SIDE = 800
+#: Skip the OSD call and the extra pass when the upright reading beats the upside-down one
+#: by more than this share. One-sided on purpose: anything competitive proceeds as before.
+ORIENT_MARGIN = 0.15
 #: Tesseract's own confidence (0-100) for a character to count as confidently read.
 CONFIDENT = 60.0
 #: The skew search: up to this many degrees either way.
@@ -329,10 +337,13 @@ class TesseractOcr:
     Tesseract reads; enlarged, they come back (``Családi név / Surname``), and so do the
     values under them. ``None`` reads the image as it is.
 
-    ``orient`` (LAB-1210): a page whose words stand upright (text running up or down) is read
-    again a quarter turn either way; a page read poorly, upside down; one read middlingly, in
-    the orientation Tesseract's OSD suggests. The best reading wins, so a wrong guess costs a
-    pass, never the upright reading.
+    ``orient`` (LAB-1210, LAB-1305): a page whose words stand upright (text running up or
+    down) is read again a quarter turn either way; a page read poorly, upside down; one read
+    middlingly, in the orientation Tesseract's OSD suggests — but only after a downscaled
+    upside-down read (:data:`ORIENT_MAX_SIDE`) reads competitively with the upright one.
+    An upright page reads upside down as junk, so upright documents skip both the OSD call
+    and the full extra pass. The best reading wins, so a wrong guess costs a pass, never the
+    upright reading.
     ``deskew``: a page skewed by :data:`MIN_SKEW`-:data:`MAX_SKEW` degrees (estimated from its
     row profile) is straightened before reading. Both read in a :class:`PageFrame` and map the
     boxes back (:meth:`read`). Upright, straight pages cost nothing extra.
@@ -406,15 +417,37 @@ class TesseractOcr:
             logger.debug("ocr: read in a frame turned %.1f degrees", best.frame.angle)
         return OcrPage(words, best.frame)
 
+    def _upside_down_share(self, image: Image.Image) -> float:
+        """The confident-character share of ``image`` turned 180 degrees and downscaled to
+        :data:`ORIENT_MAX_SIDE` (LAB-1305): the cheap upright/upside-down discriminator.
+        No deskew, no small-text tiles: it only decides whether a full extra pass is worth
+        running. Respects the image deadline like every other pass."""
+        frame = PageFrame.of(image.size, 180.0)
+        framed = frame.render(image)
+        longest = max(framed.size)
+        if longest > ORIENT_MAX_SIDE:
+            ratio = ORIENT_MAX_SIDE / longest
+            framed = framed.resize(
+                (max(1, round(framed.width * ratio)), max(1, round(framed.height * ratio))),
+                Image.Resampling.BILINEAR,
+            )
+        words, confidences = self._tesseract(framed, 1.0, (0, 0), ())
+        return _Reading(frame, words, confidences).share
+
     def _turns(self, image: Image.Image, reading: _Reading, scale: float) -> list[float]:
         """The quarter turns worth reading ``image`` in, given its upright ``reading``.
 
-        Words standing up: a quarter turn either way. A poor reading: upside down. A middling
-        one (a busy real document reads like that upright): whatever Tesseract's orientation
-        detection suggests, or upside down when it can't tell.
+        Words standing up: a quarter turn either way. Otherwise the downscaled upside-down
+        reading decides first (LAB-1305): an upright page reads it as junk, so when it is
+        clearly worse the upright reading stands — no OSD call, no extra pass. Only a
+        competitive upside-down reading proceeds: a poor one upside down, a middling one
+        (a busy real document reads like that upright) in whatever orientation Tesseract's
+        OSD suggests, or upside down when OSD can't tell.
         """
         if reading.sideways:
             return [90.0, 270.0]
+        if self._upside_down_share(image) + ORIENT_MARGIN < reading.share:
+            return []
         if reading.share < POOR_READING:
             return [180.0]
         hint = self._osd_turn(image, scale)

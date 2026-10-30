@@ -390,8 +390,8 @@ image parts are refused with `503 ocr_unavailable` (fail closed, ADR 0006): set
 `PII_GUARD_IMAGE_REQUIRE_OCR=false` only if SAM-only masking is acceptable, which leaves text in
 images unchecked (`X-PII-Guard-Image-OCR: off`). pytesseract hands Tesseract the image through
 a temp file, so the read-only `api` and `demo-api` containers mount a `tmpfs` on `/tmp`; a
-read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck checks `/healthz`
-and OCR availability, and prints `ocr on|off` (`docker inspect --format
+read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck reads `/healthz`
+(`"ocr"` plus `"image_require_ocr"`), and prints `ocr on|off` (`docker inspect --format
 '{{json .State.Health}}' <container>`). For `make demo` outside Docker: `brew install
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.

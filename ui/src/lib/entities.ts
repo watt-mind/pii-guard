@@ -259,5 +259,7 @@ export function detectorLabel(detector: string, options: DetectorLabelOptions = 
   if (detector === "ner") return "Multilingual NER";
   if (detector === "known") return "Known value (pre-loaded)";
   if (detector === "demo") return "Demo rules (in browser)";
+  if (detector === "captions") return "Field captions";
+  if (detector === "mrz") return "Machine-readable zone";
   return detector;
 }

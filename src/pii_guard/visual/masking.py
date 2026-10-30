@@ -52,7 +52,7 @@ import threading
 import time
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 from PIL import Image
@@ -73,6 +73,7 @@ from pii_guard.visual.labels import RegionLabel, VaultMatcher, label_image
 from pii_guard.visual.ocr import (
     OcrEngine,
     OcrText,
+    OcrWord,
     TesseractOcr,
     check_deadline,
     deadline,
@@ -130,6 +131,10 @@ RENDER_MODES: tuple[Render, ...] = ("labels", "opaque")
 
 #: How far a ``FACE`` box is grown before masking: (up, sides, down), fractions of its size.
 FACE_PADDING: tuple[float, float, float] = (0.40, 0.10, 0.05)
+#: Gap kept between an ``ID_PHOTO`` cover and a caption start it would otherwise swallow
+#: (LAB-1488): the photo estimate (a grown face box) is generous by design, but it must not
+#: cover the starts of the field captions or non-personal values next to the portrait.
+CAPTION_GAP = 3
 
 
 class UnsupportedImageError(PiiGuardError):
@@ -397,6 +402,7 @@ class ImageMasker:
                     ),
                 )
         regions = [grow_face(r, width, height) for r in analysis.regions]
+        regions = _clip_photos(regions, analysis.ocr.words if analysis.ocr is not None else [])
         policed = _merge([self._police(r) for r in regions])
         blocked = Counter(r.entity_type for r in policed if r.policy is Policy.BLOCK)
         if blocked:
@@ -552,6 +558,60 @@ def _with_box(item: PolicedRegion, box: Box | None) -> PolicedRegion:
     if box is None:
         return item
     return PolicedRegion(item.region, item.origin, item.policy, item.label, box)
+
+
+def clip_photo(photo: Region, face: Box | None, words: Sequence[OcrWord]) -> Region:
+    """An ``ID_PHOTO`` region clipped at swallowed caption starts (LAB-1488).
+
+    The photo around a face is estimated by growing the face box, generously by design; on
+    an ID card that estimate reaches past the portrait into the starts of the field
+    captions and non-personal values next to it. The right edge moves back to the leftmost
+    OCR word that starts past the face, overlaps the photo vertically and sticks out past
+    its right edge — a swallowed caption start — keeping :data:`CAPTION_GAP` pixels clear.
+    The cover never shrinks past the face it was grown around, and without words, without
+    a face inside, or without such a word, the region is unchanged.
+    """
+    if face is None:
+        return photo
+    edge = photo.box.x2
+    for word in words:
+        if (
+            word.box.x1 > face.x2
+            and word.box.y1 <= photo.box.y2
+            and word.box.y2 >= photo.box.y1
+            and word.box.x2 > photo.box.x2
+            and word.box.x1 - CAPTION_GAP < edge
+        ):
+            edge = word.box.x1 - CAPTION_GAP
+    edge = max(edge, face.x2)
+    if edge >= photo.box.x2:
+        return photo
+    return replace(photo, box=Box(photo.box.x1, photo.box.y1, edge, photo.box.y2))
+
+
+def _clip_photos(regions: list[Region], words: Sequence[OcrWord]) -> list[Region]:
+    """Every ``ID_PHOTO`` region :func:`clip_photo`-clipped at caption starts."""
+    if not words:
+        return regions
+    faces = [r.box for r in regions if r.entity_type is EntityType.FACE]
+    out: list[Region] = []
+    for region in regions:
+        if region.entity_type is not EntityType.ID_PHOTO:
+            out.append(region)
+            continue
+        face = next(
+            (
+                box
+                for box in faces
+                if box.x1 >= region.box.x1
+                and box.y1 >= region.box.y1
+                and box.x2 <= region.box.x2
+                and box.y2 <= region.box.y2
+            ),
+            None,
+        )
+        out.append(clip_photo(region, face, words))
+    return out
 
 
 def grow_face(region: Region, width: int, height: int) -> Region:

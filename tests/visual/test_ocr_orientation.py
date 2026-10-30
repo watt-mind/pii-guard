@@ -23,10 +23,13 @@ from pii_guard.detect.rules import RuleDetector
 from pii_guard.types import EntityType
 from pii_guard.visual import Box, OcrWord, tesseract_available, text_regions
 from pii_guard.visual.ocr import (
+    GOOD_READING,
+    POOR_READING,
     OcrPage,
     PageFrame,
     TesseractOcr,
     _merge_boxes,
+    _Reading,
     estimate_skew,
     ocr_text,
 )
@@ -274,14 +277,32 @@ def test_a_middling_reading_asks_osd(fake_tesseract: FakeTesseract) -> None:
     assert [w.text for w in read.words] == ["TAJ:", *FICTIONAL_TAJ.split()]
 
 
+def test_clearly_upright_middling_reading_skips_osd_and_the_extra_pass(
+    fake_tesseract: FakeTesseract,
+) -> None:
+    # LAB-1305: an upright page reads upside down as junk, so a middling upright reading
+    # stands without the OSD call and the full extra pass (one cheap discriminator read).
+    ocr = TesseractOcr(upscale_to=None, deskew=False)
+    page = bar_page()
+    upright = ocr._read(page, PageFrame.of(page.size, 0.0), 1.0)
+    assert [w.text for w in upright.words] == ["TAJ:", *FICTIONAL_TAJ.split()]
+    middling = _Reading(upright.frame, upright.words, [95.0, 95.0, 15.0, 15.0])
+    assert POOR_READING <= middling.share < GOOD_READING
+    assert ocr._turns(page, middling, 1.0) == []
+    assert fake_tesseract.osd_calls == 0
+    # The upright read plus the discriminator read: no OSD, no full extra pass.
+    assert len(fake_tesseract.calls) == 2
+
+
 @pytest.mark.parametrize("answer", [0, 45])
 def test_osd_saying_upright_costs_no_pass(fake_tesseract: FakeTesseract, answer: int) -> None:
     fake_tesseract.upside_good = 2
     fake_tesseract.osd = answer
     read = TesseractOcr(upscale_to=None, deskew=False, suppress=False).read(bar_page().rotate(180))
-    # 0: upright, no second pass. 45: OSD can't be trusted, so upside down is read too.
+    # 0: upright, no full second pass (one cheap upside-down discriminator read runs first).
+    # 45: OSD can't be trusted, so upside down is read too (after the same cheap read).
     assert read.frame.identity == (answer == 0)
-    assert len(fake_tesseract.calls) == (1 if answer == 0 else 2)
+    assert len(fake_tesseract.calls) == (2 if answer == 0 else 3)
 
 
 def test_osd_failing_falls_back_to_upside_down(fake_tesseract: FakeTesseract) -> None:

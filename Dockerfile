@@ -70,7 +70,9 @@ USER piiguard
 EXPOSE 8787
 
 # Healthy = /healthz answers and OCR is available (or explicitly not required); prints "ocr on|off".
+# Healthy = /healthz answers and OCR is available (or explicitly not required): the OCR state
+# comes from /healthz itself ("ocr" + "image_require_ocr"), so the check needs no app import.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import os, sys, urllib.request; from pii_guard.visual.ocr import tesseract_available as t; urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['PII_GUARD_PORT']}/healthz\", timeout=2); ok = t(); print('ocr', 'on' if ok else 'off'); sys.exit(0 if ok or os.environ.get('PII_GUARD_IMAGE_REQUIRE_OCR', 'true').lower() in ('false', '0', 'no', 'off') else 1)"]
+    CMD ["python", "-c", "import json, os, sys, urllib.request; r = json.load(urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['PII_GUARD_PORT']}/healthz\", timeout=2)); print('ocr', r.get('ocr')); sys.exit(0 if r.get('ocr') == 'on' or not r.get('image_require_ocr', True) else 1)"]
 
 CMD ["pii-guard", "serve"]

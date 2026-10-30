@@ -113,6 +113,9 @@ LOCAL_ENTITY_TYPES: tuple[EntityType, ...] = (EntityType.FACE, EntityType.ID_PHO
 #: beyond YuNet's box (90th percentile 0.5-0.7); these values were picked from four settings
 #: on the fictional set and the specimens (LAB-1229) as the smallest with no fictional portrait
 #: under 95 % covered. Over-masking is the safe side: a larger box costs precision, not privacy.
+#: Kept generous on purpose (LAB-1488 review): the masking pipeline (:func:`masking._clip_photos`)
+#: clips the estimate back at swallowed caption starts instead, so captions stay readable while
+#: the portrait stays covered.
 PHOTO_PADDING: tuple[float, float, float, float] = (0.65, 0.65, 0.6, 0.8)
 
 #: The image sizes (longer side, px; 0 = as given) YuNet runs at.
