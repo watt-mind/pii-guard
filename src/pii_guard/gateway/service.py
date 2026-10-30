@@ -1179,12 +1179,18 @@ class Gateway:
 
         def answer_event() -> bytes:
             content = restorer.masked_content()
+            # A choice past the retention cap has no copy; mark it rather than omit it, so
+            # a truncated echo is not mistaken for a short answer (LAB-1581).
+            truncated = restorer.masked_truncated()
+            choices = [
+                {"index": i, "content": None, "truncated": True}
+                if i in truncated
+                else {"index": i, "content": content[i]}
+                for i in sorted({*content, *truncated})
+            ]
             return sse_event(
                 json.dumps(
-                    {
-                        "object": "pii_guard.masked_answer",
-                        "choices": [{"index": i, "content": content[i]} for i in sorted(content)],
-                    },
+                    {"object": "pii_guard.masked_answer", "choices": choices},
                     ensure_ascii=False,
                 )
             )

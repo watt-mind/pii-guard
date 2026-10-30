@@ -120,16 +120,32 @@ def test_scrub_redacts_credential_synonyms_and_short_secrets() -> None:
         "prompt_cache_key": "conv-1",
         "max_tokens": 10,
         "author": "Teszt Elek",
-        "messages": [{"content": "Bearer xy and k9z here"}],
+        "messages": [{"content": "Bearer x9 and k9z here"}],
     }
     out = scrub(value, ["k9z"])
     dumped = json.dumps(out)
     for marker in (f"value-{i}" for i in range(1, 10)):
         assert marker not in dumped
-    assert "xy" not in out["messages"][0]["content"].replace("Bearer [redacted]", "")
+    assert "x9" not in out["messages"][0]["content"].replace("Bearer [redacted]", "")
     assert "k9z" not in dumped  # a 3-char known secret is still scrubbed
     assert out["prompt_cache_key"] == "conv-1"  # not a credential
     assert out["max_tokens"] == 10 and out["author"] == "Teszt Elek"
+
+
+@pytest.mark.parametrize("prose", ["a basic idea", "bearer bonds are paper", "Basic setup"])
+def test_scrub_keeps_prose_after_bearer_and_basic(prose: str) -> None:
+    # LAB-1581: a short plain word after "basic"/"bearer" is English, not a credential.
+    assert scrub({"content": prose})["content"] == prose
+
+
+@pytest.mark.parametrize(
+    "token",
+    ["abcdefghijklmnop", "part.part.sig0000", "dGVzdDp0ZXN0", "x9", "abc-de"],
+)
+def test_scrub_still_redacts_token_shaped_values(token: str) -> None:
+    for scheme in ("Bearer", "basic"):
+        out = scrub({"content": f"auth {scheme} {token} end"})["content"]
+        assert out == f"auth {scheme} {REDACTED} end"
 
 
 def test_scrub_truncates_long_strings() -> None:

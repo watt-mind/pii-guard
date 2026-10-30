@@ -215,6 +215,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
 | `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
 | `PII_GUARD_NER_WARMUP_TIMEOUT` | `ner_warmup_timeout` | `float` (> 0, seconds): how long a detecting request waits for the background NER load | `120` |
+| `PII_GUARD_BODY_READ_TIMEOUT` | `body_read_timeout` | `float` (> 0, seconds): whole request-body read deadline on the REST API; past it, 408 `request_timeout` and nothing is processed (raise it for large image bodies on slow links) | `30` |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |

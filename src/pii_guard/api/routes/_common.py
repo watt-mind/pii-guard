@@ -34,6 +34,7 @@ __all__ = [
     "BodyReadTimeoutError",
     "ClientDisconnectedError",
     "LoggedRoute",
+    "body_read_timeout",
     "check_text_size",
     "ensure_connected",
     "ephemeral_session",
@@ -49,9 +50,18 @@ access_logger = logging.getLogger("pii_guard.api.access")
 _BODY_BYTES_PER_CHAR = 12
 _BODY_OVERHEAD_BYTES = 16_384
 
-#: Whole request-body read deadline (LAB-1566): bytes alone do not stop a slow-loris client
-#: from holding a request open; the projects middleware bounds its body read the same way.
+#: Default whole request-body read deadline (LAB-1566): bytes alone do not stop a slow-loris
+#: client from holding a request open. ``PII_GUARD_BODY_READ_TIMEOUT``
+#: (``Settings.body_read_timeout``, LAB-1581) overrides it; this applies without app settings.
 BODY_READ_TIMEOUT_SECONDS = 30.0
+
+
+def body_read_timeout(request: Request) -> float:
+    """The body-read deadline in seconds: ``Settings.body_read_timeout``, else the default."""
+    app = request.scope.get("app")
+    settings = getattr(getattr(app, "state", None), "settings", None)
+    timeout = getattr(settings, "body_read_timeout", None)
+    return float(timeout) if timeout is not None else BODY_READ_TIMEOUT_SECONDS
 
 
 class BodyReadTimeoutError(PiiGuardError):
@@ -154,14 +164,14 @@ async def _read_body_capped(request: Request, limit: int) -> None:
 
     The body is cached on the request (Starlette's ``request.body()`` / ``stream()`` then
     return it), so the handler reads what was counted here. A time deadline
-    (:data:`BODY_READ_TIMEOUT_SECONDS`, LAB-1566) bounds the whole read as well: past it,
-    408 and nothing is processed."""
+    (:func:`body_read_timeout`, LAB-1566) bounds the whole read as well: past it, 408 and
+    nothing is processed."""
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return
     chunks: list[bytes] = []
     size = 0
     try:
-        async with asyncio.timeout(BODY_READ_TIMEOUT_SECONDS):
+        async with asyncio.timeout(body_read_timeout(request)):
             async for chunk in request.stream():
                 size += len(chunk)
                 if size > limit:
