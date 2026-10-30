@@ -36,6 +36,7 @@ __all__ = ["BYTE_EXACT", "ArgumentsContext", "ShellContext", "ShellText", "shell
 COMMAND_KEYS = frozenset({"command", "cmd"})
 #: In a ``command`` array, the element after one of these is a script (``bash -lc "..."``).
 _SCRIPT_FLAG_RE = re.compile(r"-[a-z]*c")
+_SHELL_NAMES = frozenset({"sh", "bash", "zsh", "dash", "ksh", "ash"})
 _SED_NAMES = frozenset({"sed", "gsed"})
 #: sed commands without an argument (so ``1d;s/a/b/`` reads on).
 _SED_BARE = frozenset("dpgGhHxnNDP=")
@@ -150,7 +151,7 @@ class _Shell:
     """Quoting state of one shell command string, read character by character."""
 
     def __init__(self) -> None:
-        self.mode = "normal"  # normal | single | double | unknown
+        self.mode = "normal"  # normal | single | double | comment | unknown
         self.escape = False
         self.previous = ""
         self.word = ""  # the current word's text outside quotes
@@ -175,6 +176,12 @@ class _Shell:
         mode = self.mode
         if mode == "unknown":
             return
+        if mode == "comment":
+            if char == "\n":
+                self.mode = "normal"
+            self.previous = char
+            return
+        was_escaped = self.escape
         if mode == "single":
             if char == "'":
                 self.mode, self.sed = "normal", None
@@ -186,7 +193,7 @@ class _Shell:
             self._double(char)
         else:
             self._normal(char)
-        self.previous = char
+        self.previous = "" if was_escaped else char
 
     def _double(self, char: str) -> None:
         if char != '"' or self.escape:
@@ -217,7 +224,7 @@ class _Shell:
         elif char == '"':
             self.mode, self.in_word, self.word_quoted = "double", True, True
         elif char == "#" and not self.in_word:
-            self.mode = "unknown"
+            self.mode = "comment"
         elif char == "<" and self.previous == "<":
             self.mode = "unknown"  # heredoc (or a here-string): not modeled
         elif char.isspace() and char != "\n":
@@ -288,6 +295,7 @@ class ArgumentsContext:
         self._escape = False
         self._unicode = ""
         self._buffer = ""  # decoded text of a short string (a key or an array element)
+        self._first_element: str | None = None
         self._previous_element = ""
         self._shell: _Shell | None = None
 
@@ -355,6 +363,8 @@ class ArgumentsContext:
             or (
                 depth == 2
                 and self._stack == ["o", "a"]
+                and self._first_element is not None
+                and self._first_element.rsplit("/", 1)[-1] in _SHELL_NAMES
                 and _SCRIPT_FLAG_RE.fullmatch(self._previous_element)
             )
         ):
@@ -367,6 +377,8 @@ class ArgumentsContext:
                 self._key = self._buffer
             self._expect_key = False
         elif self._stack and self._stack[-1] == "a":
+            if self._first_element is None and self._stack == ["o", "a"]:
+                self._first_element = self._buffer
             self._previous_element = self._buffer
 
     def _structure(self, char: str) -> None:
@@ -375,6 +387,8 @@ class ArgumentsContext:
         elif char in "{[":
             self._stack.append("o" if char == "{" else "a")
             self._expect_key = char == "{"
+            if self._stack == ["o", "a"]:
+                self._first_element = None
             self._previous_element = ""
         elif char in "}]":
             if not self._stack:

@@ -293,3 +293,94 @@ def test_endpoint_key_on_a_near_miss_muse_catalog_path_is_refused(hosted, path):
     assert result.status_code in (401, 404), result.text
     assert "muse-spark-1.3" not in result.text
     assert not seen
+
+
+# --- LAB-1651: coding agents through an endpoint URL ------------------------------------------
+
+#: A coding agent's request: its system prompt and tool schemas come before any history.
+#: Muse Code's measured 132 KB (LAB-1651) is the largest; this one is close to it.
+AGENT_PROMPT = "You are a coding agent. Use the tools to read and edit files. " * 2100
+
+
+def _agent_chat(
+    client: TestClient, endpoint: dict[str, Any], key: str, system: str, **body: Any
+) -> httpx.Response:
+    return client.post(
+        endpoint["base_path"] + "/chat/completions",
+        json={
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": EMAIL},
+            ],
+            **body,
+        },
+        headers={"authorization": "Bearer " + key},
+    )
+
+
+def test_endpoint_takes_a_coding_agent_sized_body(hosted):
+    client, seen = hosted
+    endpoint = _create(client, provider="openai", api_key=PROVIDER_KEY, model="synthetic-a").json()
+    key = _key(client, endpoint)
+    assert len(AGENT_PROMPT) > 3 * client.app.state.hosted.settings.hosted_max_body_bytes
+    result = _agent_chat(client, endpoint, key, AGENT_PROMPT)
+    assert result.status_code == 200, result.text
+    assert EMAIL not in seen[-1].content.decode()
+
+
+def test_endpoint_body_limit_is_bounded(hosted):
+    client, seen = hosted
+    endpoint = _create(client, provider="openai", api_key=PROVIDER_KEY, model="synthetic-a").json()
+    key = _key(client, endpoint)
+    limit = client.app.state.hosted.settings.hosted_endpoint_max_body_bytes
+    result = _agent_chat(client, endpoint, key, "x" * limit)
+    assert result.status_code == 403, result.text
+    assert result.json()["error"]["message"] == "Endpoint request body is too large"
+    assert not [r for r in seen if r.method == "POST"]
+
+
+def test_console_chat_keeps_the_text_body_limit(hosted):
+    client, seen = hosted
+    limit = client.app.state.hosted.settings.hosted_max_body_bytes
+    result = client.post(
+        "/v1/chat/completions",
+        json={"model": "muse-spark-1.3", "messages": [{"role": "user", "content": "x" * limit}]},
+        headers=auth(),
+    )
+    assert result.status_code == 403, result.text
+    assert result.json()["error"]["message"] == "Hosted request body is too large"
+    assert not [r for r in seen if r.method == "POST"]
+
+
+@pytest.mark.parametrize("field", ["max_tokens", "max_completion_tokens"])
+def test_endpoint_clamps_an_agent_output_limit(hosted, field):
+    # OpenCode sends max_tokens 32000 and pi max_completion_tokens 16384 (LAB-1651).
+    client, seen = hosted
+    endpoint = _create(client, provider="openai", api_key=PROVIDER_KEY, model="synthetic-a").json()
+    key = _key(client, endpoint)
+    result = _chat(client, endpoint, key, **{field: 32000})
+    assert result.status_code == 200, result.text
+    sent = json.loads(seen[-1].content)
+    assert (
+        sent["max_completion_tokens"] == client.app.state.hosted.settings.hosted_max_output_tokens
+    )
+    assert "max_tokens" not in sent
+
+
+def test_endpoint_still_refuses_policy_header_overrides(hosted):
+    # The middleware stays strict; `pii-guard connect` just stops sending them (LAB-1651).
+    client, seen = hosted
+    endpoint = _create(client, provider="openai", api_key=PROVIDER_KEY, model="synthetic-a").json()
+    key = _key(client, endpoint)
+    for header in (
+        {"x-pii-guard-mode": "audit"},
+        {"x-pii-guard-language": "de"},
+        {"x-pii-guard-connection": "synthetic"},
+    ):
+        result = client.post(
+            endpoint["base_path"] + "/chat/completions",
+            json={"messages": [{"role": "user", "content": EMAIL}]},
+            headers={"authorization": "Bearer " + key, **header},
+        )
+        assert result.status_code == 403, (header, result.text)
+    assert not [r for r in seen if r.method == "POST"]

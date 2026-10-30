@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from pii_guard.cli import main as root_main
-from pii_guard.integrations import pi
+from pii_guard.integrations import pi, snippets
 from pii_guard.integrations.cli import main
 from pii_guard.integrations.common import (
     CANARY_VALUES,
@@ -118,6 +118,56 @@ def test_endpoint_url_is_written_without_a_session_path(tmp_path: Path) -> None:
     assert code == 0
     settings = json.loads((muse / "settings.json").read_text())
     assert settings["endpoint_transport"]["base_url"] == endpoint
+
+
+#: Headers a project endpoint fixes from its policy and refuses from a client (LAB-1651).
+ENDPOINT_FIXED = ("x-pii-guard-mode", "x-pii-guard-language", "x-pii-guard-connection")
+
+
+def test_endpoint_connect_writes_no_policy_headers(tmp_path: Path) -> None:
+    # LAB-1651: pi sent X-PII-Guard-Mode/-Language from its config and the endpoint refused
+    # every turn ("Endpoint language cannot be overridden"), even --language en.
+    endpoint = "http://127.0.0.1:9/e/ep_synthetic/v1"
+    stale = {
+        "providers": {"pii-guard": {"baseUrl": endpoint, "headers": {"X-PII-Guard-Mode": "x"}}}
+    }
+    (tmp_path / "models.json").write_text(json.dumps(stale))
+    args = ("--agent-dir", str(tmp_path), "--model", "m1", "--gateway", endpoint)
+    code, _ = run("pi", *args, "--mode", "audit", "--language", "de")
+    assert code == 0
+    entry = json.loads((tmp_path / "models.json").read_text())["providers"]["pii-guard"]
+    assert "headers" not in entry
+    assert entry["baseUrl"] == endpoint and entry["models"] == [
+        {"id": "m1", "name": "m1 (pii-guard)"}
+    ]
+    muse = tmp_path / "muse"
+    assert run("muse-code", "--muse-dir", str(muse), "--gateway", endpoint)[0] == 0
+    for written in (tmp_path / "models.json", muse / "settings.json"):
+        text = written.read_text().lower()
+        assert not any(name in text for name in ENDPOINT_FIXED), written
+
+
+def test_local_gateway_connect_keeps_its_headers(tmp_path: Path, unreachable: str) -> None:
+    args = ("--agent-dir", str(tmp_path), "--model", "m1", "--gateway", unreachable)
+    assert run("pi", *args, "--mode", "audit", "--language", "de")[0] == 0
+    entry = json.loads((tmp_path / "models.json").read_text())["providers"]["pii-guard"]
+    assert entry["headers"] == {"X-PII-Guard-Mode": "audit", "X-PII-Guard-Language": "de"}
+
+
+def test_endpoint_blocks_send_no_policy_headers() -> None:
+    # Every Connect page block and `connect --print` for an endpoint (the same document).
+    for model in ("muse-spark-1.3", None):
+        doc = snippets.build_endpoint(
+            gateway_url="https://guard.example/e/ep_synthetic/v1",
+            endpoint="ep_synthetic",
+            name="Synthetic",
+            model=model,
+            preset=None,
+        )
+        assert {t["id"] for t in doc["tools"]} == set(snippets.TOOL_IDS)
+        for tool in doc["tools"]:
+            text = json.dumps(tool).lower()
+            assert not any(name in text for name in ENDPOINT_FIXED), tool["id"]
 
 
 def test_is_endpoint_url() -> None:

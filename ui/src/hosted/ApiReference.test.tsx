@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../components/Sidebar";
 import { HOSTED_CAPABILITIES, LOCAL_CAPABILITIES } from "../lib/capabilities";
@@ -111,14 +112,52 @@ describe("the API reference page", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "API reference" })).toBeInTheDocument();
     expect(consoleStub).not.toHaveBeenCalled();
     const nav = screen.getByRole("navigation", { name: "Main navigation" });
-    expect(within(nav).getByText("API")).toHaveAttribute("aria-current", "page");
-    expect(within(nav).getByRole("link", { name: "Console" })).toHaveAttribute("href", anonymous.login_url);
+    for (const link of within(nav).getAllByRole("link", { name: "API" })) {
+      expect(link).toHaveAttribute("aria-current", "location");
+      expect(link).toHaveAttribute("href", "#api");
+    }
+    expect(screen.getByRole("link", { name: "Sign in to console" })).toHaveAttribute("href", anonymous.login_url);
     // The spec is the committed docs/openapi.json, served from the build, never the runtime /openapi.json.
     const download = screen.getByRole("link", { name: "openapi.json" });
     expect(download.getAttribute("href")).toMatch(/openapi\.json$/);
     expect(download.getAttribute("href")).not.toBe("/openapi.json");
     expect(screen.getByRole("link", { name: /Guide: quickstart/ })).toHaveAttribute("href", "https://github.com/watt-mind/pii-guard/blob/develop/docs/api.md");
     expect((call as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual(["/v1/account"]);
+  });
+
+  it("uses the shared public header and footer, including the mobile menu and one appearance control (LAB-1657)", async () => {
+    const user = userEvent.setup();
+    open("#api");
+    render(<HostedApp call={requester(anonymous)} console={consoleStub} />);
+    await screen.findByRole("heading", { level: 1, name: "API reference" });
+    const header = screen.getByRole("banner");
+    expect(header).toHaveClass("public-header");
+    expect(header.closest(".pii-guard-api")).toHaveClass("public-teal-theme");
+    expect(within(header).getByRole("link", { name: "PII Guard" })).toHaveAttribute("href", "#site");
+    expect(within(header).getByRole("link", { name: "Source on GitHub" })).toHaveAttribute("href", "https://github.com/watt-mind/pii-guard");
+
+    const menu = within(header).getByText("Menu").closest("details")!;
+    await user.click(menu.querySelector("summary")!);
+    const api = within(menu).getByRole("link", { name: "API" });
+    expect(api).toHaveAttribute("href", "#api");
+    expect(api).toHaveAttribute("aria-current", "location");
+    expect(api.querySelector("svg")).toBeNull();
+    await user.keyboard("{Escape}");
+
+    const appearance = screen.getByLabelText("Appearance");
+    expect(screen.getAllByLabelText("Appearance")).toHaveLength(1);
+    await user.click(appearance);
+    expect(screen.getAllByRole("radiogroup", { name: "Theme" })).toHaveLength(1);
+    await user.click(screen.getByRole("radio", { name: "Dark theme" }));
+    expect(document.documentElement).toHaveClass("dark");
+    await user.click(screen.getByRole("radio", { name: "Light theme" }));
+    expect(document.documentElement).not.toHaveClass("dark");
+
+    const footer = screen.getByRole("navigation", { name: "Footer" });
+    expect(within(footer).getByRole("link", { name: "Home" })).toHaveAttribute("href", "#site");
+    expect(within(footer).getByRole("link", { name: "Benchmarks" })).toHaveAttribute("href", "#evaluation");
+    expect(within(footer).getByRole("link", { name: "API reference" })).toHaveAttribute("href", "#api");
+    expect(within(footer).getByRole("link", { name: /API guide/ })).toHaveAttribute("href", "https://github.com/watt-mind/pii-guard/blob/develop/docs/api.md");
   });
 
   it("opens inside the console for a signed-in owner (LAB-1626)", async () => {
@@ -135,6 +174,10 @@ describe("the API reference page", () => {
     expect(screen.getByRole("heading", { level: 1, name: "API reference" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Main navigation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Appearance")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "API reference" }).closest(".pii-guard-api")).not.toHaveClass("public-teal-theme");
     const scalar = await screen.findByTestId("scalar");
     expect(JSON.parse(scalar.dataset.servers ?? "[]")[0].url).toBe(window.location.origin);
     vi.unstubAllEnvs();

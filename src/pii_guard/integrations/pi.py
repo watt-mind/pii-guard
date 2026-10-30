@@ -8,7 +8,9 @@ default ``~/.pi/agent``). :func:`provider_entry` builds a ``pii-guard`` provider
   from the environment at request time), else a placeholder pi needs to list the models; the
   gateway sends its own ``PII_GUARD_UPSTREAM_API_KEY`` upstream;
 - ``headers``: ``X-PII-Guard-Mode: fast`` (rules + NER: agent turns are many and long, audit
-  mode's LLM detector would add its latency to every one) and ``X-PII-Guard-Language``;
+  mode's LLM detector would add its latency to every one) and ``X-PII-Guard-Language``. Not
+  for a project endpoint URL (``/e/<endpoint>/v1``): the endpoint's policy fixes its mode and
+  language and refuses a request that names others (LAB-1651), so that entry has no headers;
 - ``compat``: ``supportsDeveloperRole: false`` (system prompts go as ``system``, which every
   OpenAI-compatible server accepts) and ``supportsStore: false`` (pi otherwise sends
   ``store``, which only OpenAI itself understands). The gateway forwards both fields; the flags
@@ -29,7 +31,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from pii_guard.integrations.common import ConnectError, render_json
+from pii_guard.integrations.common import ConnectError, is_endpoint_url, render_json
 
 __all__ = [
     "PROVIDER_ID",
@@ -86,15 +88,17 @@ def provider_entry(
     language: str = "en",
     api_key: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    entry: dict[str, Any] = {
         "name": "pii-guard",
         "baseUrl": gateway_url.rstrip("/"),
         "api": "openai-completions",
         "apiKey": api_key or PLACEHOLDER_KEY,
-        "headers": {"X-PII-Guard-Mode": mode, "X-PII-Guard-Language": language},
-        "compat": {"supportsDeveloperRole": False, "supportsStore": False},
-        "models": [{"id": model, "name": f"{model} (pii-guard)"} for model in models],
     }
+    if not is_endpoint_url(gateway_url):
+        entry["headers"] = {"X-PII-Guard-Mode": mode, "X-PII-Guard-Language": language}
+    entry["compat"] = {"supportsDeveloperRole": False, "supportsStore": False}
+    entry["models"] = [{"id": model, "name": f"{model} (pii-guard)"} for model in models]
+    return entry
 
 
 def merge(existing: Mapping[str, Any], entry: Mapping[str, Any]) -> dict[str, Any]:

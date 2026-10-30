@@ -17,12 +17,12 @@ describe("public header navigation", () => {
   });
   it("exposes every resource, marks the active section and restores Escape focus", async () => {
     const user = userEvent.setup();
-    render(<PublicHeader current="data" accountHref="#overview" />);
+    render(<PublicHeader current="trust" accountHref="#overview" />);
     // jsdom does not implement native summary Enter activation; checked in browser.
     await user.click(trigger());
     expect(menu()).toHaveAttribute("open");
-    expect(within(menu()).getByRole("link", { name: "Privacy" })).toHaveAttribute("aria-current", "location");
-    for (const [label, href] of [["Model details", "#meta"], ["Image masking", "#images"], ["Privacy limits", "#privacy"], ["Why Europe", "#europe"], ["Get started", "#account"], ["Self-hosting guide", "https://github.com/watt-mind/pii-guard#try-it"]]) {
+    expect(within(menu()).getByRole("link", { name: "Privacy & trust" })).toHaveAttribute("aria-current", "location");
+    for (const [label, href] of [["Technical overview", "#technical"], ["Image masking", "#images"], ["Privacy & trust", "#trust"], ["Get started", "#account"], ["Self-hosting guide", "https://github.com/watt-mind/pii-guard#try-it"]]) {
       expect(within(menu()).getByRole("link", { name: label })).toHaveAttribute("href", href);
     }
     await user.tab();
@@ -47,14 +47,14 @@ describe("public header navigation", () => {
     const user = userEvent.setup();
     const { rerender } = render(<PublicHeader accountHref="#overview" />);
     await user.click(trigger());
-    await user.click(within(menu()).getByRole("link", { name: "Why Europe" }));
+    await user.click(within(menu()).getByRole("link", { name: "Technical overview" }));
     expect(menu()).not.toHaveAttribute("open");
     const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
-    rerender(<><PublicHeader accountHref="#overview" /><main><section id="europe"><h2 tabIndex={-1}>Synthetic destination</h2></section></main></>);
+    rerender(<><PublicHeader accountHref="#overview" /><main><section id="technical"><h2 tabIndex={-1}>Synthetic destination</h2></section></main></>);
     await waitFor(() => expect(screen.getByRole("heading")).toHaveFocus());
     expect(scroll).toHaveBeenCalled();
     await user.click(trigger());
-    await user.click(within(menu()).getByRole("link", { name: "Why Europe" }));
+    await user.click(within(menu()).getByRole("link", { name: "Technical overview" }));
     await waitFor(() => expect(screen.getByRole("heading")).toHaveFocus());
     scroll.mockRestore();
   });
@@ -88,7 +88,7 @@ describe("public header navigation", () => {
   it("preserves modified-click navigation without closing or moving focus", async () => {
     const user = userEvent.setup(); render(<PublicHeader accountHref="#overview" />);
     await user.click(trigger());
-    fireEvent.click(within(menu()).getByRole("link", { name: "Why Europe" }), { ctrlKey: true });
+    fireEvent.click(within(menu()).getByRole("link", { name: "Technical overview" }), { ctrlKey: true });
     expect(menu()).toHaveAttribute("open");
   });
 });

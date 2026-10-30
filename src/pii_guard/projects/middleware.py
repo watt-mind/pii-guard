@@ -134,7 +134,9 @@ async def endpoint_body(
                 raise EndpointModelRequiredError(
                     "This endpoint has no pinned model: the request must name one in 'model'"
                 )
-        raw = bytearray(json.dumps(body).encode())
+        # Compact, so the re-serialised body the hosted limit checks next is no larger than
+        # what the client sent (default separators add about 1-2%, LAB-1651).
+        raw = bytearray(json.dumps(body, separators=(",", ":")).encode())
     filtered = [
         (k, v)
         for k, v in scope.get("headers", [])

@@ -44,6 +44,24 @@ def test_defaults_hold_visual_types_and_local_detection(store: ProjectStore) -> 
     }
 
 
+def test_memory_store_defaults_hold_visual_types() -> None:
+    store = ProjectStore.memory(MASTER_KEY, PolicySet(), "standard")
+    try:
+        project = store.default_project(OWNER)
+        policy = store.get_policy(OWNER, project["id"], project["default_policy_version_id"])
+        assert policy["visual_detection"] == "local"
+        assert {
+            k: policy["entity_policies"][k] for k in ("FACE", "ID_PHOTO", "SIGNATURE", "STAMP")
+        } == {
+            "FACE": "mask",
+            "ID_PHOTO": "mask",
+            "SIGNATURE": "mask",
+            "STAMP": "keep",
+        }
+    finally:
+        store.close()
+
+
 def test_visual_actions_and_detection_are_versioned(store: ProjectStore) -> None:
     project = store.default_project(OWNER)
     first = store.create_policy(

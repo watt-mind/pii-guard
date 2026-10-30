@@ -6,11 +6,9 @@ import "./publicNavigation.css";
 
 const PRIMARY = [{ href: "#demo", label: "Demo" }, { href: "#how", label: "How it works" }, { href: "#results", label: "Benchmarks" }, { href: "#api", label: "API" }];
 const RESOURCES = [
-  { href: "#meta", label: "Model details" },
+  { href: "#technical", label: "Technical overview" },
   { href: "#images", label: "Image masking" },
-  { href: "#data", label: "Privacy" },
-  { href: "#privacy", label: "Privacy limits" },
-  { href: "#europe", label: "Why Europe" },
+  { href: "#trust", label: "Privacy & trust" },
   { href: "#account", label: "Get started" },
   { href: `${SOURCE}#try-it`, label: "Self-hosting guide" },
 ];
@@ -62,6 +60,11 @@ export function PublicHeader({ current, accountHref, signedIn = false }: { curre
     const from = document.activeElement;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       if (document.activeElement !== from && document.activeElement !== document.body) return;
+      if (["#demo", "#trust", "#technical"].includes(href) && document.getElementById("public-page-heading")) {
+        globalThis.scrollTo?.(0, 0);
+        document.getElementById("public-page-heading")?.focus({ preventScroll: true });
+        return;
+      }
       const target = document.getElementById(href.slice(1));
       target?.scrollIntoView({ block: "start" });
       target?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
@@ -70,7 +73,7 @@ export function PublicHeader({ current, accountHref, signedIn = false }: { curre
   const navLink = (item: { href: string; label: string }, mobile = false) => <a key={item.href} className={mobile ? "public-mobile-link" : undefined} href={item.href} onClick={navigate} aria-current={current === item.href.slice(1) ? "location" : undefined}>{item.label}{item.href.startsWith("https:") && <span aria-hidden="true">↗</span>}</a>;
   return <header className="public-header">
     <div className="public-header-bar">
-      <a href="#" className="public-brand"><Logo />PII Guard</a>
+      <a href="#site" className="public-brand"><Logo />PII Guard</a>
       <nav aria-label="Main navigation" className="public-nav">
         <div className="public-primary">{PRIMARY.map((item) => navLink(item))}</div>
         <details ref={disclosure} className="public-disclosure">

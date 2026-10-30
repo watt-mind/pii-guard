@@ -7,6 +7,7 @@ import hmac
 import os
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -18,6 +19,7 @@ from pii_guard.config import Settings
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import GatewayConfig, Mode
 from pii_guard.gateway.detection import ModeDetector
+from pii_guard.gateway.opaque_ids import IssuedIds
 from pii_guard.gateway.service import Gateway
 from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.attribution import sponsored_upstream_headers
@@ -113,6 +115,8 @@ class Runtime:
     active: int = 0
     session_holds: dict[str, Any] = field(default_factory=dict)
     holds_lock: Any = field(default_factory=threading.Lock)
+    issued_ids: IssuedIds = field(default_factory=IssuedIds)
+    session_incarnations: OrderedDict[str, Any] = field(default_factory=OrderedDict)
     #: The ``_runtimes`` key; a guest runtime is dropped as soon as it is idle.
     identity: str = ""
     guest: bool = False
@@ -501,6 +505,8 @@ class HostedService:
         gateway._detect_workers = self._workers
         gateway._session_holds = runtime.session_holds
         gateway._holds_lock = runtime.holds_lock
+        gateway.issued_ids = runtime.issued_ids
+        gateway._session_incarnations = runtime.session_incarnations
         request.state.hosted_gateway = gateway
         return gateway
 
