@@ -9,9 +9,10 @@ import random
 
 import pytest
 
-from pii_guard.detect.rules import RuleDetector, hu
+from pii_guard.detect.rules import RuleDetector
 from pii_guard.eval.identities import identity_generator
 from pii_guard.lang import postcode_index
+from pii_guard.languages.hu import rules as hu
 from pii_guard.types import EntityType as E
 
 
