@@ -57,6 +57,9 @@ function detailOf(ref: string, reveal: boolean, mode: "masked" | "full"): VaultS
         forms: 1,
         variant_of: null,
         hint: "T•••• E•••",
+        detector: "rules",
+        first_seen: 12.0,
+        last_seen: 18.5,
         ...(reveal ? { original: "Teszt Elek", known_forms: ["Teszt Eleké"] } : {}),
       },
       {
@@ -67,6 +70,9 @@ function detailOf(ref: string, reveal: boolean, mode: "masked" | "full"): VaultS
         forms: 0,
         variant_of: null,
         hint: "t••••.e•••@e••••••.c••",
+        detector: "known",
+        first_seen: 12.0,
+        last_seen: 12.0,
         ...(reveal ? { original: "teszt.elek@example.com", known_forms: [] } : {}),
       },
     ],
@@ -197,6 +203,33 @@ describe("Vault", () => {
     const client = fakeClient("masked");
     render(<Vault status={statusOf("masked")} live active client={client} focus={{ ref: "s_3333cccc4444dddd", nonce: 1 }} />);
     expect(await screen.findByRole("heading", { name: /Session s_3333cccc4444dddd/ })).toBeInTheDocument();
+  });
+
+  it("follows the open session in the URL hash, and a stale ref says the session is gone (LAB-1333)", async () => {
+    const client = fakeClient("masked");
+    const user = userEvent.setup();
+    const onSelectRef = vi.fn();
+    render(<Vault status={statusOf("masked")} live active client={client} onSelectRef={onSelectRef} />);
+    await user.click(await screen.findByRole("button", { name: /s_1111aaaa2222bbbb/ }));
+    expect(await screen.findByRole("heading", { name: /Session s_1111aaaa2222bbbb/ })).toBeInTheDocument();
+    expect(onSelectRef).toHaveBeenLastCalledWith("s_1111aaaa2222bbbb");
+
+    render(<Vault status={statusOf("masked")} live active client={client} focus={{ ref: "s_deadbeef", nonce: 7 }} />);
+    expect(await screen.findByText("This session is gone: it expired or was dropped.")).toBeInTheDocument();
+  });
+
+  it("clears the detail when a filter hides the open session (LAB-1333)", async () => {
+    const client = fakeClient("masked");
+    const user = userEvent.setup();
+    const onSelectRef = vi.fn();
+    render(<Vault status={statusOf("masked")} live active client={client} onSelectRef={onSelectRef} />);
+    await user.click(await screen.findByRole("button", { name: /s_1111aaaa2222bbbb/ }));
+    expect(await screen.findByRole("heading", { name: /Session s_1111aaaa2222bbbb/ })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search by session ref"), "3333");
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Session s_1111/ })).toBeNull());
+    expect(screen.getByText("Pick a session to see its placeholders.")).toBeInTheDocument();
+    expect(onSelectRef).toHaveBeenLastCalledWith(null);
   });
 
   it("says why it can't inspect: inspector off, demo mode", async () => {

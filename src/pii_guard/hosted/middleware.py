@@ -14,6 +14,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pii_guard.api.errors import error_headers, error_response
 from pii_guard.api.routes._common import ClientDisconnectedError
+from pii_guard.api.security import looks_like_endpoint_key
 from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
@@ -144,7 +145,7 @@ class HostedMiddleware:
                     scheme, _, auth = auth.partition(" ")
                     if scheme.lower() != "bearer":
                         raise HostedUnauthorizedError("Invalid guard API key")
-                if auth.startswith("pg_ep_"):
+                if looks_like_endpoint_key(auth):
                     # Muse reads its catalog at the root of an endpoint base URL (LAB-1462).
                     root_catalog = routed is None and path == MUSE_CATALOG
                     if (routed is None and not root_catalog) or headers.get("x-pii-guard-token"):

@@ -56,6 +56,7 @@ from collections.abc import Iterable, Sequence
 from contextvars import ContextVar
 from functools import lru_cache
 
+from pii_guard.languages import on_change
 from pii_guard.types import EntityType, Span
 
 __all__ = ["NUMBER_TYPES", "check_numbers", "cue_before", "number_verdict"]
@@ -145,7 +146,9 @@ def _lexicons() -> tuple[tuple[frozenset[str], tuple[str, ...]], tuple[frozenset
 
     The typed cues of every language pack join the positive words (phone cues too: a number
     after "phone" is personal data whatever type the model gave it), so a pack that adds a cue
-    protects the values after it here too.
+    protects the values after it here too. The negative words are every pack's
+    ``ner``-scoped ``references.tsv`` entries (LAB-1345), or the built-in :data:`_NEGATIVE`
+    when no pack provides any (a language without a pack keeps its behavior).
     """
     from pii_guard.detect.rules import _pack_cues
 
@@ -157,7 +160,32 @@ def _lexicons() -> tuple[tuple[frozenset[str], tuple[str, ...]], tuple[frozenset
             for word in _WORD_RE.findall(cue.key):
                 if len(word) > 2 and word not in _GENERIC:  # "ID card" adds "card"
                     pos_words.append(word + ("*" if cue.suffix else ""))
-    return _lexicon(pos_words), _lexicon(_NEGATIVE)  # type: ignore[return-value]
+    negatives = _pack_negatives()
+    if negatives is None:
+        negatives = list(_NEGATIVE)
+    return _lexicon(pos_words), _lexicon(negatives)  # type: ignore[return-value]
+
+
+# A new pack's reference words rebuild the lexicons, like its cue words.
+on_change(_lexicons.cache_clear)
+
+
+def _pack_negatives() -> list[str] | None:
+    """Folded negative words from every pack's ``references.tsv``, or ``None``.
+
+    ``None`` (no pack provides references) keeps the built-in :data:`_NEGATIVE`. Entries
+    hold single words: a multi-word entry (``sygn. akt``) contributes its first token, and
+    a trailing dot is not part of the folded word (``sygn.`` -> ``sygn``).
+    """
+    from pii_guard.languages.references import pack_references
+
+    words: list[str] = []
+    for _, entries in pack_references():
+        for entry in entries:
+            if entry.scope not in ("both", "ner"):
+                continue  # ``rules``-only and ``weak`` entries never drop an NER number
+            words.append(_fold(entry.text.split()[0].rstrip(".")) + ("*" if entry.suffix else ""))
+    return words or None
 
 
 def _classify_word(word: str) -> bool | None:

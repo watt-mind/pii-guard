@@ -150,7 +150,9 @@ def run(
     if live:
         body["reasoning_effort"] = "low"
     started = time.perf_counter()
-    with TestClient(app) as http:
+    # Loopback base URL + client: the DNS-rebinding guard answers 400 for TestClient's
+    # default host (testserver) (LAB-1253).
+    with TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000)) as http:
         # The application knows its contract's parties: it pre-loads them as known values,
         # so the session masks them in the text without an NER or LLM detector.
         created = http.post(
