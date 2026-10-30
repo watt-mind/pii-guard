@@ -10,11 +10,13 @@ mode. Their ``repr()`` never shows a value.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
 from pii_guard.types import EntityType
 from pii_guard.vault.entry import _Entry
+from pii_guard.vault.known import KnownValue
 from pii_guard.vault.placeholders import normalize_value
 from pii_guard.vault.session import VaultSession
 from pii_guard.vault.vault import Vault
@@ -89,21 +91,28 @@ def ttl_of(vault: Vault) -> float:
 
 def view_of(session: VaultSession) -> SessionView | None:
     """Counts and timings of ``session``, or ``None`` once it has expired."""
-    summary = session.peek_summary()
-    if summary is None:
-        return None
-    entries, known_values, idle_seconds, ttl_left, generation = summary
-    counts = Counter(e.entity_type.value for e in entries)
-    return SessionView(
-        session_id=session.session_id,
-        entries=len(entries),
-        occurrences=sum(e.count for e in entries),
-        known_values=known_values,
-        entity_counts=dict(sorted(counts.items())),
-        idle_seconds=idle_seconds,
-        ttl_left_seconds=ttl_left,
-        generation=generation,
-    )
+
+    def build(
+        entries: Sequence[_Entry],
+        known_values: int,
+        idle_seconds: float,
+        ttl_left: float,
+        generation: int,
+    ) -> SessionView:
+        counts = Counter(e.entity_type.value for e in entries)
+        return SessionView(
+            session_id=session.session_id,
+            entries=len(entries),
+            occurrences=sum(e.count for e in entries),
+            known_values=known_values,
+            entity_counts=dict(sorted(counts.items())),
+            idle_seconds=idle_seconds,
+            ttl_left_seconds=ttl_left,
+            generation=generation,
+        )
+
+    # ``build`` runs under the session lock: entry counts change while a mask runs.
+    return session.peek_summary(build)
 
 
 def _forms(entry: _Entry) -> tuple[str, ...]:
@@ -117,10 +126,18 @@ def _forms(entry: _Entry) -> tuple[str, ...]:
 def entries_of(session: VaultSession) -> tuple[list[EntryView], list[KnownView]]:
     """Every placeholder of ``session`` (variants after their value) and the known values
     nothing matched yet. Both empty once the session has expired."""
-    snapshot = session.peek_entries()
+    # The views are built under the session lock (``peek_entries`` runs ``_views`` while
+    # holding it): an entry's variants, seen forms, surfaces, aliases and count change while
+    # a mask runs, and reading them unlocked could see a half-applied update.
+    snapshot = session.peek_entries(_views)
     if snapshot is None:
         return [], []
-    by_key, known = snapshot
+    return snapshot
+
+
+def _views(
+    by_key: Sequence[tuple[tuple[EntityType, str], _Entry]], known: list[KnownValue]
+) -> tuple[list[EntryView], list[KnownView]]:
     known_keys = {(k.entity_type, normalize_value(k.value)) for k in known}
     views: list[EntryView] = []
     for (entity_type, normalized), entry in by_key:

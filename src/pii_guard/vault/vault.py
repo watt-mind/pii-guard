@@ -38,7 +38,6 @@ from pii_guard.types import MaskingError, VaultNotConfiguredError
 from pii_guard.vault.entry import (
     _CASE_AMBIGUOUS,
     _MIN_ALIAS_LETTERS,
-    _PREFILTER,
     CASE_SENSITIVE_TYPES,
     IDENTIFIER_TYPES,
     MODEL_DETECTORS,
@@ -59,7 +58,6 @@ from pii_guard.vault.entry import (
     _Needles,
     _needles,
     _occurrence,
-    _occurrences,
     _occurs_alone,
     _Plan,
     _recased,
@@ -77,14 +75,6 @@ from pii_guard.vault.placeholders import (
 )
 from pii_guard.vault.session import (
     _COMMITTED_STATE,
-    _FOLD_MEMO_CHARS,
-    _FOLD_MEMO_ENTRIES,
-    _MASK_MEMO,
-    _MASK_MEMO_CHARS,
-    _MASK_MEMO_ENTRIES,
-    _MAX_RESERVED,
-    _MAX_TOUCHED,
-    _REMASK_SINCE,
     _RESET_CACHES,
     DEFAULT_MAX_ENTRIES,
     DEFAULT_MAX_RESTORED_CHARS,
@@ -118,16 +108,7 @@ __all__ = [
     "NEUTRAL_DETECTORS",
     "_CASE_AMBIGUOUS",
     "_COMMITTED_STATE",
-    "_FOLD_MEMO_CHARS",
-    "_FOLD_MEMO_ENTRIES",
-    "_MASK_MEMO",
-    "_MASK_MEMO_CHARS",
-    "_MASK_MEMO_ENTRIES",
-    "_MAX_RESERVED",
-    "_MAX_TOUCHED",
     "_MIN_ALIAS_LETTERS",
-    "_PREFILTER",
-    "_REMASK_SINCE",
     "_RESET_CACHES",
     "Authorize",
     "MaskResult",
@@ -160,7 +141,6 @@ __all__ = [
     "_literal_forms",
     "_needles",
     "_occurrence",
-    "_occurrences",
     "_occurs_alone",
     "_recased",
     "_relaid",
@@ -335,11 +315,12 @@ class Vault:
             self._purge_locked()
             if session_id is None:
                 created = self._create_locked(f"s_{secrets.token_hex(16)}")
-                created.touch_explicit(self._max_entries)
+                created.touch_explicit(self._max_entries)  # explicit: capped, not rotated
                 return created
             session = self._sessions.get(session_id)
             if session is None:
                 raise SessionNotFoundError("vault session not found or expired")
+            # Addressed explicitly now: capped from here on, not rotated.
             session.touch_explicit(self._max_entries, authorize=authorize)
             return session
 

@@ -9,11 +9,9 @@ from __future__ import annotations
 import bisect
 import itertools
 import re
-import sys
 import unicodedata
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any
 
 from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
@@ -79,7 +77,6 @@ __all__ = [
     "_validated",
     "_value_key",
     "_value_shape",
-    "_vault_attr",
     "plan_spans",
 ]
 
@@ -254,12 +251,6 @@ class Unmasked:
     digits_only: bool
     model_only: bool = False
     known: bool = False
-
-
-def _vault_attr(name: str, default: Any) -> Any:
-    """Read ``name`` from :mod:`pii_guard.vault.vault` when loaded so test monkeypatches apply."""
-    mod = sys.modules.get("pii_guard.vault.vault")
-    return getattr(mod, name, default) if mod is not None else default
 
 
 class _Entry:
@@ -480,12 +471,11 @@ class _Entry:
         occurrences written as its value (:meth:`written_as`).
         """
         pattern = self.pattern(language)
-        occ_fn = _vault_attr("_occurrences", _occurrences)
         # Skipping a scan that can find nothing changes no output, only its cost: each
         # request re-masks the whole history against every value of the session (LAB-1277).
-        own = [] if _absent(self.prefilter(language), folded) else occ_fn(pattern, folded)
+        own = [] if _absent(self.prefilter(language), folded) else _occurrences(pattern, folded)
         aliases = [
-            (alias, occ_fn(alias_pattern, folded))
+            (alias, _occurrences(alias_pattern, folded))
             for alias, alias_pattern, needles in self.alias_pattern_list(language)
             if not _absent(needles, folded)
         ]
@@ -554,7 +544,7 @@ def _initial(literal: str) -> str:
 
 def _absent(needles: _Needles, views: tuple[FoldedText, ...]) -> bool:
     """No needle is in any view, so the pattern they filter cannot match there."""
-    if needles is None or not _vault_attr("_PREFILTER", _PREFILTER):
+    if needles is None or not _PREFILTER:
         return False
     return not any(needle in view.text for view in views for needle in needles)
 
@@ -766,13 +756,12 @@ def _unmasked_known(
     language: str,
 ) -> Iterator[Unmasked]:
     """Yield every unmasked occurrence of pre-loaded ``known`` values across ``views``."""
-    occ_fn = _vault_attr("_occurrences", _occurrences)
     for item, pattern in known.patterns(language):
         if pattern.search(joined_text) is None:
             continue
         chars, digits = _value_shape(normalize_value(item.value))
         for index, view in enumerate(views):
-            for start, end in occ_fn(pattern, view):
+            for start, end in _occurrences(pattern, view):
                 yield Unmasked(index, start, end, item.entity_type, chars, digits, known=True)
 
 

@@ -17,6 +17,8 @@ from pathlib import Path
 import pytest
 from vault_helpers import TEST_KEY, span_of
 
+import pii_guard.vault.entry as entry_module
+import pii_guard.vault.session as session_module
 import pii_guard.vault.vault as vault_module
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import PLACEHOLDER_RE, Vault, VaultSession
@@ -103,8 +105,8 @@ def test_prefilter_and_fold_memo_change_no_output(
     monkeypatch: pytest.MonkeyPatch, case_sensitive: bool
 ) -> None:
     with_prefilter = _session_output(case_sensitive=case_sensitive)
-    monkeypatch.setattr(vault_module, "_PREFILTER", False)
-    monkeypatch.setattr(vault_module, "_FOLD_MEMO_CHARS", 0)
+    monkeypatch.setattr(entry_module, "_PREFILTER", False)
+    monkeypatch.setattr(session_module, "_FOLD_MEMO_CHARS", 0)
     without = _session_output(case_sensitive=case_sensitive)
     assert with_prefilter[0] == without[0]
     assert with_prefilter[1] == without[1]
@@ -113,13 +115,13 @@ def test_prefilter_and_fold_memo_change_no_output(
 
 def _scans(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     calls = [0]
-    original = vault_module._occurrences
+    original = entry_module._occurrences
 
     def counting(pattern: re.Pattern[str], views: tuple) -> list[tuple[int, int]]:
         calls[0] += 1
         return original(pattern, views)
 
-    monkeypatch.setattr(vault_module, "_occurrences", counting)
+    monkeypatch.setattr(entry_module, "_occurrences", counting)
     return calls
 
 
@@ -185,8 +187,8 @@ def _memo(session: VaultSession) -> dict[str, object]:
 
 
 def test_fold_memo_is_bounded_and_forgotten_on_close(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(vault_module, "_FOLD_MEMO_ENTRIES", 4)
-    monkeypatch.setattr(vault_module, "_FOLD_MEMO_CHARS", 200)
+    monkeypatch.setattr(session_module, "_FOLD_MEMO_ENTRIES", 4)
+    monkeypatch.setattr(session_module, "_FOLD_MEMO_CHARS", 200)
     session = Vault(TEST_KEY).session()
 
     def texts() -> Iterator[str]:
@@ -231,6 +233,6 @@ def test_prefilter_matches_unfiltered_output_for_overlapping_values(
         return out
 
     with_prefilter = run()
-    monkeypatch.setattr(vault_module, "_PREFILTER", False)
+    monkeypatch.setattr(entry_module, "_PREFILTER", False)
     without = run()
     assert _canonical(with_prefilter) == _canonical(without)
