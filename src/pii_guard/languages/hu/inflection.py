@@ -137,6 +137,8 @@ def _hu_harmony_class(lemma: str) -> int | None:
     ``-nak`` and ``-nek`` occur in writing, so the suffix as written is kept.
     """
     word = lemma.split()[-1].casefold() if lemma.split() else ""
+    if word.endswith("né") and len(word) > 2:
+        word = word[:-2]  # married name: the base decides (Kovácsnénak, Péternének)
     vowels = [c for c in word if c in _HU_VOWELS]
     if not vowels:
         return None

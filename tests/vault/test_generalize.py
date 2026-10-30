@@ -104,6 +104,9 @@ def test_harmony_only_for_hungarian_person_placeholders() -> None:
         ("Minta Kovács", "vel", "Minta Kováccsal"),
         ("Minta Kitti", "nak", "Minta Kittinek"),
         ("Minta Emil", "ért", "Minta Emilért"),
+        ("Kiss Béláné", "nek", "Kiss Bélánénak"),
+        ("Minta Kovácsné", "nek", "Minta Kovácsnénak"),
+        ("Teszt Péterné", "nak", "Teszt Péternének"),
     ],
 )
 def test_hungarian_restore_reharmonizes(lemma: str, suffix: str, expected: str) -> None:
