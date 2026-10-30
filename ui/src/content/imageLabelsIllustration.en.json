@@ -1,0 +1,197 @@
+{
+  "recorded": "2026-10-30",
+  "provenance": {
+    "kind": "annotated-illustration",
+    "image_sha256": "5434cb85f51f5dc20ddb04f7334dd37c2febf1f605530363e75042a5018e696e",
+    "geometry": "eval/fixtures/visual/labels.json: composition portrait and signature annotations; repository renderer padding, no label expansion",
+    "text_recording": "imageLabelsRecording.en.json",
+    "note": "OCR, message, summary, transcript and text-only Muse answer retained from the original recording. Visual boxes are annotations, not detector output. No detection metrics claimed."
+  },
+  "message": {
+    "masked": "[[PERSON_f31df7]] is the seller. Is her ID card attached, and is it still valid?"
+  },
+  "image": {
+    "media_type": "image/png",
+    "width": 1012,
+    "height": 638,
+    "transcript": "FICTIONAL SPECIMEN AUTHORITY\nIDENTITY CARD\nSurname\n[[PERSON_f31df7]]\nGiven names\n[[PERSON_f31df7]]\nDate of birth Sex\n[[DATE_OF_BIRTH_009547]] F\nDocument no. Nationality\n[[ID_DOCUMENT_62427f]] UTO\nExpiry\n30 JUN 2031\n[PHOTO · [[PERSON_f31df7]]]\nLEO,\nMINTA/ SPECIMEN : Al-generated fictional specimen",
+    "summary": {
+      "document_type": "id_card",
+      "holder": "[[PERSON_f31df7]]",
+      "holder_match": "fuzzy",
+      "holder_confidence": 1.0,
+      "document_number": "[[ID_DOCUMENT_62427f]]",
+      "issuing_country": null,
+      "expiry": null,
+      "expired": false,
+      "mrz_present": false,
+      "mrz_valid": null,
+      "fields_found": {
+        "date_of_birth": "[[DATE_OF_BIRTH_009547]]",
+        "document_number": "[[ID_DOCUMENT_62427f]]",
+        "given_names": "[[PERSON_f31df7]]",
+        "surname": "[[PERSON_f31df7]]"
+      },
+      "fields_uncertain": []
+    },
+    "regions": [
+      {
+        "entity_type": "PERSON",
+        "box": [
+          320,
+          130,
+          488,
+          148
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_f31df7]]",
+        "label": "[[PERSON_f31df7]]",
+        "match": "fuzzy",
+        "match_confidence": 1.0,
+        "cover_box": [
+          318,
+          128,
+          490,
+          150
+        ],
+        "label_lines": [
+          "[[PERSON_f31df7]]"
+        ],
+        "label_px": 17
+      },
+      {
+        "entity_type": "PERSON",
+        "box": [
+          319,
+          176,
+          378,
+          194
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_f31df7]]",
+        "label": "[[PERSON_f31df7]]",
+        "match": "fuzzy",
+        "match_confidence": 1.0,
+        "cover_box": [
+          317,
+          174,
+          435,
+          196
+        ],
+        "label_lines": [
+          "[[PERSON_f31df7]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "DATE_OF_BIRTH",
+        "box": [
+          320,
+          221,
+          453,
+          240
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[DATE_OF_BIRTH_009547]]",
+        "label": "[[DATE_OF_BIRTH_009547]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          318,
+          219,
+          493,
+          242
+        ],
+        "label_lines": [
+          "[[DATE_OF_BIRTH_009547]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "box": [
+          319,
+          264,
+          429,
+          294
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[ID_DOCUMENT_62427f]]",
+        "label": "[[ID_DOCUMENT_62427f]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          317,
+          262,
+          480,
+          296
+        ],
+        "label_lines": [
+          "[[ID_DOCUMENT_62427f]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_PHOTO",
+        "box": [
+          48,
+          120,
+          288,
+          432
+        ],
+        "source": "annotation",
+        "policy": "mask",
+        "label": "PHOTO · [[PERSON_f31df7]]",
+        "cover_box": [
+          46,
+          118,
+          290,
+          434
+        ],
+        "label_lines": [
+          "PHOTO · [[PERSON_f31df7]]"
+        ],
+        "label_px": 18
+      },
+      {
+        "entity_type": "SIGNATURE",
+        "box": [
+          90,
+          465,
+          288,
+          563
+        ],
+        "source": "annotation",
+        "policy": "mask",
+        "label": "SIGNATURE",
+        "cover_box": [
+          88,
+          463,
+          290,
+          565
+        ],
+        "label_lines": [
+          "SIGNATURE"
+        ],
+        "label_px": 34
+      }
+    ]
+  },
+  "answer": {
+    "masked": "Yes, the ID card for [[PERSON_f31df7]] is attached and it is still valid.",
+    "model": "muse-spark-1.3",
+    "by": "Muse Spark, reading the masked message, summary and transcript"
+  }
+}
