@@ -271,15 +271,15 @@ still. Restored values flash once. New motion runs only with
 ## Screenshots
 
 README screenshots (`docs/assets/demo/`) come from `make demo` in fast mode (rules + the
-published NER) on the mock upstream, on free ports (`scripts/demo.py --mock
---api-port … --ui-port …`), with `scripts/demo_traffic.py` sent through it and the English
-support ticket masked in Text and sent in Chat, in the dark theme (`pii-guard:theme` = `dark`
-in localStorage), captured by headless Chromium at 1440 × 900 (phone shots 375 × 812 at 2×) and
-encoded with `cwebp -q 82`. The Images shot is a live on-device run of the English ID card:
-the API runs with `PII_GUARD_SEGMENTER=local` and `PII_GUARD_POLICY_OVERRIDES=SIGNATURE=keep,STAMP=keep`
-(the legacy local preview policy, since signatures need SAM 3.1), so no image leaves the machine.
-`demo.webp` is six frames at 2.4 s each (`img2webp -lossy -q 78`): Overview, Text masked and
-then scrolled to the output, Chat, Logs, Connect.
+published NER) on the mock upstream, on free ports (`scripts/demo.py --api-port … --ui-port …`),
+with the default `hybrid` segmenter and SAM 3.1 (a Meta API key in the API's environment), in
+the dark theme (`pii-guard:theme` = `dark` in localStorage). The demo scenarios
+(`pii_guard.bench.scenarios`) are sent through it except `hu-image`, which only keeps SAM calls
+down (without a SAM key it is refused, and with one it is masked); then the English support ticket
+is masked in Text and sent in Chat, and the English ID card is masked once in Images (two SAM
+prompts, for the signature). Headless Chromium at 1440 × 900 (phone shots 375 × 812 at 2×),
+encoded with `cwebp -q 82`. `demo.webp` is six frames at 2.4 s each (`img2webp -lossy -q 78`):
+Overview, Text masked and then scrolled to the output, Chat, Logs, Connect.
 
 ## Copy
 
