@@ -95,6 +95,8 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 51 | 92.8% | 90.2% | 91.5% | 0.6% | 2.3% | 1.1% | 100.0% | 37 ms | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 51 | 93.8% | 91.8% | 92.8% | 0.0% | 1.7% | 1.6% | 100.0% | 55 ms | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 51 | 92.8% | 91.2% | 92.0% | 0.0% | 0.6% | 3.2% | 100.0% | 35 ms | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 51 | 94.5% | 95.9% | 95.2% | 0.6% | 1.7% | 2.2% | 100.0% | 34 ms | 2026-10-30 | `251926c` |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 51 | 94.4% | 95.4% | 94.9% | 1.2% | 2.3% | 2.2% | 100.0% | 38 ms | 2026-10-30 | `251926c` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 51 | 89.5% | 91.8% | 90.6% | 4.0% | 1.2% | 6.0% | 100.0% | 128 ms | 2026-10-28 | `97ee284` |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 51 | 94.4% | 92.8% | 93.6% | 8.1% | 4.6% | 5.7% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard rules + NER (distilled base) † | 10 | 100.0% | 97.1% | 98.5% | 3.3% | 3.3% | 0.0% | 100.0% | 35 ms | 2026-10-27 | `c611f99` |
@@ -104,6 +106,7 @@ hand-written; documents: de 10 + en 10 + hu 31.
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 80 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 51 ms | 2026-10-29 | `d22908a` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 51 | 95.3% | 93.3% | 94.3% | 0.0% | 2.9% | 1.1% | 100.0% | 43 ms | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 51 | 95.9% | 94.3% | 95.1% | 0.0% | 2.3% | 1.1% | 100.0% | 35 ms | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 51 | 96.3% | 92.8% | 94.5% | 0.6% | 2.9% | 0.6% | 100.0% | 61 ms | 2026-10-29 | `ffe349b` |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 51 | 98.0% | 98.5% | 98.2% | 1.2% | 2.9% | 1.1% | 100.0% | 17 ms* | 2026-10-27 | `910a6a2` |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 51 | 89.0% | 92.3% | 90.6% | 1.2% | 2.9% | 5.9% | 100.0% | 14 ms* | 2026-10-27 | `910a6a2` |
@@ -164,6 +167,8 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 96.2% | 92.6% | 89.5% | 0.0% | 0.0% | 0.9% |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 95.1% | 92.6% | 92.0% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 90.4% | 92.3% | 92.4% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 98.7% | 95.8% | 93.8% | 2.7% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 97.5% | 95.5% | 93.8% | 2.7% | 3.3% | 0.0% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 97.6% | 90.1% | 88.3% | 0.0% | 3.3% | 5.7% |
 | pii-guard fast, built-in zero-shot NER (Davlan/xlm-roberta-base-ner-hrl) | 96.1% | 90.7% | 93.7% | 8.1% | 10.0% | 7.5% |
 | pii-guard rules + NER (distilled base) | — | 98.5% | — | — | 3.3% | — |
@@ -173,6 +178,7 @@ By language:
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 97.4% | 94.2% | 93.3% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 97.4% | 94.2% | 93.3% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 97.4% | 94.2% | 93.3% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 97.4% | 94.2% | 94.6% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 97.4% | 92.6% | 94.1% | 0.0% | 0.0% | 0.9% |
 | pii-guard fast, NER v2 base without Ai4Privacy rows (LAB-1150) | 98.8% | 98.6% | 97.9% | 0.0% | 0.0% | 1.9% |
 | pii-guard fast, NER v2 base, OpenPII cut to 1k rows/language (LAB-1150) | 94.0% | 87.3% | 90.4% | 0.0% | 0.0% | 1.9% |
@@ -327,10 +333,13 @@ generated; documents: de 100 + en 100 + hu 100.
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 300 | 94.4% | 98.3% | 96.3% | 0.0% | 0.0% | 3.4% | 100.0% | 52 ms | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 300 | 94.4% | 98.4% | 96.4% | 0.0% | 0.0% | 3.2% | 100.0% | 62 ms | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 300 | 92.2% | 98.2% | 95.1% | 0.0% | 0.1% | 5.4% | 100.0% | 50 ms | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 300 | 91.3% | 99.1% | 95.0% | 0.0% | 0.0% | 3.2% | 100.0% | 50 ms | 2026-10-30 | `251926c` |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 300 | 92.1% | 99.1% | 95.5% | 0.0% | 0.0% | 2.7% | 100.0% | 50 ms | 2026-10-30 | `251926c` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 300 | 74.9% | 98.3% | 85.0% | 0.3% | 3.0% | 20.5% | 99.7% | 178 ms | 2026-10-28 | `97ee284` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 300 | 96.0% | 98.2% | 97.1% | 0.1% | 0.1% | 1.8% | 100.0% | 113 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 300 | 96.0% | 98.2% | 97.1% | 0.1% | 0.1% | 1.8% | 100.0% | 163 ms | 2026-10-29 | `d22908a` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 300 | 96.0% | 98.2% | 97.1% | 0.1% | 0.1% | 1.8% | 100.0% | 52 ms | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 300 | 96.1% | 98.1% | 97.1% | 0.1% | 0.0% | 1.7% | 100.0% | 51 ms | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 300 | 97.4% | 97.8% | 97.6% | 0.8% | 0.1% | 1.0% | 100.0% | 95 ms | 2026-10-29 | `ffe349b` |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 300 | 76.5% | 92.1% | 83.6% | 2.5% | 0.7% | 16.6% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
 | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 300 | 81.7% | 92.0% | 86.6% | 4.8% | 0.3% | 14.2% | 100.0% | 16 ms* | 2026-10-27 | `477196a` |
@@ -369,10 +378,13 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 96.2% | 95.5% | 97.3% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 96.0% | 96.1% | 97.0% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 94.4% | 95.3% | 95.5% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 96.0% | 93.8% | 95.2% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 96.2% | 94.2% | 96.0% | 0.0% | 0.0% | 0.0% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 88.6% | 83.9% | 82.7% | 0.0% | 0.8% | 0.2% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 96.7% | 96.8% | 97.7% | 0.0% | 0.4% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 96.7% | 96.8% | 97.7% | 0.0% | 0.4% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 96.7% | 96.8% | 97.7% | 0.0% | 0.4% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 96.3% | 97.3% | 97.6% | 0.0% | 0.4% | 0.0% |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 97.7% | 96.6% | 98.4% | 0.9% | 1.6% | 0.0% |
 | pii-guard fast, NER v2.1 base, epoch 1 of 5 (LAB-1306) | 83.9% | 83.9% | 82.9% | 3.8% | 1.8% | 1.9% |
 | pii-guard fast, NER v2.1 base, epoch 2 of 5 (LAB-1306) | 84.6% | 86.7% | 88.5% | 7.2% | 4.4% | 2.9% |
@@ -828,7 +840,10 @@ hand-written; documents: en 6.
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 6 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 6 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 6 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 6 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 35 ms | 2026-10-30 | `251926c` |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 6 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 33 ms | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 6 | 100.0% | 93.3% | 96.5% | 0.0% | 0.0% | 0.0% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 6 | 100.0% | 93.3% | 96.5% | 0.0% | 0.0% | 0.0% | 100.0% | 33 ms | 2026-10-30 | `251926c` |
 
 
 By language:
@@ -838,7 +853,10 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 100.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 100.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 100.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 100.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 100.0% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 96.5% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 96.5% | 0.0% |
 
 
 ### `eu-inflection`
@@ -850,7 +868,10 @@ hand-written; documents: es 4 + fr 4 + ga 4 + hr 5 + it 4 + lt 5 + lv 5 + mt 4 +
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 48 | 98.3% | 96.7% | 97.5% | 1.7% | 1.7% | 0.0% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 48 | 98.4% | 97.5% | 97.9% | 1.7% | 0.8% | 0.8% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 48 | 99.2% | 97.5% | 98.4% | 1.7% | 0.8% | 0.0% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 48 | 99.2% | 99.2% | 99.2% | 0.8% | 0.8% | 0.8% | 100.0% | 33 ms | 2026-10-30 | `251926c` |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 48 | 98.4% | 98.4% | 98.4% | 1.7% | 0.8% | 0.8% | 100.0% | 33 ms | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 48 | 98.4% | 98.4% | 98.4% | 1.7% | 1.7% | 1.6% | 100.0% | 33 ms | 2026-10-29 | `4c4ad56` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 48 | 98.4% | 98.4% | 98.4% | 1.7% | 1.7% | 1.6% | 100.0% | 33 ms | 2026-10-30 | `251926c` |
 
 
 By language:
@@ -860,7 +881,10 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 100.0% | 94.7% | 82.3% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 88.9% | 100.0% | 100.0% | 0.0% | 10.0% | 11.1% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 100.0% | 94.7% | 94.1% | 100.0% | 100.0% | 100.0% | 100.0% | 95.2% | 88.9% | 100.0% | 100.0% | 0.0% | 10.0% | 11.1% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 100.0% | 94.7% | 94.1% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 88.9% | 100.0% | 100.0% | 0.0% | 10.0% | 11.1% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 100.0% | 94.7% | 94.7% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 10.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 100.0% | 94.7% | 95.2% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 88.9% | 100.0% | 100.0% | 0.0% | 10.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 11.1% | 0.0% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 100.0% | 94.7% | 94.1% | 100.0% | 100.0% | 100.0% | 100.0% | 90.9% | 100.0% | 100.0% | 100.0% | 0.0% | 10.0% | 11.1% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 100.0% | 94.7% | 94.1% | 100.0% | 100.0% | 100.0% | 100.0% | 90.9% | 100.0% | 100.0% | 100.0% | 0.0% | 10.0% | 11.1% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
 
 
 ### `eu-smoke`
@@ -872,7 +896,10 @@ hand-written; documents: es 5 + fr 5 + ga 5 + hr 5 + it 5 + lt 5 + lv 5 + mt 5 +
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 55 | 97.5% | 93.8% | 95.6% | 0.5% | 0.0% | 1.0% | 100.0% | 31 ms | 2026-10-29 | `4c4ad56` |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 55 | 97.5% | 92.8% | 95.1% | 1.1% | 0.5% | 1.0% | 100.0% | 35 ms | 2026-10-29 | `4c4ad56` |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 55 | 94.4% | 94.3% | 94.3% | 0.5% | 0.0% | 2.5% | 100.0% | 34 ms | 2026-10-29 | `4c4ad56` |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 55 | 99.5% | 98.6% | 99.0% | 0.0% | 0.0% | 0.5% | 100.0% | 34 ms | 2026-10-30 | `251926c` |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 55 | 99.5% | 98.6% | 99.0% | 0.0% | 0.0% | 0.5% | 100.0% | 35 ms | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 55 | 98.0% | 92.8% | 95.4% | 0.5% | 1.1% | 2.1% | 100.0% | 36 ms | 2026-10-29 | `4c4ad56` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 55 | 98.0% | 92.8% | 95.4% | 0.5% | 1.1% | 2.1% | 100.0% | 37 ms | 2026-10-30 | `251926c` |
 
 
 By language:
@@ -882,7 +909,10 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 94.7% | 97.3% | 94.1% | 97.4% | 97.3% | 97.3% | 97.3% | 85.0% | 97.3% | 97.3% | 97.3% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 6.2% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 94.7% | 97.3% | 94.1% | 97.4% | 97.3% | 97.3% | 97.3% | 85.0% | 91.4% | 97.3% | 97.3% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 6.2% | 6.2% | 0.0% | 0.0% |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 92.3% | 94.4% | 91.6% | 100.0% | 97.3% | 100.0% | 100.0% | 72.7% | 94.4% | 97.3% | 100.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 6.2% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 100.0% | 97.3% | 97.1% | 100.0% | 100.0% | 100.0% | 100.0% | 94.7% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 100.0% | 97.3% | 97.1% | 100.0% | 100.0% | 100.0% | 100.0% | 94.7% | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 97.3% | 97.3% | 88.9% | 97.4% | 97.3% | 97.3% | 94.4% | 92.3% | 91.4% | 97.3% | 97.3% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 6.2% | 0.0% | 0.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 97.3% | 97.3% | 88.9% | 97.4% | 97.3% | 97.3% | 94.4% | 92.3% | 91.4% | 97.3% | 97.3% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 6.2% | 0.0% | 0.0% |
 
 
 ### `gretel-finance`
@@ -1106,10 +1136,13 @@ hand-written; documents: hu 12.
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 12 | 100.0% | 96.7% | 98.3% | 0.0% | 24.0% | 0.0% | 100.0% | 32 ms | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 22.0% | 0.0% | 100.0% | 79 ms | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 12 | 100.0% | 90.2% | 94.8% | 2.0% | 16.0% | 0.0% | 100.0% | 31 ms | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 12 | 100.0% | 100.0% | 100.0% | 0.0% | 14.0% | 0.0% | 100.0% | 34 ms | 2026-10-30 | `251926c` |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 12 | 100.0% | 100.0% | 100.0% | 0.0% | 14.0% | 0.0% | 100.0% | 35 ms | 2026-10-30 | `251926c` |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 12 | 96.7% | 96.7% | 96.7% | 0.0% | 10.0% | 0.0% | 100.0% | 105 ms | 2026-10-28 | `97ee284` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 119 ms | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 47 ms | 2026-10-29 | `d22908a` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 36 ms | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 12 | 100.0% | 93.4% | 96.6% | 2.0% | 30.0% | 0.0% | 100.0% | 34 ms | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 12 | 100.0% | 90.2% | 94.8% | 4.0% | 30.0% | 0.0% | 100.0% | 60 ms | 2026-10-29 | `ffe349b` |
 
 
@@ -1143,10 +1176,13 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 98.3% | 0.0% |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 96.6% | 2.0% |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 94.8% | 2.0% |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 100.0% | 0.0% |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 100.0% | 0.0% |
 | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | 96.7% | 0.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 96.6% | 2.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 96.6% | 2.0% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 96.6% | 2.0% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 96.6% | 2.0% |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 94.8% | 4.0% |
 
 
@@ -1195,10 +1231,13 @@ hand-written; documents: bg 2 + cs 2 + da 2 + de 2 + el 2 + en 2 + es 2 + et 2 +
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 42 | 40.3% | 79.4% | 53.5% | 5.8% | 0.4% | 57.2% | 73.8% | 3.0 s | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 42 | 41.7% | 78.2% | 54.4% | 7.2% | 0.1% | 55.7% | 71.4% | 3.2 s | 2026-10-29 | `51fdc76` |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 42 | 43.3% | 76.7% | 55.3% | 8.5% | 0.0% | 54.1% | 64.3% | 3.0 s | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 42 | 43.6% | 80.7% | 56.6% | 5.9% | 0.3% | 46.7% | 78.6% | 2.7 s | 2026-10-30 | `251926c` |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 42 | 45.8% | 82.4% | 58.9% | 5.3% | 0.0% | 46.2% | 78.6% | 2.9 s | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | — | 2026-10-29 | `d3ac82e` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 4.8 s | 2026-10-29 | `2b3c7ba` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 12.8 s | 2026-10-29 | `d2e710a` |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 42 | 41.8% | 77.3% | 54.3% | 8.5% | 0.1% | 55.5% | 83.3% | 3.2 s | 2026-10-29 | `51fdc76` |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 42 | 42.0% | 77.5% | 54.5% | 8.2% | 0.1% | 55.3% | 83.3% | 2.7 s | 2026-10-30 | `251926c` |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 42 | 42.1% | 76.9% | 54.4% | 9.0% | 0.1% | 55.5% | 83.3% | 13.8 s | 2026-10-29 | `d2e710a` |
 | pii-guard rules alone (MAPA baseline, LAB-1516) | 42 | 0.0% | 0.0% | 0.0% | 99.3% | 0.4% | 100.0% | 100.0% | — | 2026-10-29 | `d3ac82e` |
 
@@ -1226,10 +1265,13 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 64.1% | 65.2% | 66.7% | 62.2% | 63.2% | 76.1% | 65.4% | 43.2% | 48.8% | 61.2% | 64.1% | 57.0% | 65.0% | 59.6% | 58.4% | 14.7% | 60.7% | 65.7% | 61.2% | 66.2% | 65.8% | 2.8% | 0.0% | 0.0% | 8.8% | 2.8% | 16.2% | 5.9% | 2.8% | 6.1% | 2.9% | 16.2% | 0.0% | 2.9% | 11.4% | 5.3% | 17.1% | 6.1% | 2.7% | 2.9% | 0.0% | 8.6% |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 63.2% | 61.6% | 64.9% | 60.8% | 62.7% | 77.1% | 63.7% | 58.3% | 49.9% | 61.7% | 62.4% | 56.0% | 63.6% | 59.6% | 58.1% | 14.4% | 61.9% | 64.3% | 63.6% | 61.9% | 66.1% | 2.8% | 0.0% | 0.0% | 11.8% | 2.8% | 21.6% | 5.9% | 2.8% | 12.1% | 2.9% | 16.2% | 5.7% | 2.9% | 11.4% | 10.5% | 17.1% | 6.1% | 5.4% | 2.9% | 2.9% | 5.7% |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 64.4% | 60.0% | 64.8% | 60.7% | 61.4% | 68.0% | 66.9% | 53.6% | 51.0% | 62.4% | 64.5% | 53.6% | 64.3% | 56.3% | 57.0% | 19.7% | 57.0% | 60.5% | 64.4% | 61.0% | 62.9% | 5.6% | 2.7% | 2.9% | 14.7% | 11.1% | 21.6% | 5.9% | 8.3% | 9.1% | 2.9% | 13.5% | 5.7% | 5.9% | 11.4% | 10.5% | 11.4% | 9.1% | 10.8% | 5.9% | 5.7% | 2.9% |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 59.3% | 60.9% | 60.3% | 57.5% | 58.6% | 58.7% | 57.3% | 59.0% | 50.6% | 56.7% | 57.3% | 55.2% | 59.7% | 60.9% | 57.7% | 34.3% | 57.9% | 57.2% | 62.7% | 61.9% | 58.7% | 2.8% | 0.0% | 5.7% | 5.9% | 2.8% | 8.1% | 5.9% | 2.8% | 3.0% | 2.9% | 10.8% | 5.7% | 2.9% | 8.6% | 10.5% | 14.3% | 9.1% | 8.1% | 2.9% | 2.9% | 8.6% |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 58.9% | 62.0% | 62.5% | 64.6% | 62.3% | 70.0% | 60.3% | 59.7% | 50.5% | 54.1% | 61.3% | 54.2% | 60.4% | 59.8% | 60.5% | 40.1% | 56.8% | 58.1% | 65.4% | 63.3% | 61.6% | 2.8% | 0.0% | 2.9% | 5.9% | 5.6% | 10.8% | 2.9% | 2.8% | 3.0% | 5.9% | 8.1% | 8.6% | 2.9% | 8.6% | 5.3% | 14.3% | 9.1% | 8.1% | 0.0% | 0.0% | 2.9% |
 | pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 62.5% | 64.4% | 70.4% | 65.8% | 59.2% | 74.5% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 62.5% | 65.8% | 70.4% | 66.2% | 59.2% | 74.5% | 65.0% | 60.1% | 52.5% | 63.8% | 64.8% | 58.9% | 64.0% | 57.8% | 53.7% | 13.1% | 62.4% | 66.8% | 64.0% | 61.6% | 68.0% | 2.8% | 2.7% | 0.0% | 5.9% | 5.6% | 24.3% | 5.9% | 2.8% | 6.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 62.5% | 64.4% | 70.4% | 65.2% | 59.2% | 74.6% | 65.0% | 59.3% | 51.5% | 63.8% | 64.8% | 63.2% | 64.0% | 57.0% | 53.7% | 13.0% | 62.4% | 66.8% | 64.0% | 61.6% | 67.5% | 2.8% | 5.4% | 0.0% | 14.7% | 5.6% | 27.0% | 5.9% | 2.8% | 9.1% | 0.0% | 24.3% | 2.9% | 2.9% | 17.1% | 21.1% | 25.7% | 6.1% | 5.4% | 2.9% | 0.0% | 5.7% |
 | pii-guard rules alone (MAPA baseline, LAB-1516) | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 100.0% | 94.3% | 100.0% | 100.0% | 100.0% | 100.0% | 97.2% | 93.9% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
 
@@ -1259,10 +1301,13 @@ By language:
 | pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535) | 5.8% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 5.8% (43/740) |
 | pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535) | 7.2% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 7.2% (53/740) |
 | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+| pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | 5.9% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 5.9% (44/740) |
+| pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | 5.3% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 5.3% (39/740) |
 | pii-guard fast, NER v2.0 (MAPA 21-language baseline, LAB-1516) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1494) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1535) | 8.5% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.5% (63/740) |
+| pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | 8.2% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 8.2% (61/740) |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 9.0% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 9.1% (67/740) |
 | pii-guard rules alone (MAPA baseline, LAB-1516) | 99.3% | — (0/0) | — (0/0) | — (0/0) | — (0/0) | 99.3% (735/740) |
 
@@ -1877,6 +1922,27 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
 | 2026-10-30 | `2026-10-30-lab-1222-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `879b0f7` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-mapa-eur-lex-v41-a2` | pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-eu-inflection-v41-a2` | pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | eu-inflection | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-en-court-v41-a2` | pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | en-court-smoke | en | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-eu-smoke-v41-a2` | pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | eu-smoke | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-agent-traffic-dev-v41-a2` | pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | agent-traffic-dev | de, en, hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-inflection-v41-a2` | pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | inflection | hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-smoke-v41-a2` | pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS taught as O (LAB-1547) | smoke | de, en, hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-mapa-eur-lex-v41-a1` | pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-eu-inflection-v41-a1` | pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | eu-inflection | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-en-court-v41-a1` | pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | en-court-smoke | en | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-eu-smoke-v41-a1` | pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | eu-smoke | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-agent-traffic-dev-v41-a1` | pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | agent-traffic-dev | de, en, hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-inflection-v41-a1` | pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | inflection | hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-smoke-v41-a1` | pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS kept out of the loss (LAB-1547) | smoke | de, en, hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-mapa-eur-lex-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | mapa-eur-lex | bg, cs, da, de, el, en, es, et, fi, fr, ga, hu, it, lt, lv, mt, nl, pt, ro, sk, sv | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-en-court-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | en-court-smoke | en | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-eu-inflection-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | eu-inflection | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-eu-smoke-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | eu-smoke | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-agent-traffic-dev-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | agent-traffic-dev | de, en, hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-inflection-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | inflection | hu | recorded | `251926c` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1547-smoke-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1547) | smoke | de, en, hu | recorded | `251926c` | — | — |
 | 2026-10-30 | `2026-10-30-lab-1199-post-value-cues-ai4privacy-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | ai4privacy | de, en, hu | recorded | `4cd1181` (dirty) | — | — |
 | 2026-10-30 | `2026-10-30-lab-1199-post-value-cues-company-names-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | company-names | hu | recorded | `4cd1181` (dirty) | — | — |
 | 2026-10-30 | `2026-10-30-lab-1199-post-value-cues-synth-sample-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | synth-sample | en, hu | recorded | `4cd1181` (dirty) | — | — |
