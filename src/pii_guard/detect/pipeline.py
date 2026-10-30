@@ -73,6 +73,7 @@ STRUCTURED_TYPES: frozenset[EntityType] = frozenset(
         EntityType.NATIONAL_ID_HU_TAX,
         EntityType.NATIONAL_ID_HU_TAJ,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.COMPANY_ID_HU,
         EntityType.VEHICLE_PLATE,
         EntityType.SECRET,

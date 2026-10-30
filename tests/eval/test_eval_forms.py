@@ -97,6 +97,8 @@ def test_unknown_language_falls_back_to_exact() -> None:
         ("hívj: +36-30-1234567", "06 30 123 4567", EntityType.PHONE),
         ("hívj: 30 123 4567", "06301234567", EntityType.PHONE),
         ("rendszám abc 123", "ABC-123", EntityType.VEHICLE_PLATE),
+        ("card 4000-0000-0000-0002", "4000000000000002", EntityType.PAYMENT_CARD),
+        ("card 4000000000000002", "4000 0000 0000 0002", EntityType.PAYMENT_CARD),
     ],
 )
 def test_codes_match_with_any_separators(text: str, value: str, entity_type: EntityType) -> None:

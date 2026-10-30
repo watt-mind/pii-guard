@@ -107,6 +107,12 @@ const ENTITY_DEFS: Record<EntityType, EntityDef> = {
     policy: "mask",
     group: "identifier",
   },
+  PAYMENT_CARD: {
+    label: "Payment card",
+    short: "CRD",
+    policy: "mask",
+    group: "identifier",
+  },
   COMPANY_ID_HU: {
     label: "Company ID (HU)",
     short: "CÉG",
@@ -209,6 +215,7 @@ export const CHECKSUM_TYPES: ReadonlySet<EntityType> = new Set<EntityType>([
   "NATIONAL_ID_HU_TAX",
   "NATIONAL_ID_HU_TAJ",
   "BANK_ACCOUNT",
+  "PAYMENT_CARD",
   "COMPANY_ID_HU",
 ]);
 
@@ -220,7 +227,7 @@ const TEXT_TYPES = Object.keys(ENTITY_DEFS).filter((t) => !["FACE", "SIGNATURE",
  */
 export const DETECTOR_TYPES: Record<string, { types: readonly EntityType[]; partly?: readonly EntityType[] }> = {
   rules: {
-    types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE", "SECRET"],
+    types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "PAYMENT_CARD", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE", "SECRET"],
     partly: ["ADDRESS"],
   },
   ner: { types: ["PERSON", "ORGANIZATION", "ADDRESS"] },

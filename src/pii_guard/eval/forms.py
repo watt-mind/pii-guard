@@ -35,6 +35,7 @@ __all__ = [
     "PackForms",
     "find_surface_forms",
     "language_forms",
+    "matching_types",
     "register_language_forms",
     "surface_pattern",
 ]
@@ -47,11 +48,22 @@ CODE_ENTITY_TYPES: frozenset[EntityType] = frozenset(
         EntityType.NATIONAL_ID_HU_TAJ,
         EntityType.ID_DOCUMENT,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.COMPANY_ID_HU,
         EntityType.PARCEL_NUMBER_HU,
         EntityType.VEHICLE_PLATE,
     }
 )
+
+#: Types that score as one: gold sets built before ``PAYMENT_CARD`` existed (LAB-1102) label
+#: cards ``BANK_ACCOUNT``, and learned detectors still report a card they find that way.
+_SCORED_ALIKE: frozenset[EntityType] = frozenset({EntityType.BANK_ACCOUNT, EntityType.PAYMENT_CARD})
+
+
+def matching_types(entity_type: EntityType) -> frozenset[EntityType]:
+    """The types a gold span of ``entity_type`` matches when scoring (itself, or its alias)."""
+    return _SCORED_ALIKE if entity_type in _SCORED_ALIKE else frozenset({entity_type})
+
 
 _SEP = r"[\s\-./()]*"
 

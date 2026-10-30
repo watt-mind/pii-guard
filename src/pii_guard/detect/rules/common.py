@@ -4,8 +4,8 @@ IBAN (any country, mod-97), email addresses, international phone numbers (``+`` 
 country code; ``+36`` is left to the Hungarian pack, which validates the area code) and
 payment card numbers (issuer prefix + Luhn).
 
-Payment cards are reported as ``BANK_ACCOUNT``: there is no card type in the taxonomy yet,
-and a card number is a financial account identifier with the same policy (mask).
+Payment cards are reported as ``PAYMENT_CARD`` (LAB-1102), apart from ``BANK_ACCOUNT``, so a
+policy override or a per-type score can treat them on their own. Both are masked by default.
 """
 
 from __future__ import annotations
@@ -203,7 +203,7 @@ def _find_payment_card(text: str) -> Iterator[_Hit]:
             ):
                 continue
             score = 0.9 if m.group("compact") else 0.95
-            yield _Hit(m.start(), m.end(), EntityType.BANK_ACCOUNT, score)
+            yield _Hit(m.start(), m.end(), EntityType.PAYMENT_CARD, score)
 
 
 RULES: tuple[Rule, ...] = (_find_iban, _find_email, _find_intl_phone, _find_payment_card)

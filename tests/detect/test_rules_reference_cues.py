@@ -127,7 +127,7 @@ def test_tax_id_scores_are_unchanged() -> None:
     ],
 )
 def test_card_after_a_reference_is_not_masked(text: str) -> None:
-    assert E.BANK_ACCOUNT not in _types(text, cued=False)
+    assert not {E.PAYMENT_CARD, E.BANK_ACCOUNT} & set(_types(text, cued=False))
 
 
 @pytest.mark.parametrize(
@@ -145,7 +145,7 @@ def test_card_after_a_reference_is_not_masked(text: str) -> None:
     ],
 )
 def test_card_with_a_cue_or_without_a_reference_is_masked(text: str) -> None:
-    assert E.BANK_ACCOUNT in _types(text)
+    assert E.PAYMENT_CARD in _types(text)
 
 
 # --- Hungarian postcode before a company name ------------------------------------

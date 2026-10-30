@@ -35,6 +35,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from pii_guard.eval.forms import matching_types
 from pii_guard.types import EntityType
 
 if TYPE_CHECKING:
@@ -63,6 +64,7 @@ NUMBER_TYPES: frozenset[EntityType] = frozenset(
         EntityType.NATIONAL_ID_HU_TAJ,
         EntityType.ID_DOCUMENT,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.COMPANY_ID_HU,
         EntityType.PARCEL_NUMBER_HU,
         EntityType.VEHICLE_PLATE,
@@ -106,7 +108,7 @@ def classify(value: str, entity_type: EntityType, language: str) -> Validity | N
         first, last = alnum[0], alnum[-1] + 1
         for rule in _rules().rules_for(language):
             if any(
-                h.entity_type is entity_type and h.start <= first and h.end >= last
+                h.entity_type in matching_types(entity_type) and h.start <= first and h.end >= last
                 for h in rule(text)
             ):
                 result = "valid"

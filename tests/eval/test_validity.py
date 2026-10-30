@@ -71,6 +71,7 @@ def _steuer_id() -> str:
     ("valid", "invalid", "entity_type", "language"),
     [
         pytest.param(_card(), _bump(_card()), E.BANK_ACCOUNT, "en", id="card-luhn"),
+        pytest.param(_card(), _bump(_card()), E.PAYMENT_CARD, "en", id="payment-card"),
         pytest.param(_iban(), "HU00" + _iban()[4:], E.BANK_ACCOUNT, "hu", id="iban"),
         pytest.param(_taj(), _bump(_taj()), E.NATIONAL_ID_HU_TAJ, "hu", id="hu-taj"),
         pytest.param(_tax(), _bump(_tax()), E.NATIONAL_ID_HU_TAX, "hu", id="hu-tax-id"),

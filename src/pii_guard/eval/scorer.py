@@ -62,7 +62,12 @@ from typing import Literal, Protocol
 from pii_guard.detect.normalize import normalize_for_detection
 from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.eval.fixtures import Document, GoldSpan, ignore_regions
-from pii_guard.eval.forms import find_surface_forms, language_forms, surface_pattern
+from pii_guard.eval.forms import (
+    find_surface_forms,
+    language_forms,
+    matching_types,
+    surface_pattern,
+)
 from pii_guard.eval.stats import percentile
 from pii_guard.policy import DEFAULT_POLICIES, PolicySet
 from pii_guard.registry import create_detector
@@ -168,7 +173,7 @@ class TypeCounts:
 
 
 def _matches(gold: _SpanLike, pred: _SpanLike, mode: MatchMode) -> bool:
-    if gold.entity_type != pred.entity_type:
+    if pred.entity_type not in matching_types(gold.entity_type):
         return False
     if mode == "exact":
         return gold.start == pred.start and gold.end == pred.end

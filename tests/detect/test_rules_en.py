@@ -127,7 +127,12 @@ def test_register_rule_pack(monkeypatch: pytest.MonkeyPatch) -> None:
 )
 @pytest.mark.parametrize("language", ["en", "hu", "de"])
 def test_payment_card(detector: RuleDetector, value: str, language: str) -> None:
-    assert_detects(detector, value, E.BANK_ACCOUNT, language)
+    assert_detects(detector, value, E.PAYMENT_CARD, language)
+
+
+def test_payment_card_has_its_own_type(detector: RuleDetector) -> None:
+    # LAB-1102: a card is a PAYMENT_CARD, not a BANK_ACCOUNT, so a policy can treat it apart.
+    assert found(detector, "card 4000 0000 0000 0002") == [(E.PAYMENT_CARD, "4000 0000 0000 0002")]
 
 
 @pytest.mark.parametrize(
@@ -148,7 +153,7 @@ def test_payment_card(detector: RuleDetector, value: str, language: str) -> None
     ],
 )
 def test_payment_card_look_alikes(detector: RuleDetector, text: str) -> None:
-    assert E.BANK_ACCOUNT not in types_in(detector, text)
+    assert not {E.PAYMENT_CARD, E.BANK_ACCOUNT} & types_in(detector, text)
 
 
 def test_luhn() -> None:
@@ -163,7 +168,7 @@ def test_luhn() -> None:
 def test_card_property(payload: str) -> None:
     value = make_card("4" + payload)
     spans = RuleDetector().detect(PREFIX + grouped(value) + SUFFIX, language="en")
-    assert [(s.entity_type, s.text) for s in spans] == [(E.BANK_ACCOUNT, grouped(value))]
+    assert [(s.entity_type, s.text) for s in spans] == [(E.PAYMENT_CARD, grouped(value))]
 
 
 # --- US SSN -----------------------------------------------------------------
@@ -406,7 +411,7 @@ def test_english_letter(detector: RuleDetector) -> None:
             (E.PHONE, "020 7946 0000"),
             (E.ID_DOCUMENT, "AB 12 34 56 C"),
             (E.ID_DOCUMENT, "123-45-6789"),
-            (E.BANK_ACCOUNT, card),
+            (E.PAYMENT_CARD, card),
             (E.VEHICLE_PLATE, "EX12 MPL"),
             (E.ADDRESS, "EX1 2AB"),
         ]

@@ -145,6 +145,7 @@ _CODE_TYPES = frozenset(
     {
         EntityType.PHONE,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.ID_DOCUMENT,
         EntityType.NATIONAL_ID_HU_TAX,
         EntityType.NATIONAL_ID_HU_TAJ,
