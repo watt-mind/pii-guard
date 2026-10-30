@@ -30,6 +30,32 @@ hypothesis_settings.register_profile("ci-full", deadline=None, derandomize=True,
 hypothesis_settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "dev"))
 
 
+_CI_MAX_EXAMPLES = 25
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Shrink explicit Hypothesis example counts on the ``ci`` profile (LAB-1288).
+
+    The ``ci`` profile's ``max_examples=25`` only reaches tests without their own
+    ``@settings(max_examples=...)``; most property tests set 50 to 300 explicitly and ran
+    at full size on pull requests. On ``ci`` this hook derives each collected test's
+    settings with the count capped, so PR runs shrink them while ``dev`` and ``ci-full``
+    (nightly, main) keep the full count. Derandomized either way: the same seed runs the
+    same (fewer) examples, and a red run still prints the reproduce blob."""
+    if os.environ.get("HYPOTHESIS_PROFILE") != "ci":
+        return
+    for item in items:
+        fn = getattr(item, "obj", None)
+        current = getattr(fn, "_hypothesis_internal_use_settings", None)
+        if current is None:
+            continue
+        limit = current.max_examples
+        if limit is not None and limit > _CI_MAX_EXAMPLES:
+            fn._hypothesis_internal_use_settings = hypothesis_settings(
+                current, max_examples=_CI_MAX_EXAMPLES
+            )
+
+
 def pytest_report_header() -> str:
     s = hypothesis_settings.default
     return f"hypothesis: derandomize={s.derandomize} deadline={s.deadline} (seed per test name)"

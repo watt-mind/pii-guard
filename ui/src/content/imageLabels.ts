@@ -25,7 +25,8 @@ export interface ImageLabelsRecording {
     summary: Record<string, unknown>;
     matches: Record<string, number>;
   };
-  answer: { masked: string; by: string };
+  /** The model's masked answer; `model` names it (Muse Spark since LAB-1524). */
+  answer: { masked: string; by: string; model?: string };
 }
 
 export const IMAGE_LABELS = recording as unknown as ImageLabelsRecording;

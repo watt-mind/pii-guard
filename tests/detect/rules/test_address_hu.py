@@ -9,9 +9,10 @@ import random
 
 import pytest
 
-from pii_guard.detect.rules import RuleDetector, hu
+from pii_guard.detect.rules import RuleDetector
 from pii_guard.eval.identities import identity_generator
 from pii_guard.lang import postcode_index
+from pii_guard.languages.hu import rules as hu
 from pii_guard.types import EntityType as E
 
 
@@ -50,6 +51,14 @@ def test_full_address_with_a_consistent_postcode(
     detector: RuleDetector, context: str, address: str
 ) -> None:
     assert addresses(detector, context.format(address)) == [(address, hu.SCORE_CONSISTENT)]
+
+
+def test_consistent_postcode_case_from_lab_1298(detector: RuleDetector) -> None:
+    """LAB-1298: this exact invocation failed once in a full local xdist run and passes
+    alone. Pinned verbatim so a recurrence reproduces without the full suite."""
+    assert addresses(detector, "lakcím: 1051 Budapest, Minta utca 12. 3/5. ), Vevő") == [
+        ("1051 Budapest, Minta utca 12. 3/5.", hu.SCORE_CONSISTENT)
+    ]
 
 
 def test_the_span_has_the_right_offsets(detector: RuleDetector) -> None:
@@ -114,7 +123,21 @@ def test_look_alikes(detector: RuleDetector, text: str) -> None:
 def test_bare_postcode_still_found_and_consistency_boosts_it(detector: RuleDetector) -> None:
     assert addresses(detector, "3300 Eger") == [("3300", 0.85)]
     assert addresses(detector, "3300 Szeged") == [("3300", 0.75)]
-    assert addresses(detector, "3300 Kitaláltfalva") == [("3300", 0.75)]
+    # An unknown word after the number is not a settlement, so there is no postcode (LAB-1476).
+    assert addresses(detector, "3300 Kitaláltfalva") == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "-rw-r--r--  1 dev  staff  1203 Oct 28 22:40 customers.md",
+        "-rw-r--r--  1 dev  staff  2048 Jan 12 10:00 notes.md",
+        "drwxr-xr-x  5 dev  staff   160 Szept 3 09:11 docs",
+    ],
+)
+def test_tool_output_sizes_are_not_postcodes(detector: RuleDetector, text: str) -> None:
+    """A file size before a month abbreviation in `ls -la` output is not an ADDRESS."""
+    assert addresses(detector, text) == []
 
 
 def test_only_for_hungarian_text(detector: RuleDetector) -> None:

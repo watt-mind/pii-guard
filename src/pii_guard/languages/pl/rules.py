@@ -35,6 +35,7 @@ from pii_guard.detect.rules._base import (
     NOT_IN_WORD_AFTER,
     NUM_END,
     NUM_START,
+    VALIDATED_ID_DOCUMENT,
     Rule,
     _Hit,
     context_before,
@@ -119,7 +120,13 @@ def _labelled(
     def rule(text: str) -> Iterator[_Hit]:
         for m, labelled in _numbers(pattern, valid, context, text):
             if labelled:
-                yield _Hit(m.start("value"), m.end("value"), EntityType.ID_DOCUMENT, 0.97)
+                yield _Hit(
+                    m.start("value"),
+                    m.end("value"),
+                    EntityType.ID_DOCUMENT,
+                    0.97,
+                    VALIDATED_ID_DOCUMENT,
+                )
 
     return rule
 
@@ -130,7 +137,13 @@ def _unlabelled(
     def rule(text: str) -> Iterator[_Hit]:
         for m, labelled in _numbers(pattern, valid, context, text):
             if not labelled and not _reference_before(text, m.start("value")):
-                yield _Hit(m.start("value"), m.end("value"), EntityType.ID_DOCUMENT, score)
+                yield _Hit(
+                    m.start("value"),
+                    m.end("value"),
+                    EntityType.ID_DOCUMENT,
+                    score,
+                    VALIDATED_ID_DOCUMENT,
+                )
 
     return rule
 
@@ -145,7 +158,7 @@ _find_nip = _unlabelled(_NIP_RE, is_valid_nip, _NIP_CONTEXT, 0.8)
 def _find_vat_number(text: str) -> Iterator[_Hit]:
     for m in _VAT_RE.finditer(text):
         if is_valid_nip(m.group("value")):
-            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, 0.95)
+            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, 0.95, VALIDATED_ID_DOCUMENT)
 
 
 # --- Documents: ID card, passport ----------------------------------------------------

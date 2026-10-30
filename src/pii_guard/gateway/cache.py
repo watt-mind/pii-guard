@@ -1,8 +1,8 @@
 """Detection cache: history messages are detected once per conversation.
 
 Key: (session id, keyed digest of session incarnation + language + detector config + message
-text). Value: span
-offsets, types, scores and detector names -- **never the text or the values**; spans are
+text). Value: span offsets, types, scores, detector names and ``forced_by`` -- **never the
+text or the values**; spans are
 rebuilt from the message text on a hit. The digest is an HMAC under a random per-process key,
 so the cache doesn't even hold a plain hash of a short value. Bounded (LRU) with a sliding TTL
 equal to the vault session TTL, so an entry never outlives its conversation's mapping by much.
@@ -24,7 +24,7 @@ from pii_guard.vault import DEFAULT_TTL_SECONDS
 __all__ = ["CacheKey", "DetectionCache"]
 
 CacheKey = tuple[str, bytes]
-_Stored = tuple[tuple[int, int, EntityType, float, str], ...]
+_Stored = tuple[tuple[int, int, EntityType, float, str, str | None], ...]
 
 
 class DetectionCache:
@@ -75,16 +75,28 @@ class DetectionCache:
             self._data[key] = (now + self._ttl, stored)
             self._data.move_to_end(key)
         spans: list[Span] = []
-        for start, end, entity_type, score, detector in stored:
+        for start, end, entity_type, score, detector, forced_by in stored:
             if end > len(text):
                 return None
-            spans.append(Span(start, end, entity_type, text[start:end], score, detector))
+            spans.append(
+                Span(
+                    start,
+                    end,
+                    entity_type,
+                    text[start:end],
+                    score,
+                    detector,
+                    forced_by=forced_by,
+                )
+            )
         return spans
 
     def put(self, key: CacheKey, spans: Sequence[Span]) -> None:
         if self.max_entries <= 0:
             return
-        stored: _Stored = tuple((s.start, s.end, s.entity_type, s.score, s.detector) for s in spans)
+        stored: _Stored = tuple(
+            (s.start, s.end, s.entity_type, s.score, s.detector, s.forced_by) for s in spans
+        )
         with self._lock:
             self._data[key] = (self._clock() + self._ttl, stored)
             self._data.move_to_end(key)

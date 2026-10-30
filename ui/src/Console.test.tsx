@@ -225,7 +225,7 @@ describe("Overview", () => {
     expect(value("Values masked")).toBe(String(EVENTS.reduce((n, e) => n + totalMasked(e), 0)));
     expect(value("Requests blocked")).toBe(String(EVENTS.filter((e) => e.outcome === "blocked" || e.outcome === "refused").length));
     const types = within(region("Overview")).getByRole("region", { name: "Top entity types" });
-    expect(within(types).getAllByRole("listitem")[0]).toHaveTextContent(/^(Bank account|Email|Phone)2$/);
+    expect(within(types).getAllByRole("listitem")[0]).toHaveTextContent(/^(Bank account \/ card|Email|Phone)2$/);
     const stages = within(region("Overview")).getByRole("region", { name: "Latency per stage" });
     expect(within(stages).getByRole("rowheader", { name: "Detect" })).toBeInTheDocument();
     expect(within(region("Overview")).getByText(/Detectors seen in the shown calls\. Fast: Rules \+ Image pipeline\./)).toBeInTheDocument();

@@ -43,12 +43,20 @@ export interface Metrics {
 
 export type Family = "pii-guard" | "comparison";
 
+/**
+ * Whose system it is (`system.role` in the run records, LAB-1495): pii-guard's own
+ * configuration, another organisation's model run through pii-guard's pipeline (family
+ * `pii-guard`, because pii-guard ran it), or a comparison tool.
+ */
+export type SystemRole = "own" | "other-model" | "tool";
+
 export interface SystemInfo {
   color: string;
   shape: "circle" | "square" | "triangle" | "diamond" | "cross";
   label: string;
   short_label: string;
   family: Family;
+  role: SystemRole;
   tool: string;
   kind: "text" | "visual";
   detectors: string[];
@@ -336,24 +344,21 @@ export interface HeadlineSide {
 }
 
 /**
- * Someone else's model run through pii-guard's pipeline: a Hugging Face model of another
- * organisation (alone, or in place of pii-guard's NER) or a zero-shot model. Run records give
- * these `family: "pii-guard"` because pii-guard ran them; the screen shows them apart so no
- * one reads them as pii-guard's own (LAB-1493).
+ * Someone else's model run through pii-guard's pipeline: a model of another organisation
+ * (alone, or in place of pii-guard's NER) or a zero-shot model. The run record says so
+ * (`role: "other-model"`), so the screen shows them apart and no one reads them as
+ * pii-guard's own (LAB-1493, LAB-1495).
  */
 export function isOtherModel(info: SystemInfo | undefined): boolean {
-  if (!info || info.family !== "pii-guard") return false;
-  // A Hugging Face id ("org/model-name"); "rows/language" and "hu/s11" in labels are not.
-  const repos = info.label.match(/\b[\w.-]+\/[\w.]*-[\w.-]+/g) ?? [];
-  return repos.some((r) => !r.startsWith("watt-mind/")) || /\bzero-shot\b/i.test(info.label);
+  return info?.role === "other-model";
 }
 
 /** The picker group a system belongs to: pii-guard's own, other open models, or the tools. */
 export type SystemGroup = "ours" | "other-model" | "tool";
 
 export function groupOf(info: SystemInfo | undefined): SystemGroup {
-  if (!info || info.family === "comparison") return "tool";
-  return isOtherModel(info) ? "other-model" : "ours";
+  if (!info || info.role === "tool") return "tool";
+  return info.role === "other-model" ? "other-model" : "ours";
 }
 
 function sideOf(index: BenchmarkIndex, s: Snapshot, m: Metrics): HeadlineSide {

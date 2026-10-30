@@ -30,6 +30,15 @@ def test_word_boundaries() -> None:
     assert _found("Elekes Tesztelek", "Elek") == []
 
 
+def test_underscore_is_a_boundary_not_a_word_character() -> None:
+    # A value glued to an underscore still survived there: the leak check missed it (LAB-1147).
+    assert _found("prefix [[PERSON_Teszt Elek]] suffix", "Teszt Elek") == ["Teszt Elek"]
+    assert _found("user_Teszt Elek end", "Teszt Elek") == ["Teszt Elek"]
+    assert _found("my_Teszt Elek_suffix", "Teszt Elek", language="en") == ["Teszt Elek"]
+    # Letters on either side still join the value: no match.
+    assert _found("Elekes Tesztelek", "Teszt Elek") == []
+
+
 def test_hungarian_suffixes_stay_outside_the_match() -> None:
     assert _found("Teszt Eleknek írtam", "Teszt Elek") == ["Teszt Elek"]
     assert _found("Teszt Elekkel", "Teszt Elek") == ["Teszt Elek"]

@@ -19,6 +19,7 @@
   },
   "system": {
     "family": "comparison",
+    "role": "tool",
     "tool": "eka-pii-redaction",
     "version": "0.7.0",
     "detectors": [

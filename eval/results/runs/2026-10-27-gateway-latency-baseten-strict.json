@@ -22,6 +22,7 @@
     "key": "gateway-latency:strict:rules+llm:muse-spark-open",
     "label": "pii-guard gateway, strict mode (rules + llm muse-spark-open)",
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": "0.1.0",
     "detectors": [
