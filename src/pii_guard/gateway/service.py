@@ -978,7 +978,14 @@ class Gateway:
             slot.write(url)
             stats.image_payload_bytes += len(url)
             if outcome.summary is not None:
-                slot.annotate(image_annotation(number, outcome))
+                # An image can register a common-word name (e.g. "Placeholder"). The
+                # generated helper, summary keys and transcript headings are new text too;
+                # sweep the complete annotation after every image has joined the session.
+                # The unchanged outbound re-check still refuses any surviving known value.
+                annotation = session.mask(
+                    image_annotation(number, outcome), [], language=language, remask=True
+                )
+                slot.annotate(annotation)
 
     # --- the endpoint --------------------------------------------------------------------
 

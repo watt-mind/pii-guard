@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import re
 from typing import Any, ClassVar
 
 import httpx
@@ -573,6 +574,123 @@ def _name_line(text: str) -> list[OcrWord]:
         out.append(OcrWord(word, Box(x, 90, x + 10 * len(word), 110), (0,)))
         x += 10 * len(word) + 8
     return out
+
+
+def _common_word_name_gateway(name: str) -> tuple[FastAPI, list[dict[str, Any]]]:
+    """Real gateway/image pipeline with synthetic OCR and an offline upstream."""
+    forwarded: list[dict[str, Any]] = []
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        forwarded.append(body)
+        token = PLACEHOLDER_RE.search(json.dumps(body))
+        answer = token.group(0) if token else "ok"
+        if request.url.path.endswith("/responses"):
+            return httpx.Response(
+                200,
+                json={
+                    "id": "resp_test",
+                    "object": "response",
+                    "status": "completed",
+                    "model": "m",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": answer, "annotations": []}],
+                        }
+                    ],
+                },
+            )
+        return httpx.Response(
+            200,
+            json={"choices": [{"index": 0, "message": {"role": "assistant", "content": answer}}]},
+        )
+
+    settings = Settings(
+        tenant_key=TENANT_KEY,
+        upstream_base_url="http://up.invalid/v1",
+        upstream_api_key="k",
+        default_language="en",
+    )
+    config = GatewayConfig(mode="fast")
+    app = create_app(settings)
+    app.state.gateway = Gateway(
+        settings=settings,
+        vault=Vault.from_settings(settings),
+        config=config,
+        detectors=build_mode_detectors(settings, config),
+        transport=httpx.MockTransport(upstream),
+        sam=FakeSam(),  # type: ignore[arg-type]
+        ocr=FakeOcr(_name_line(f"Name: {name}")),
+    )
+    return app, forwarded
+
+
+def _common_word_name_body(name: str, responses: bool) -> dict[str, Any]:
+    url = "data:image/png;base64," + base64.b64encode(id_card_png()).decode()
+    parts = [
+        {"type": "input_text" if responses else "text", "text": f"Contract party: {name}."},
+        {"type": "input_image", "image_url": url}
+        if responses
+        else {"type": "image_url", "image_url": {"url": url}},
+    ]
+    return {
+        "model": "m",
+        "input" if responses else "messages": [{"role": "user", "content": parts}],
+    }
+
+
+@pytest.mark.parametrize("responses", [False, True], ids=["chat", "responses"])
+@pytest.mark.parametrize("name", ["PLACEHOLDER", "SUMMARY"])
+def test_image_annotation_sweeps_generated_words_matching_a_known_name(
+    name: str, responses: bool
+) -> None:
+    # LAB-1689: OCR can confirm a surname that also occurs in the generated helper or
+    # a heading. Scrub the complete generated text; do not rename one particular word.
+    app, forwarded = _common_word_name_gateway(name)
+    endpoint = "/v1/responses" if responses else "/v1/chat/completions"
+    with TestClient(app) as http:
+        response = http.post(endpoint, json=_common_word_name_body(name, responses))
+    assert response.status_code == 200, response.text
+    assert response.headers["X-PII-Guard-Outbound-Check"] == "passed"
+    assert len(forwarded) == 1
+    messages = forwarded[0]["input" if responses else "messages"]
+    parts = messages[-1]["content"]
+    annotation = parts[-1]["text"]
+    assert not re.search(rf"\b{name}\b", annotation, re.IGNORECASE)
+    token = PLACEHOLDER_RE.search(parts[0]["text"])
+    assert token is not None and token.group(0) in annotation
+    assert name in response.text.upper()  # the masked upstream answer still restores
+    image_url = parts[1]["image_url"]
+    masked_url = image_url if isinstance(image_url, str) else image_url["url"]
+    assert base64.b64decode(masked_url.split(",", 1)[1]) != id_card_png()
+
+
+@pytest.mark.parametrize("responses", [False, True], ids=["chat", "responses"])
+def test_image_annotation_fix_does_not_exempt_a_surviving_name(
+    monkeypatch: pytest.MonkeyPatch, responses: bool
+) -> None:
+    # A real masking regression in the original contract text must still fail closed,
+    # even while the generated annotation is correctly swept for this same surname.
+    original_write = Gateway._write
+
+    def faulty_write(slots: Any, masked: Any, *args: Any, **kwargs: Any) -> None:
+        original_write(slots, masked, *args, **kwargs)
+        for slot in slots:
+            if slot.text.startswith("Contract party:"):
+                slot.write(slot.text)
+
+    monkeypatch.setattr(Gateway, "_write", staticmethod(faulty_write))
+    app, forwarded = _common_word_name_gateway("PLACEHOLDER")
+    endpoint = "/v1/responses" if responses else "/v1/chat/completions"
+    with TestClient(app) as http:
+        response = http.post(endpoint, json=_common_word_name_body("PLACEHOLDER", responses))
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "outbound_check_failed"
+    assert response.headers["X-PII-Guard-Outbound-Check"] == "blocked"
+    assert forwarded == []
+    assert "Contract party:" not in response.text and "PLACEHOLDER" not in response.text
 
 
 @pytest.mark.parametrize(
