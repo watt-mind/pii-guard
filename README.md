@@ -93,7 +93,7 @@ leaks **13.8 %** ([ablation](docs/benchmarks.md#ai4privacy)), so on unseen text 
 Ai4Privacy data too ([configurations](eval/results/2026-10-27-comparison/README.md#systems)).
 
 - **Where fast mode is weak:** finance text (19.1 %, level with Presidio's 18.8 %), and over-masking:
-  1.1 % on the hand-written set and 1.7 % on agent traffic, but 26.4 % on CEE-PII, where
+  1.1 % on the hand-written set and 1.7 % on agent traffic, but 26.3 % on CEE-PII, where
   reference numbers without a cue word come out as IDs
   ([model card](training/ner/model-card.md#limitations)).
 - **Audit mode** (opt-in: rules + NER + Muse Spark Open, one hosted Baseten call per message,
