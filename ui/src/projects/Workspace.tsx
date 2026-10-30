@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type TextEntityType, type VisualEntityType } from "../api/types";
 import { ENTITY_META, type Policy } from "../lib/entities";
 import { ApiError } from "../api/http";
@@ -9,8 +9,9 @@ import { useHostedSession } from "../hosted/session";
 import { dateTime, relativeTime } from "../lib/time";
 import { setSelectedEndpoint } from "./selection";
 import { exampleModel, projectPath, pendingPolicyEdit, pendingPolicyEndpoint, requestPolicyEdit, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
+import OwnerAccessPanel from "./OwnerAccess";
 
-const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
+const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : OwnerAccessPanel;
 
 const configurationRecovery = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? (error: unknown) => recovery(error) : (error: unknown, hosted: boolean) => {
   if (hosted) return recovery(error);
@@ -53,7 +54,7 @@ const byId = (id: string) => () => document.getElementById(id);
 function useFocusLater() {
   const target = useRef<(() => HTMLElement | null | undefined) | null>(null);
   const [tick, setTick] = useState(0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const find = target.current;
     target.current = null;
     find?.()?.focus();
@@ -90,7 +91,7 @@ function useEscapeGuard(onCancel: () => void, busy: boolean) {
   const [asking, setAsking] = useState(false);
   const keepRef = useRef<HTMLButtonElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (asking) keepRef.current?.focus();
   }, [asking]);
   const keep = () => {
@@ -161,13 +162,13 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
   useEffect(() => () => {
     carried = null;
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (refocus && projects.length) projectSelect.current?.focus();
   }, [refocus, projects.length]);
   return (
     <div className="space-y-6">
       <PageHeader title="Projects" lead="Keep each application’s endpoints, endpoint keys and policies together. Every endpoint pins one upstream and one policy version, and can pin one model." />
-      {!hosted && OwnerAccess && <Suspense fallback={null}><OwnerAccess /></Suspense>}
+      {!hosted && OwnerAccess && <OwnerAccess />}
       {error && (
         <Notice tone="danger" live action={<Button size="sm" onClick={() => setRetry((n) => n + 1)}>Retry projects</Button>}>
           {error}
@@ -530,7 +531,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
 
 /** Focus a form's heading when it opens, so keyboard users land where the form appeared. */
 function useFocusOnOpen(id: string) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const heading = document.getElementById(id);
     heading?.focus({ preventScroll: true });
     heading?.scrollIntoView?.({ block: "nearest" });
@@ -855,7 +856,7 @@ function PolicyForm({ policy, template, endpoints, preferred = null, latest, hos
 function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoint; base: string; call: Requester; hosted: boolean }) {
   const panel = useRef<HTMLElement>(null);
   // This component mounts only after an explicit Connect & keys expansion.
-  useEffect(() => {
+  useLayoutEffect(() => {
     panel.current?.focus({ preventScroll: true });
     panel.current?.scrollIntoView({ block: "start", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, []);
@@ -1000,4 +1001,3 @@ function KeyRow({ item, children }: { item: EndpointKey; children?: ReactNode })
     </li>
   );
 }
-
