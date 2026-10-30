@@ -186,3 +186,58 @@ def test_pieces_of_different_types_on_one_token_keep_the_majority_type() -> None
     ]
     (span,) = snap_to_tokens(text, spans)
     assert (span.text, span.entity_type) == ("8461269321", E.NATIONAL_ID_HU_TAX)
+
+
+# LAB-1359: the model tags the given name and leaves out the surname before it when the
+# surname is also an everyday word (``Fekete [[PERSON]]ért``). A capitalised word from the
+# pack's ``surnames`` lexicon directly before a PERSON span joins the span.
+@pytest.mark.parametrize(
+    ("text", "value", "expected"),
+    [
+        ("A levelet Fekete Tihamérért kaptuk meg tegnap.", "Tihamér", "Fekete Tihamér"),
+        ("Kerekes Elek írta alá a szerződést.", "Elek", "Kerekes Elek"),
+        ("Kérem, hívja vissza Kerekes Piroska a héten.", "Piroska", "Kerekes Piroska"),
+        # A double surname joins whole, not only its last part.
+        ("Holnap Fekete-Kerekes Ottó jön.", "Ottó", "Fekete-Kerekes Ottó"),
+        # A sub-word fragment snaps first, then takes the surname.
+        ("A levelet Fekete Tihamérért kaptuk meg tegnap.", "hamér", "Fekete Tihamér"),
+    ],
+)
+def test_preceding_lexicon_surname_joins_the_person_span(
+    text: str, value: str, expected: str
+) -> None:
+    assert ner_spans(text, fragment(text, value)) == [expected]
+
+
+@pytest.mark.parametrize(
+    ("text", "value", "label"),
+    [
+        # Lowercase: the everyday word, not a surname.
+        ("A fekete Tihamér nevű ló nyert.", "Tihamér", "PERSON"),
+        # A capitalised word that is not in the surnames lexicon (fictional test surname).
+        ("Holnap Teszt Elek jön.", "Elek", "PERSON"),
+        # Not directly before the span (punctuation, two spaces, a line break).
+        ("Ezt mondta Fekete, Elek pedig hallgatott.", "Elek", "PERSON"),
+        ("Holnap Fekete  Elek jön.", "Elek", "PERSON"),
+        ("Fekete\nElek jön.", "Elek", "PERSON"),
+        # Only PERSON spans take a surname: a company keeps its own boundaries.
+        ("A szerződést Fekete Gépész Kft. írta alá.", "Gépész Kft.", "ORGANIZATION"),
+    ],
+)
+def test_surname_join_needs_a_capitalised_lexicon_surname_right_before(
+    text: str, value: str, label: str
+) -> None:
+    assert ner_spans(text, fragment(text, value, label)) == [value]
+
+
+def test_surname_join_is_hungarian_lexicon_driven_and_round_trips() -> None:
+    text = "A levelet Fekete Tihamérért kaptuk meg tegnap."
+    raw = [fragment(text, "Tihamér")]
+    assert [s.text for s in NerDetector(backend=FakeBackend(raw)).detect(text, "en")] == [
+        "Tihamérért"
+    ], "no surnames lexicon for English: the span only snaps to the word"
+    pipeline = DetectionPipeline([RuleDetector(), NerDetector(backend=FakeBackend(raw))])
+    session = Vault(KEY).session()
+    out = session.mask(text, pipeline.detect(text, "hu"), language="hu")
+    assert "Fekete" not in out and "Tihamér" not in out
+    assert session.unmask(out) == text
