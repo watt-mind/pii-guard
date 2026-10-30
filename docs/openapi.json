@@ -1629,7 +1629,7 @@
           "Masking"
         ],
         "summary": "Detect personal data without masking it",
-        "description": "Detect without masking. Every span carries its type's policy; ``block`` spans are\nreported here, not refused (nothing leaves the guard).\n\nWith ``session_id`` the session's known values are merged in as ``/v1/mask`` does\n(``detector: \"known\"``). The vault is only resolved then, so analyze without a session\nneeds no tenant key. Nothing is stored and no session is created; an unknown or expired\nsession is a 404. Known spans of a ``keep`` type report ``mask``: ``/v1/mask`` masks them.",
+        "description": "Detect without masking. Every span carries its type's policy; ``block`` spans are\nreported here, not refused (nothing leaves the guard).\n\nWith ``session_id`` the session's known values are merged in as ``/v1/mask`` does\n(``detector: \"known\"``). The vault is only resolved then, so analyze without a session\nneeds no tenant key. Nothing is stored and no session is created; an unknown or expired\nsession is a 404, as is one a gateway request bound to another client identity (LAB-1590).\nKnown spans of a ``keep`` type report ``mask``: ``/v1/mask`` masks them.",
         "operationId": "analyze_v1_analyze_post",
         "requestBody": {
           "content": {
@@ -2039,7 +2039,7 @@
           "Sessions"
         ],
         "summary": "Add known values to a session",
-        "description": "Add known values to an existing session (404 if it is unknown or expired).\n\nA refused request (an invalid value, or more than the session may hold) adds nothing.",
+        "description": "Add known values to an existing session (404 if it is unknown or expired).\n\nA refused request (an invalid value, or more than the session may hold) adds nothing.\nA session a gateway request bound to another client identity is a 404 too, and nothing is\nadded to it (LAB-1590).",
         "operationId": "add_known_values_v1_sessions__session_id__known_values_post",
         "parameters": [
           {
@@ -3111,7 +3111,7 @@
               }
             ],
             "title": "Session Id",
-            "description": "Optional vault session (1-128 characters, as on `/v1/mask`) whose pre-loaded known values are merged in (`detector: \"known\"`). Unknown or expired: 404 `not_found`. Never creates a session."
+            "description": "Optional vault session (1-128 characters, as on `/v1/mask`) whose pre-loaded known values are merged in (`detector: \"known\"`). Unknown, expired or bound to another client identity: 404 `not_found`. Never creates a session."
           }
         },
         "type": "object",
@@ -3398,7 +3398,7 @@
               }
             ],
             "title": "Session Id",
-            "description": "Vault session to mask in (1-128 characters). Omitted or `null`: a new session is created and returned. An existing id reuses its mapping, so the same value keeps the same placeholder across calls. Unknown or expired: 404 `not_found`."
+            "description": "Vault session to mask in (1-128 characters). Omitted or `null`: a new session is created and returned. An existing id reuses its mapping, so the same value keeps the same placeholder across calls. Unknown, expired or bound to another client identity: 404 `not_found`."
           }
         },
         "type": "object",

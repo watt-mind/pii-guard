@@ -8,6 +8,8 @@
 - :func:`v1_router` builds a router with that route class.
 - :func:`ephemeral_session` resolves a request's vault session and drops it again when the
   request created it and then fails (ADR 0006: a refused request leaves nothing in the vault).
+- :func:`owned_session` looks up an existing session the caller names, refusing a session a
+  gateway request bound to a different client identity (LAB-1590).
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from pii_guard.api.deps import PayloadTooLargeError, get_max_text_chars
+from pii_guard.gateway.sessions import check_owner, client_identity
 from pii_guard.policy import BlockedEntityError
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import Vault, VaultSession
@@ -39,6 +42,7 @@ __all__ = [
     "ensure_connected",
     "ephemeral_session",
     "log_extra",
+    "owned_session",
     "text_body_limit",
     "v1_router",
 ]
@@ -189,6 +193,20 @@ def check_text_size(request: Request, text: str) -> None:
         raise PayloadTooLargeError(f"text is longer than {limit} characters")
 
 
+def owned_session(vault: Vault, session_id: str, request: Request) -> VaultSession:
+    """The existing session ``session_id``, if the caller may use it (LAB-1590).
+
+    Unknown, expired or closed: :class:`~pii_guard.vault.SessionNotFoundError` (404). A session
+    a gateway request bound to a client identity (LAB-1565/1580) is refused to any other
+    identity -- a different ``Authorization`` value, or none for a credentialed owner -- with
+    the same 404, as ``/v1/unmask`` does. The check runs before the TTL slides (LAB-1584), so
+    a refused caller can't keep the session alive. Unbound and anonymous-owned sessions stay
+    open to every caller, and the lookup never claims a session.
+    """
+    identity = client_identity(request.headers)
+    return vault.session(session_id, authorize=lambda s: check_owner(s, identity))
+
+
 @overload
 def ephemeral_session(
     vault: Vault, session_id: str | None, request: Request
@@ -206,9 +224,9 @@ def ephemeral_session(
 ) -> AbstractContextManager[VaultSession | None]:
     """``with ephemeral_session(vault, session_id, request) as session:`` fails closed.
 
-    On entry, ``vault.session(session_id)``: the existing session (unknown or expired: 404
-    ``not_found``, before the block runs) or, for ``None``, a new one. Without a vault
-    (``None``, e.g. an opaque image) the session is ``None``.
+    On entry, :func:`owned_session`: the existing session (unknown, expired or bound to another
+    client identity: 404 ``not_found``, before the block runs) or, for ``None``, a new one.
+    Without a vault (``None``, e.g. an opaque image) the session is ``None``.
 
     If the block raises anything (``BaseException``: cancellation and timeouts too), a
     :class:`~pii_guard.policy.BlockedEntityError` adds ``blocked=<TYPE:count,...>`` to the
@@ -222,7 +240,12 @@ def ephemeral_session(
 def _ephemeral_session(
     vault: Vault | None, session_id: str | None, request: Request
 ) -> Iterator[VaultSession | None]:
-    session = vault.session(session_id) if vault is not None else None
+    if vault is None:
+        session = None
+    elif session_id is None:
+        session = vault.session()
+    else:
+        session = owned_session(vault, session_id, request)
     try:
         yield session
     except BaseException as exc:
