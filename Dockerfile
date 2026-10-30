@@ -14,8 +14,9 @@ WORKDIR /app
 # runs YuNet, the on-device face and ID-photo detector of the default hybrid segmenter
 # (PII_GUARD_SEGMENTER, LAB-1245). The demo image (compose.yaml, profile demo) adds `ner`
 # (torch + transformers) for fast mode with the NER; its model is fetched at run time into a
-# volume, never baked in (LAB-1192).
-ARG PII_GUARD_EXTRAS="ocr local-vision"
+# volume, never baked in (LAB-1192). The `sam` extra is Meta's official SAM 3.1 output parser
+# (meta-sam-parser, SAM License, LAB-1665).
+ARG PII_GUARD_EXTRAS="ocr local-vision sam"
 
 # Dependencies first, so code changes don't invalidate this layer.
 RUN --mount=type=cache,target=/root/.cache/uv \

@@ -142,7 +142,7 @@ def test_durable_money_failure_denies_before_paid_work_and_releases_local_permit
         class MissingMoney:
             available = False
 
-            def charge(self, cost, cancelled):
+            def charge(self, cost, cancelled, request_id=None):
                 raise SponsoredUnavailableError
 
             def close(self):
@@ -172,12 +172,17 @@ def test_durable_charge_is_before_downstream_and_survives_downstream_failure():
         class Money:
             available = True
 
-            def charge(self, cost, cancelled):
+            def charge(self, cost, cancelled, request_id=None):
                 costs.append(cost)
+
+            def refund(self, request_id, settled, cancelled):
+                refunds.append(settled)
+                return 0
 
             def close(self):
                 pass
 
+        refunds = []
         service.spend = Money()
 
         async def downstream(*args):
@@ -189,7 +194,8 @@ def test_durable_charge_is_before_downstream_and_survives_downstream_failure():
         assert len(costs) == 1 and costs[0] > 0
         assert service._ingress == service.quotas._active == 0
         assert all(runtime.active == 0 for runtime in service._runtimes.values())
-        # Completion/failure never triggers another monetary operation or refund.
+        # No upstream call happened: one settlement to zero (LAB-1662), no further charge.
+        assert refunds == [0]
         assert service.quotas._spent_allocation == 0
         await service.close()
 
@@ -206,7 +212,7 @@ def test_cancelled_durable_write_holds_worker_until_late_completion_without_outb
         class SlowMoney:
             available = True
 
-            def charge(self, cost, cancelled):
+            def charge(self, cost, cancelled, request_id=None):
                 cancelled_events.append(cancelled)
                 entered.set()
                 finish.wait(timeout=5)

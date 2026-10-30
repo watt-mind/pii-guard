@@ -13,8 +13,11 @@ normal Responses API object whose single ``output_text`` is a token string::
 - ``<0f>``: frame marker (frame 0; SAM 3.1 also tracks objects through video frames);
 - ``0``, ``1``, ...: object ids, objects separated by ``,``;
 - ``box``: inclusive pixel corners in an image of size ``w`` x ``h``;
-- ``mask``: ``data=H,W,~<base-85 payload>``, an undocumented entropy-coded bitmap kept
-  opaquely in :class:`~pii_guard.visual.regions.SamMask`.
+- ``mask``: ``data=H,W,~<base-85 payload>``, an entropy-coded bitmap kept opaquely in
+  :class:`~pii_guard.visual.regions.SamMask`.
+
+The output is decoded with Meta's official parser, ``meta_sam_parser`` (the optional ``sam``
+extra; see :func:`parse_sam_output`), inside our own size and count limits.
 
 No object found → empty ``output_text``. The API returns no confidence scores.
 
@@ -88,15 +91,69 @@ DEFAULT_ENTITY_TYPES: tuple[EntityType, ...] = (
 
 _RETRY_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 
+#: Bounds on one ``output_text``, checked before any parser sees it (LAB-1665). Text or object
+#: counts above them fail closed; they are far above what SAM 3.1 returns for one prompt.
+MAX_OUTPUT_CHARS = 4_000_000
+MAX_OBJECTS = 1_000
+#: Meta's parser validates every mask by decoding it, in pure Python (~3.5 us per mask pixel,
+#: 2026-10-30). Above this many mask pixels in one output the masks are not decoded and the
+#: tolerant decoder below reads the boxes instead (masking fills whole boxes either way), so a
+#: large or hostile mask cannot hold a request for seconds.
+MAX_DECODED_MASK_PIXELS = 262_144
+
 _FRAME_RE = re.compile(r"<(\d+)f>")
 _OBJECT_RE = re.compile(
     r"(?P<id>\d+)<\|box;(?P<box>[^|]*)\|>(?:<\|mask;(?P<mask>[^|]*)\|>)?",
 )
 _KV_RE = re.compile(r"([a-z0-9]+)=([^;]*)")
+_BOX_TOKEN_RE = re.compile(r"<\|box(?:;([^|]*))?\|>")
+# Every mask the parser can decode has ``H,W,~`` or ``H,W,!`` in its ``data`` field.
+_MASK_DIMS_RE = re.compile(r"([0-9]+),([0-9]+),[!~]")
+
+
+_meta_parser_missing_logged = False
+
+
+def _meta_parser() -> Any | None:
+    """Meta's official SAM 3.1 output parser, ``meta_sam_parser`` (the optional ``sam`` extra),
+    or ``None`` when it is not installed (logged once; our own decoder is used instead)."""
+    global _meta_parser_missing_logged
+    try:
+        import meta_sam_parser
+    except ImportError:
+        if not _meta_parser_missing_logged:
+            _meta_parser_missing_logged = True
+            logger.info(
+                "sam: meta-sam-parser is not installed (the `sam` extra); SAM 3.1 output is "
+                "read by pii-guard's own decoder"
+            )
+        return None
+    return meta_sam_parser
 
 
 def _kv(raw: str) -> dict[str, str]:
     return dict(_KV_RE.findall(raw))
+
+
+def _image_box(
+    corners: tuple[int, int, int, int], ref: tuple[int, int], image_size: tuple[int, int]
+) -> Box:
+    """An inclusive SAM box in a ``ref`` (w, h) image, clipped, then rescaled outwards to
+    ``image_size`` (w, h) when the two differ."""
+    x1, y1, x2, y2 = corners
+    ref_w, ref_h = ref
+    width, height = image_size
+    if ref_w <= 0 or ref_h <= 0:
+        raise DetectionError("SAM box has an unexpected format")
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(ref_w - 1, x2), min(ref_h - 1, y2)
+    if x2 < x1 or y2 < y1:
+        raise DetectionError("SAM box has an unexpected format")
+    box = Box(x1, y1, x2, y2)
+    if (ref_w, ref_h) != (width, height):
+        box = box.scaled(width / ref_w, height / ref_h)
+        box = Box(box.x1, box.y1, min(box.x2, width - 1), min(box.y2, height - 1))
+    return box
 
 
 def _parse_mask(raw: str | None) -> SamMask | None:
@@ -125,35 +182,97 @@ def parse_sam_output(
 ) -> list[Region]:
     """Parse a SAM 3.1 ``output_text`` into regions in an image of ``image_size`` (w, h).
 
+    Decoded with Meta's official parser, ``meta_sam_parser`` (LAB-1665, the optional ``sam``
+    extra), which also checks every mask payload; without the extra the tolerant decoder
+    below reads everything. Output outside its grammar that this function has always accepted
+    (boxes without a mask, as a self-hosted endpoint or a test double may send; boxes past
+    the image edge) goes to the tolerant decoder, so the result is the same as before.
+
     Boxes are rescaled if the API reports a different image size than ``image_size`` (scaled
     outwards, never smaller) and clipped to the image. Empty text means nothing was found.
-    Text that is not empty but contains no well-formed object raises ``DetectionError``.
+    Text that is not empty but contains no well-formed object, or that exceeds
+    :data:`MAX_OUTPUT_CHARS` or :data:`MAX_OBJECTS`, raises ``DetectionError``.
     """
     if not text.strip():
         return []
+    if len(text) > MAX_OUTPUT_CHARS or text.count("<|box") > MAX_OBJECTS:
+        raise DetectionError("SAM output exceeds the size limits")
+    regions = _parse_with_meta(text, entity_type, image_size)
+    return regions if regions is not None else _parse_tolerant(text, entity_type, image_size)
+
+
+def _parse_with_meta(
+    text: str, entity_type: EntityType, image_size: tuple[int, int]
+) -> list[Region] | None:
+    """Regions from ``meta_sam_parser``, or ``None`` when the output is not entirely in its
+    grammar (any diagnostic, a text line, a box without its mask, a non-lossless mask), its
+    masks exceed :data:`MAX_DECODED_MASK_PIXELS`, or the ``sam`` extra is not installed."""
+    msp = _meta_parser()
+    if msp is None:
+        return None
+    pixels = 0
+    for match in _MASK_DIMS_RE.finditer(text):
+        if len(match.group(1)) > 9 or len(match.group(2)) > 9:
+            return None
+        pixels += int(match.group(1)) * int(match.group(2))
+        if pixels > MAX_DECODED_MASK_PIXELS:
+            return None
+    # The parser keeps box corners but not the image size each box refers to.
+    refs: list[tuple[int, int]] = []
+    for match in _BOX_TOKEN_RE.finditer(text):
+        fields = _kv(match.group(1) or "")
+        try:
+            refs.append((int(fields["w"]), int(fields["h"])))
+        except (KeyError, ValueError):
+            return None
+    try:
+        parser = msp.image_segmentation_format().create_parser()
+        parser.push(text, emit=False)
+        result = parser.finish(msp.CompletedOutcome()).result
+    except Exception:  # a third-party parser failure must never let output through unchecked
+        logger.debug("sam: meta_sam_parser raised; using the tolerant decoder")
+        return None
+    records = result.records
+    if result.diagnostics or len(records) != 2 * len(refs):
+        return None
+    regions: list[Region] = []
+    for ref, box_record, mask_record in zip(refs, records[::2], records[1::2], strict=True):
+        if (
+            not isinstance(box_record, msp.SegmentationBoxRecord)
+            or not isinstance(mask_record, msp.SegmentationMaskRecord)
+            or mask_record.object_id != box_record.object_id
+            or mask_record.mask.encoding != "lossless"
+        ):
+            return None
+        corners = (
+            int(box_record.left),
+            int(box_record.top),
+            int(box_record.right) - 1,
+            int(box_record.bottom) - 1,
+        )
+        mask = mask_record.mask
+        sam_mask = SamMask(x=0, y=0, height=mask.height, width=mask.width, data=mask.payload[1:])
+        regions.append(
+            Region(entity_type, _image_box(corners, ref, image_size), None, "sam", mask=sam_mask)
+        )
+    return regions or None
+
+
+def _parse_tolerant(
+    text: str, entity_type: EntityType, image_size: tuple[int, int]
+) -> list[Region]:
+    """The pre-LAB-1665 decoder, for output outside ``meta_sam_parser``'s grammar."""
     width, height = image_size
     body = _FRAME_RE.sub("", text)
     regions: list[Region] = []
-    consumed = 0
     for match in _OBJECT_RE.finditer(body):
-        consumed += len(match.group(0))
         fields = _kv(match.group("box"))
         try:
-            x1, y1, x2, y2 = (int(fields[k]) for k in ("x1", "y1", "x2", "y2"))
-            ref_w = int(fields.get("w", width))
-            ref_h = int(fields.get("h", height))
+            corners = (int(fields["x1"]), int(fields["y1"]), int(fields["x2"]), int(fields["y2"]))
+            ref = (int(fields.get("w", width)), int(fields.get("h", height)))
         except (KeyError, ValueError) as exc:
             raise DetectionError("SAM box has an unexpected format") from exc
-        if ref_w <= 0 or ref_h <= 0:
-            raise DetectionError("SAM box has an unexpected format")
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(ref_w - 1, x2), min(ref_h - 1, y2)
-        if x2 < x1 or y2 < y1:
-            raise DetectionError("SAM box has an unexpected format")
-        box = Box(x1, y1, x2, y2)
-        if (ref_w, ref_h) != (width, height):
-            box = box.scaled(width / ref_w, height / ref_h)
-            box = Box(box.x1, box.y1, min(box.x2, width - 1), min(box.y2, height - 1))
+        box = _image_box(corners, ref, image_size)
         regions.append(Region(entity_type, box, None, "sam", mask=_parse_mask(match.group("mask"))))
     # Everything left over should be object separators; anything else is a format change.
     leftover = _OBJECT_RE.sub("", body).replace(",", "").strip()

@@ -163,8 +163,9 @@ def sse_body(pieces: Sequence[str], *, done: bool = True) -> bytes:
 
 
 def make_app(
-    upstream: MockUpstream,
+    upstream: MockUpstream | None = None,
     *,
+    transport: httpx.BaseTransport | None = None,
     llm: FakeLlm | None = None,
     config: GatewayConfig | None = None,
     settings: Settings | None = None,
@@ -178,7 +179,7 @@ def make_app(
     config = config or GatewayConfig(mode=Mode.AUDIT)
     app = create_app(settings)
     app.state.gateway_config = config
-    app.state.gateway_transport = upstream.transport()
+    app.state.gateway_transport = transport or (upstream or MockUpstream()).transport()
     app.state.gateway_detectors = build_mode_detectors(
         settings, config, llm_detector=llm or FakeLlm()
     )

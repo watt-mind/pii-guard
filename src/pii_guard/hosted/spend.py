@@ -1,4 +1,9 @@
-"""A pre-funded, monetary-only Azure Blob allowance. Never creates or refunds funds.
+"""A pre-funded, monetary-only Azure Blob allowance. Never creates funds.
+
+A charge is a conservative reservation. After the request, the process that made it may
+settle it down to actual usage (LAB-1662): a refund returns part or all of that one charge,
+at most once per request id, through the same ETag compare-and-swap. Every counter stays
+monotonic (refunds are their own totals), so rollback detection is unchanged.
 
 The operator and every identity allowed to write this blob are trusted budget owners.
 ETags prevent concurrent lost updates, not an authorized writer restoring old state.
@@ -13,6 +18,7 @@ import math
 import re
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, replace
@@ -27,6 +33,10 @@ from pii_guard.hosted.quotas import SponsoredUnavailableError
 MAX_BLOB_BYTES = 4096
 MAX_MONEY = 10**15
 MAX_ATTEMPTS = 3
+# Charges awaiting settlement in this process. A charge never settled (a crash, a lost
+# entry past this bound) simply stays charged in full.
+MAX_OPEN_CHARGES = 4096
+_REFUND_FIELDS = frozenset({"refunded_total", "daily_refunded"})
 
 
 class Conflict(Exception):
@@ -69,6 +79,17 @@ class _State:
     day: str
     daily_charged: int
     enabled: bool
+    # Optional on disk: absent (both zero) until the allocation's first refund, so a blob
+    # stays readable by a release without settlement until then.
+    refunded_total: int = 0
+    daily_refunded: int = 0
+
+    @property
+    def net_total(self) -> int:
+        return self.charged_total - self.refunded_total
+
+    def net_daily(self, today: str) -> int:
+        return self.daily_charged - self.daily_refunded if self.day == today else 0
 
     @classmethod
     def parse(cls, raw: bytes, approval: Approval, today: str) -> _State:
@@ -83,8 +104,14 @@ class _State:
         if len(raw) > MAX_BLOB_BYTES:
             raise ValueError
         data = json.loads(raw, object_pairs_hook=object_pairs)
-        if not isinstance(data, dict) or set(data) != set(cls.__dataclass_fields__):
+        required = set(cls.__dataclass_fields__) - _REFUND_FIELDS
+        if not isinstance(data, dict) or set(data) not in (
+            required,
+            required | _REFUND_FIELDS,
+        ):
             raise ValueError
+        data.setdefault("refunded_total", 0)
+        data.setdefault("daily_refunded", 0)
         if any(
             type(data[key]) is not int
             for key in (
@@ -93,6 +120,8 @@ class _State:
                 "expires_at",
                 "charged_total",
                 "daily_charged",
+                "refunded_total",
+                "daily_refunded",
             )
         ):
             raise ValueError
@@ -108,18 +137,22 @@ class _State:
             or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", data["day"])
             or datetime.strptime(data["day"], "%Y-%m-%d").date().isoformat() != data["day"]
             or data["day"] > today
-            or not 0
-            <= data["daily_charged"]
-            <= data["charged_total"]
-            <= approval.ceiling_microdollars
+            or not 0 <= data["daily_charged"] <= data["charged_total"] <= MAX_MONEY
+            or not 0 <= data["daily_refunded"] <= data["daily_charged"]
+            or not data["daily_refunded"] <= data["refunded_total"] <= data["charged_total"]
+            or data["charged_total"] - data["refunded_total"] > approval.ceiling_microdollars
         ):
             raise ValueError
         return cls(**data)
 
     def encoded(self) -> bytes:
+        names = [
+            name
+            for name in self.__dataclass_fields__
+            if name not in _REFUND_FIELDS or self.refunded_total
+        ]
         return json.dumps(
-            {name: getattr(self, name) for name in self.__dataclass_fields__},
-            separators=(",", ":"),
+            {name: getattr(self, name) for name in names}, separators=(",", ":")
         ).encode("ascii")
 
 
@@ -146,6 +179,8 @@ class DurableSpend:
         self._last: _State | None = None
         self._available = False
         self._last_now = 0.0
+        # request id -> (cost, UTC day) of a committed charge not yet settled.
+        self._open: OrderedDict[str, tuple[int, str]] = OrderedDict()
 
     def _now(self) -> tuple[float, str]:
         now = self._clock()
@@ -169,8 +204,15 @@ class DurableSpend:
         last = self._last
         if last is not None and (
             state.charged_total < last.charged_total
+            or state.refunded_total < last.refunded_total
             or state.day < last.day
-            or (state.day == last.day and state.daily_charged < last.daily_charged)
+            or (
+                state.day == last.day
+                and (
+                    state.daily_charged < last.daily_charged
+                    or state.daily_refunded < last.daily_refunded
+                )
+            )
         ):
             raise SponsoredUnavailableError
         self._last = state
@@ -200,8 +242,8 @@ class DurableSpend:
                 self._available = (
                     state.enabled
                     and now < state.expires_at
-                    and state.charged_total < state.ceiling_microdollars
-                    and (state.day != today or state.daily_charged < self._daily_ceiling)
+                    and state.net_total < state.ceiling_microdollars
+                    and state.net_daily(today) < self._daily_ceiling
                 )
             except Exception:
                 self._available = False
@@ -209,8 +251,8 @@ class DurableSpend:
                 if self._closing.is_set():
                     self._close_locked()
 
-    def charge(self, cost: int, cancelled: threading.Event) -> None:
-        """Full conservative charge, never refund or reconcile on completion."""
+    def charge(self, cost: int, cancelled: threading.Event, request_id: str | None = None) -> None:
+        """Full conservative charge. With a ``request_id``, :meth:`refund` may settle it."""
         with self._lock:
             self._available = False
             try:
@@ -221,12 +263,13 @@ class DurableSpend:
                         raise SponsoredUnavailableError
                     state, etag, now, today = self._read()
                     now, today = self._now()
-                    daily = state.daily_charged if state.day == today else 0
+                    same_day = state.day == today
                     if (
                         not state.enabled
                         or now >= state.expires_at
-                        or state.charged_total + cost > state.ceiling_microdollars
-                        or daily + cost > self._daily_ceiling
+                        or state.net_total + cost > state.ceiling_microdollars
+                        or state.net_daily(today) + cost > self._daily_ceiling
+                        or state.charged_total + cost > MAX_MONEY
                         or cancelled.is_set()
                     ):
                         raise SponsoredUnavailableError
@@ -234,7 +277,8 @@ class DurableSpend:
                         state,
                         charged_total=state.charged_total + cost,
                         day=today,
-                        daily_charged=daily + cost,
+                        daily_charged=(state.daily_charged if same_day else 0) + cost,
+                        daily_refunded=state.daily_refunded if same_day else 0,
                     )
                     try:
                         if self._store is None:
@@ -248,18 +292,88 @@ class DurableSpend:
                             raise SponsoredUnavailableError from None
                         continue
                     self._last = updated
+                    # Committed: settleable even if the caller then treats it as failed.
+                    self._remember(request_id, cost, today)
                     after_write, after_day = self._now()
                     if after_write >= state.expires_at or after_day != today or cancelled.is_set():
                         raise SponsoredUnavailableError
                     self._available = (
-                        updated.charged_total < updated.ceiling_microdollars
-                        and updated.daily_charged < self._daily_ceiling
+                        updated.net_total < updated.ceiling_microdollars
+                        and updated.net_daily(today) < self._daily_ceiling
                     )
                     return
                 raise SponsoredUnavailableError
             except Exception:
                 # SDK/validation exceptions can carry account URLs, credentials or data.
                 self._available = False
+                raise SponsoredUnavailableError from None
+            finally:
+                if self._closing.is_set():
+                    self._close_locked()
+
+    def _remember(self, request_id: str | None, cost: int, day: str) -> None:
+        if request_id is None or request_id in self._open:
+            return
+        self._open[request_id] = (cost, day)
+        while len(self._open) > MAX_OPEN_CHARGES:
+            self._open.popitem(last=False)
+
+    def refund(self, request_id: str, settled: int, cancelled: threading.Event) -> int:
+        """Settle one charge down to ``settled`` microdollars; return the amount refunded.
+
+        At most once per request id: the open charge is consumed before any write, so a
+        retry, a second call or an unknown write outcome can never refund twice. Only ever
+        lowers a charge; ``settled`` at or above the charge (or invalid) refunds nothing.
+        A failure leaves the charge in full, and raises like :meth:`charge`.
+        """
+        with self._lock:
+            entry = self._open.pop(request_id, None)
+            if entry is None:
+                return 0
+            cost, day = entry
+            if type(settled) is not int or settled < 0:
+                return 0
+            amount = cost - min(settled, cost)
+            if amount == 0:
+                return 0
+            try:
+                for attempt in range(MAX_ATTEMPTS):
+                    if cancelled.is_set():
+                        raise SponsoredUnavailableError
+                    state, etag, _, today = self._read()
+                    # The charge sits in this day's counters only while they are still that
+                    # day's; otherwise it is refunded from the allocation total alone.
+                    daily = state.day == day
+                    if state.refunded_total + amount > state.charged_total or (
+                        daily and state.daily_refunded + amount > state.daily_charged
+                    ):
+                        raise SponsoredUnavailableError
+                    updated = replace(
+                        state,
+                        refunded_total=state.refunded_total + amount,
+                        daily_refunded=state.daily_refunded + (amount if daily else 0),
+                    )
+                    try:
+                        # A caller that gave up (timeout) must not see a late refund land.
+                        if self._store is None or cancelled.is_set():
+                            raise SponsoredUnavailableError
+                        self._store.compare_and_swap(updated.encoded(), etag)
+                    except Conflict:
+                        if attempt + 1 == MAX_ATTEMPTS:
+                            raise SponsoredUnavailableError from None
+                        continue
+                    self._last = updated
+                    now, today = self._now()
+                    self._available = (
+                        updated.enabled
+                        and now < updated.expires_at
+                        and updated.net_total < updated.ceiling_microdollars
+                        and updated.net_daily(today) < self._daily_ceiling
+                    )
+                    return amount
+                raise SponsoredUnavailableError
+            except Exception:
+                # Same discipline as charge: no SDK text escapes; the charge stays in full.
                 raise SponsoredUnavailableError from None
             finally:
                 if self._closing.is_set():

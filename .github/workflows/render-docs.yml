@@ -50,7 +50,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: false
-      - run: uv sync --no-dev
+      - run: uv sync --no-dev --group report  # resvg-py: the PNG copies of the images (LAB-1663)
       - name: Render, commit the generated files, push to develop
         env:
           GH_TOKEN: ${{ github.token }}

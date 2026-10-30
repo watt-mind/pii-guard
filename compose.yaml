@@ -22,7 +22,7 @@ x-demo-image: &demo-image
   build:
     context: .
     args:
-      PII_GUARD_EXTRAS: "ocr local-vision ner"
+      PII_GUARD_EXTRAS: "ocr local-vision ner sam"
 
 services:
   api:

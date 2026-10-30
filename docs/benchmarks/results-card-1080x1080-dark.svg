@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080" role="img" aria-labelledby="t d" font-family="Inter, &#x27;Helvetica Neue&#x27;, Helvetica, Arial, sans-serif">
+<title id="t">PII Guard: 0.2 % of personal values reached the model</title>
+<desc id="d">Stat card. On 990 fictional agent-traffic documents, PII Guard (fast, NER v4.2) leaked 0.2 % with 0.7 % over-masking; PrivAiTe leaked 2.4 % with 35.2 % over-masking; Presidio leaked 16.6 % with 33.4 % over-masking; LLM Guard leaked 20.2 % with 16.9 % over-masking. Masks personal data before it reaches the LLM, and puts it back in the answer. github.com/watt-mind/pii-guard</desc>
+<rect x="0" y="0" width="1080" height="1080" fill="#0F1115"/>
+<text x="56" y="81.8" font-size="32.3" fill="#F2F3F5" font-weight="700">PII Guard</text>
+<text x="216.4" y="81.8" font-size="22.8" fill="#B4B6BF">open-source privacy gateway for AI agents</text>
+<text x="56" y="962.7" font-size="25.3" fill="#F2F3F5" font-weight="600">Masks personal data before it reaches the LLM, and puts it back in the answer.</text>
+<text x="56" y="1038" font-size="18.1" fill="#B4B6BF">Runs 2026-10-30 · generated from the committed run records</text>
+<text x="1024" y="1038" font-size="18.1" fill="#F2F3F5" text-anchor="end" font-weight="600">github.com/watt-mind/pii-guard</text>
+<text x="56" y="1011.8" font-size="17.7" fill="#B4B6BF">990 fictional agent-traffic documents (German, English and Hungarian) · same documents and scorer for every tool</text>
+<text x="48.8" y="282.4" font-size="180.5" fill="#C9F78F" font-weight="700">0.2%</text>
+<text x="561.5" y="206.6" font-size="25.2" fill="#F2F3F5" font-weight="600">of personal values reached the model</text>
+<text x="561.5" y="239.3" font-size="20.4" fill="#B4B6BF">over-masking 0.7 % · rules + local NER, on CPU</text>
+<text x="56" y="339" font-size="21" fill="#B4B6BF">Leak: share of labeled personal values that reached the model</text>
+<text x="56" y="410.5" font-size="24.7" fill="#C9F78F" font-weight="700">PII Guard</text>
+<rect x="209.5" y="379.1" width="471.9" height="45.6" rx="9.1" fill="#1A1D23"/>
+<rect x="209.5" y="379.1" width="11.4" height="45.6" rx="9.1" fill="#B6F36B"/>
+<text x="696.5" y="410.5" font-size="24.7" fill="#C9F78F" font-weight="700">0.2 %</text>
+<text x="777.4" y="410.5" font-size="19.8" fill="#B4B6BF">over-masking 0.7 %</text>
+<text x="56" y="501.7" font-size="24.7" fill="#F2F3F5" font-weight="600">PrivAiTe</text>
+<rect x="209.5" y="470.3" width="471.9" height="45.6" rx="9.1" fill="#1A1D23"/>
+<rect x="209.5" y="470.3" width="56.3" height="45.6" rx="9.1" fill="#56B4E9"/>
+<text x="696.5" y="501.7" font-size="24.7" fill="#F2F3F5" font-weight="700">2.4 %</text>
+<text x="777.5" y="501.7" font-size="19.8" fill="#B4B6BF">over-masking 35.2 %</text>
+<text x="56" y="592.9" font-size="24.7" fill="#F2F3F5" font-weight="600">Presidio</text>
+<rect x="209.5" y="561.5" width="471.9" height="45.6" rx="9.1" fill="#1A1D23"/>
+<rect x="209.5" y="561.5" width="386.4" height="45.6" rx="9.1" fill="#F0884A"/>
+<text x="696.5" y="592.9" font-size="24.7" fill="#F2F3F5" font-weight="700">16.6 %</text>
+<text x="788" y="592.9" font-size="19.8" fill="#B4B6BF">over-masking 33.4 %</text>
+<text x="56" y="684.1" font-size="24.7" fill="#F2F3F5" font-weight="600">LLM Guard</text>
+<rect x="209.5" y="652.7" width="471.9" height="45.6" rx="9.1" fill="#1A1D23"/>
+<rect x="209.5" y="652.7" width="471.9" height="45.6" rx="9.1" fill="#E09BC8"/>
+<text x="696.5" y="684.1" font-size="24.7" fill="#F2F3F5" font-weight="700">20.2 %</text>
+<text x="793" y="684.1" font-size="19.8" fill="#B4B6BF">over-masking 16.9 %</text>
+</svg>

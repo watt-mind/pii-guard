@@ -197,6 +197,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
       const parsed = parseHash(globalThis.location.hash);
       if (parsed) navigate(parsed.route, parsed.redirect ? "replace" : "none");
     };
+    onHash();
     window.addEventListener("hashchange", onHash);
     window.addEventListener("popstate", onHash);
     return () => {
