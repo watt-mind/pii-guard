@@ -445,6 +445,8 @@ class Gateway:
         client, self._client, self._client_loop = self._client, None, None
         if client is not None:
             await client.aclose()
+        elif self._transport is not None:
+            await self._transport.aclose()
 
     async def bound_upstream_response(self, response: httpx.Response) -> None:
         """Bound untrusted hosted upstream bytes before buffering or SSE parsing.
@@ -818,6 +820,9 @@ class Gateway:
     ) -> list[str]:
         # A name found whole in one text repairs the same name found in part in another, or
         # one this session already has ("1,Jane Placeholder" with only "Placeholder" detected).
+        for slot, found in zip(slots, spans, strict=True):
+            if slot.kind == "identifier" and found:
+                slot.write("")
         texts = [slot.text for slot in slots]
         spans = widen_request(texts, spans, session.confirmed_values(WIDENED_TYPES), language)
         results = [
@@ -1084,19 +1089,14 @@ class Gateway:
             _count_masked(stats, before, session)
             with timer.span("mask"):
                 self._recheck(body, collect_texts, session, language, stats, names, issued)
+            forwarding = time.perf_counter()
+            payload = self._forwarded(body, session, stats, add_chat_note)
+            check_upstream_payload(payload, stats.image_payload_bytes)
         except BaseException:
             stats.log("blocked")
             self._release_session(session, created, masked=False)
             raise
         self._release_session(session, created, masked=True)
-
-        forwarding = time.perf_counter()
-        payload = self._forwarded(body, session, stats, add_chat_note)
-        try:
-            check_upstream_payload(payload, stats.image_payload_bytes)
-        except PayloadTooLargeError:
-            stats.log("blocked")
-            raise
         if trace.payloads:
             trace.masked_request = payload
         # The client's messages as masked: the note is a flag, not a message, so a UI that
@@ -1329,14 +1329,15 @@ class Gateway:
                 stats.upstream_ms = timer.stages["upstream"] * 1000
                 stats.unresolved = len(restorer.unresolved)
                 if outcome == "ok":
-                    restored = {}
-                    for index, masked in restorer.masked_content().items():
-                        text, spans, _ = restore_text(session, masked)
-                        restored[index] = (text, spans)
-                    self._seed_cache(session, language, detector, restored, stats)
-                    if trace.full:
-                        trace.stream_restored = {i: t for i, (t, _) in restored.items()}
-                        trace.stream_restored_tools = restorer.restored_tool_calls()
+                    with suppress(PiiGuardError):
+                        restored = {}
+                        for index, masked in restorer.masked_content().items():
+                            text, spans, _ = restore_text(session, masked)
+                            restored[index] = (text, spans)
+                        self._seed_cache(session, language, detector, restored, stats)
+                        if trace.full:
+                            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
+                            trace.stream_restored_tools = restorer.restored_tool_calls()
                 stats.log(outcome)
                 if trace.payloads:
                     trace.stream_masked = restorer.masked_content()

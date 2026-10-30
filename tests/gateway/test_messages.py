@@ -692,3 +692,40 @@ def test_guard_token_in_x_api_key_is_never_forwarded_upstream() -> None:
     assert "x-api-key" not in request.headers
     assert token not in str(request.headers)
     assert refused.status_code == 401
+
+
+def test_stream_request_refuses_non_sse_upstream_response() -> None:
+    """When ``stream=True`` is requested, a non-SSE upstream response fails closed with 502."""
+
+    class NonStreamingMessagesUpstream(MessagesUpstream):
+        def handler(self, request: httpx.Request) -> httpx.Response:
+            self.requests.append(request)
+            return httpx.Response(200, json={"id": "msg_01", "type": "message", "content": []})
+
+    upstream = NonStreamingMessagesUpstream()
+    r = post(upstream, claude_code_body(stream=True))
+    assert r.status_code == 502
+    assert r.json()["error"]["code"] == "upstream_did_not_stream"
+
+
+def test_sse_restorer_flushes_open_unmaskers_before_message_stop_and_ignores_after_finish() -> None:
+    """Held-back partial placeholders flush before ``message_stop`` and post-finish is ignored."""
+    vault = Vault.from_settings(Settings(tenant_key=TEST_TENANT_KEY))
+    session, _ = vault.session_or_create("test-session")
+    restorer = MessagesSseRestorer(session)
+    delta = {
+        "type": "content_block_delta",
+        "index": 0,
+        "delta": {"type": "text_delta", "text": "Hi [[PER"},
+    }
+    out = restorer.process(None, json.dumps(delta))
+    out += restorer.process(None, json.dumps({"type": "message_stop"}))
+    events = [json.loads(data) for _, data in out]
+    assert [e["type"] for e in events] == [
+        "content_block_delta",
+        "content_block_delta",
+        "message_stop",
+    ]
+    assert events[1]["delta"] == {"type": "text_delta", "text": "[[PER"}
+    assert restorer.finish() == []
+    assert restorer.process(None, json.dumps(delta)) == []

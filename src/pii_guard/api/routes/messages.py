@@ -39,8 +39,10 @@ _lock = threading.Lock()
 def get_messages_gateway(request: Request) -> MessagesGateway:
     state = request.app.state
     gateway = get_gateway(request)
-    if getattr(state, "hosted", None) is not None or getattr(
-        request.state, "project_routed_endpoint", False
+    if (
+        getattr(state, "hosted", None) is not None
+        or getattr(request.state, "project_routed_endpoint", False)
+        or getattr(request.state, "hosted_runtime", None) is not None
     ):
         return MessagesGateway(gateway)
     messages = getattr(state, "messages_gateway", None)

@@ -735,3 +735,95 @@ def test_unknown_delta_without_a_string_delta_is_restored_whole() -> None:
     [(name, data)] = restorer.process(event["type"], json.dumps(event))
     assert name == "response.future.delta"
     assert json.loads(data)["delta"] == {"text": "to a@example.com"}
+
+
+def test_stream_request_refuses_non_sse_upstream_response() -> None:
+    """When ``stream=True`` is requested, a non-SSE upstream response fails closed with 502."""
+
+    class NonStreamingResponsesUpstream(ResponsesUpstream):
+        def handler(self, request: httpx.Request) -> httpx.Response:
+            self.requests.append(request)
+            return httpx.Response(200, json=response_object("hello", "{}"))
+
+    upstream = NonStreamingResponsesUpstream()
+    with TestClient(make_app(upstream)) as http:
+        response = http.post("/v1/responses", json=muse_body(stream=True))
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "upstream_did_not_stream"
+
+
+def test_refused_identifier_does_not_pollute_existing_session() -> None:
+    """Refusing an identifier with PII must not store the refused value in an existing session."""
+    upstream = ResponsesUpstream()
+    app = make_app(upstream)
+    with TestClient(app) as http:
+        first = http.post(
+            "/v1/responses", json={"model": "m", "input": "Mail teszt.elek@example.com"}
+        )
+        session_id = first.headers["X-PII-Guard-Session"]
+        bad = {
+            "model": "m",
+            "input": [
+                {
+                    "type": "function_call",
+                    "id": "fc_1",
+                    "call_id": "minta.maria@example.org",
+                    "name": "muse.read_file",
+                    "arguments": "{}",
+                }
+            ],
+        }
+        refused = http.post(
+            "/v1/responses",
+            json=bad,
+            headers={"X-PII-Guard-Session": session_id},
+        )
+        assert refused.status_code == 400
+        session = app.state.gateway.vault.session(session_id)
+        assert len(session._by_placeholder) == 1
+
+
+def test_sse_restorer_flushes_open_unmaskers_before_terminal_and_ignores_after_finish() -> None:
+    """Held-back partial placeholders flush before ``response.completed`` and post-finish stops."""
+
+    class Session:
+        def restore_budget(self) -> Any:
+            from pii_guard.vault import RestoreBudget
+
+            return RestoreBudget(1000)
+
+        def unmask_with_report(self, text: str, *, budget: Any = None) -> Any:
+            from pii_guard.vault import UnmaskResult
+
+            return UnmaskResult(text.replace("[[EMAIL_abcd12]]", "a@example.com"), ())
+
+    restorer = ResponsesSseRestorer(Session())  # type: ignore[arg-type]
+    delta = {
+        "type": "response.output_text.delta",
+        "output_index": 0,
+        "content_index": 0,
+        "delta": "Hi [[EM",
+    }
+    out = restorer.process(delta["type"], json.dumps(delta))
+    completed = {
+        "type": "response.completed",
+        "response": {
+            "id": "r1",
+            "status": "completed",
+            "error": {"message": "secret [[EMAIL_abcd12]]"},
+        },
+    }
+    out += restorer.process(completed["type"], json.dumps(completed))
+    events = [json.loads(data) for _, data in out]
+    assert [e["type"] for e in events] == [
+        "response.output_text.delta",
+        "response.output_text.delta",
+        "response.completed",
+    ]
+    assert events[1]["delta"] == "[[EM"
+    assert events[2]["response"]["error"] == {
+        "code": "upstream_error",
+        "message": "upstream failed",
+    }
+    assert restorer.finish() == []
+    assert restorer.process(delta["type"], json.dumps(delta)) == []
