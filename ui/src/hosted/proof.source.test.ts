@@ -135,7 +135,7 @@ describe("landing numbers match their sources (LAB-1499)", () => {
     const m = JSON.parse(readFileSync(join(ROOT, "eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json"), "utf8")).results["v42-b3"];
     expect([LATENCY.value, LATENCY.p95]).toEqual([`${Math.round(m.p50_ms)} ms`, `${Math.round(m.p95_ms)} ms`]);
     const readme = readFileSync(join(ROOT, "README.md"), "utf8");
-    expect(readme).toContain(`p50 ${LATENCY.value}, p95 ${LATENCY.p95}`);
+    expect(readme).toContain(`The NER takes ${LATENCY.value} per message on a laptop CPU (p50; p95 ${LATENCY.p95}`);
   });
 
   it("real coding agents: requests, leaks and refusals", () => {
