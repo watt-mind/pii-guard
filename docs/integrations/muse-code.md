@@ -66,6 +66,22 @@ reminder observers), each with about 10 kB of instructions and around 80 tool de
 run a gateway for Muse in fast mode (rules + NER). `connect` and `--check` print a reminder.
 Language: the gateway's `PII_GUARD_DEFAULT_LANGUAGE` (set `en` for English code).
 
+### Endpoint URLs
+
+A project endpoint works too (`<origin>/e/<endpoint-id>/v1`, docs/projects.md):
+
+```bash
+pii-guard connect muse-code --gateway https://guard.example/e/<endpoint-id>/v1
+META_API_KEY="$PII_GUARD_ENDPOINT_KEY" muse
+```
+
+Muse sends `META_API_KEY` as the bearer token, so it carries the endpoint key (`pg_ep_...`).
+Muse reads its catalog at the root (`/muse-code/models`), not under `/e/<endpoint-id>/`: the
+gateway resolves the endpoint from the key there and serves that endpoint's catalog, the same
+as `/e/<endpoint-id>/muse-code/models`. It lists only the endpoint's pinned model (or, for a
+pass-through endpoint, the provider's list). The root catalog is the only root route an
+endpoint key reaches (LAB-1462).
+
 ### `--check`
 
 `--check` reads the catalog (`GET /muse-code/models`), then sends one non-streamed

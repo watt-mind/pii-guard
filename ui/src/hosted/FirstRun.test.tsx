@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignedInConsole } from "../App";
 import { createMockChat } from "../api/chat";
-import type { HttpGuardClient } from "../api/http";
+import { ApiError, type HttpGuardClient } from "../api/http";
 import { createMockClient } from "../api/mock";
 import type { StatusResult } from "../api/status";
 import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
@@ -176,6 +176,28 @@ describe("first run, sponsored off", () => {
     expect(container.innerHTML).not.toContain("example-meta-key");
     expect(storedAnywhere("example-meta-key")).toBe(false);
     expect(storedAnywhere(KEY)).toBe(false);
+  });
+
+  it("a malformed Meta key gets a message next to the field, and the endpoint still needs a key", async () => {
+    history.replaceState(null, "", "#connect");
+    serve();
+    const call = requester(false, {
+      "/v1/account/first-run": (body) => {
+        if ((body as { meta_api_key?: string })?.meta_api_key) throw new ApiError(422, "invalid_provider_key", "The request could not complete.");
+        return firstRun(false);
+      },
+    });
+    renderConsole(call);
+    const setup = await screen.findByRole("region", { name: "Connect your client" });
+    const form = await within(setup).findByRole("form", { name: "Add your Meta API key" });
+    const user = userEvent.setup();
+    const field = within(form).getByLabelText("Meta API key");
+    await user.type(field, "short-key");
+    await user.click(within(form).getByRole("button", { name: "Save key and continue" }));
+    expect(await within(form).findByText(/doesn.t look like a Meta API key/)).toBeInTheDocument();
+    expect(field).toHaveAccessibleDescription(expect.stringMatching(/doesn.t look like a Meta API key/));
+    expect(within(setup).getByText("Needs a key")).toBeInTheDocument();
+    expect(within(setup).queryByText("Ready")).not.toBeInTheDocument();
   });
 
   it("a refused test request says why, and never claims a fallback", () => {

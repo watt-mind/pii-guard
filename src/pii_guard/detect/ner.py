@@ -41,9 +41,11 @@ Download / warm the model cache (Hugging Face cache, ``HF_HOME``)::
 from __future__ import annotations
 
 import argparse
+import bisect
 import importlib.util
 import logging
 import os
+import re
 import sys
 import threading
 from collections.abc import Callable, Mapping, Sequence
@@ -54,7 +56,7 @@ from pii_guard.detect import ner_resolve
 from pii_guard.detect.ner_context import guard_spans
 from pii_guard.detect.ner_numbers import check_numbers
 from pii_guard.detect.ner_orgs import relabel_brands
-from pii_guard.detect.ner_words import snap_to_tokens, snap_to_words
+from pii_guard.detect.ner_words import SNAPPED_TYPES, snap_to_tokens, snap_to_words
 from pii_guard.types import DetectionError, EntityType, Span
 
 __all__ = [
@@ -74,6 +76,7 @@ __all__ = [
     "decode_tokens",
     "dependencies_available",
     "merge_entities",
+    "model_view",
     "select_device",
 ]
 
@@ -788,7 +791,7 @@ class NerDetector:
             return []
         backend = self.load()
         try:
-            raw = backend.predict(text)
+            raw = backend.predict(model_view(text)[0])
         except DetectionError:
             raise
         except Exception as exc:
@@ -810,9 +813,9 @@ class NerDetector:
         batch = getattr(backend, "predict_batch", None)
         try:
             if batch is not None:
-                raws = batch([texts[i] for i in todo])
+                raws = batch([model_view(texts[i])[0] for i in todo])
             else:
-                raws = [backend.predict(texts[i]) for i in todo]
+                raws = [backend.predict(model_view(texts[i])[0]) for i in todo]
         except DetectionError:
             raise
         except Exception as exc:
@@ -826,6 +829,7 @@ class NerDetector:
     def to_spans(self, text: str, raw: Sequence[RawEntity], language: str = "hu") -> list[Span]:
         """Map labels, apply thresholds, trim span ends and build :class:`Span` objects."""
         spans: set[Span] = set()
+        cuts = model_view(text)[1]
         for entity in raw:
             entity_type = self.label_map.get(entity.label.upper())
             if entity_type is None or entity_type not in self.entity_types:
@@ -835,11 +839,19 @@ class NerDetector:
             score = min(max(float(entity.score), 0.0), 1.0)
             if score < self.threshold(language, entity_type):
                 continue
-            trimmed = _trim(text, entity.start, entity.end, entity_type)
-            if trimmed is None:
-                continue
-            start, end = trimmed
-            spans.add(Span(start, end, entity_type, text[start:end], score, self.name))
+            # A name or address ends at a cell boundary (LAB-1258); numbers that run across
+            # fields are split by check_numbers, which also reads the fields around them.
+            parts = (
+                _cut_at_cells(entity.start, entity.end, cuts)
+                if entity_type in SNAPPED_TYPES
+                else [(entity.start, entity.end)]
+            )
+            for part_start, part_end in parts:
+                trimmed = _trim(text, part_start, part_end, entity_type)
+                if trimmed is None:
+                    continue
+                start, end = trimmed
+                spans.add(Span(start, end, entity_type, text[start:end], score, self.name))
         # Names, organisations and addresses start and end on word boundaries (LAB-1338).
         found = snap_to_words(text, list(spans), language)
         # Numbers and phones cover whole tokens, so no digits stay next to the mask (LAB-1367).
@@ -853,6 +865,41 @@ class NerDetector:
         found = relabel_brands(text, found, language)  # brand names as PERSON (LAB-1336)
         # File names, paths, code and tool names in agent text are not personal data (LAB-1470).
         return guard_spans(text, found, language)
+
+
+# A ``,`` or ``;`` with a capital letter right after it: a cell boundary before a name in a
+# delimited row ("2,Teszt Elek,teszt.elek@example.com"). Prose puts a space after them,
+# decimals ("1,5") have a digit, and header rows (``id,name,tax_id``) stay as they are: the
+# model reads number types from them.
+_GLUED_DELIMITER = re.compile(r"[,;](?=[^\W\d_])")
+
+
+def model_view(text: str) -> tuple[str, tuple[int, ...]]:
+    """The text the model sees, and the positions of the cell boundaries in it (LAB-1258).
+
+    A delimiter glued to the next cell makes that cell's first word a sub-word piece, so the
+    model mis-spans it ("Elek,teszt.elek@example.com,+36") or misses it. Each glued delimiter
+    becomes a space: same length, so model offsets are offsets into ``text``.
+    """
+    cuts = tuple(m.start() for m in _GLUED_DELIMITER.finditer(text) if text[m.end()].isupper())
+    if not cuts:
+        return text, ()
+    chars = list(text)
+    for cut in cuts:
+        chars[cut] = " "
+    return "".join(chars), cuts
+
+
+def _cut_at_cells(start: int, end: int, cuts: Sequence[int]) -> list[tuple[int, int]]:
+    """``[start, end)`` split at each cell boundary in ``cuts``, without the delimiter."""
+    parts: list[tuple[int, int]] = []
+    for cut in cuts[bisect.bisect_left(cuts, start) : bisect.bisect_left(cuts, end)]:
+        if start < cut:
+            parts.append((start, cut))
+        start = cut + 1
+    if start < end:
+        parts.append((start, end))
+    return parts
 
 
 def _trim(text: str, start: int, end: int, entity_type: EntityType) -> tuple[int, int] | None:

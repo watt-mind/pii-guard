@@ -62,6 +62,7 @@ from typing import Any, ClassVar
 from PIL import Image, ImageDraw, ImageFont
 
 from pii_guard.detect.rules import RuleDetector
+from pii_guard.eval.record import with_role
 from pii_guard.eval.stats import percentile
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import EntityType, Span
@@ -930,14 +931,16 @@ def _run_record(
             "pii_guard_version": "0.1.0",
             "note": None,
         },
-        "system": {
-            "key": key,
-            "label": label,
-            "family": "pii-guard",
-            "tool": "pii-guard",
-            "version": None,
-            "detectors": detectors,
-        },
+        "system": with_role(
+            {
+                "key": key,
+                "label": label,
+                "family": "pii-guard",
+                "tool": "pii-guard",
+                "version": None,
+                "detectors": detectors,
+            }
+        ),
         "fixture_set": fixture_set,
         "fixtures": [
             {

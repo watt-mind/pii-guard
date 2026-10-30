@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { TOOLS, fetchSnippets, type Snippets, type ToolSnippet } from "../api/connect";
+import { ApiError } from "../api/http";
 import { Button, ButtonLink, Field, Input, Notice, Select } from "../components/ui";
 import { projectPath, type Endpoint, type ProjectList } from "../projects/api";
 import { getSelectedProject, setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
@@ -214,7 +215,7 @@ function MetaKeyStep({ call, onAdded }: { call: Requester; onAdded: () => void }
       setValue("");
       onAdded();
     } catch (err) {
-      setError(recovery(err).startsWith("The request was refused") ? "That key could not be saved. Paste the whole key, without spaces or quotes." : recovery(err));
+      setError(metaKeyError(err));
     } finally {
       setBusy(false);
     }
@@ -251,6 +252,13 @@ function MetaKeyStep({ call, onAdded }: { call: Requester; onAdded: () => void }
       </Button>
     </form>
   );
+}
+
+/** What to fix next to the Meta key field: a malformed key gets its own message, never a generic save error. */
+function metaKeyError(err: unknown): string {
+  if (err instanceof ApiError && err.code === "invalid_provider_key") return "That doesn't look like a Meta API key. Paste the whole key as one line, without spaces, quotes or a URL.";
+  const fallback = recovery(err);
+  return fallback.startsWith("The request was refused") ? "That key could not be saved. Paste the whole key, without spaces or quotes." : fallback;
 }
 
 function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoint: Endpoint; projectId: string; onKey: (key: IssuedKey | null) => void }) {

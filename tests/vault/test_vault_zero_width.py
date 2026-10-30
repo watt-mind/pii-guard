@@ -8,7 +8,7 @@ fictional (ADR 0005).
 from __future__ import annotations
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from vault_helpers import TEST_KEY, span_of
 
@@ -114,6 +114,9 @@ def _cased(word: str, how: str) -> str:
 
 
 @settings(max_examples=200, deadline=None)
+# LAB-1307: "Aaából" reads as the lengthened stem "Aaá" + "-ból", so the value itself masks as
+# "[[PERSON_…]]ból"; the separated occurrence must split the same way, not more or less.
+@example(words=["aa", "aaából"], how="lower", seps=[ZWSP, ZWSP], replace=False)
 @given(
     words=st.lists(_WORD, min_size=2, max_size=3),
     how=st.sampled_from(["lower", "upper", "title"]),
@@ -130,8 +133,49 @@ def test_separator_between_words_never_hides_an_occurrence(
     text = f"{value} írt. Később {written} is."
     s = session()
     masked = s.mask(text, [span_of(text, value, P)], language="hu")
-    tail = masked[masked.index("Később") :]
-    assert "[[PERSON_" in tail
+    head, tail = masked.split(" írt. ")
     assert not any(sep in tail for sep in SEPARATORS)
-    # Nothing of the occurrence is left beside the placeholder.
-    assert PLACEHOLDER_RE.sub(" ", tail).split() == ["Később", "is."]
+    assert tail.startswith("Később ") and tail.endswith(" is.")
+    occurrence = tail[len("Később ") : -len(" is.")]
+    # The occurrence is masked exactly like the value's own span. Intended (LAB-1307): when the
+    # value itself splits as lemma + Hungarian suffix (``Aaából`` -> ``Aaá`` + ``ból``), the
+    # placeholder covers the stem and that suffix stays outside it, in both places, so unmask
+    # re-inflects it. Nothing else of the occurrence is left beside the placeholder.
+    first, second = PLACEHOLDER_RE.match(head), PLACEHOLDER_RE.match(occurrence)
+    assert first is not None and second is not None
+    assert first.group(0) == second.group(0)
+    suffix = head[first.end() :]
+    assert occurrence[second.end() :].casefold() == suffix.casefold()
+    assert value.casefold().endswith(suffix.casefold()) and not any(c.isspace() for c in suffix)
+
+
+# --- a separator at a lower -> upper split inside a confirmed value (LAB-1363) ---------------
+
+S = EntityType.SECRET
+_VALUE = "AbCdEfGh1234xY"  # fictional, not secret-shaped
+
+
+@pytest.mark.parametrize("sep", SEPARATORS)
+@pytest.mark.parametrize("split", range(1, len(_VALUE)))
+def test_confirmed_secret_with_a_separator_at_any_split_is_remasked(sep: str, split: int) -> None:
+    s = session()
+    first = f"key {_VALUE}"
+    placeholder = s.mask(first, [span_of(first, _VALUE, S)], language="en")[len("key ") :]
+    occurrence = _VALUE[:split] + sep + _VALUE[split:]
+    masked = s.mask("see " + occurrence, [], language="en")
+    assert masked == f"see {placeholder}"
+
+
+def test_repro_lower_upper_split_of_a_confirmed_secret() -> None:
+    s = session()
+    first = f"key {_VALUE}"
+    s.mask(first, [span_of(first, _VALUE, S)], language="en")
+    masked = s.mask(f"see {_VALUE[:6]}{ZWSP}{_VALUE[6:]}", [], language="en")
+    assert "AbCdEf" not in masked and "1234" not in masked and ZWSP not in masked
+
+
+def test_lower_upper_separator_between_words_still_reads_two_words() -> None:
+    # The dropped reading is an extra view: the detection fold's own is unchanged.
+    views = fold_views(f"Teszt{ZWSP}Elek")
+    assert views[0].text == "teszt elek"
+    assert "tesztelek" in [v.text for v in views]
