@@ -232,3 +232,106 @@ def test_catalog_upstream_errors_keep_no_message() -> None:
         response = http.get("/muse-code/models")
     assert response.status_code == 401
     assert "Teszt" not in response.text
+
+
+def test_muse_code_load_and_render_edge_cases(tmp_path: Path) -> None:
+    empty_file = tmp_path / "empty.json"
+    empty_file.write_text("   \n")
+    assert muse_code.load(empty_file) == ({}, "   \n")
+
+    not_dict = tmp_path / "list.json"
+    not_dict.write_text("[1, 2, 3]")
+    with pytest.raises(muse_code.ConnectError, match="must hold a JSON object"):
+        muse_code.load(not_dict)
+
+    bad_transport = tmp_path / "bad_transport.json"
+    bad_transport.write_text('{"endpoint_transport": "not-an-object"}')
+    with pytest.raises(muse_code.ConnectError, match="endpoint_transport must be an object"):
+        muse_code.load(bad_transport)
+
+    merged = muse_code.merge({}, "http://127.0.0.1:8787/v1")
+    raw = json.dumps(merged)
+    assert muse_code.render({}, raw, "http://127.0.0.1:8787/v1") == raw
+
+
+def test_muse_code_fetch_catalog_edge_cases() -> None:
+    def err_handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("cannot connect")
+
+    client = httpx.Client(transport=httpx.MockTransport(err_handler))
+    with pytest.raises(muse_code.ConnectError, match="could not reach"):
+        muse_code.fetch_catalog("http://gw.test/v1", client=client)
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+    with pytest.raises(muse_code.ConnectError, match="answered HTTP 500"):
+        muse_code.fetch_catalog("http://gw.test/v1", client=client)
+
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"data": "not a list"}))
+    )
+    with pytest.raises(muse_code.ConnectError, match="lists no visible models"):
+        muse_code.fetch_catalog("http://gw.test/v1", client=client)
+
+    catalog = {
+        "data": [
+            "not a dict",
+            {"id": 123},
+            {"id": "hidden-model", "metadata": {"muse-code": {"is_hidden": True}}},
+            {"id": "good-model", "metadata": {"muse-code": {"is_hidden": False}}},
+        ]
+    }
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, json=catalog))
+    )
+    assert muse_code.fetch_catalog("http://gw.test/v1", client=client) == ["good-model"]
+
+
+def test_muse_code_text_helper() -> None:
+    assert muse_code._text("plain") == "plain"
+    assert muse_code._text([{"text": "hello "}, {"text": "world"}, "ignored"]) == "hello world"
+    assert muse_code._text(12345) == ""
+
+
+def test_muse_code_run_check_edge_cases() -> None:
+    def raise_err(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    client = httpx.Client(transport=httpx.MockTransport(raise_err))
+    res, _ = muse_code.run_check("http://gw.test/v1", "m", client=client)
+    assert "could not reach" in (res.error or "")
+
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda r: httpx.Response(404, text="Not Found"))
+    )
+    res, _ = muse_code.run_check("http://gw.test/v1", "m", client=client)
+    assert res.error == muse_code.NOT_THE_GATEWAY
+
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(200, text="not json", headers={"x-pii-guard-request-id": "r1"})
+        )
+    )
+    res, _ = muse_code.run_check("http://gw.test/v1", "m", client=client)
+    assert res.error == "the answer is not JSON"
+
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(
+                400,
+                json={"error": {"code": "bad_req", "message": "bad"}},
+                headers={"x-pii-guard-request-id": "r1"},
+            )
+        )
+    )
+    res, _ = muse_code.run_check("http://gw.test/v1", "m", client=client)
+    assert res.error == "bad_req bad"
+
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(
+                200, json={"output": []}, headers={"x-pii-guard-request-id": "r1"}
+            )
+        )
+    )
+    res, _ = muse_code.run_check("http://gw.test/v1", "m", client=client)
+    assert "the answer has no pii_guard echo" in (res.error or "")
