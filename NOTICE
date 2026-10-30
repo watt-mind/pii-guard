@@ -28,6 +28,18 @@ OpenStreetMap
     counts of public-space types, a non-substantial extract of highway=* name values.
 
 ------------------------------------------------------------------------------------------
+Optional dependency, installed in the Docker images (not part of the pii-guard package)
+------------------------------------------------------------------------------------------
+
+meta-sam-parser 0.1.0 (Meta's official SAM 3.1 output parser)
+  Copyright (c) Meta Platforms, Inc. and affiliates. https://github.com/meta-models/meta-sam
+  Licence: SAM License (not an open-source licence); full text in
+  licenses/meta-sam-parser-SAM-LICENSE.txt.
+  - Installed by the optional `sam` extra and included in the Docker images (Dockerfile,
+    Dockerfile.hosted). pii-guard uses it unmodified; without it, SAM 3.1 output is read by
+    pii-guard's own decoder.
+
+------------------------------------------------------------------------------------------
 In the repository only (evaluation fixtures, not in the Python package or the image)
 ------------------------------------------------------------------------------------------
 

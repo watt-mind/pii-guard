@@ -778,6 +778,15 @@ wheels = [
 ]
 
 [[package]]
+name = "meta-sam-parser"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/bc/af93a1fa4834124816b3fa0165aa9a6c35eb90d11a1dfe7c257992381f44/meta_sam_parser-0.1.0.tar.gz", hash = "sha256:d59ca55993c5975fc8910f29b76e33499bc2870f79e9afcc30c916f17ef3bb40", size = 33694, upload-time = "2026-10-06T18:37:45.432Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/6b/4f079abae8fbef65d08a5f315444ca96a3e267ad017576a97264ee17b26b/meta_sam_parser-0.1.0-py3-none-any.whl", hash = "sha256:eca156907911c56cef3a350ffc81c34b7e70655e5fa3ccdddb77042c541a0152", size = 40810, upload-time = "2026-10-06T18:37:44.229Z" },
+]
+
+[[package]]
 name = "mpmath"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1887,6 +1896,9 @@ ner = [
 ocr = [
     { name = "pytesseract" },
 ]
+sam = [
+    { name = "meta-sam-parser" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1914,6 +1926,7 @@ requires-dist = [
     { name = "gliner", marker = "extra == 'gliner'", specifier = "==0.2.29" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "huggingface-hub", marker = "extra == 'baselines'", specifier = ">=0.30" },
+    { name = "meta-sam-parser", marker = "extra == 'sam'", specifier = "==0.1.0" },
     { name = "opencv-python-headless", marker = "extra == 'local-vision'", specifier = ">=4.10" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "presidio-analyzer", marker = "extra == 'baselines'", specifier = "==2.2.365" },
@@ -1934,7 +1947,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'ner'", specifier = ">=5.21.0" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
-provides-extras = ["ocr", "baselines", "local-vision", "ner", "gliner", "hosted-azure"]
+provides-extras = ["ocr", "baselines", "sam", "local-vision", "ner", "gliner", "hosted-azure"]
 
 [package.metadata.requires-dev]
 dev = [

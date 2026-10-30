@@ -73,9 +73,9 @@ class SamMask:
 
     The API sends ``<|mask;x=..;y=..;data=H,W,~<payload>|>`` after each box: ``H``/``W`` are
     the mask grid size (it matches the box size), ``payload`` is a base-85 string whose first
-    four bytes are the big-endian length of an entropy-coded bitstream. The encoding is not
-    documented, so the mask is carried opaquely; masking always fills the whole box, which
-    is a superset of the mask (safer, never smaller).
+    four bytes are the big-endian length of an entropy-coded bitstream. Meta's official parser,
+    ``meta_sam_parser``, checks the payload decodes; the mask is still carried opaquely, as
+    masking always fills the whole box, a superset of the mask (safer, never smaller).
     """
 
     x: int

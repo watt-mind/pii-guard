@@ -148,6 +148,8 @@ images.
 | Audit mode (opt-in) and red-teaming | **Muse Spark Open** (open weights) | [audit runs](docs/benchmarks.md#smoke), [red team](eval/results/2026-10-27-redteam/README.md) |
 | Signatures in images (optional) | **SAM 3.1** (Meta Model API); faces on the device (YuNet) | [specimen results](eval/results/visual/specimens.md) |
 
+SAM 3.1 output is decoded with Meta's official `meta_sam_parser` (optional `sam` extra; included in the Docker image).
+
 ## How it works
 
 ```
