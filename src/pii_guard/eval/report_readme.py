@@ -528,7 +528,10 @@ def render_compact(
         overs = _bold_min([c.get("over_masking") for c in cells])
         docs = sum(info["documents"].values())
         label = f"{col['title']} · {docs} docs ({'+'.join(info['documents'])})"
-        body = [f"{a} · {b}" for a, b in zip(leaks, overs, strict=True)]
+        # No breakable space inside a cell, so a row never wraps at GitHub's 1280 px column.
+        body = [
+            f"{a}&nbsp;·&nbsp;{b}".replace(" %", "%") for a, b in zip(leaks, overs, strict=True)
+        ]
         out.append("| " + " | ".join(_escape(c) for c in [label, *body]) + " |")
     out.append("")
     for note in spec.get("notes") or []:

@@ -214,8 +214,14 @@ def test_compact_block_bolds_the_lowest_per_row_and_metric() -> None:
     block = render_compact(_index(), parse_spec(README_SPEC, "cfg"))
     lines = block.splitlines()
     assert "| Leak · over-masking | **Ours** | Tool |" in lines
-    assert "| Set A · 7 docs (de+en) | **0.2 %** · **0.7 %** | 16.6 % · 33.4 % |" in lines
-    assert "| Set B · 5 docs (en) | 19.0 % · **24.0 %** | **18.8 %** · 75.0 % |" in lines
+    assert (
+        "| Set A · 7 docs (de+en) | **0.2%**&nbsp;·&nbsp;**0.7%** | 16.6%&nbsp;·&nbsp;33.4% |"
+        in lines
+    )
+    assert (
+        "| Set B · 5 docs (en) | 19.0%&nbsp;·&nbsp;**24.0%** | **18.8%**&nbsp;·&nbsp;75.0% |"
+        in lines
+    )
     assert "Partial on a: 0.1 %." in lines
     assert "- On b, 19.0 % against 18.8 % (5 docs, German and English)." in lines
     assert "<details><summary>How</summary>" in lines

@@ -86,11 +86,11 @@ A real model: `pii-guard up --upstream meta` (or `openai`, `fireworks`, `openrou
 
 | Leak · over-masking | **PII Guard fast** | PrivAiTe | Presidio | LLM Guard |
 |---|---:|---:|---:|---:|
-| Hand-written · 62 docs (de+en+hu+pl) | **0.0 %** · **1.3 %** | 13.0 % · 25.7 % | 25.5 % · 26.1 % | 46.3 % · 33.7 % |
-| Agent traffic · 990 docs (de+en+hu) | **0.2 %** · **0.7 %** | 2.4 % · 35.2 % | 16.6 % · 33.4 % | 20.2 % · 16.9 % |
-| Nemotron-PII · 300 docs (en) | **0.6 %** · 1.5 % | 4.0 % · 5.6 % | 12.8 % · 32.0 % | 28.8 % · **0.6 %** |
-| CEE-PII · 451 docs (en+hu) | **0.8 %** · **7.3 %** | 4.4 % · 59.2 % | 36.5 % · 52.5 % | 75.8 % · 66.4 % |
-| Gretel finance · 400 docs (de+en) | 19.1 % · 24.4 % | 27.7 % · 46.5 % | **18.8 %** · 75.4 % | 59.3 % · **17.0 %** |
+| Hand-written · 62 docs (de+en+hu+pl) | **0.0%**&nbsp;·&nbsp;**1.3%** | 13.0%&nbsp;·&nbsp;25.7% | 25.5%&nbsp;·&nbsp;26.1% | 46.3%&nbsp;·&nbsp;33.7% |
+| Agent traffic · 990 docs (de+en+hu) | **0.2%**&nbsp;·&nbsp;**0.7%** | 2.4%&nbsp;·&nbsp;35.2% | 16.6%&nbsp;·&nbsp;33.4% | 20.2%&nbsp;·&nbsp;16.9% |
+| Nemotron-PII · 300 docs (en) | **0.6%**&nbsp;·&nbsp;1.5% | 4.0%&nbsp;·&nbsp;5.6% | 12.8%&nbsp;·&nbsp;32.0% | 28.8%&nbsp;·&nbsp;**0.6%** |
+| CEE-PII · 451 docs (en+hu) | **0.8%**&nbsp;·&nbsp;**7.3%** | 4.4%&nbsp;·&nbsp;59.2% | 36.5%&nbsp;·&nbsp;52.5% | 75.8%&nbsp;·&nbsp;66.4% |
+| Gretel finance · 400 docs (de+en) | 19.1%&nbsp;·&nbsp;24.4% | 27.7%&nbsp;·&nbsp;46.5% | **18.8%**&nbsp;·&nbsp;75.4% | 59.3%&nbsp;·&nbsp;**17.0%** |
 
 Leak: labeled personal values left fully readable in what the model receives. A value with only part left readable (a surname, the tail of a number) is a partial leak, counted separately: PII Guard fast 0.0 % on agent traffic, 1.4 % on the hand-written set. Over-masking: masks on text that was not personal data. Lower is better for both; the lowest in each row is bold.
 
