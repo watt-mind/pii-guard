@@ -309,6 +309,17 @@ class IdentityGenerator:
     language: str = ""
     _used_names: set[str] = field(default_factory=set)
     _street_tokens: set[str] = field(default_factory=set)
+    #: Index into the generator's institution towns. When set, properties and institutions
+    #: are placed there, so a land registry office or court sits in the property's own town.
+    local_town: int | None = None
+    #: Also keep given names (mothers' included) distinct between the people of one document.
+    #: Off by default so other seeded sets built on this generator stay byte-identical.
+    distinct_given_names: bool = False
+
+    @property
+    def town_count(self) -> int:
+        """How many towns have institutions (valid values of ``local_town``)."""
+        raise NotImplementedError  # pragma: no cover - abstract
 
     # Hooks -------------------------------------------------------------------------------
     def person(self, gender: str | None = None) -> Person:  # pragma: no cover - abstract
@@ -342,13 +353,18 @@ class IdentityGenerator:
         end = dt.date(2004, 12, 31).toordinal()
         return dt.date.fromordinal(self.rng.randint(start, end))
 
+    def _town_index(self, count: int) -> int:
+        return self.local_town if self.local_town is not None else self.rng.randrange(count)
+
     def _unique_name(self, build: Callable[[], tuple[str, str, str]]) -> tuple[str, str, str]:
         # Distinct people in one document get distinct full names and surnames, so labels
-        # (and the model) can't confuse them.
+        # (and the model) can't confuse them; with ``distinct_given_names`` every name part,
+        # so a given name used alone ("Péter") points at one person only.
         for _ in range(50):
             given, family, full = build()
-            if full not in self._used_names and family not in self._used_names:
-                self._used_names.update({full, family, given})
+            parts = set(full.split()) if self.distinct_given_names else {family}
+            if full not in self._used_names and not parts & self._used_names:
+                self._used_names.update({full, family, given, *full.split()})
                 return given, family, full
         return build()  # pragma: no cover - lists are much larger than any document
 
@@ -413,6 +429,10 @@ class HungarianIdentities(IdentityGenerator):
 
     def __init__(self, rng: random.Random) -> None:
         super().__init__(rng, "hu")
+
+    @property
+    def town_count(self) -> int:
+        return len(_HU_TOWNS)
 
     def _given(self, gender: str, avoid: str = "") -> str:
         kind = "given_names_f" if gender == "f" else "given_names_m"
@@ -537,6 +557,12 @@ class HungarianIdentities(IdentityGenerator):
         gender = gender or self.rng.choice("fm")
         given, family, full = self._unique_name(lambda: self._name(gender))
         mother_given = self._given("f")
+        if self.distinct_given_names:
+            for _ in range(20):
+                if mother_given not in self._used_names:
+                    break
+                mother_given = self._given("f")
+            self._used_names.add(mother_given)
         mother_family = self._surname(avoid=family)
         birth = self._birth_date()
         return Person(
@@ -581,10 +607,10 @@ class HungarianIdentities(IdentityGenerator):
             parcel += f"/{self.rng.randint(1, 40)}"
         if self.rng.random() < 0.15:
             parcel = "0" + parcel
-        return Property(address=self.address(), parcel=parcel)
+        return Property(address=self.address(self.local_town), parcel=parcel)
 
     def institution(self, kind: str = "court") -> Institution:
-        index = self.rng.randrange(len(_HU_TOWNS))
+        index = self._town_index(len(_HU_TOWNS))
         town, adjective, _ = _HU_TOWNS[index]
         if kind == "court":
             name = (
@@ -649,6 +675,10 @@ class EnglishIdentities(IdentityGenerator):
 
     def __init__(self, rng: random.Random) -> None:
         super().__init__(rng, "en")
+
+    @property
+    def town_count(self) -> int:
+        return len(_EN_TOWNS)
 
     def _name(self, gender: str) -> tuple[str, str, str]:
         given = self.rng.choice(_EN_GIVEN_F if gender == "f" else _EN_GIVEN_M)
@@ -734,10 +764,10 @@ class EnglishIdentities(IdentityGenerator):
         )
 
     def property(self) -> Property:
-        return Property(address=self.address())
+        return Property(address=self.address(self.local_town))
 
     def institution(self, kind: str = "court") -> Institution:
-        index = self.rng.randrange(len(_EN_TOWNS))
+        index = self._town_index(len(_EN_TOWNS))
         town = _EN_TOWNS[index][0]
         name = f"{town} County Court" if kind == "court" else f"{town} City Council"
         return Institution(

@@ -128,6 +128,34 @@ def test_hungarian_names_family_first_and_distinct_in_one_document() -> None:
     assert all(p.mother_name and p.family not in p.mother_name.split()[0] for p in people)
 
 
+def test_given_names_are_unique_in_one_document() -> None:
+    """Two people in one document never share a given name, mothers included (LAB-1105)."""
+    for seed in SEEDS:
+        for make in (hu, en):
+            gen = make(f"given/{seed}")
+            gen.distinct_given_names = True
+            people = [gen.person() for _ in range(3)]
+            given = [p.given for p in people]
+            assert len(set(given)) == len(given), seed
+            mothers = [p.mother_name.split()[-1] for p in people if p.mother_name]
+            assert not set(mothers) & set(given), seed
+            assert len(set(mothers)) == len(mothers), seed
+
+
+def test_local_town_ties_property_and_institution() -> None:
+    """With ``local_town`` set, the property and the office share a town (LAB-1105)."""
+    for seed in SEEDS:
+        gen = hu(f"town/{seed}")
+        gen.local_town = gen.rng.randrange(gen.town_count)
+        prop, office = gen.property(), gen.institution("office")
+        town = office.address.split(",")[0].split(" ", 1)[1]
+        assert prop.address.split(",")[0].split(" ", 1)[1] == town
+        english = en(f"town/{seed}")
+        english.local_town = english.rng.randrange(english.town_count)
+        court = english.institution("court")
+        assert court.org_name.split(" County")[0] in english.property().address
+
+
 def test_rule_detector_recognises_generated_identifiers() -> None:
     """The generated values look like the real thing to the rule detector."""
     det = RuleDetector()
