@@ -113,8 +113,9 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 #: Bumped whenever the same seed would plan different documents (2: names and places drawn from
-#: the language-pack lexicons, hard negatives in the prompt).
-GENERATOR_VERSION = 2
+#: the language-pack lexicons, hard negatives in the prompt; 3: given names unique per
+#: document, a property's office or court in the property's town).
+GENERATOR_VERSION = 3
 DEFAULT_BASE_URL = "https://api.meta.ai/v1"
 #: The corpus is entirely fictional, so it may use the contributor tier (cheaper; its traffic
 #: may be used by Meta to improve its products). Never use this tier for real or masked data:
@@ -351,6 +352,11 @@ def plan_document(language: str, seed: int, index: int, kind: str | None = None)
     else:
         template = pack.kind(kind)
     identities = identity_generator(pack.language, rng)
+    identities.distinct_given_names = True
+    kinds = {party.kind for party in template.parties}
+    if "property" in kinds and kinds & {"court", "office"}:
+        # The land registry office (or court) handling a property sits in its own town.
+        identities.local_town = rng.randrange(identities.town_count)
 
     values: list[Value] = []
     blocks: list[str] = []
