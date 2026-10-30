@@ -15,10 +15,14 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARED, COMPARISON, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, RUNS, SETS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
+import { COMPARED, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, PROOF, RUNS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
 import AgentReplay from "./AgentReplay";
+import { ImageMaskingPreview } from "./ImageMaskingPreview";
+import { LandingBenchmarkChart } from "./LandingBenchmarkChart";
 import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
+import { PublicPageContent, type PublicSections } from "./PublicPages";
+import { publicPageOf } from "./publicRoutes";
 import { useCurrentSection } from "./useCurrentSection";
 import { consoleSectionOf } from "./consoleLink";
 import { PublicHeader } from "./PublicHeader";
@@ -32,7 +36,6 @@ const LOGOUT = "/.auth/logout?post_logout_redirect_uri=%2F";
 const NER_MODEL = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
 const DOCS = `${SOURCE}/blob/develop/docs`;
 const SELF_HOST = `${SOURCE}#try-it`;
-const MODEL_CARD = `${NER_MODEL}#model-card`;
 const CI = `${SOURCE}/actions/workflows/ci.yml`;
 const HARNESS_REPORT = `${DOCS}/integrations/harness-matrix-2026-10-29.md`;
 const EU_REGULATION = `${DOCS}/eu-regulation.md`;
@@ -61,7 +64,7 @@ type Language = keyof typeof RECORDED;
 const LANGUAGES = [{ value: "en", label: "English" }, { value: "hu", label: "Hungarian" }] as const;
 
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
-const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
+const SECTIONS = ["image-preview", "how", "results", "account"] as const;
 
 const link = "underline underline-offset-4 hover:text-ink";
 
@@ -169,9 +172,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   function heroRun(e: MouseEvent<HTMLAnchorElement>) {
     if ((!startsRun && !(signedIn && !needsKey && !running)) || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    document.getElementById("demo")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-    document.getElementById("demo-heading")?.focus({ preventScroll: true });
+    window.location.hash = "demo";
     if (signedIn) {
       if (!editable) { setEditable(true); reset(); }
       else if (result) { focusEditor.current = true; setResult(null); setAnnounce("Your draft is ready to edit."); }
@@ -184,12 +185,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     try { await refresh(); } finally { setReconnecting(false); }
   }
 
-  const current = useCurrentSection(SECTIONS);
+  const hash = useHash();
+  const page = publicPageOf(hash);
+  const current = useCurrentSection(SECTIONS, page);
 
-  return <div className="public-teal-theme min-h-dvh bg-canvas text-sm text-ink">
-    <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
-    <PublicHeader current={current} signedIn={signedIn} accountHref={signedIn ? (hasConsole ? "#overview" : "#account") : loginUrl} />
-    <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10">
+  const sections: PublicSections = {
+    imagePreview: <ImageMaskingPreview />,
+    hero: (
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
           <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible<span className="sm:hidden"> ·</span> <span className="sm:block">Built on Meta’s <span className="whitespace-nowrap">XLM-RoBERTa</span>, Muse Glimmer, Muse Spark and SAM&nbsp;3.1</span></p>
@@ -210,7 +212,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
         <AgentReplay />
       </section>
-
+    ),
+    why: (
       <section id="why" aria-labelledby="why-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="why-heading" eyebrow="Why PII Guard" title="Made for agents, measured in the open." />
         <ul aria-label="What makes it different" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -221,9 +224,11 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <Differentiator href="#results" title="Measured in the open">Public test sets, {COMPARED.tools} other tools and {COMPARED.openModels} other open NER models, {RUNS.label} committed runs. Our NER is published.</Differentiator>
         </ul>
       </section>
-
+    ),
+    demo: (
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-20 space-y-4">
         <SectionHead id="demo-heading" eyebrow="Demo" title="See exactly what the model sees." lead={`One request, four steps: your text, what ${modelOr("the model")} sees, its answer, and that answer with the real values back.`} />
+        <p className="max-w-3xl rounded-lg border border-line bg-surface-2 p-3 text-sm text-muted">Detection can miss values. PII Guard pseudonymizes data; it does not anonymize it. The hosted guard receives your input in full. Use fictional data while evaluating, and review the masked request. <a className={link} href="#trust">Read Privacy &amp; trust</a>.</p>
         {DEMO_VIDEO_URL && <DemoVideo url={DEMO_VIDEO_URL} />}
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-center gap-3">
@@ -240,7 +245,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div className="mt-4 space-y-3 empty:hidden">
             {account && !signedIn && sponsoredOff && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={loginUrl}>Sign in to run your own text</ButtonLink>}>The recorded run below shows the same flow, answered by a real model.</Notice>}
             {needsKey && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={hasConsole ? "#connect" : "#account"}>Add a model key</ButtonLink>}>Add your own model key to run it, or follow the recorded run below.</Notice>}
-            {!account && accountError && <Notice title="The live service isn’t reachable" action={<Button busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Retry live service"}</Button>}>The recorded run below still shows the whole flow.</Notice>}
+            {!account && accountError && <Notice tone="danger" live title="The live service isn’t reachable" action={<Button busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Retry live service"}</Button>}>The recorded run below still shows the whole flow.</Notice>}
             {running && <div className="rounded-lg border border-line bg-surface-2 p-3 sm:p-4">
               <p className="flex items-center gap-2 text-sm font-medium text-ink"><span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ink motion-safe:animate-pulse" />Waiting for the live result</p>
               <p className="mt-2 text-xs text-muted">Masking, the model response and restoration happen on the server. Individual stage progress isn’t available here.</p>
@@ -273,8 +278,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           </div>
           <p className="text-xs text-muted">Blue marks a value and the placeholder that replaced it; green marks a value PII Guard put back.</p>
         </div>
+        {account && <details className="rounded-lg border border-line bg-surface p-4"><summary className="cursor-pointer font-medium">Hosted preview account and limits</summary><div className="mt-4"><Limits account={account} hideZero /></div></details>}
       </section>
-
+    ),
+    meta: (
       <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="meta-heading" eyebrow="Built on Meta models" title="Open weights wherever real data goes. Hosted models see placeholders." lead="Anything that sees real personal data is an open-weight model you can run yourself." />
         <ul aria-label="Meta models and what each does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
@@ -285,7 +292,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <MetaModel name={modelOr("Muse Spark")} where="Meta Model API" role="Answers in this demo. It only ever sees placeholders." />
         </ul>
       </section>
-
+    ),
+    europe: (
       <section id="europe" aria-labelledby="europe-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="europe-heading" eyebrow="Why Europe" title="What EU rules ask, and what PII Guard does." />
         <ul aria-label="EU rules and what PII Guard does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-3">
@@ -305,7 +313,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           </Card>
         </div>
       </section>
-
+    ),
+    images: (
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
         <Suspense fallback={<div className="h-[420px] rounded-xl border border-line bg-surface" aria-hidden="true" />}><ImageShowcase /></Suspense>
@@ -318,31 +327,21 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
         </div>
       </section>
-
-      <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on each test set below." lead="Committed runs of 27–28 Oct 2026 on fictional and public data. Leak: personal values that still reach the model; F1 also counts over-masking. The sets are small, so treat a gap of a point or two as noise; where PII Guard is weaker is under Limits." />
-        <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 lg:grid-cols-2">
+    ),
+    results: (
+      <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-5">
+        <SectionHead id="results-heading" eyebrow="Benchmarks" title="The lowest leak rate on each test set below." lead="Committed runs on fictional and public data. Leak rate measures personal values left unmasked; lower is better. These are specific test sets, so small differences should be treated with care." />
+        <p className="max-w-3xl text-muted">{RUNS.label} committed benchmark runs. {MEASURED}. Detection adds {LATENCY.value} per request (p50) in the published measurement.</p>
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
-            <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" aria-hidden="true" />}><ResultsChart /></Suspense>
+            <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" role="status"><span className="sr-only">Loading the comparison chart…</span></div>}><ResultsChart /></Suspense>
           </Card>
-          <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labeled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better)." className="flex flex-col">
-            <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
-              <table className="w-full min-w-[28rem] border-collapse text-sm">
-                <caption className="sr-only">Leak rate and F1 in percent, by dataset, for PII Guard and three comparison tools</caption>
-                <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
-                <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
-              </table>
-            </div>
-            <div className="space-y-5 sm:hidden">{SETS.map((set, i) => <ResultTable key={set} caption={set} columns={["Leak", "F1"]} rows={COMPARISON.map((row) => ({ name: row.system, ours: row.ours, values: [row.leak[i]!, row.f1[i]!] }))} />)}</div>
-            <p className="mt-3 text-xs text-muted">PII Guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits PII Guard was not trained on.</p>
-            <div className="mt-auto border-t border-line pt-4">
-              <p className="text-muted"><span className="font-medium text-ink">Against {COMPARED.openModels} other open PII models</span>, with the same rules around each: ours leaks {OPEN_MODELS[0].leak}&nbsp;%. The closest, {OPEN_MODELS[1].model}, leaks {OPEN_MODELS[1].leak}&nbsp;% and masks about nine times as much text that isn’t personal data ({OPEN_MODELS[1].over}&nbsp;% against {OPEN_MODELS[0].over}&nbsp;%).</p>
-              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
-            </div>
-          </Card>
+          <LandingBenchmarkChart />
         </div>
+        <div className="flex flex-wrap gap-3"><ButtonLink href="#evaluation">Explore the benchmarks</ButtonLink><a className="inline-flex min-h-11 items-center rounded-sm underline underline-offset-4" href="#trust">Read the limits</a></div>
       </section>
-
+    ),
+    how: (
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="how-heading" eyebrow="How it works" title="Live in three steps." lead="An OpenAI-compatible gateway (Chat Completions and Responses) between your agent and the model provider, tested with Codex, OpenCode, Muse Code, pi and the OpenAI SDK." />
         <ol aria-label="Live in three steps" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -354,7 +353,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <Step n={3} title="See every request in Logs, with its outbound check result.">What the model received, and the re-check before it left: a request is blocked if a known value survived masking.</Step>
         </ol>
       </section>
-
+    ),
+    data: (
       <section id="data" aria-labelledby="data-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="data-heading" eyebrow="Your data" title="What happens to your data here." lead="This covers the hosted preview. If you self-host, all of it stays on your own servers." />
         <Card>
@@ -373,7 +373,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/hosted.md`}>Full processing and retention details ↗</a></p>
         </Card>
       </section>
-
+    ),
+    privacy: (
       <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="privacy-heading" eyebrow="Limits" title="What PII Guard doesn’t promise." />
         <ul aria-label="What PII Guard doesn’t promise" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-2 lg:grid-cols-3">
@@ -392,45 +393,31 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </ul>
         <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
       </section>
-
+    ),
+    account: (
       <section id="account" aria-labelledby="account-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={!account && accountError ? "The live service isn’t reachable right now. You can still self-host it, or come back to run the live demo." : signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live demo. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
         <div className="flex flex-wrap items-center gap-3">
           {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
-          <Card title="Hosted preview" subtitle="For evaluation · we run the guard" headingLevel={3} aria-label="Hosted preview: your runs and the server limits">
-            <div className="space-y-4">
-              <KeyValues items={[
-                { label: "Your originals", value: "Our service on Azure, Sweden Central (EU), in memory." },
-                { label: "What leaves", value: `Masked text, to ${modelOr("Meta’s model")} or the provider you connect.` },
-              ]} />
-              {accountError ? <Notice tone="danger" live action={<Button size="sm" busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Reconnect to API"}</Button>}>{accountError}</Notice> : !account ? <p className="text-muted">Checking live availability…</p> : <>
-                {(!sponsoredOff || signedIn) && <dl className="grid max-w-md grid-cols-2 gap-4 border-t border-line pt-4">
-                  {typeof account.limits.requests_per_day === "number"
-                    ? <Metric label={signedIn ? "Runs left today" : "Free runs left today"} value={Math.max(0, account.limits.requests_per_day - account.usage.requests_today)} suffix={`of ${account.limits.requests_per_day}`} />
-                    : <Metric label="Runs today" value={account.usage.requests_today} />}
-                  <Metric label="Resets" value={resetsIn(account) ?? "—"} />
-                </dl>}
-                <Limits account={account} hideZero />
-                <p className="text-xs text-muted">A restart clears sessions and model connections. Model keys stay with the service, never in your browser.</p>
-              </>}
-            </div>
-          </Card>
-          <Card title="Self-hosted" subtitle="Open source · you run it" headingLevel={3}>
-            <KeyValues items={[
-              { label: "Your originals", value: "Your own servers. Use local detectors to keep all raw processing local." },
-              { label: "What leaves", value: "Masked text, to the model you choose." },
-              { label: "Who runs it", value: <>You, under Apache-2.0. One command starts it:<code className="mt-1 block font-mono text-ui">uvx --from wattmind-pii-guard pii-guard up</code></> },
-            ]} />
-          </Card>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card title="Hosted console" subtitle="Try your own text and connect your app." headingLevel={3}><p className="text-muted">Manage projects, model connections and gateway endpoints in one place.</p><p className="mt-4 text-xs text-muted"><a className={link} href="#trust">Hosted processing and retention details</a></p></Card>
+          <Card title="Self-hosted" subtitle="Open source · you run it" headingLevel={3}><p className="text-muted">Run the gateway on your own servers and connect an OpenAI-compatible client.</p><p className="mt-4"><a className={link} href={SELF_HOST}>Self-hosting guide ↗</a></p></Card>
         </div>
       </section>
+    ),
+  };
+
+  return <div className="public-teal-theme min-h-dvh bg-canvas text-sm text-ink">
+    <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
+    <PublicHeader current={page === "demo" ? "demo" : page === "trust" ? "trust" : page === "technical" ? "technical" : current} signedIn={signedIn} accountHref={signedIn ? (hasConsole ? "#overview" : "#account") : loginUrl} />
+    <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10">
+      <PublicPageContent page={page} hash={hash} sections={sections} />
     </main>
     <footer className="public-footer border-t border-line">
       <div className="mx-auto grid max-w-[1280px] gap-4 px-4 py-8 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <a href="#" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
+          <a href="#site" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
         </div>
         <p className="text-muted">Open-source privacy gateway for AI agents.</p>
         <nav aria-label="Footer" className="public-footer-columns">
@@ -442,7 +429,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div><h2>Learn</h2>
             <a href="#how">How it works</a>
             <a href={`${DOCS}/benchmarks.md`}>Benchmarks <span aria-hidden="true">↗</span></a>
-            <a href="#data">Privacy</a>
+            <a href="#trust">Privacy &amp; trust</a>
             {PRIVACY_NOTICE_URL && <a href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
           </div>
           <div className="public-footer-project"><h2>Project</h2>
@@ -480,14 +467,6 @@ function Differentiator({ href, title, children }: { href: string; title: string
 }
 
 /** A small results table: one row per system, values in percent; ours in ink. Fits a phone. */
-function ResultTable({ caption, hideCaption = false, columns, rows }: { caption: string; hideCaption?: boolean; columns: string[]; rows: { name: string; title?: string; ours?: boolean; values: readonly string[] }[] }) {
-  return <table className="w-full border-collapse text-sm">
-    <caption className={hideCaption ? "sr-only" : "pb-1 text-left text-xs font-medium text-ink"}>{caption}</caption>
-    <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-1.5 pr-3 text-left font-normal">System</th>{columns.map((c) => <th key={c} scope="col" className="py-1.5 pl-2 text-right font-normal">{c}</th>)}</tr></thead>
-    <tbody>{rows.map((row) => <tr key={row.name} className="border-b border-line last:border-0"><th scope="row" title={row.title} className={["py-1.5 pr-3 text-left", row.ours ? "font-medium text-ink" : "font-normal text-ink"].join(" ")}>{row.name}</th>{row.values.map((v, i) => <td key={i} className={["py-1.5 pl-2 text-right whitespace-nowrap tabular-nums", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;%</td>)}</tr>)}</tbody>
-  </table>;
-}
-
 /** One audience in the "Who it's for" card: columns split by hairlines from md up. */
 function Audience({ title, task, children }: { title: string; task: string; children: ReactNode }) {
   return <li className="min-w-0 md:px-5 md:first:pl-0 md:last:pr-0"><h3 className="text-sm font-medium text-ink">{title}</h3><p className="mt-2 border-l-2 border-line pl-2.5 font-mono text-2xs text-ink sm:text-xs">“{task}”</p><p className="mt-2 text-muted">{children}</p></li>;

@@ -308,3 +308,19 @@ signed-in access becomes “Open console” / “Console”.
 The footer groups Build, Learn and Project links. Build and Learn sit side by side on
 phones, with Project below; all three become columns from 640px. “Built by Watt Mind”
 sits beside the license and project attribution, with the fictional-data note below.
+
+
+## Public content journeys
+
+The landing keeps the original hero intact, followed by three integration steps, a compact
+benchmark summary and two setup choices. The full demo is a separate `#demo` page;
+`#trust` contains the detailed hosted data handling and limitations, and `#technical`
+contains model roles, differentiators and EU context. Full charts remain in Evaluation.
+The public shell and demo state are shared so navigation preserves drafts and results.
+Legacy image/data/privacy/model/EU hashes still open their matching supporting sections.
+Canonical page routes start at the page title; detail anchors reserve room for the header.
+
+A compact image-masking preview follows the unchanged hero. It uses the English synthetic
+specimen and recorded cover geometry from the full Demo, reserves intrinsic image sizes,
+and links to the full image flow. The homepage copy states that this recording keeps
+signatures visible and that detection can miss information.
