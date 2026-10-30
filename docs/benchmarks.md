@@ -336,7 +336,7 @@ generated; documents: de 330 + en 330 + hu 330.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 990 | 99.8% | 56.3% | 72.0% | 38.8% | 10.9% | 0.0% | 100.0% | 0.90 ms | 2026-10-30 | `87ea986` |
+| **pii-guard rules** | 990 | 99.8% | 56.3% | 72.0% | 38.8% | 10.9% | 0.0% | 100.0% | 1.2 ms | 2026-10-30 | `8bf410b` |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 96.3% | 98.0% | 97.1% | 0.2% | 0.0% | 1.3% | 100.0% | 16 ms | 2026-10-30 | `e2f5480` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) † | 660 | 75.1% | 46.1% | 57.1% | 31.3% | 26.6% | 3.2% | 91.5% | 162 ms* | 2026-10-28 | `36a78e3` |
 | pii-guard NER v2.0 alone (no rules) † | 660 | 96.6% | 96.5% | 96.6% | 0.4% | 0.0% | 1.1% | 100.0% | 52 ms* | 2026-10-28 | `36a78e3` |
@@ -356,11 +356,11 @@ generated; documents: de 330 + en 330 + hu 330.
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) † | 660 | 95.6% | 96.9% | 96.2% | 0.4% | 0.0% | 1.1% | 100.0% | 171 ms* | 2026-10-29 | `d2e710a` |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) † | 660 | 97.0% | 96.2% | 96.6% | 2.0% | 0.0% | 0.5% | 100.0% | 171 ms* | 2026-10-29 | `d2e710a` |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) † | 660 | 82.3% | 93.0% | 87.3% | 3.7% | 0.6% | 13.3% | 100.0% | 15 ms* | 2026-10-27 | `477196a` |
-| Presidio † | 660 | 48.8% | 74.2% | 58.9% | 8.7% | 15.3% | 40.1% | — | 11 ms* | 2026-10-27 | `cd119ae` |
-| LLM Guard † | 660 | 82.9% | 69.9% | 75.8% | 18.3% | 6.8% | 11.8% | 100.0% | 56 ms* | 2026-10-27 | `cd119ae` |
-| PrivAiTe † | 660 | 58.9% | 87.6% | 70.4% | 0.5% | 1.1% | 34.0% | 63.0% | 104 ms* | 2026-10-27 | `cd119ae` |
+| Presidio | 990 | 57.5% | 71.2% | 63.6% | 16.6% | 11.9% | 33.4% | — | 27 ms | 2026-10-30 | `8bf410b` |
+| LLM Guard | 990 | 74.7% | 67.6% | 71.0% | 20.2% | 8.6% | 16.9% | 100.0% | 82 ms | 2026-10-30 | `8bf410b` |
+| PrivAiTe | 990 | 56.0% | 84.3% | 67.3% | 2.4% | 1.9% | 35.2% | 65.1% | 155 ms | 2026-10-30 | `8bf410b` |
 
-† Not run on every language of the current fixture files (de + en + hu): its `all` pools fewer documents, so compare it by language, not with the other rows. tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) (no hu); NER v2.0 alone (no rules) (no hu); rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) (no hu); fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) (no hu); fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) (no hu); fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) (no hu); fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410) (no hu); fast, NER v3.1 candidate C: B without Wismut (LAB-1410) (no hu); fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) (no hu); fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) (no hu); fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) (no hu); fast, NER v3.3 candidate T1: S30 + targeted add-on, 1 epoch (LAB-1512) (no hu); fast, NER v3.3 candidate T2: S30 + targeted add-on, 2 epochs (LAB-1512) (no hu); audit (rules + NER v2 + LLM) (no hu); fast, NER v2.0 (selection-only re-score, LAB-1494) (no hu); fast, NER v2.0 (selection-only re-score, LAB-1512) (no hu); fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) (no hu); fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) (no hu); Presidio (no hu); LLM Guard (no hu); PrivAiTe (no hu).
+† Not run on every language of the current fixture files (de + en + hu): its `all` pools fewer documents, so compare it by language, not with the other rows. tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) (no hu); NER v2.0 alone (no rules) (no hu); rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) (no hu); fast, NER v3 candidate: mmBERT-base on the v3 mix (LAB-1393) (no hu); fast, NER v3 candidate: XLM-R base on the v3 mix (LAB-1393) (no hu); fast, NER v3.1 candidate A: v3 mix minus agent-traffic (LAB-1410) (no hu); fast, NER v3.1 candidate B: A + hu/s11 gold, Privy halved (LAB-1410) (no hu); fast, NER v3.1 candidate C: B without Wismut (LAB-1410) (no hu); fast, NER v3.2 soup S30: 0.7 v2.0 + 0.3 v3.1-B (LAB-1494) (no hu); fast, NER v3.2 soup S50: 0.5 v2.0 + 0.5 v3.1-B (LAB-1494) (no hu); fast, NER v3.2 soup S70: 0.3 v2.0 + 0.7 v3.1-B (LAB-1494) (no hu); fast, NER v3.3 candidate T1: S30 + targeted add-on, 1 epoch (LAB-1512) (no hu); fast, NER v3.3 candidate T2: S30 + targeted add-on, 2 epochs (LAB-1512) (no hu); audit (rules + NER v2 + LLM) (no hu); fast, NER v2.0 (selection-only re-score, LAB-1494) (no hu); fast, NER v2.0 (selection-only re-score, LAB-1512) (no hu); fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) (no hu); fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) (no hu).
 
 
 By language:
@@ -387,9 +387,9 @@ By language:
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | 96.6% | 95.9% | — | 0.1% | 0.7% | — |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | 97.2% | 96.0% | — | 0.9% | 2.9% | — |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | 87.5% | 87.2% | — | 2.9% | 4.6% | — |
-| Presidio | 55.8% | 62.4% | — | 8.1% | 9.3% | — |
-| LLM Guard | 73.5% | 78.4% | — | 18.4% | 18.2% | — |
-| PrivAiTe | 69.9% | 71.0% | — | 0.5% | 0.5% | — |
+| Presidio | 64.7% | 62.4% | 63.7% | 20.7% | 9.3% | 19.7% |
+| LLM Guard | 73.5% | 78.4% | 64.2% | 18.5% | 18.2% | 23.9% |
+| PrivAiTe | 69.9% | 71.0% | 61.3% | 0.5% | 0.5% | 6.1% |
 
 
 
@@ -415,9 +415,6 @@ On an earlier version of a fixture file (current: de `627c4b09bcb8`, en `0923f7f
 | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1512) | hu | `8fd6d0fa8a43` | 330 | 97.4% | 0.0% | 2026-10-29 |
 | pii-guard fast, NER v2.0 with dev-calibrated thresholds, candidate H (LAB-1512) | hu | `8fd6d0fa8a43` | 330 | 98.1% | 0.2% | 2026-10-29 |
 | pii-guard fast, NER v2.1 base, epoch 5 of 5 (LAB-1306) | hu | `8fd6d0fa8a43` | 330 | 87.8% | 2.7% | 2026-10-27 |
-| Presidio | hu | `8fd6d0fa8a43` | 330 | 63.7% | 19.7% | 2026-10-27 |
-| LLM Guard | hu | `8fd6d0fa8a43` | 330 | 64.2% | 23.9% | 2026-10-27 |
-| PrivAiTe | hu | `8fd6d0fa8a43` | 330 | 61.2% | 6.1% | 2026-10-27 |
 
 ### `agent-traffic-dev`
 
@@ -565,8 +562,11 @@ mixed; documents: de 200 + en 200 + hu 200.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 600 | 98.5% | 37.1% | 53.9% | 62.3% | 1.6% | 0.1% | 100.0% | 0.60 ms | 2026-10-30 | `879b0f7` |
+| **pii-guard rules** | 600 | 98.5% | 37.1% | 53.9% | 62.3% | 1.6% | 0.1% | 100.0% | 0.67 ms | 2026-10-30 | `8bf410b` |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 600 | 98.9% | 96.9% | 97.9% | 2.4% | 0.1% | 0.3% | 100.0% | 56 ms | 2026-10-29 | `323d859` |
+| Presidio | 600 | 64.4% | 49.1% | 55.7% | 34.8% | 8.1% | 14.7% | — | 15 ms | 2026-10-30 | `8bf410b` |
+| LLM Guard | 600 | 83.4% | 53.7% | 65.3% | 43.8% | 1.8% | 14.1% | 100.0% | 70 ms | 2026-10-30 | `8bf410b` |
+| PrivAiTe | 600 | 67.8% | 65.4% | 66.6% | 9.5% | 2.5% | 5.4% | 98.0% | 96 ms | 2026-10-30 | `8bf410b` |
 
 
 By language:
@@ -575,6 +575,9 @@ By language:
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 59.2% | 50.1% | 53.4% | 57.3% | 65.1% | 63.6% |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 99.0% | 96.9% | 98.0% | 1.0% | 2.5% | 3.6% |
+| Presidio | 63.8% | 49.8% | 55.7% | 36.8% | 22.6% | 46.1% |
+| LLM Guard | 71.5% | 67.4% | 58.7% | 39.8% | 46.2% | 44.7% |
+| PrivAiTe | 68.0% | 70.4% | 61.4% | 6.5% | 7.7% | 14.0% |
 
 
 **Number validity.** The headline leak above, split by whether a structured identifier passes the language packs' own validators (card Luhn, IBAN, TAJ and tax-ID check digits, phone numbering plans, ID-document checksums and formats). Invalid numbers stay in the headline: a mistyped real identifier is still personal data ([evaluation.md](evaluation.md#number-validity)). Valid values per type: `PHONE` 107/237, `NATIONAL_ID_HU_TAX` 1/41, `NATIONAL_ID_HU_TAJ` 4/42, `ID_DOCUMENT` 44/447, `BANK_ACCOUNT` 10/142.
@@ -585,6 +588,9 @@ By language:
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 62.3% | 100.0% (166/166) | 0.0% (0/166) | 37.4% (278/743) | 61.1% (454/743) | 71.2% (908/1276) |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 2.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 4.2% (53/1276) |
+| Presidio | 34.8% | 30.7% (51/166) | 57.8% (96/166) | 17.1% (127/743) | 55.6% (413/743) | 19.7% (251/1276) |
+| LLM Guard | 43.8% | 73.5% (122/166) | 25.9% (43/166) | 23.3% (173/743) | 70.8% (526/743) | 30.5% (389/1276) |
+| PrivAiTe | 9.5% | 68.1% (113/166) | 4.2% (7/166) | 33.8% (251/743) | 3.0% (22/743) | 14.0% (179/1276) |
 
 
 On an earlier version of a fixture file (current: de `2ad2850cd94c`, en `b3063862846f`, hu `aeb0edeed491`). These ran on other documents, so they stay out of the table above and the charts:
@@ -726,15 +732,6 @@ On an earlier version of a fixture file (current: de `2ad2850cd94c`, en `b306386
 | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | de | `d0005390afa5` | 200 | 80.4% | 18.8% | 2026-10-27 |
 | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | en | `fcfc735dff40` | 200 | 81.5% | 21.7% | 2026-10-27 |
 | pii-guard fast, GLiNER multi v2.1 zero-shot (LAB-1150) | hu | `bd1901745c33` | 200 | 76.8% | 26.3% | 2026-10-27 |
-| Presidio | de | `d0005390afa5` | 200 | 38.3% | 18.9% | 2026-10-27 |
-| Presidio | en | `fcfc735dff40` | 200 | 57.0% | 22.5% | 2026-10-27 |
-| Presidio | hu | `bd1901745c33` | 200 | 54.0% | 46.1% | 2026-10-27 |
-| LLM Guard | de | `d0005390afa5` | 200 | 70.9% | 39.8% | 2026-10-27 |
-| LLM Guard | en | `fcfc735dff40` | 200 | 67.2% | 46.1% | 2026-10-27 |
-| LLM Guard | hu | `bd1901745c33` | 200 | 56.3% | 44.7% | 2026-10-27 |
-| PrivAiTe | de | `d0005390afa5` | 200 | 66.7% | 6.5% | 2026-10-27 |
-| PrivAiTe | en | `fcfc735dff40` | 200 | 69.2% | 7.7% | 2026-10-27 |
-| PrivAiTe | hu | `bd1901745c33` | 200 | 59.6% | 14.0% | 2026-10-27 |
 
 ### `brand-names`
 
@@ -2090,6 +2087,14 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-30 | `2026-10-30-lab-1656-ai4privacy-privaite` | PrivAiTe | ai4privacy | de, en, hu | recorded | `8bf410b` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-30 | `2026-10-30-lab-1656-ai4privacy-presidio` | Presidio | ai4privacy | de, en, hu | recorded | `8bf410b` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-30 | `2026-10-30-lab-1656-ai4privacy-llm-guard` | LLM Guard | ai4privacy | de, en, hu | recorded | `8bf410b` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-30 | `2026-10-30-lab-1656-ai4privacy` | pii-guard rules | ai4privacy | de, en, hu | recorded | `8bf410b` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1656-agent-traffic-privaite` | PrivAiTe | agent-traffic | de, en, hu | recorded | `8bf410b` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-30 | `2026-10-30-lab-1656-agent-traffic-presidio` | Presidio | agent-traffic | de, en, hu | recorded | `8bf410b` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-30 | `2026-10-30-lab-1656-agent-traffic-llm-guard` | LLM Guard | agent-traffic | de, en, hu | recorded | `8bf410b` | arm64, 10 CPUs, CPU only | — |
+| 2026-10-30 | `2026-10-30-lab-1656-agent-traffic` | pii-guard rules | agent-traffic | de, en, hu | recorded | `8bf410b` | — | — |
 | 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `e2f5480` | — | — |
 | 2026-10-30 | `2026-10-30-datasets-agent-traffic-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic | de, en, hu | recorded | `e2f5480` | — | — |
 | 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-rules` | pii-guard rules | agent-traffic-dev | de, en, hu | recorded | `87ea986` | — | — |

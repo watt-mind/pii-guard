@@ -4,7 +4,7 @@ import { AgentTrafficTable, OpenModelsTable, ProofFacts } from "./LandingProof";
 import { AGENT_TRAFFIC, HARD_CASES, INFLECTION, OPEN_MODELS, POLISH } from "./proof";
 
 describe("landing proof sections (LAB-1656)", () => {
-  it("agent traffic shows leak and over-masking per tool and flags partial runs", () => {
+  it("agent traffic leads with over-masking against the lowest-leak other tool, on the same documents", () => {
     render(<AgentTrafficTable />);
     const table = screen.getByRole("table", { name: /agent traffic/i });
     const rows = within(table).getAllByRole("row").slice(1);
@@ -15,7 +15,9 @@ describe("landing proof sections (LAB-1656)", () => {
       expect(rows[i]).toHaveTextContent(`${r.over} %`);
       if (r.partial) expect(within(rows[i]!).getByLabelText("ran on fewer languages")).toBeInTheDocument();
     }
-    expect(screen.getByText(/not a like-for-like comparison/)).toBeInTheDocument();
+    expect(screen.getByText(/of masked spans weren’t personal data, against 35.2/)).toHaveTextContent("PrivAiTe");
+    expect(AGENT_TRAFFIC.every((r) => r.docs === AGENT_TRAFFIC[0]!.docs)).toBe(true);
+    expect(screen.queryByText(/§ Not run on every language/)).toBeNull();
   });
 
   it("renders every open model with a link to its card", () => {

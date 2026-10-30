@@ -159,7 +159,7 @@ The full tables, generated from the run records, are the README's
 - **Agent traffic** (tool calls, JSON, logs; ⟦B3 agent-traffic docs⟧ documents): fast mode leaks
   ⟦B3 agent-traffic leak⟧ and over-masks ⟦B3 agent-traffic over-masking⟧, against PrivAiTe's
   ⟦PrivAiTe agent-traffic leak⟧ and ⟦PrivAiTe agent-traffic over-masking⟧
-  (⟦same fixture version and languages, or say it is not⟧).
+  (the same 990 documents, all three languages).
 - **Hand-written set** (de + en + hu + pl, 62 documents): ⟦B3 smoke leak⟧ against
   ⟦tools smoke range⟧, and ⟦B3 smoke leak per language⟧ in each language.
 - **Public test sets:** ⟦B3 nemotron leak⟧ vs ⟦best tool nemotron⟧ on Nemotron-PII and
@@ -168,8 +168,9 @@ The full tables, generated from the run records, are the README's
   ⟦B3 invalid-number leak⟧ of mistyped ones leak (the "Number validity" table).
 
 † Ai4Privacy is in-distribution for the NER (it trained on other rows of the same dataset's
-train split), so it is never counted as a win; the comparison tools have no run on the
-current Ai4Privacy sample.
+train split), so it is never counted as a win; a version trained without those rows leaked
+far more on an earlier version of the sample, so on unseen text in that style PrivAiTe may
+leak less.
 
 - **Evidence:** [benchmarks.md, results by fixture set](benchmarks.md#results-by-fixture-set),
   generated from the run records (95 % bootstrap intervals for the dataset runs are under

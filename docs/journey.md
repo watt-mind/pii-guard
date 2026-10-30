@@ -29,7 +29,7 @@ README's [results block](../README.md#results) and [benchmarks.md](benchmarks.md
 | Set | Fast mode: leak | Over-masking | Best other tool: leak / over-masking | Source |
 |---|---:|---:|---:|---|
 | Hand-written, de + en + hu + pl (62 docs) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [smoke](benchmarks.md#smoke) |
-| Agent traffic, de + en + hu (990 docs) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe, same fixture version or marked⟧ | [agent-traffic](benchmarks.md#agent-traffic) |
+| Agent traffic, de + en + hu (990 docs) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [agent-traffic](benchmarks.md#agent-traffic) |
 | Nemotron-PII (300) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [nemotron-pii](benchmarks.md#nemotron-pii) |
 | CEE-PII (451) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [cee-pii](benchmarks.md#cee-pii) |
 | Gretel finance (400), dataset labels / corrected | ⟦B3⟧ | ⟦B3⟧ | ⟦Presidio⟧ | [gretel-finance](benchmarks.md#gretel-finance) |

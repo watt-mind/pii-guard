@@ -85,12 +85,10 @@ except where marked †).
 | Leak | Hand-written (de+en+hu+pl, 62 docs) | Agent traffic (de+en+hu, 990 docs) | Nemotron-PII (en, 300 docs) | CEE-PII (en+hu, 451 docs) | Gretel finance (de+en, 400 docs) | Gretel finance, corrected labels (de+en, 400 docs) | Ai4Privacy (de+en+hu, 600 docs) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | **PII Guard fast** (rules + NER, on-device, $0) | **0.0 %** | **0.2 %** | **0.7 %** | **0.4 %** | 19.0 % | **2.4 %** | 2.4 % † |
-| PrivAiTe | 13.0 % | 0.5 % § | 4.0 % | 4.4 % | 27.7 % | 13.2 % | — |
-| Presidio | 25.5 % | 8.7 % § | 12.8 % | 36.5 % | **18.8 %** | 14.8 % | — |
-| LLM Guard | 46.3 % | 18.3 % § | 28.8 % | 75.8 % | 59.3 % | 51.3 % | — |
+| PrivAiTe | 13.0 % | 2.4 % | 4.0 % | 4.4 % | 27.7 % | 13.2 % | 9.5 % |
+| Presidio | 25.5 % | 16.6 % | 12.8 % | 36.5 % | **18.8 %** | 14.8 % | 34.8 % |
+| LLM Guard | 46.3 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 51.3 % | 43.8 % ‡ |
 | PII Guard rules only (no name detection) | 40.7 % | 38.8 % | 56.0 % | 41.3 % | 80.8 % | 77.1 % | 62.3 % |
-
-§ Run on fewer languages than the set has, on an earlier version of its files, so not comparable with the complete rows: LLM Guard on Agent traffic (no hu); Presidio on Agent traffic (no hu); PrivAiTe on Agent traffic (no hu). Per-language numbers are in [docs/benchmarks.md](docs/benchmarks.md).
 
 Detection p50 on the `smoke` set: fast 23 ms*, PrivAiTe 60 ms*, Presidio 42 ms*, LLM Guard 60 ms* (`*` averaged over several runs), each on the machine in its run record: compare loosely.
 
@@ -101,9 +99,9 @@ What fast mode adds to each request on CPU (gateway overhead, rules + NER, one r
 | Over-masking | Hand-written (de+en+hu+pl, 62 docs) | Agent traffic (de+en+hu, 990 docs) | Nemotron-PII (en, 300 docs) | CEE-PII (en+hu, 451 docs) | Gretel finance (de+en, 400 docs) | Gretel finance, corrected labels (de+en, 400 docs) | Ai4Privacy (de+en+hu, 600 docs) |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | **PII Guard fast** (rules + NER, on-device, $0) | 0.9 % | 1.3 % | 1.4 % | 26.3 % | 22.6 % | 21.8 % | 0.3 % |
-| PrivAiTe | 25.7 % | 34.0 % § | 5.6 % | 59.2 % | 46.5 % | 46.6 % | — |
-| Presidio | 26.1 % | 40.1 % § | 32.0 % | 52.5 % | 75.4 % | 76.7 % | — |
-| LLM Guard | 33.7 % | 11.8 % § | **0.6 %** | 66.4 % | **17.0 %** | **17.0 %** | — |
+| PrivAiTe | 25.7 % | 35.2 % | 5.6 % | 59.2 % | 46.5 % | 46.6 % | 5.4 % |
+| Presidio | 26.1 % | 33.4 % | 32.0 % | 52.5 % | 75.4 % | 76.7 % | 14.7 % |
+| LLM Guard | 33.7 % | 16.9 % | **0.6 %** | 66.4 % | **17.0 %** | **17.0 %** | 14.1 % |
 | PII Guard rules only (no name detection) | **0.0 %** | **0.0 %** | 0.8 % | **0.0 %** | 21.7 % | 21.8 % | **0.1 %** |
 
 Over-masking: share of masked spans that are not personal data; lower is better ([how it is scored](docs/benchmarks.md#how-to-read-this)).
@@ -114,8 +112,9 @@ Records behind the fast row: Hand-written ([1](eval/results/runs/2026-10-30-lab-
 † **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
 train split; no evaluated row was trained on), so this cell is not a win. The same recipe
 trained without those rows leaked far more on an earlier version of this sample
-([ablation](docs/benchmarks.md#ai4privacy)). The comparison tools have no run on the current
-Ai4Privacy sample, so their cells are empty rather than copied from another scorer.
+([ablation](docs/benchmarks.md#ai4privacy)), so on unseen text in that style PrivAiTe may well
+leak less than fast mode. ‡ LLM Guard's model was fine-tuned on Ai4Privacy data too
+([configurations](eval/results/2026-10-27-comparison/README.md#systems)).
 
 - **Where fast mode is weak:** finance text on the dataset's own labels, about level with
   Presidio; on the corrected labels ([why](docs/datasets.md)) it leaks least. Over-masking

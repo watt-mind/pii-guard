@@ -96,16 +96,18 @@ export const WEAKER = { gretel: "19.0", gretelPresidio: "18.8", ceeOverMasking: 
 
 /**
  * Agent traffic (`agent-traffic`, generated tool calls, JSON and logs): leak and over-masking of
- * fast mode against the comparison tools. `docs` is each row's pooled documents; a tool row with
- * `partial` ran on fewer languages, on an earlier version of the files (a † row in the report),
- * so the landing labels it and doesn't call it a like-for-like win.
+ * fast mode against the comparison tools, all on the same 990 documents (de + en + hu; the tools
+ * re-run on the current files by LAB-1656, `2026-10-30-lab-1656-agent-traffic-*`). `docs` is each row's pooled documents; a tool row with
+ * `partial` ran on fewer languages (a † row in the report), so the landing labels it with the
+ * reason and doesn't call it a like-for-like win.
  */
-type TrafficRow = { system: string; leak: string; over: string; docs: number; partial?: boolean; ours?: boolean };
+/** `partial` names why a tool couldn't run on every language (shown in the § footnote). */
+type TrafficRow = { system: string; leak: string; over: string; docs: number; partial?: string; ours?: boolean };
 export const AGENT_TRAFFIC: readonly TrafficRow[] = [
   { system: "PII Guard", leak: "0.2", over: "1.3", docs: 990, ours: true },
-  { system: "PrivAiTe", leak: "0.5", over: "34.0", docs: 660, partial: true },
-  { system: "Presidio", leak: "8.7", over: "40.1", docs: 660, partial: true },
-  { system: "LLM Guard", leak: "18.3", over: "11.8", docs: 660, partial: true },
+  { system: "PrivAiTe", leak: "2.4", over: "35.2", docs: 990 },
+  { system: "Presidio", leak: "16.6", over: "33.4", docs: 990 },
+  { system: "LLM Guard", leak: "20.2", over: "16.9", docs: 990 },
 ];
 
 /** Fast mode's leak per language on `smoke` (the report's "By language" table). */

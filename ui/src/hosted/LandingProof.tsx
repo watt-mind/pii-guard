@@ -23,19 +23,27 @@ function Table({ caption, children, label }: { caption: string; label: string; c
   );
 }
 
-/** Agent traffic: leak and over-masking side by side, so a low leak bought by masking everything shows. */
+/**
+ * Agent traffic: over-masking first, then leak, against the lowest-leak other tool (both on the
+ * same documents), so a low leak bought by masking everything shows.
+ */
 export function AgentTrafficTable() {
-  const partial = AGENT_TRAFFIC.some((r) => r.partial);
+  const ours = AGENT_TRAFFIC.find((r) => r.ours)!;
+  const rival = AGENT_TRAFFIC.filter((r) => !r.ours && !r.partial).reduce((a, b) => (Number(b.leak) < Number(a.leak) ? b : a));
+  const partial = AGENT_TRAFFIC.filter((r) => r.partial);
   return (
     <figure className="rounded-xl border border-line bg-surface p-4 sm:p-6">
       <h3 className="text-base font-medium text-ink">Agent traffic: tool calls, JSON and logs</h3>
-      <p className="mt-1 mb-4 text-xs text-muted">Lower is better in both columns. Over-masking is the share of masked spans that weren’t personal data.</p>
-      <Table label="Agent traffic results, scrolls sideways" caption="Leak and over-masking on generated agent traffic, by tool">
+      <p className="mt-1 text-sm text-ink">
+        {ours.over}&nbsp;% of masked spans weren’t personal data, against {rival.over}&nbsp;% for {rival.system}. Leaked: {ours.leak}&nbsp;% against {rival.leak}&nbsp;%.
+      </p>
+      <p className="mt-1 mb-4 text-xs text-muted">Same {ours.docs} documents for every tool. Lower is better in both columns.</p>
+      <Table label="Agent traffic results, scrolls sideways" caption="Over-masking and leak on generated agent traffic, by tool">
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
             <th scope="col" className="py-2 pr-3 font-medium">Tool</th>
-            <th scope="col" className={head}>Leaked</th>
             <th scope="col" className={head}>Over-masked</th>
+            <th scope="col" className={head}>Leaked</th>
             <th scope="col" className={head}>Docs</th>
           </tr>
         </thead>
@@ -46,14 +54,16 @@ export function AgentTrafficTable() {
                 {r.system}
                 {r.partial && <span className="ml-1 text-faint" aria-label="ran on fewer languages">§</span>}
               </th>
-              <td className={cell}>{r.leak}&nbsp;%</td>
               <td className={cell}>{r.over}&nbsp;%</td>
+              <td className={cell}>{r.leak}&nbsp;%</td>
               <td className={`${cell} text-muted`}>{r.docs}</td>
             </tr>
           ))}
         </tbody>
       </Table>
-      {partial && <figcaption className="mt-3 text-xs text-muted">§ Ran on German and English only, on an earlier version of the files: not a like-for-like comparison.</figcaption>}
+      {partial.length > 0 && (
+        <figcaption className="mt-3 text-xs text-muted">§ Not run on every language, so not like-for-like: {partial.map((r) => `${r.system} (${r.partial})`).join("; ")}.</figcaption>
+      )}
     </figure>
   );
 }
