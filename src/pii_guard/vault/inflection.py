@@ -71,20 +71,6 @@ def following_suffix(text: str, pos: int) -> str:
 _INFLECTIONS: dict[str, InflectionMatcher] = {}
 _EXACT = ExactMatcher()
 
-# Kept importable from here for one release; they now live in the language packs.
-_MOVED = {
-    "HungarianSuffixMatcher": "pii_guard.languages.hu.inflection",
-    "EnglishPossessiveMatcher": "pii_guard.languages.en.inflection",
-}
-
-
-def __getattr__(name: str) -> object:
-    if name in _MOVED:
-        from importlib import import_module
-
-        return getattr(import_module(_MOVED[name]), name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 
 def _primary(language: str) -> str:
     return (language or "").strip().lower().replace("_", "-").split("-")[0]

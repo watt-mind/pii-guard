@@ -1,0 +1,46 @@
+# Reference words: labels that make a number a business number, not personal data
+# (order, invoice, tracking, SKU ...). One entry per line, `#` comments, blank lines ignored.
+# A trailing `*` lets the word take suffixes (`order*`: `orders`, `Bestellnummer`).
+# Entries are written without accents; both spellings match (`rendeles*` matches
+# `rendelés` and `rendeles`).
+# Optional second column: `both` (the default: the rules check and the NER check read it),
+# `rules` (the rules check only) or `ner` (the NER check only), `weak` (LAB-1293: a poor
+# negative cue such as an amount or generic reference word, honored by the rules check only;
+# the NER check ignores it, as before).
+order*
+invoice*
+inv
+receipt*
+booking*
+tracking*
+shipment*
+ticket*
+item
+items	ner
+sku*
+article*
+ord	ner
+shipping*	ner
+parcel*	ner
+consignment*	ner
+awb	ner
+req	ner
+request*	ner
+trace	ner
+span	ner
+txn	ner
+transaction*	ner
+session*	ner
+uuid	ner
+guid	ner
+hash*	ner
+sha	ner
+digest*	ner
+commit*	ner
+reference	weak
+ref	weak
+case	weak
+total	weak
+amount	weak
+price	weak
+balance	weak

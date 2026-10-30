@@ -16,7 +16,7 @@ from hypothesis import strategies as st
 from pii_guard.detect import rules
 from pii_guard.detect.rules import RuleDetector, RulePack, primary_language, register_rule_pack
 from pii_guard.detect.rules.common import is_valid_card_number, luhn_check_digit
-from pii_guard.detect.rules.en import is_valid_nino, is_valid_ssn
+from pii_guard.languages.en.rules import is_valid_nino, is_valid_ssn
 from pii_guard.types import EntityType
 
 E = EntityType

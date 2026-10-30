@@ -243,7 +243,7 @@ def _muse_endpoint(url: str, model: str, key: str | None) -> tuple[str, str]:
     # Muse sends META_API_KEY as the bearer token, for its catalog at the root of the base URL
     # (/muse-code/models) too: the gateway serves this endpoint's catalog there (LAB-1462).
     token = f'META_API_KEY="${key}" ' if key else ""
-    code = f"pii-guard connect muse-code --gateway {_q(url)}\n{token}muse"
+    code = f"pii-guard connect muse-code --gateway {_q(url)} --no-session-path\n{token}muse"
     note = (
         "Muse Code reads its endpoint only from settings.json, so this writes it first "
         "(endpoint_transport, backup kept, --dry-run to preview). Muse sends META_API_KEY as "

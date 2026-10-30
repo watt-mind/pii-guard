@@ -3,6 +3,21 @@
 The mapping (placeholder -> original value) lives only in this process and expires after a
 TTL of inactivity. Nothing in this module logs, reprs or raises with an original value: logs
 and errors carry entity types, counts and placeholder ids only (AGENTS.md, ADR 0006).
+
+Compiled patterns (the ``re`` module cache, at most 512 entries process-wide) may briefly
+outlive a dropped session: the vault and the detectors build patterns from folded values,
+and CPython keeps them until LRU eviction or a restart. This is accepted residual risk
+(LAB-1364): the cache is bounded and memory-only, in the same trust boundary as the
+running vault, and it never reaches logs, traces or error messages. Wiring ``re.purge()``
+into the delete path would force every live session to recompile its patterns, so it is
+deliberately not done.
+
+Doubled case suffixes are out of scope (LAB-1142): a case ending stacked on a case ending
+is not Hungarian (``Hajnának`` + ``nak``), so the vault does not split the surface to its
+lemma first. Both occurrences share one placeholder keyed on the labelled value's lemma
+and the extra suffix is not restored on unmask; nothing leaks, the text just does not
+round-trip. Real stacked suffixes (``-é``/``-ék``/``-éi`` plus a case ending, LAB-1337)
+round-trip normally.
 """
 
 from __future__ import annotations
@@ -26,7 +41,13 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
-from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
+from pii_guard.types import (
+    EntityType,
+    MaskingError,
+    PiiGuardError,
+    Span,
+    VaultNotConfiguredError,
+)
 from pii_guard.vault.fold import FoldedText, dropped, fold_value, fold_views, spaced
 from pii_guard.vault.inflection import (
     InflectionMatcher,
@@ -266,10 +287,13 @@ class _Entry:
         "casing",
         "changed",
         "count",
+        "detector",
         "entity_type",
         "exact",
+        "first_seen",
         "initials",
         "language",
+        "last_seen",
         "model_only",
         "needles",
         "normalized",
@@ -297,6 +321,13 @@ class _Entry:
         self.normalized = normalized
         self.language = language
         self.count = 0
+        # The detector of the first span that created the entry (LAB-1332): provenance for
+        # the vault inspector. Never overwritten; a neutral re-mask (``gateway``) leaves it.
+        self.detector: str | None = None
+        # Vault-clock times of the first and latest masked occurrence (LAB-1332). ``None``
+        # until the entry's first occurrence is assembled.
+        self.first_seen: float | None = None
+        self.last_seen: float | None = None
         # The session generation at which this entry was created or its patterns last
         # changed (a new surface or alias): see :attr:`VaultSession.generation`.
         self.changed = 0
@@ -781,6 +812,10 @@ class VaultSession:
         Every form of one value shares one placeholder keyed on its lemma: a span that ends
         in a suffix is narrowed to the stem (``Próba Zsuzsannának`` -> ``[[PERSON_x]]nak``)
         and stem-changed forms (``Próba Zsuzsannát``, ``Kováccsal``) are found as occurrences.
+        A single-word value that is also a common word (``Bor``/``bor``) masks that word's
+        inflected forms too (``bort``): accepted over-masking (LAB-1343). Telling the surname
+        from the common word would need a capitalisation or lexicon gate, and either would
+        leak a lower-case name in chat text; the guard stays biased toward masking.
 
         Casing: by default every casing of a value shares its placeholder too, and
         :meth:`unmask` restores the value as first written (``TESZT ELEK és Teszt Elek`` with
@@ -1128,6 +1163,10 @@ class VaultSession:
             parts.append(entry.placeholder)
             entry.remember(following_suffix(text, end), text[start:end])
             entry.count += 1
+            now = self._clock()
+            if entry.first_seen is None:
+                entry.first_seen = now
+            entry.last_seen = now
             per_type[entry.entity_type.value] += 1
             cursor = end
         parts.append(text[cursor:])
@@ -1287,6 +1326,8 @@ class VaultSession:
         placeholder = self._new_placeholder(entity_type, normalized)
         entry = _Entry(placeholder, entity_type, value, normalized, language)
         entry.model_only = detector in MODEL_DETECTORS
+        if detector not in NEUTRAL_DETECTORS:
+            entry.detector = detector
         entry.order = len(self._by_key)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
@@ -1340,6 +1381,7 @@ class VaultSession:
             variant = _Entry(
                 placeholder, entry.entity_type, original, entry.normalized, entry.language
             )
+            variant.detector = entry.detector
             entry.variants[form] = variant
             self._by_placeholder[placeholder] = variant
         return variant
@@ -1790,7 +1832,7 @@ class Vault:
         """
         key = settings.tenant_key_bytes()
         if key is None:
-            raise MaskingError("PII_GUARD_TENANT_KEY is not set", code="vault_not_configured")
+            raise VaultNotConfiguredError("PII_GUARD_TENANT_KEY is not set")
         kwargs.setdefault("case_sensitive_placeholders", settings.vault_case_sensitive_placeholders)
         kwargs.setdefault("max_sessions", settings.vault_max_sessions)
         kwargs.setdefault("max_entries", settings.vault_max_entries)
@@ -1922,14 +1964,22 @@ class Vault:
         return session
 
     def drop(self, session_id: str) -> None:
-        """Close and forget a session now (no error if it is already gone)."""
+        """Close and forget a session now (no error if it is already gone).
+
+        Compiled patterns built from its values may stay in the process-wide ``re`` cache
+        until eviction: accepted residual risk, see the module docstring (LAB-1364).
+        """
         with self._lock:
             session = self._sessions.pop(session_id, None)
         if session is not None:
             session.close()
 
     def purge_expired(self) -> int:
-        """Drop every expired session; returns how many were dropped."""
+        """Drop every expired session; returns how many were dropped.
+
+        Like :meth:`drop`, this leaves compiled patterns in the process-wide ``re`` cache
+        until eviction (LAB-1364).
+        """
         with self._lock:
             return self._purge_locked()
 

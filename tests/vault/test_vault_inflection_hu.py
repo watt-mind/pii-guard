@@ -12,10 +12,10 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from vault_helpers import TEST_KEY, span_of
 
+from pii_guard.languages.hu.inflection import HungarianSuffixMatcher
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import (
     PLACEHOLDER_RE,
-    HungarianSuffixMatcher,
     StreamUnmasker,
     Vault,
     VaultSession,
