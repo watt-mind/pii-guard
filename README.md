@@ -53,12 +53,12 @@ Mask, then unmask with the session the guard keeps (output from fast mode):
 
 ```bash
 curl -sS http://127.0.0.1:8787/v1/mask -H 'Content-Type: application/json' \
-  -d '{"text": "Teszt Elek írt Teszt Eleknek.", "language": "hu"}'
-# {"masked_text": "[[PERSON_f8eb32]] írt [[PERSON_f8eb32]]nek.", "session_id": "s_…", …}
+  -d '{"text": "Please email Jane Placeholder at jane.placeholder@example.net about her refund.", "language": "en"}'
+# {"masked_text": "Please email [[PERSON_ed7efa]] at [[EMAIL_8990bf]] about her refund.", "session_id": "s_…", …}
 
 curl -sS http://127.0.0.1:8787/v1/unmask -H 'Content-Type: application/json' \
-  -d '{"text": "Kedves [[PERSON_f8eb32]]!", "session_id": "s_…"}'
-# {"text": "Kedves Teszt Elek!", "unresolved": []}
+  -d '{"text": "Done: I emailed [[PERSON_ed7efa]] about the refund.", "session_id": "s_…"}'
+# {"text": "Done: I emailed Jane Placeholder about the refund.", "unresolved": []}
 ```
 
 Or put it in front of an existing client; only the base URL changes:
