@@ -118,9 +118,13 @@ function useEscapeGuard(onCancel: () => void, busy: boolean) {
 
 /** A panel opened from a row (edit, new version, keys) renders inside that row, below it (LAB-1619). */
 const INLINE = "w-full basis-full pt-1";
+// Below an endpoint row's summary line (a block, not a flex item: LAB-1652).
+const PANEL = "mt-3 min-w-0";
 
 const LIST = "divide-y divide-line";
-const ROW = "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0";
+const ITEM = "py-3 first:pt-0 last:pb-0";
+const ROW_LINE = "flex flex-wrap items-center justify-between gap-x-4 gap-y-2";
+const ROW = `${ROW_LINE} ${ITEM}`;
 const REVIEW = "rounded-lg bg-surface-2 p-3 text-sm text-ink sm:p-4";
 
 /** Project configuration only. Secrets live in component memory, never browser storage. */
@@ -448,62 +452,67 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
         {endpoints.length > 0 && (
           <ul className={LIST}>
             {[...endpoints.filter((e) => e.enabled), ...endpoints.filter((e) => !e.enabled)].map((endpoint) => (
-              <li key={endpoint.id} className={`${ROW} sm:flex-nowrap`}>
-                <div className="min-w-0 sm:flex-1">
-                  <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
-                    {endpoint.name}
-                    {!endpoint.enabled && <Badge>Disabled</Badge>}
-                  </h3>
-                  <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · {endpoint.model ? <span className="font-mono text-xs">{endpoint.model}</span> : "Client chooses the model"}</p>
-                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-                    {policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}
-                    {endpoint.enabled && newerVersion(endpoint) && <Badge>v{newerVersion(endpoint)!.version} available</Badge>}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:shrink-0 sm:justify-end">
-                  {endpoint.enabled && newerVersion(endpoint) && (
-                    // Asks first (LAB-1640): the endpoint may carry production traffic.
-                    <ConfirmAction
+              // The summary and its actions share one line; the inline Edit and Connect & keys panels
+              // sit below it at full width. Inside one no-wrap flex line, a full-width panel squeezed
+              // the summary to one character per line (LAB-1652).
+              <li key={endpoint.id} className={ITEM}>
+                <div className={`${ROW_LINE} sm:flex-nowrap`}>
+                  <div className="min-w-0 sm:flex-1">
+                    <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
+                      {endpoint.name}
+                      {!endpoint.enabled && <Badge>Disabled</Badge>}
+                    </h3>
+                    <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · {endpoint.model ? <span className="font-mono text-xs">{endpoint.model}</span> : "Client chooses the model"}</p>
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+                      {policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}
+                      {endpoint.enabled && newerVersion(endpoint) && <Badge>v{newerVersion(endpoint)!.version} available</Badge>}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:shrink-0 sm:justify-end">
+                    {endpoint.enabled && newerVersion(endpoint) && (
+                      // Asks first (LAB-1640): the endpoint may carry production traffic.
+                      <ConfirmAction
+                        size="sm"
+                        trigger={`Apply v${newerVersion(endpoint)!.version}`}
+                        triggerLabel={`Apply v${newerVersion(endpoint)!.version} to ${endpoint.name}`}
+                        title={`Apply ${newerVersion(endpoint)!.name} v${newerVersion(endpoint)!.version} to '${endpoint.name}'?`}
+                        body={`The next request through it uses v${newerVersion(endpoint)!.version} instead of v${endpoint.policy_version}. Other endpoints keep their versions.`}
+                        confirm={`Apply v${newerVersion(endpoint)!.version}`}
+                        busy={busy}
+                        onConfirm={() => applyLatest(endpoint)}
+                      />
+                    )}
+                    {!endpoint.enabled && (
+                      <ConfirmAction
+                        size="sm"
+                        trigger="Delete"
+                        triggerLabel={`Delete ${endpoint.name}`}
+                        title={`Delete endpoint '${endpoint.name}'?`}
+                        body="Its configuration is removed; its endpoint keys are already revoked."
+                        confirm="Delete endpoint"
+                        busy={busy}
+                        onConfirm={() => deleteEndpoint(endpoint)}
+                      />
+                    )}
+                    {endpoint.enabled && (
+                      <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
+                        Connect & keys
+                      </Button>
+                    )}
+                    <Button
                       size="sm"
-                      trigger={`Apply v${newerVersion(endpoint)!.version}`}
-                      triggerLabel={`Apply v${newerVersion(endpoint)!.version} to ${endpoint.name}`}
-                      title={`Apply ${newerVersion(endpoint)!.name} v${newerVersion(endpoint)!.version} to '${endpoint.name}'?`}
-                      body={`The next request through it uses v${newerVersion(endpoint)!.version} instead of v${endpoint.policy_version}. Other endpoints keep their versions.`}
-                      confirm={`Apply v${newerVersion(endpoint)!.version}`}
                       busy={busy}
-                      onConfirm={() => applyLatest(endpoint)}
-                    />
-                  )}
-                  {!endpoint.enabled && (
-                    <ConfirmAction
-                      size="sm"
-                      trigger="Delete"
-                      triggerLabel={`Delete ${endpoint.name}`}
-                      title={`Delete endpoint '${endpoint.name}'?`}
-                      body="Its configuration is removed; its endpoint keys are already revoked."
-                      confirm="Delete endpoint"
-                      busy={busy}
-                      onConfirm={() => deleteEndpoint(endpoint)}
-                    />
-                  )}
-                  {endpoint.enabled && (
-                    <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
-                      Connect & keys
+                      aria-label={`Edit ${endpoint.name}`}
+                      ref={(el) => { if (el) editRefs.current.set(endpoint.id, el); else editRefs.current.delete(endpoint.id); }}
+                      onClick={() => openEndpointForm(endpoint)}
+                    >
+                      Edit
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    busy={busy}
-                    aria-label={`Edit ${endpoint.name}`}
-                    ref={(el) => { if (el) editRefs.current.set(endpoint.id, el); else editRefs.current.delete(endpoint.id); }}
-                    onClick={() => openEndpointForm(endpoint)}
-                  >
-                    Edit
-                  </Button>
+                  </div>
                 </div>
-                {endpointEdit !== "new" && endpointEdit?.id === endpoint.id && <div className={INLINE}>{endpointForm}</div>}
+                {endpointEdit !== "new" && endpointEdit?.id === endpoint.id && <div className={PANEL}>{endpointForm}</div>}
                 {inspected?.id === endpoint.id && (
-                  <div className={INLINE}>
+                  <div className={PANEL}>
                     <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={inspected} base={base} call={call} hosted={hosted} />
                   </div>
                 )}
