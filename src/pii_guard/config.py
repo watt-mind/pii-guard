@@ -179,6 +179,10 @@ class Settings(BaseSettings):
     image_max_pixels: int = Field(default=16_000_000, ge=1)
     image_concurrency: int = Field(default=2, ge=1)
     image_timeout: float = Field(default=120.0, gt=0)
+    # Whole request-body read deadline in seconds for the REST API (LAB-1566, LAB-1581): bytes
+    # alone don't stop a slow-loris client. Past it, 408 request_timeout and nothing is
+    # processed; raise it for large image bodies on slow links.
+    body_read_timeout: float = Field(default=30.0, gt=0)
 
     # Most live vault sessions; one more evicts the least recently used (docs/operations.md).
     vault_max_sessions: int = Field(default=10_000, ge=1)

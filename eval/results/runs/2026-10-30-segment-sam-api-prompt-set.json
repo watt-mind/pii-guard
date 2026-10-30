@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-30-segment-sam-api-prompt-set",
+  "kind": "visual",
+  "date": "2026-10-30",
+  "recorded_at": null,
+  "source": "recorded",
+  "imported_from": null,
+  "title": "Segmenter sam-api on prompt-set (LAB-1118)",
+  "notes": [
+    "LAB-1229 segmenter comparison: portrait and signature regions only, no OCR; candidate sam-api.",
+    "portrait: recall@IoU0.5 100.0 %, leak (<95 % covered) 33.3 %, strict leak 100.0 %, precision 100.0 % (10 boxes); signature: recall@IoU0.5 50.0 %, leak (<95 % covered) 83.3 %, strict leak 100.0 %, precision 100.0 % (8 boxes).",
+    "Per image p50 4004.1 ms, p95 5550.7 ms on Darwin arm64 CPU; model load 2.9 ms; peak RSS 87.2 MB; weights hosted; licence hosted (Meta Model API).",
+    "Default SAM prompts on the synthetic prompt-study set (LAB-1118); per-prompt numbers in eval/results/visual/prompt-study-synthetic.md."
+  ],
+  "code": {
+    "commit": "d16b9ec326d2bb082813b09c0f49ddf0363e2e6f",
+    "dirty": true,
+    "pii_guard_version": null,
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "role": "own",
+    "tool": "pii-guard",
+    "version": null,
+    "detectors": [
+      {
+        "name": "sam",
+        "model": "sam-3.1",
+        "model_ref": "meta-api:sam-3.1",
+        "revision": null,
+        "settings": {},
+        "serving": null
+      }
+    ],
+    "key": "visual-segment:sam-3.1",
+    "label": "segmenter sam-3.1 (no OCR)"
+  },
+  "fixture_set": "prompt-set",
+  "fixtures": [
+    {
+      "path": "eval/visual/prompt-set/manifest.json",
+      "sha256": null,
+      "set": "prompt-set",
+      "language": null,
+      "origin": "generated",
+      "generator": "pillow",
+      "documents": 24
+    }
+  ],
+  "languages": [],
+  "hardware": {
+    "description": "arm64 CPU, one process; host load average 19 (shared with other jobs)",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": {
+    "usd": 0.24,
+    "estimated": true,
+    "gpu_minutes": null,
+    "model_calls": 96,
+    "tokens": null,
+    "shared_with": [],
+    "note": "SAM None: 96 calls at $0.0025/call (planning estimate; responses report no price)"
+  },
+  "metrics": {
+    "specimens": 24,
+    "overall": {
+      "regions": 18,
+      "recall_iou50": 0.6667,
+      "recall_cov90": 0.5556,
+      "mean_coverage": 0.612
+    },
+    "by_region_type": {
+      "portrait": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.6667,
+        "mean_coverage": 0.906
+      },
+      "signature": {
+        "regions": 12,
+        "recall_iou50": 0.5,
+        "recall_cov90": 0.5,
+        "mean_coverage": 0.4651
+      }
+    },
+    "by_doc_type": {
+      "id_photo": {
+        "regions": 6,
+        "recall_iou50": 1.0,
+        "recall_cov90": 0.6667,
+        "mean_coverage": 0.906,
+        "specimens": 6
+      },
+      "scanned": {
+        "regions": 4,
+        "recall_iou50": 0.5,
+        "recall_cov90": 0.5,
+        "mean_coverage": 0.4762,
+        "specimens": 4
+      },
+      "scribble": {
+        "regions": 4,
+        "recall_iou50": 1.0,
+        "recall_cov90": 1.0,
+        "mean_coverage": 0.9191,
+        "specimens": 4
+      },
+      "script": {
+        "regions": 4,
+        "recall_iou50": 0.0,
+        "recall_cov90": 0.0,
+        "mean_coverage": 0.0,
+        "specimens": 4
+      },
+      "stamp": {
+        "regions": 0,
+        "recall_iou50": null,
+        "recall_cov90": null,
+        "mean_coverage": null,
+        "specimens": 6
+      }
+    },
+    "by_country": {
+      "GB": {
+        "regions": 18,
+        "recall_iou50": 0.6667,
+        "recall_cov90": 0.5556,
+        "mean_coverage": 0.612,
+        "specimens": 24
+      }
+    },
+    "over_masking_mean": 0.0017,
+    "errors": 0,
+    "latency_ms": {
+      "sam_call_p50": 973.7,
+      "sam_call_p95": 1579.3,
+      "sam_per_image_p50": 4004.1,
+      "sam_per_image_p95": 5550.7,
+      "local_per_image_p50": 0.0,
+      "local_per_image_p95": 0.0,
+      "total_per_image_p50": 4004.1,
+      "total_per_image_p95": 5550.7,
+      "segment_per_image_p50": 4004.1,
+      "segment_per_image_p95": 5550.7,
+      "segment_first_image": 4086.1,
+      "segment_model_load": 2.9
+    }
+  }
+}

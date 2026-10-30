@@ -112,6 +112,14 @@ class SseRestorer:
         """
         return {index: "".join(parts) for index, parts in self._masked_content.items()}
 
+    def masked_truncated(self) -> frozenset[int]:
+        """The choices whose masked copy passed the retention cap and was dropped (LAB-1581).
+
+        The ``masked_answer`` echo marks them truncated, so a dropped copy is distinguishable
+        from a short or empty answer.
+        """
+        return frozenset(self._masked_overflow)
+
     def _retain_masked(self, index: int, value: str) -> None:
         if index in self._masked_overflow:
             return

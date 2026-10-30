@@ -1,5 +1,5 @@
 .PHONY: help setup lint format test test-all types gate serve check docker docker-smoke audit licences \
-	pii-diff gitleaks links baselines demo demo-traffic smoke smoke-fast bench wheel wheel-smoke
+	pii-diff gitleaks links baselines openapi demo demo-traffic smoke smoke-fast bench wheel wheel-smoke
 
 # Hygiene (LAB-1254): `uv sync` once via `make setup` (or `make baselines` for that extra),
 # then every `uv run` below is `uv run --no-sync`, so a source edit never rebuilds pii-guard
@@ -45,6 +45,9 @@ types: ## mypy on src/, failing only on errors not in scripts/ci/mypy-baseline.t
 
 gate: ## quality regression gate: leak / round trip / over-masking vs committed runs (offline)
 	uv run --no-sync python -m pii_guard.eval.gate
+
+openapi: ## regenerate docs/openapi.json and the docs/api.md error table from the app
+	uv run python scripts/export_openapi.py
 
 check: lint types test gate ## the Python checks CI runs (CONTRIBUTING.md lists every CI job)
 

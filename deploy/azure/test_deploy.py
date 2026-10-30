@@ -67,6 +67,7 @@ case "$*" in
   "deployment group validate "*|"deployment group create "*) exit 0;;
   "rest "*) echo true;;
   "containerapp ingress update "*) exit 0;;
+  "containerapp show "*"ingress.external"*) echo "${TEST_LIVE_EXTERNAL:-false}";;
   "containerapp show "*"latestReadyRevisionName"*)
     echo "${TEST_READY_REVISION:-reviewed-revision}";;
   "containerapp show "*) echo reviewed-revision;;

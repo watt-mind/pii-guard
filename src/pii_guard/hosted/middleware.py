@@ -67,7 +67,7 @@ class HostedMiddleware:
             await self.app(scope, receive, send)
             return
         path = scope.get("path", "")
-        if path in {"/healthz", "/readyz"} or (
+        if path in {"/healthz", "/readyz", "/readyz/serving"} or (
             not path.startswith(
                 ("/v1", "/e/", "/s/", "/muse-code", "/metrics", "/docs", "/redoc", "/openapi")
             )

@@ -67,6 +67,13 @@ API_KEY_ENV_VAR = "PII_GUARD_SAM_API_KEY"
 #: ``ID_PHOTO``: on the same specimens ``"id photo"`` and ``"passport photo"`` returned nothing
 #: (0/37 portraits), while ``"photo of a person"`` found 89 % at IoU >= 0.5 with 3 stray
 #: regions; see ``eval/results/visual/``.
+#: On the synthetic prompt-study set (LAB-1118, ``eval/visual/prompt-set``, 2026-10-30;
+#: ``eval/results/visual/prompt-study-synthetic.md``) the defaults hold: the signature pair
+#: finds 4/4 pen scribbles and 2/4 scanned-look signatures, but **no prompt tried finds a
+#: signature set in a script font** (0/4 for each of six prompts); ``"stamp"`` finds 5/6 stamps
+#: (``"rubber stamp"``, ``"ink stamp"`` none). ``"portrait"`` found 6/6 framed ID photos against
+#: 4/6 for ``"photo of a person"``, but only 65 % of specimen portraits, so it is not added
+#: until the pair is measured on the specimens.
 DEFAULT_PROMPTS: dict[EntityType, tuple[str, ...]] = {
     EntityType.FACE: ("face",),
     EntityType.SIGNATURE: ("signature", "squiggly line"),

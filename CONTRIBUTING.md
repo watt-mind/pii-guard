@@ -82,6 +82,7 @@ one always conflict, even when their inputs don't overlap (LAB-1269). So:
 |---|---|---|
 | the benchmark index (`eval/results/index.json`, the UI's copy) | run records | **no**: `pii-guard eval report` writes it locally, and the UI build gets it from `pii-guard eval report --print-index` (`ui/vite.config.ts`; run `uv sync` once) |
 | `docs/benchmarks.md`, `docs/benchmarks/*.svg`, `docs/benchmarks/colours.json` | run records, `docs/benchmarks/config.json` | yes, so they read on GitHub |
+| the results block of `README.md` (between `<!-- results:start -->` and `<!-- results:end -->`) | run records, per-dataset counts, the `readme` section of `docs/benchmarks/config.json` | yes |
 | the milestones block of `docs/journey.md` | `docs/journey/*.md`, one file per milestone | yes; numbers are given when it is rendered |
 
 Who renders the committed ones depends on the repository variable `RENDER_DOCS_ON_MERGE`:
