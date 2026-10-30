@@ -11,9 +11,9 @@ has that type's shape (:data:`SHAPES`: characters, separators, length).
 Cues are language-pack data, a ``cues.tsv`` next to ``captions.tsv``::
 
     # cue <TAB> entity type, or "-" for a cue that names something else (an order number)
-    kártyaszám*	BANK_ACCOUNT
-    TAJ	NATIONAL_ID_HU_TAJ
-    rendelésszám*	-
+    kártyaszám*\tBANK_ACCOUNT
+    TAJ\tNATIONAL_ID_HU_TAJ
+    rendelésszám*\t-
 
 - matching ignores case and accents (``kartyaszam`` is ``kártyaszám``), a space in a cue also
   matches a hyphen or nothing (``TAJ szám``, ``TAJ-szám``, ``TAJszám``), and a trailing ``*``
@@ -28,8 +28,8 @@ Cues are language-pack data, a ``cues.tsv`` next to ``captions.tsv``::
 A third column ``after`` marks a cue that follows its value, as Hungarian puts it
 (LAB-1199)::
 
-    számon	PHONE	after
-    számú útlevél*	ID_DOCUMENT	after
+    számon\tPHONE\tafter
+    számú útlevél*\tID_DOCUMENT\tafter
 
 The value must stand right before the cue, separated by spaces only (``a +36 30 123 4567
 számon``, ``a KA652524 számú útlevelére``), with the same shapes, score and rejections. A
@@ -268,42 +268,52 @@ _CURRENCY_BEFORE = ("$", "€", "£")
 _MAX_VALUE_LENGTH = 48
 
 
+def _value_char(ch: str, shape: Shape) -> bool:
+    return ch.isascii() and (ch.isdigit() or (shape.letters and ch.isupper()))
+
+
+def _digitish(ch: str, shape: Shape) -> bool:
+    return ch.isdigit() or (shape.plus and ch in "()")
+
+
+def _step_separator(text: str, i: int, shape: Shape, separators: str) -> int | None:
+    """Next index after separator at ``i``, or ``None`` if the value ends before ``i``."""
+    n = len(text)
+    ch = text[i]
+    if ch not in separators:
+        return None
+    j = i + 1
+    if ch == ")" and j < n and text[j] in shape.separators and text[j] != " ":  # "(95)-76"
+        j += 1
+    if ch != " " and j < n and text[j] == " ":  # "- 30", ") 234": one space after
+        j += 1
+    if j >= n or not (_value_char(text[j], shape) or (shape.plus and text[j] == "(")):
+        return None
+    # A space only separates digit groups, never a value from the next word.
+    if " " in text[i:j] and not (_digitish(text[i - 1], shape) and _digitish(text[j], shape)):
+        return None
+    return j
+
+
 def _scan_value(text: str, pos: int, shape: Shape) -> int | None:
     """End of the value starting at ``pos``, or ``None`` if none of ``shape`` starts there."""
     n = len(text)
     i = pos
     if shape.plus and i < n and text[i] in "+(":
         i += 1
-    separators = shape.separators + ("()" if shape.plus else "")
-
-    def value_char(ch: str) -> bool:
-        return ch.isascii() and (ch.isdigit() or (shape.letters and ch.isupper()))
-
-    def digitish(ch: str) -> bool:
-        return ch.isdigit() or (shape.plus and ch in "()")
-
-    if i >= n or not value_char(text[i]):
+    if i >= n or not _value_char(text[i], shape):
         return None
+    separators = shape.separators + ("()" if shape.plus else "")
     end = i
     while i < n:
-        ch = text[i]
-        if value_char(ch):
+        if _value_char(text[i], shape):
             i += 1
             end = i
             continue
-        if ch not in separators:
+        nxt = _step_separator(text, i, shape, separators)
+        if nxt is None:
             break
-        j = i + 1
-        if ch == ")" and j < n and text[j] in shape.separators and text[j] != " ":  # "(95)-76"
-            j += 1
-        if ch != " " and j < n and text[j] == " ":  # "- 30", ") 234": one space after
-            j += 1
-        if j >= n or not (value_char(text[j]) or (shape.plus and text[j] == "(")):
-            break
-        # A space only separates digit groups, never a value from the next word.
-        if " " in text[i:j] and not (digitish(text[i - 1]) and digitish(text[j])):
-            break
-        i = j
+        i = nxt
     if shape.plus and text[pos:end].count("(") > text[pos:end].count(")"):
         if text[end : end + 1] != ")":
             return None
