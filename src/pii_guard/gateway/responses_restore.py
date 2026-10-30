@@ -80,6 +80,7 @@ _DELTAS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "response.custom_tool_call_input.delta": ("input", ("output_index",), "tool"),
 }
 _DONES = {name[: -len(".delta")] + ".done": name for name in _DELTAS}
+_TERMINAL_EVENTS = frozenset({"response.completed", "response.failed", "response.incomplete"})
 
 
 #: Budget for a text that was already charged once in this stream: re-restoring it (a
@@ -178,6 +179,8 @@ def restore_response(session: VaultSession, body: dict[str, Any]) -> RestoreRepo
     One :class:`~pii_guard.vault.RestoreBudget` covers the body (the cache copy has its own):
     past it, raises :class:`~pii_guard.vault.UnmaskOutputTooLargeError` (LAB-1350)."""
     report = RestoreReport()
+    if isinstance(body.get("error"), dict):
+        body["error"] = {"code": "upstream_error", "message": "upstream failed"}
     for index, item in enumerate(body.get("output") or []):
         text = _message_text(item)
         if text is not None:
@@ -319,6 +322,8 @@ class ResponsesSseRestorer:
         return ("delta", event_type, *(data.get(f) for f in fields))
 
     def process(self, event: str | None, data: str) -> list[tuple[str | None, str]]:
+        if self._done:
+            return []
         if data.strip() == DONE:
             return [*self.finish(), (None, DONE)]
         try:
@@ -330,7 +335,10 @@ class ResponsesSseRestorer:
         self.chunks += 1
         event_type = parsed.get("type") if isinstance(parsed.get("type"), str) else event
         if event_type == "error" or (event_type is None and parsed.get("error")):
-            return [self._emit(_error("upstream_error", "upstream stream error"))]
+            return [
+                *self._flush_open(),
+                self._emit(_error("upstream_error", "upstream stream error")),
+            ]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(parsed))
         if event_type in _DELTAS:
@@ -358,6 +366,12 @@ class ResponsesSseRestorer:
             extra = self._flush(key)
             if extra is not None:
                 out.append(self._emit(extra))
+        elif event_type in _TERMINAL_EVENTS:
+            out.extend(self._flush_open())
+        if event_type == "response.failed" or isinstance(parsed.get("response"), dict):
+            response = parsed.get("response")
+            if isinstance(response, dict) and isinstance(response.get("error"), dict):
+                response["error"] = {"code": "upstream_error", "message": "upstream failed"}
         self._charged_texts.update("".join(parts) for parts in self._stream_texts.values())
         restored = _restore_value(
             self._session,
@@ -368,10 +382,6 @@ class ResponsesSseRestorer:
             context="event",
             event_type=event_type,
         )
-        if event_type == "response.failed":
-            response = restored.get("response")
-            if isinstance(response, dict) and isinstance(response.get("error"), dict):
-                response["error"] = {"code": "upstream_error", "message": "upstream failed"}
         out.append(self._emit(restored))
         return out
 
@@ -421,14 +431,17 @@ class ResponsesSseRestorer:
             return None
         return {**template, "delta": rest}
 
-    def finish(self) -> list[tuple[str | None, str]]:
-        """Delta events for anything still held back when the stream ends early."""
-        if self._done:
-            return []
-        self._done = True
+    def _flush_open(self) -> list[tuple[str | None, str]]:
         out = []
         for key in list(self._unmaskers):
             extra = self._flush(key)
             if extra is not None:
                 out.append(self._emit(extra))
         return out
+
+    def finish(self) -> list[tuple[str | None, str]]:
+        """Delta events for anything still held back when the stream ends early."""
+        if self._done:
+            return []
+        self._done = True
+        return self._flush_open()

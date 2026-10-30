@@ -15,14 +15,19 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARED, COMPARISON, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, OPEN_MODELS, PROOF, RUNS, SETS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
+import { COMPARED, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, PROOF, RUNS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
 import AgentReplay from "./AgentReplay";
+import { ImageMaskingPreview } from "./ImageMaskingPreview";
+import { LandingBenchmarkChart } from "./LandingBenchmarkChart";
 import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
+import { PublicPageContent, type PublicSections } from "./PublicPages";
+import { publicPageOf } from "./publicRoutes";
 import { useCurrentSection } from "./useCurrentSection";
 import { consoleSectionOf } from "./consoleLink";
 import { PublicHeader } from "./PublicHeader";
 import { DeferredSection } from "./DeferredSection";
+import { RecordedImageExample } from "./RecordedImageExample";
 import { PublicEvaluation } from "./PublicEvaluation";
 import { ApiReference } from "./ApiReference";
 import { isApiHash } from "./apiConfig";
@@ -35,7 +40,6 @@ const LOGOUT = "/.auth/logout?post_logout_redirect_uri=%2F";
 const NER_MODEL = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
 const DOCS = `${SOURCE}/blob/develop/docs`;
 const SELF_HOST = `${SOURCE}#try-it`;
-const MODEL_CARD = `${NER_MODEL}#model-card`;
 const CI = `${SOURCE}/actions/workflows/ci.yml`;
 const HARNESS_REPORT = `${DOCS}/integrations/harness-matrix-2026-10-29.md`;
 const EU_REGULATION = `${DOCS}/eu-regulation.md`;
@@ -45,7 +49,7 @@ const DEMO_VIDEO_URL = import.meta.env.VITE_PII_GUARD_DEMO_VIDEO_URL || null;
 
 // Below the fold and heavier than the rest of the page: loaded on demand, so the first paint
 // stays small (Lighthouse, LAB-1466).
-const ImageShowcase = lazy(() => import("./ImageShowcase"));
+
 const ResultsChart = lazy(() => import("./ResultsChart"));
 
 // TODO(owner, LAB-1474): operator name, privacy notice URL and contact address. Until they are
@@ -64,7 +68,7 @@ type Language = keyof typeof RECORDED;
 const LANGUAGES = [{ value: "en", label: "English" }, { value: "hu", label: "Hungarian" }] as const;
 
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
-const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
+const SECTIONS = ["image-preview", "how", "results", "account"] as const;
 
 const link = "inline-flex min-h-6 items-center underline underline-offset-4 hover:text-ink";
 
@@ -103,6 +107,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const [editable, setEditable] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const focusEditor = useRef(false);
+  const customDraft = useRef<{ text: string; language: Language } | null>(null);
 
   useEffect(() => () => controller.current?.abort(), []);
   const signedIn = Boolean(account?.authenticated);
@@ -122,6 +127,14 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
 
   function reset(nextLanguage = language) {
     setLanguage(nextLanguage); setText(RECORDED[nextLanguage].original); setResult(null); setFailed(false); setQuota(false); setError(""); setAnnounce("");
+  }
+  function changeInput(custom: boolean) {
+    if (editable) customDraft.current = { text, language };
+    const draft = custom ? customDraft.current : null;
+    reset(draft?.language ?? language);
+    if (draft) setText(draft.text);
+    setEditable(custom);
+    focusEditor.current = custom;
   }
   async function run() {
     setRunning(true); setError(""); setFailed(false); setQuota(false); setResult(null); setAnnounce("Running the live demo…");
@@ -175,11 +188,9 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   function heroRun(e: MouseEvent<HTMLAnchorElement>) {
     if ((!startsRun && !(signedIn && !needsKey && !running)) || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    document.getElementById("demo")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-    document.getElementById("demo-heading")?.focus({ preventScroll: true });
+    window.location.hash = "demo";
     if (signedIn) {
-      if (!editable) { setEditable(true); reset(); }
+      if (!editable) changeInput(true);
       else if (result) { focusEditor.current = true; setResult(null); setAnnounce("Your draft is ready to edit."); }
     }
     else void run();
@@ -190,12 +201,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     try { await refresh(); } finally { setReconnecting(false); }
   }
 
-  const current = useCurrentSection(SECTIONS);
+  const hash = useHash();
+  const page = publicPageOf(hash);
+  const current = useCurrentSection(SECTIONS, page);
 
-  return <div className="public-teal-theme min-h-dvh bg-canvas text-sm text-ink">
-    <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
-    <PublicHeader current={current} signedIn={signedIn} accountHref={signedIn ? (hasConsole ? "#overview" : "#account") : loginUrl} />
-    <main id="main" tabIndex={-1} className="mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10">
+  const sections: PublicSections = {
+    imagePreview: <ImageMaskingPreview />,
+    hero: (
       <section aria-labelledby="intro-heading" className="grid items-center gap-10 pt-10 sm:pt-16 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:pt-20">
         <div className="min-w-0 space-y-6">
           <p className="font-mono text-2xs text-muted sm:text-xs">Open source · OpenAI-compatible<span className="sm:hidden"> ·</span> <span className="sm:block">Built on Meta’s <span className="whitespace-nowrap">XLM-RoBERTa</span>, Muse Glimmer, Muse Spark and SAM&nbsp;3.1</span></p>
@@ -216,10 +228,11 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </div>
         <AgentReplay />
       </section>
-
+    ),
+    why: (
       <section id="why" aria-labelledby="why-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="why-heading" eyebrow="Why PII Guard" title="Made for agents, measured in the open." />
-        <ul aria-label="What makes it different" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-5">
+        <ul aria-label="What makes it different" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-3">
           <Differentiator href="#how" title="Agents, not just chat">Prompts, tool calls and streamed answers. Tested on the coding agents {HARNESS.agents.join(", ").replace(/, (?=[^,]*$)/, " and ")}: {HARNESS.requests} requests, {HARNESS.leaked} values leaked, {HARNESS.refused} turns refused.</Differentiator>
           <Differentiator href="#how" title="No LLM, no GPU to mask">Validated rules and our open NER on the CPU, adding {LATENCY.value} per request (p50). Nothing is sent out to find personal data.</Differentiator>
           <Differentiator href="#how" title="Inflected EU languages">Hungarian names change with every case; the ending stays outside the placeholder, so the model still writes correct sentences.</Differentiator>
@@ -227,18 +240,20 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <Differentiator href="#results" title="Measured in the open">Public test sets, {COMPARED.tools} other tools and {COMPARED.openModels} other open NER models, {RUNS.label} committed runs. Our NER is published.</Differentiator>
         </ul>
       </section>
-
+    ),
+    demo: (
       <section id="demo" aria-labelledby="demo-heading" aria-busy={running} className="scroll-mt-20 space-y-4">
         <SectionHead id="demo-heading" eyebrow="Demo" title="See exactly what the model sees." lead={`One request, four steps: your text, what ${modelOr("the model")} sees, its answer, and that answer with the real values back.`} />
+        <p className="max-w-3xl rounded-lg border border-line bg-surface-2 p-3 text-sm text-muted">Detection can miss values. PII Guard pseudonymizes data; it does not anonymize it. The hosted guard receives your input in full. Use fictional data while evaluating, and review the masked request. <a className={link} href="#trust">Read Privacy &amp; trust</a>.</p>
         {DEMO_VIDEO_URL && <DemoVideo url={DEMO_VIDEO_URL} />}
         <Card aria-label="Run the example">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3"><p aria-hidden="true" className="text-sm font-medium text-ink">Sample</p><SegmentedControl label="Sample language" options={LANGUAGES.map((l) => ({ ...l, disabled: running }))} value={language} onChange={(v) => reset(v as Language)} /></div>
-            {signedIn && !needsKey && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => { setEditable(e.target.value === "custom"); reset(); }}><option value="curated">The sample</option><option value="custom">Your text</option></Select></Field>}
+            <div className="flex items-center gap-3"><p aria-hidden="true" className="text-sm font-medium text-ink">{editable ? "Language" : "Sample"}</p><SegmentedControl label={editable ? "Text language" : "Sample language"} options={LANGUAGES.map((l) => ({ ...l, disabled: running }))} value={language} onChange={(v) => { if (editable) { setLanguage(v as Language); setResult(null); setFailed(false); setError(""); setAnnounce("Language changed; your draft is preserved."); } else reset(v as Language); }} /></div>
+            {signedIn && !needsKey && <Field label="Input" className="min-w-36 max-w-56 flex-1"><Select disabled={running} value={editable ? "custom" : "curated"} onChange={(e) => changeInput(e.target.value === "custom")}><option value="curated">The sample</option><option value="custom">Your text</option></Select></Field>}
             {canRun && !quota && <Button variant="primary" busy={running} disabled={!running && editable && !text.trim()} onClick={() => void run()}>{running ? "Running…" : failed ? "Try again" : editable ? "Run your text" : "Run the live demo"}</Button>}
             {result && !running && <>
               {editable && <Button onClick={() => { focusEditor.current = true; setResult(null); setAnnounce("Your draft is ready to edit."); }}>Edit your text</Button>}
-              <Button onClick={() => { setEditable(false); reset(); }}>Back to the recorded run</Button>
+              <Button onClick={() => changeInput(false)}>Back to the recorded run</Button>
             </>}
             <div className="basis-full sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
@@ -246,7 +261,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div className="mt-4 space-y-3 empty:hidden">
             {account && !signedIn && sponsoredOff && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={loginUrl}>Sign in to run your own text</ButtonLink>}>The recorded run below shows the same flow, answered by a real model.</Notice>}
             {needsKey && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={hasConsole ? "#connect" : "#account"}>Add a model key</ButtonLink>}>Add your own model key to run it, or follow the recorded run below.</Notice>}
-            {!account && accountError && <Notice title="The live service isn’t reachable" action={<Button busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Retry live service"}</Button>}>The recorded run below still shows the whole flow.</Notice>}
+            {!account && accountError && <Notice tone="danger" live title="The live service isn’t reachable" action={<Button busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Retry live service"}</Button>}>The recorded run below still shows the whole flow.</Notice>}
             {running && <div className="rounded-lg border border-line bg-surface-2 p-3 sm:p-4">
               <p className="flex items-center gap-2 text-sm font-medium text-ink"><span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ink motion-safe:animate-pulse" />Waiting for the live result</p>
               <p className="mt-2 text-xs text-muted">Masking, the model response and restoration happen on the server. Individual stage progress isn’t available here.</p>
@@ -279,19 +294,23 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           </div>
           <p className="text-xs text-muted">Blue marks a value and the placeholder that replaced it; green marks a value PII Guard put back.</p>
         </div>
+        {account && <details className="rounded-lg border border-line bg-surface p-4"><summary className="cursor-pointer font-medium">Hosted preview account and limits</summary><div className="mt-4"><Limits account={account} hideZero /></div></details>}
       </section>
-
+    ),
+    meta: (
       <section id="meta" aria-labelledby="meta-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="meta-heading" eyebrow="Built on Meta models" title="Open weights wherever real data goes. Hosted models see placeholders." lead="Anything that sees real personal data is an open-weight model you can run yourself." />
-        <ul aria-label="Meta models and what each does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
-          <MetaModel name="XLM-RoBERTa" where="Inside PII Guard, CPU" role={<>The base of our NER, fine-tuned for personal data. Runs on every request. <a className={link} href={NER_MODEL}>Published ↗</a></>} />
-          <MetaModel name="Muse Glimmer 30B" where="Open weights, served on Modal" role="The teacher: it labeled 4,964 fictional documents, and our NER was distilled from its labels." />
-          <MetaModel name="Muse Spark Open" where="Open weights, on Baseten" role="The opt-in audit detector, and the red team that tries to re-identify masked text." />
-          <MetaModel name="SAM 3.1" where="Self-hosted installs" role="Finds signatures on scans, so they’re masked along with faces and ID photos." />
-          <MetaModel name={modelOr("Muse Spark")} where="Meta Model API" role="Answers in this demo. It only ever sees placeholders." />
+        <SectionHead id="meta-heading" eyebrow="Built on Meta models" title="What runs inside the guard—and what runs at the provider." lead="Detection, training and downstream generation play different roles. Enabling a remote detector extends the boundary that receives original data." />
+        <ul aria-label="Meta models and what each does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
+          <MetaModel stage="Runtime detection" name="XLM-RoBERTa" where="Inside PII Guard, CPU" role={<>The NER component used for hosted fast text detection, alongside validated rules. Rules-only configurations are also available. <a className={link} href={NER_MODEL}>Published ↗</a></>} />
+          <MetaModel stage="Training only" name="Muse Glimmer 30B" where="Open weights, served on Modal" role="The teacher: it labeled 4,964 fictional documents, and our NER was distilled from its labels." />
+          <MetaModel stage="Optional remote audit" name="Muse Spark Open" where="Open weights, on Baseten" role="The opt-in audit detector receives originals. It also supports red-team evaluation that tries to re-identify masked text." />
+          <MetaModel stage="Image processing" name="SAM 3.1" where="Self-hosted installs" role="Finds signatures on scans, so they’re masked along with faces and ID photos." />
+          <MetaModel stage="Downstream generation" name={modelOr("Muse Spark")} where="Meta Model API" role="Answers in this demo after masking. Detection can miss values; inspect the masked request before relying on it." />
         </ul>
+        <p className="text-sm text-muted">The hosted preview uses local image detectors rather than SAM. <a className={link} href="#trust">Check the hosted trust boundary</a> before choosing remote detection.</p>
       </section>
-
+    ),
+    europe: (
       <section id="europe" aria-labelledby="europe-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="europe-heading" eyebrow="Why Europe" title="What EU rules ask, and what PII Guard does." />
         <ul aria-label="EU rules and what PII Guard does" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-3">
@@ -311,12 +330,12 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           </Card>
         </div>
       </section>
-
+    ),
+    images: (
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
-        {/* Reserved from production measurements: stacked phone/tablet panes, paired desktop panes. */}
-        <DeferredSection anchor="images" className="min-h-[2200px] sm:min-h-[2600px] lg:min-h-[1100px]"><ImageShowcase /></DeferredSection>
-        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model, with faces, ID photos and signatures found on the server itself. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <RecordedImageExample />
+        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model, with faces, ID photos and signatures found on the server itself. The recorded specimens keep signatures and stamps visible; current project policies can choose to mask detected signatures. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
         <div aria-labelledby="images-proof-heading" role="group" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 border-y border-line py-5 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="min-w-0">
             <h3 id="images-proof-heading" className="text-sm font-medium text-ink">Measured on images</h3>
@@ -325,31 +344,21 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-3">{IMAGE_PROOF.map((p) => <Metric key={p.label} label={p.label} value={p.value} hint={p.hint} />)}</dl>
         </div>
       </section>
-
-      <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="results-heading" eyebrow="Results" title="The lowest leak rate on each test set below." lead="Committed runs of 27–28 Oct 2026 on fictional and public data. Leak: personal values that still reach the model; F1 also counts over-masking. The sets are small, so treat a gap of a point or two as noise; where PII Guard is weaker is under Limits." />
-        <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-6 lg:grid-cols-2">
+    ),
+    results: (
+      <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-5">
+        <SectionHead id="results-heading" eyebrow="Benchmarks" title="The lowest leak rate on each test set below." lead="Committed runs on fictional and public data. Leak rate measures personal values left unmasked; lower is better. These are specific test sets, so small differences should be treated with care." />
+        <p className="max-w-3xl text-muted">{RUNS.label} committed benchmark runs. {MEASURED}. Detection adds {LATENCY.value} per request (p50) in the published measurement.</p>
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English, Hungarian and Polish set (62 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
             <DeferredSection anchor="results" className="min-h-[340px]"><ResultsChart /></DeferredSection>
           </Card>
-          <Card title="Leak and F1 by dataset" headingLevel={3} subtitle="Leak: labeled personal values that still reach the model (lower is safer). F1: detection accuracy (higher is better)." className="flex flex-col">
-            <div tabIndex={0} role="region" aria-label="Leak and F1 by dataset, scrollable" className="hidden overflow-x-auto rounded-md sm:block">
-              <table className="w-full min-w-[28rem] border-collapse text-sm">
-                <caption className="sr-only">Leak rate and F1 in percent, by dataset, for PII Guard and three comparison tools</caption>
-                <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-2 pr-3 text-left font-normal">System</th>{SETS.map((set) => <th key={set} scope="col" className="px-2 py-2 text-right font-normal last:pr-0">{set}<span className="block">leak · F1</span></th>)}</tr></thead>
-                <tbody>{COMPARISON.map((row) => <tr key={row.system} className="border-b border-line last:border-0"><th scope="row" className={["py-2 pr-3 text-left", row.ours ? "font-medium" : "font-normal"].join(" ")}>{row.system}</th>{row.leak.map((v, i) => <td key={i} className={["px-2 py-2 text-right whitespace-nowrap tabular-nums last:pr-0", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;% · {row.f1[i]}&nbsp;%</td>)}</tr>)}</tbody>
-              </table>
-            </div>
-            <div className="space-y-5 sm:hidden">{SETS.map((set, i) => <ResultTable key={set} caption={set} columns={["Leak", "F1"]} rows={COMPARISON.map((row) => ({ name: row.system, ours: row.ours, values: [row.leak[i]!, row.f1[i]!] }))} />)}</div>
-            <p className="mt-3 text-xs text-muted">PII Guard runs of 28 Oct 2026, the other tools 27 Oct 2026. CEE-PII and Nemotron-PII are public test splits PII Guard was not trained on.</p>
-            <div className="mt-auto border-t border-line pt-4">
-              <p className="text-muted"><span className="font-medium text-ink">Against {COMPARED.openModels} other open PII models</span>, with the same rules around each: ours leaks {OPEN_MODELS[0].leak}&nbsp;%. The closest, {OPEN_MODELS[1].model}, leaks {OPEN_MODELS[1].leak}&nbsp;% and masks about nine times as much text that isn’t personal data ({OPEN_MODELS[1].over}&nbsp;% against {OPEN_MODELS[0].over}&nbsp;%).</p>
-              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">{hasConsole && <a className={link} href="#evaluation">Open the Evaluation page</a>}<a className={link} href={`${DOCS}/benchmarks.md`}>All benchmark results ↗</a><a className={link} href={`${DOCS}/evaluation.md`}>How we measure ↗</a><a className={link} href={MODEL_CARD}>NER model card ↗</a></p>
-            </div>
-          </Card>
+          <LandingBenchmarkChart />
         </div>
+        <div className="flex flex-wrap gap-3"><ButtonLink href="#evaluation">Explore the benchmarks</ButtonLink><a className="inline-flex min-h-11 items-center rounded-sm underline underline-offset-4" href="#trust">Read the limits</a></div>
       </section>
-
+    ),
+    how: (
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="how-heading" eyebrow="How it works" title="Live in three steps." lead="An OpenAI-compatible gateway (Chat Completions and Responses) between your agent and the model provider, tested with Codex, OpenCode, Muse Code, pi and the OpenAI SDK." />
         <ol aria-label="Live in three steps" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -361,26 +370,28 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <Step n={3} title="See every request in Logs, with its outbound check result.">What the model received, and the re-check before it left: a request is blocked if a known value survived masking.</Step>
         </ol>
       </section>
-
+    ),
+    data: (
       <section id="data" aria-labelledby="data-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="data-heading" eyebrow="Your data" title="What happens to your data here." lead="This covers the hosted preview. If you self-host, all of it stays on your own servers." />
+        <SectionHead id="data-heading" eyebrow="Your data" title="What happens to your data here." lead="This describes the hosted preview. Self-hosting puts the guard in your chosen infrastructure; masked requests still go to your chosen model provider, and remote detectors can receive originals." />
         <Card>
           <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-2 lg:grid-cols-2">
-            <KeyValues items={[
+            <div><h3 className="mb-3 text-sm font-medium text-ink">Processing and access</h3><KeyValues items={[
               { label: "Where", value: "Microsoft Azure, Sweden Central (EU). Processed in memory. No content archive, and no backup of the mappings. Azure operators can access process memory." },
               { label: "As a guest", value: `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
               { label: "Signed in", value: `Google receives your sign-in (name, email, profile). PII Guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
-            ]} />
-            <KeyValues items={[
-              { label: "Images", value: "Signed in only. Read and masked inside the service: faces and ID photos are covered, and signatures and stamps stay visible. Images are never stored or sent to a model." },
+            ]} /></div>
+            <div><h3 className="mb-3 text-sm font-medium text-ink">Images, retention and provider</h3><KeyValues items={[
+              { label: "Images", value: "Signed in only. Faces, ID photos and signatures are detected locally; your project policy decides mask or keep. Stamps cannot be detected, so a policy requiring stamp masking refuses the image. Images are processed in memory, returned to you, and never stored or sent to a model." },
               { label: "How long", value: "Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable; it doesn’t prove the memory is erased." },
-              { label: "What Meta receives", value: <>Masked text only. The <a className={link} href={META_TERMS}>Meta Model API terms ↗</a> exclude training on it (section 5.1) but allow retention as needed (section 4.4), and processing there isn’t guaranteed to stay in the EU.</> },
-            ]} />
+              { label: "What Meta receives", value: <>The request after masking; missed values can remain. The <a className={link} href={META_TERMS}>Meta Model API terms ↗</a> exclude training on it (section 5.1) but allow retention as needed (section 4.4), and processing there isn’t guaranteed to stay in the EU.</> },
+            ]} /></div>
           </div>
           <p className="mt-4 text-xs text-muted"><a className={link} href={`${DOCS}/hosted.md`}>Full processing and retention details ↗</a></p>
         </Card>
       </section>
-
+    ),
+    privacy: (
       <section id="privacy" aria-labelledby="privacy-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="privacy-heading" eyebrow="Limits" title="What PII Guard doesn’t promise." />
         <ul aria-label="What PII Guard doesn’t promise" className="grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-2 lg:grid-cols-3">
@@ -399,45 +410,31 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         </ul>
         <p className="text-xs text-muted"><a className={link} href={`${DOCS}/privacy-model.md`}>Read the privacy model ↗</a></p>
       </section>
-
+    ),
+    account: (
       <section id="account" aria-labelledby="account-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={!account && accountError ? "The live service isn’t reachable right now. You can still self-host it, or come back to run the live demo." : signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live demo. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
         <div className="flex flex-wrap items-center gap-3">
           {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
-          <Card title="Hosted preview" subtitle="For evaluation · we run the guard" headingLevel={3} aria-label="Hosted preview: your runs and the server limits">
-            <div className="space-y-4">
-              <KeyValues items={[
-                { label: "Your originals", value: "Our service on Azure, Sweden Central (EU), in memory." },
-                { label: "What leaves", value: `Masked text, to ${modelOr("Meta’s model")} or the provider you connect.` },
-              ]} />
-              {accountError ? <Notice tone="danger" live action={<Button size="sm" busy={reconnecting} onClick={() => void reconnect()}>{reconnecting ? "Retrying…" : "Reconnect to API"}</Button>}>{accountError}</Notice> : !account ? <p className="text-muted">Checking live availability…</p> : <>
-                {(!sponsoredOff || signedIn) && <dl className="grid max-w-md grid-cols-2 gap-4 border-t border-line pt-4">
-                  {typeof account.limits.requests_per_day === "number"
-                    ? <Metric label={signedIn ? "Runs left today" : "Free runs left today"} value={Math.max(0, account.limits.requests_per_day - account.usage.requests_today)} suffix={`of ${account.limits.requests_per_day}`} />
-                    : <Metric label="Runs today" value={account.usage.requests_today} />}
-                  <Metric label="Resets" value={resetsIn(account) ?? "—"} />
-                </dl>}
-                <Limits account={account} hideZero />
-                <p className="text-xs text-muted">A restart clears sessions and model connections. Model keys stay with the service, never in your browser.</p>
-              </>}
-            </div>
-          </Card>
-          <Card title="Self-hosted" subtitle="Open source · you run it" headingLevel={3}>
-            <KeyValues items={[
-              { label: "Your originals", value: "Your own servers. Use local detectors to keep all raw processing local." },
-              { label: "What leaves", value: "Masked text, to the model you choose." },
-              { label: "Who runs it", value: <>You, under Apache-2.0. One command starts it:<code className="mt-1 block font-mono text-ui">uvx --from wattmind-pii-guard pii-guard up</code></> },
-            ]} />
-          </Card>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card title="Hosted console" subtitle="Try your own text and connect your app." headingLevel={3}><p className="text-muted">Manage projects, model connections and gateway endpoints in one place.</p><p className="mt-4 text-xs text-muted"><a className={link} href="#trust">Hosted processing and retention details</a></p></Card>
+          <Card title="Self-hosted" subtitle="Open source · you run it" headingLevel={3}><p className="text-muted">Run the gateway on your own servers and connect an OpenAI-compatible client.</p><p className="mt-4"><a className={link} href={SELF_HOST}>Self-hosting guide ↗</a></p></Card>
         </div>
       </section>
+    ),
+  };
+
+  return <div className="public-teal-theme min-h-dvh bg-canvas text-sm text-ink">
+    <a href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }} className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">Skip to content</a>
+    <PublicHeader current={page === "demo" ? "demo" : page === "trust" ? "trust" : page === "technical" ? "technical" : current} signedIn={signedIn} accountHref={signedIn ? (hasConsole ? "#overview" : "#account") : loginUrl} />
+    <main id="main" tabIndex={-1} className={`mx-auto max-w-[1280px] space-y-16 px-4 pb-16 focus:outline-none sm:px-6 lg:space-y-20 lg:px-10 ${page !== "home" ? "public-subpage" : ""}`}>
+      <PublicPageContent page={page} hash={hash} sections={sections} />
     </main>
     <footer className="public-footer border-t border-line">
       <div className="mx-auto grid max-w-[1280px] gap-4 px-4 py-8 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <a href="#" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
+          <a href="#site" className="flex h-9 items-center gap-2.5 rounded-sm text-base font-medium text-ink"><Logo />PII Guard</a>
         </div>
         <p className="text-muted">Open-source privacy gateway for AI agents.</p>
         <nav aria-label="Footer" className="public-footer-columns">
@@ -450,7 +447,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div><h2>Learn</h2>
             <a href="#how">How it works</a>
             <a href={`${DOCS}/benchmarks.md`}>Benchmarks <span aria-hidden="true">↗</span></a>
-            <a href="#data">Privacy</a>
+            <a href="#trust">Privacy &amp; trust</a>
             {PRIVACY_NOTICE_URL && <a href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
           </div>
           <div className="public-footer-project"><h2>Project</h2>
@@ -488,14 +485,6 @@ function Differentiator({ href, title, children }: { href: string; title: string
 }
 
 /** A small results table: one row per system, values in percent; ours in ink. Fits a phone. */
-function ResultTable({ caption, hideCaption = false, columns, rows }: { caption: string; hideCaption?: boolean; columns: string[]; rows: { name: string; title?: string; ours?: boolean; values: readonly string[] }[] }) {
-  return <table className="w-full border-collapse text-sm">
-    <caption className={hideCaption ? "sr-only" : "pb-1 text-left text-xs font-medium text-ink"}>{caption}</caption>
-    <thead><tr className="border-b border-line text-xs text-muted"><th scope="col" className="py-1.5 pr-3 text-left font-normal">System</th>{columns.map((c) => <th key={c} scope="col" className="py-1.5 pl-2 text-right font-normal">{c}</th>)}</tr></thead>
-    <tbody>{rows.map((row) => <tr key={row.name} className="border-b border-line last:border-0"><th scope="row" title={row.title} className={["py-1.5 pr-3 text-left", row.ours ? "font-medium text-ink" : "font-normal text-ink"].join(" ")}>{row.name}</th>{row.values.map((v, i) => <td key={i} className={["py-1.5 pl-2 text-right whitespace-nowrap tabular-nums", row.ours ? "font-medium text-ink" : "text-muted"].join(" ")}>{v}&nbsp;%</td>)}</tr>)}</tbody>
-  </table>;
-}
-
 /** One audience in the "Who it's for" card: columns split by hairlines from md up. */
 function Audience({ title, task, children }: { title: string; task: string; children: ReactNode }) {
   return <li className="min-w-0 md:px-5 md:first:pl-0 md:last:pr-0"><h3 className="text-sm font-medium text-ink">{title}</h3><p className="mt-2 border-l-2 border-line pl-2.5 font-mono text-2xs text-ink sm:text-xs">“{task}”</p><p className="mt-2 text-muted">{children}</p></li>;
@@ -527,6 +516,6 @@ function ProofItem({ href, children }: { href: string; children: ReactNode }) {
 }
 
 /** One model in the Meta strip: what it does and where it runs. */
-function MetaModel({ name, where, role }: { name: string; where: string; role: ReactNode }) {
-  return <li className="min-w-0 bg-surface p-4"><h3 className="text-sm font-medium text-ink">{name}</h3><p className="mt-0.5 font-mono text-2xs text-guard">{where}</p><p className="mt-2 text-muted">{role}</p></li>;
+function MetaModel({ stage, name, where, role }: { stage: string; name: string; where: string; role: ReactNode }) {
+  return <li className="min-w-0 bg-surface p-4 sm:p-5"><p className="mb-3 text-xs text-muted">{stage}</p><h3 className="text-sm font-medium text-ink">{name}</h3><p className="mt-0.5 font-mono text-2xs text-guard">{where}</p><p className="mt-2 text-muted">{role}</p></li>;
 }

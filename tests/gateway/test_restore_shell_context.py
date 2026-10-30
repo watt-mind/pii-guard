@@ -421,3 +421,33 @@ def test_custom_tool_input_outside_quotes_stays_byte_exact() -> None:
     ph = _placeholder(session, value)
     text = f"name = {ph}\ncall({ph})"
     assert _restored_input(session, text) == text.replace(ph, value)
+
+
+@needs_shell
+@pytest.mark.parametrize("value", ACTIVE_VALUES + VALUES)
+def test_security_multiline_script_after_comment_still_escapes(value: str) -> None:
+    """A comment on an earlier line must not disable shell escaping for subsequent lines."""
+    session = _session()
+    ph = _placeholder(session, value)
+    command = _restored_command(session, f"# header comment\nprintf '%s' '{ph}'")
+    assert _bash(command) == value
+
+
+@needs_shell
+@pytest.mark.parametrize("value", ACTIVE_VALUES + VALUES)
+def test_security_escaped_dollar_before_paren_or_quote_still_escapes(value: str) -> None:
+    """``\\$(`` and ``\\$'`` are literal characters, not command substitution or ANSI-C quoting."""
+    session = _session()
+    ph = _placeholder(session, value)
+    command = _restored_command(session, f'printf "%s" "\\$({ph})"')
+    assert _bash(command) == f"$({value})"
+
+
+def test_non_shell_array_with_dash_c_stays_byte_exact() -> None:
+    """An execve array like ``["git", "-c", ...]`` is not a shell script and stays byte-exact."""
+    session = _session()
+    value = VALUES[0]
+    ph = _placeholder(session, value)
+    arguments = json.dumps({"command": ["git", "-c", f"user.name='{ph}'", "status"]})
+    restored = json.loads(_whole_arguments(session, arguments))["command"]
+    assert restored == ["git", "-c", f"user.name='{value}'", "status"]

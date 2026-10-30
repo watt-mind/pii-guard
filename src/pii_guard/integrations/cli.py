@@ -27,7 +27,9 @@ pii-guard connect codex|opencode --check [--gateway URL] [--model ID]
   always written as given: endpoints have no ``/s/<session>`` form (LAB-1614).
 
 - ``connect pi`` merges a ``pii-guard`` provider into pi's ``models.json`` (a backup of the old
-  file first; nothing is written when it's already up to date). ``--dry-run`` prints the diff
+  file first; nothing is written when it's already up to date). For a project endpoint URL the
+  provider has no ``X-PII-Guard-Mode`` / ``-Language`` headers: the endpoint's policy sets
+  both and refuses a request that names others (LAB-1651). ``--dry-run`` prints the diff
   and writes nothing; it works without a running gateway (the model list is then empty unless
   ``--model`` gives it).
 - ``connect pi --check`` sends one fictional canary request the way pi would (the provider's
@@ -111,10 +113,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=lambda v: cli_mode(v, "pii-guard connect"),
         choices=("fast", "audit"),
         default="fast",
-        help="X-PII-Guard-Mode the client sends (default: fast, rules + NER)",
+        help="X-PII-Guard-Mode the client sends (default: fast, rules + NER); not written "
+        "for a project endpoint URL, whose policy sets the mode",
     )
     parser.add_argument(
-        "--language", default="en", help="X-PII-Guard-Language the client sends (default: en)"
+        "--language",
+        default="en",
+        help="X-PII-Guard-Language the client sends (default: en); not written for a project "
+        "endpoint URL, whose policy sets the language",
     )
     parser.add_argument(
         "--api-key",

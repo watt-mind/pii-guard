@@ -37,6 +37,7 @@ import logging
 import re
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from contextlib import suppress
 from typing import Any, cast
 
 import httpx
@@ -252,8 +253,8 @@ class MessagesGateway:
         trace: CallTrace,
         path_session: str | None,
         stats: RequestStats,
-    ) -> tuple[Any, str, Any]:
-        """Steps 1-2: the masked body in place. Returns ``(session, language, detector)``."""
+    ) -> tuple[Any, str, Any, bytes]:
+        """Steps 1-2: mask body in place and return ``(session, language, detector, payload)``."""
         gw = self.gateway
         mode = stats.mode
         language = gw._language(headers)
@@ -309,12 +310,16 @@ class MessagesGateway:
             _count_masked(stats, before, session)
             with timer.span("mask"):
                 gw._recheck(body, collect_message_texts, session, language, stats, names, issued)
+            forwarding = time.perf_counter()
+            payload = gw._forwarded(body, session, stats, add_messages_note)
+            check_upstream_payload(payload, stats.image_payload_bytes)
+            timer.add("forward", time.perf_counter() - forwarding)
         except BaseException:
             stats.log("blocked")
             gw._release_session(session, created, masked=False)
             raise
         gw._release_session(session, created, masked=True)
-        return session, language, detector
+        return session, language, detector, payload
 
     async def _messages(
         self,
@@ -331,7 +336,7 @@ class MessagesGateway:
         url = self._upstream_url("/messages/count_tokens" if count_tokens else "/messages")
         mode = gw._mode(headers)
         echo = gw._echo(headers)
-        stats = _Stats(mode=mode)
+        stats = _Stats(mode=mode, mode_alias=gw._mode_alias(headers))
         trace.stats = stats
         stream = isinstance(body, dict) and body.get("stream") is True and not count_tokens
         if echo and (stream or count_tokens):
@@ -339,7 +344,7 @@ class MessagesGateway:
                 "X-PII-Guard-Echo is supported on non-streamed /v1/messages calls only"
             )
         stats.stream = stream
-        session, language, detector = await self._mask(
+        session, language, detector, payload = await self._mask(
             body,
             headers,
             max_text_chars=max_text_chars,
@@ -349,14 +354,6 @@ class MessagesGateway:
             stats=stats,
         )
         body = cast(dict[str, Any], body)
-
-        forwarding = time.perf_counter()
-        payload = gw._forwarded(body, session, stats, add_messages_note)
-        try:
-            check_upstream_payload(payload, stats.image_payload_bytes)
-        except PayloadTooLargeError:
-            stats.log("blocked")
-            raise
         if trace.payloads:
             trace.masked_request = payload
         masked_input = _masked_messages(body) if echo else None
@@ -368,7 +365,6 @@ class MessagesGateway:
             "POST", url, content=payload, headers=upstream_headers, timeout=gw.upstream_timeout()
         )
         started = time.perf_counter()
-        timer.add("forward", started - forwarding)
         timer.upstream_sent = started
         try:
             response = await client.send(request, stream=True)
@@ -395,6 +391,7 @@ class MessagesGateway:
             finally:
                 await response.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
             if response.status_code in (404, 405):
                 stats.log("unsupported_api")
                 raise UnsupportedApiError(
@@ -409,7 +406,17 @@ class MessagesGateway:
         if count_tokens:
             return await self._count(response, started, timer, stats, out_headers)
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
-        if not stream or not is_sse:
+        if stream and not is_sse:
+            with suppress(httpx.HTTPError):
+                await response.aclose()
+            stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            stats.log("upstream_did_not_stream")
+            raise UpstreamError(
+                "upstream did not return an event stream; retry without stream",
+                code="upstream_did_not_stream",
+            ) from None
+        if not stream:
             return await self._whole(
                 response,
                 started,
@@ -577,13 +584,14 @@ class MessagesGateway:
                 if trace.recording and restorer.usage:
                     trace.usage = restorer.usage
                 if outcome == "ok":
-                    restored = {}
-                    for index, masked in restorer.masked_content().items():
-                        text, spans, _ = restore_text(session, masked)
-                        restored[index] = (text, spans)
-                    self.gateway._seed_cache(session, language, detector, restored, stats)
-                    if trace.full:
-                        trace.stream_restored = {i: t for i, (t, _) in restored.items()}
+                    with suppress(PiiGuardError):
+                        restored = {}
+                        for index, masked in restorer.masked_content().items():
+                            text, spans, _ = restore_text(session, masked)
+                            restored[index] = (text, spans)
+                        self.gateway._seed_cache(session, language, detector, restored, stats)
+                        if trace.full:
+                            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
                 stats.log(outcome)
                 if trace.payloads:
                     trace.stream_masked = restorer.masked_content()
@@ -595,6 +603,7 @@ class MessagesGateway:
                 else:
                     trace.finish(outcome="stream_error", error={"code": "stream_failed"})
 
+        out_headers["Cache-Control"] = "no-cache"
         return (
             StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
             stats,

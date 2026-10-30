@@ -321,7 +321,7 @@ class HostedMiddleware:
                 )
                 async with asyncio.timeout_at(deadline):
                     scope, receive = await endpoint_body(
-                        scope, receive, state, self.service.settings.hosted_max_body_bytes
+                        scope, receive, state, self.service.settings.hosted_endpoint_max_body_bytes
                     )
                 headers = Headers(scope=scope)
             # Text routes stay text-sized; the image route gets its own bounded limit, and
@@ -333,7 +333,13 @@ class HostedMiddleware:
                 and principal.auth_method == "google"
                 and routed is None
             )
-            text_limit = self.service.settings.hosted_max_body_bytes
+            # Endpoint routes carry coding agents' prompts and tool schemas: their own limit
+            # (LAB-1651); the console and guard API keys keep the text limit.
+            text_limit = (
+                self.service.settings.hosted_endpoint_max_body_bytes
+                if routed is not None
+                else self.service.settings.hosted_max_body_bytes
+            )
             if image:
                 body_limit = image_body_limit(self.service.settings)
             elif chat_images:
@@ -415,9 +421,14 @@ class HostedMiddleware:
                 output_field = (
                     "max_output_tokens" if canonical == "/v1/responses" else "max_completion_tokens"
                 )
+                # A limit above the hosted cap is clamped to it, not refused (LAB-1651): coding
+                # agents ask for 16k-32k (OpenCode 32000, pi 16384, Muse 32000) and can't be
+                # told otherwise. Every field is only an upper bound on the reply, so the
+                # smallest one wins and the reservation below charges that, never more. A
+                # value that isn't a positive integer is still refused.
                 for key in ("max_tokens", "max_completion_tokens", "max_output_tokens"):
                     value = body.pop(key, maximum)
-                    if type(value) is not int or not 1 <= value <= maximum:
+                    if type(value) is not int or value < 1:
                         raise HostedRequestError("Output token limit is outside hosted limits")
                     maximum = min(maximum, value)
                 body[output_field] = maximum

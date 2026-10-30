@@ -60,6 +60,6 @@ describe("the Evaluation page while signed out (LAB-1533)", () => {
   it("the public Results section links to the page", async () => {
     open("#results");
     render(<HostedApp call={vi.fn(async () => anonymous) as unknown as Requester} console={consoleStub} />);
-    expect(await screen.findByRole("link", { name: "Open the Evaluation page" })).toHaveAttribute("href", "#evaluation");
+    expect(await screen.findByRole("link", { name: "Explore the benchmarks" })).toHaveAttribute("href", "#evaluation");
   });
 });

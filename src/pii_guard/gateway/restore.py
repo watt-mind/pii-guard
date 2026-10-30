@@ -242,7 +242,9 @@ _JSON_ESCAPE = _EscapeForm("\\\\")
 
 _OPEN_TOKENS = ("[", "%5B", "%5b", "\\u005b", "\\u005B")
 _CLOSE_TOKENS = ("]", "%5D", "%5d", "\\u005d", "\\u005D")
-_ENCODED_RE = re.compile(rf"(?:\[|%5[bB]|\\u005[bB]){{2}}{_BODY}(?:\]|%5[dD]|\\u005[dD]){{2}}")
+_ENCODED_RE = re.compile(
+    rf"(?:\[|%5[bB]|(?<!\\)\\u005[bB]){{2}}{_BODY}(?:\]|%5[dD]|(?<!\\)\\u005[dD]){{2}}"
+)
 #: Longest encoded placeholder (every bracket as ``\uXXXX``), plus a suffix that may still grow.
 _ENCODED_LONGEST = MAX_PLACEHOLDER_LENGTH + 4 * 5 + MAX_SUFFIX_LENGTH
 _OPEN_SUFFIX_RE = re.compile(r"-?\w*")

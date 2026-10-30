@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
  * the last of `ids` whose top has passed a line a little below the sticky header. Null above
  * the first one and below the last. Re-picked on scroll and resize, once per frame.
  */
-export function useCurrentSection(ids: readonly string[]): string | null {
+export function useCurrentSection(ids: readonly string[], page = "home"): string | null {
   const [current, setCurrent] = useState<string | null>(null);
   const key = ids.join(" ");
   useEffect(() => {
@@ -26,6 +26,6 @@ export function useCurrentSection(ids: readonly string[]): string | null {
     addEventListener("resize", schedule, { passive: true });
     pick();
     return () => { removeEventListener("scroll", schedule); removeEventListener("resize", schedule); cancelAnimationFrame(frame); };
-  }, [key]);
+  }, [key, page]);
   return current;
 }

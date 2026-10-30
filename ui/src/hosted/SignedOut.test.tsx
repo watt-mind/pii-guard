@@ -45,7 +45,7 @@ describe("a console deep link while signed out (LAB-1519)", () => {
     for (const hash of ["#demo", "#images", "#account", "#nope", ""]) {
       open(hash);
       const { unmount } = render(<HostedApp call={requester(() => anonymous)} console={consoleStub} />);
-      expect(await screen.findByRole("heading", { level: 1, name: /Send the work to the model/ })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { level: 1, name: hash === "#demo" || hash === "#images" ? "Interactive demo" : /Send the work to the model/ })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: /^Sign in to see/ })).toBeNull();
       unmount();
     }
