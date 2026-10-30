@@ -94,6 +94,13 @@ describe("the renderer's configuration (LAB-1586)", () => {
     expect(hostedServers("https://guard.example.test", null)).toHaveLength(2);
     expect((referenceConfig("/x.json", false, servers) as Record<string, unknown>).servers).toBe(servers);
   });
+
+  it("rewrites only servers on the public origin itself, not hosts that merely start with it", () => {
+    const op = (url: string) => ({ "/v1/x": { post: { servers: [{ url }] } } });
+    const url = (spec: ReturnType<typeof hostedSpec>) => (spec.paths!["/v1/x"]!.post as { servers: { url: string }[] }).servers[0]!.url;
+    expect(url(hostedSpec({ paths: op("https://guard.watt-mind.com/e/{endpoint_id}") }, "https://guard.example.test", null))).toBe("https://guard.example.test/e/{endpoint_id}");
+    expect(url(hostedSpec({ paths: op("https://guard.watt-mind.com.evil.example/v1") }, "https://guard.example.test", null))).toBe("https://guard.watt-mind.com.evil.example/v1");
+  });
 });
 
 describe("the API reference page", () => {
