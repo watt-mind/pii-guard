@@ -73,7 +73,9 @@ _SCHEMA_STRUCTURAL = frozenset({"type", "$ref", "$schema", "$id", "$anchor", "fo
 #: JSON-Schema keywords whose values are data (any JSON): every string in them is masked.
 _SCHEMA_DATA = frozenset({"enum", "const", "default", "examples"})
 #: JSON-Schema keywords mapping identifiers (checked, not masked) to sub-schemas.
-_SCHEMA_NAMED = frozenset({"properties", "patternProperties", "$defs", "definitions"})
+_SCHEMA_NAMED = frozenset(
+    {"properties", "patternProperties", "$defs", "definitions", "dependentSchemas"}
+)
 #: Every keyword above plus the common ones whose keys are structure (not checked).
 _SCHEMA_KEYWORDS = (
     _SCHEMA_STRUCTURAL
@@ -90,7 +92,6 @@ _SCHEMA_KEYWORDS = (
             "contentEncoding",
             "contentMediaType",
             "dependentRequired",
-            "dependentSchemas",
             "description",
             "else",
             "exclusiveMaximum",
@@ -1035,6 +1036,19 @@ def _collect_schema(
                 for i, entry in enumerate(sub):
                     if isinstance(entry, str):
                         _check_text(entry, f"{at}.{i}", out)
+                    else:
+                        _check_json(sub, i, f"{at}.{i}", out)
+            elif name == "dependentRequired" and isinstance(sub, dict):
+                for i, (prop, reqs) in enumerate(list(sub.items())):
+                    _check_text(prop, f"{at}.{i}", out)
+                    if isinstance(reqs, list):
+                        for j, entry in enumerate(reqs):
+                            if isinstance(entry, str):
+                                _check_text(entry, f"{at}.{i}.{j}", out)
+                            else:
+                                _check_json(reqs, j, f"{at}.{i}.{j}", out)
+                    else:
+                        _check_json(sub, prop, f"{at}.{i}", out)
             else:
                 _collect_schema(value, name, at, out)
 
@@ -1050,6 +1064,8 @@ def _check_identifier(holder: dict[str, Any], key: str, where: str, out: Collect
     value = holder.get(key)
     if isinstance(value, str):
         _check_text(value, where, out)
+    elif value is not None:
+        raise InvalidChatRequestError(f"{where} must be a string")
 
 
 def _check_text(text: str, where: str, out: CollectedTexts) -> None:

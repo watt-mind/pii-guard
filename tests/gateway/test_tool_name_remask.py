@@ -244,6 +244,16 @@ def test_a_real_name_in_an_identifier_is_still_refused_after_the_tool_name() -> 
     assert response.json()["error"]["code"] == "unsupported_content"
 
 
+def test_qualified_namespace_tool_span_is_exempt_in_identifiers() -> None:
+    names = frozenset({"muse", "write_file"})
+    text = "muse.write_file"
+    spans = [[Span(0, len(text), EntityType.PERSON, text, 0.9, "ner")]]
+    assert without_tool_names([text], spans, names, ["identifier"]) == [[]]
+    assert without_tool_names([text], spans, names, ["content"]) == spans
+    values = {"[[PERSON_aaaa]]": "muse.write_file"}
+    assert identifier_keeps_tool_names("muse.write_file", "[[PERSON_aaaa]]", names, values.get)
+
+
 def test_identifier_keeps_tool_names() -> None:
     values = {"[[PERSON_aaaa]]": "Muse", "[[PERSON_bbbb]]": "Teszt Elek"}
 

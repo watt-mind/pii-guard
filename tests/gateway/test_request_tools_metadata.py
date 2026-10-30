@@ -482,6 +482,10 @@ def test_noncolliding_masked_keys_keep_both_values() -> None:
         {"type": "object", "properties": {"x": {"type": "string", "format": EMAIL}}},
         {"type": "object", "properties": {"x": {"$id": f"https://example.invalid/{PERSON}"}}},
         {"type": "object", "$defs": {"y": {"$ref": f"#/$defs/{PERSON}"}}},
+        {"type": "object", "required": [[EMAIL]]},
+        {"type": "object", "dependentRequired": {PERSON: ["a"]}},
+        {"type": "object", "dependentRequired": {"a": [EMAIL]}},
+        {"type": "object", "dependentSchemas": {PERSON: {"type": "object"}}},
         {EMAIL: {}},  # a structural key at the function level takes the same path
     ],
 )
@@ -489,7 +493,14 @@ def test_personal_data_in_a_structural_value_is_refused(parameters: dict[str, An
     """``format``/``$id``/``$ref`` values used to be skipped unchecked at any nesting, so
     PII there went upstream verbatim. They are identifier-checked now: refused, not masked."""
     upstream = MockUpstream()
-    if "type" not in parameters and "$defs" not in parameters and "properties" not in parameters:
+    if (
+        "type" not in parameters
+        and "$defs" not in parameters
+        and "properties" not in parameters
+        and "required" not in parameters
+        and "dependentRequired" not in parameters
+        and "dependentSchemas" not in parameters
+    ):
         fields: dict[str, Any] = {
             "tools": [{"type": "function", "function": {"name": "f", "type": EMAIL}}]
         }
@@ -499,6 +510,47 @@ def test_personal_data_in_a_structural_value_is_refused(parameters: dict[str, An
     assert response.status_code == 400, response.text
     assert response.json()["error"]["code"] == "unsupported_content"
     assert_no_values(response.content)
+    assert upstream.requests == []
+
+
+@pytest.mark.parametrize(
+    ("fields", "where"),
+    [
+        (
+            {"tools": [{"type": "function", "function": {"name": [PERSON]}}]},
+            "tools.0.function.name",
+        ),
+        ({"functions": [{"name": [PERSON]}]}, "functions.0.name"),
+        (
+            {
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": 123, "schema": {}},
+                }
+            },
+            "response_format.json_schema.name",
+        ),
+        (
+            {
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {"type": "custom", "custom": {"name": [PERSON], "input": ""}}
+                        ],
+                    }
+                ]
+            },
+            "messages.0.tool_calls.0.custom.name",
+        ),
+    ],
+)
+def test_non_string_identifier_is_rejected(fields: dict[str, Any], where: str) -> None:
+    upstream = MockUpstream()
+    response = post(upstream, **fields)
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert f"{where} must be a string" in response.json()["error"]["message"]
     assert upstream.requests == []
 
 
