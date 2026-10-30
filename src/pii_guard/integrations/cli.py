@@ -23,7 +23,8 @@ pii-guard connect codex|opencode --check [--gateway URL] [--model ID]
   placeholder in every turn and every conversation. The session already in the client's config
   is kept (``connect`` stays idempotent); a new one is random. ``--no-session-path`` writes the
   plain URL: the gateway then uses one session per ``prompt_cache_key`` (Muse sends one per
-  conversation), else one per client key.
+  conversation), else one per client key. A project endpoint URL (``/e/<endpoint>/v1``) is
+  always written as given: endpoints have no ``/s/<session>`` form (LAB-1614).
 
 - ``connect pi`` merges a ``pii-guard`` provider into pi's ``models.json`` (a backup of the old
   file first; nothing is written when it's already up to date). ``--dry-run`` prints the diff
@@ -67,6 +68,7 @@ from pii_guard.integrations.common import (
     _without_session,
     default_gateway_url,
     fetch_models,
+    is_endpoint_url,
     json_diff,
     run_check,
     session_of,
@@ -160,7 +162,7 @@ def _token() -> str | None:
 def _gateway(args: argparse.Namespace, existing: object) -> str:
     """The base URL to write: ``--gateway`` or the default, with the config's session kept."""
     gateway = (args.gateway or default_gateway_url()).rstrip("/")
-    if not args.session_path:
+    if not args.session_path or is_endpoint_url(gateway):
         return gateway
     return session_url(gateway, existing if isinstance(existing, str) else None)
 
@@ -359,7 +361,7 @@ def _block_check(args: argparse.Namespace, out: list[str]) -> int:
     """``connect codex|opencode --check``: the canary the way the tool's block sends it."""
     gateway = (args.gateway or default_gateway_url()).rstrip("/")
     base_url = gateway
-    if args.session_path and session_of(gateway) is None:
+    if args.session_path and session_of(gateway) is None and not is_endpoint_url(gateway):
         base_url = session_url(gateway)
     token = _token()
     model = (args.model or [None])[0]

@@ -147,6 +147,9 @@ class TextSlot:
     text: str
     write: Callable[[str], None] = field(repr=False)
     kind: str = "content"
+    #: The index of the chat message whose whole ``content`` string this is, else ``None``
+    #: (the echo's kept spans are offsets into it, LAB-1180).
+    message: int | None = None
 
     def __repr__(self) -> str:  # never the text
         return f"TextSlot(kind={self.kind!r}, length={len(self.text)})"
@@ -558,7 +561,9 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
         raise InvalidChatRequestError(f"{where}.role must be one of {', '.join(sorted(_ROLES))}")
     content = message.get("content")
     if isinstance(content, str):
-        out.slots.append(_text_slot(message, "content", "content"))
+        slot = _text_slot(message, "content", "content")
+        slot.message = index
+        out.slots.append(slot)
     elif isinstance(content, list):
         for part_index, part in enumerate(content):
             _collect_part(part, f"{where}.content.{part_index}", out, content)

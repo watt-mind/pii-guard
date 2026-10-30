@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MAX_TOKENS, FALLBACK_CHAT_MODEL, createHttpChat, createMockChat, isChatModel, pickDefaultModel } from "./chat";
+import { DEFAULT_MAX_TOKENS, FALLBACK_CHAT_MODEL, asKeptSpans, createHttpChat, createMockChat, isChatModel, pickDefaultModel } from "./chat";
 import { createMockClient } from "./mock";
 
 function sse(events: unknown[]): string {
@@ -40,6 +40,40 @@ describe("gateway chat client", () => {
     expect(headers["X-PII-Guard-Echo"]).toBe("masked");
     expect(headers["X-PII-Guard-Mode"]).toBe("fast");
     expect(headers["X-PII-Guard-Session"]).toBeUndefined();
+  });
+
+  it("reads kept spans from the echo as UTF-16 offsets (LAB-1180)", async () => {
+    // An astral character first: the gateway counts code points, JS strings UTF-16 units.
+    const content = "\u{1F600} Minta Kft writes.";
+    const body = sse([
+      {
+        object: "pii_guard.masked_request",
+        messages: [{ role: "system", content: "s" }, { role: "user", content }],
+        kept_spans: [[], [{ type: "ORGANIZATION", start: 2, end: 11 }]],
+      },
+      "[DONE]",
+    ]);
+    const fetch = (async () => new Response(body, { headers: { "content-type": "text/event-stream" } })) as unknown as typeof globalThis.fetch;
+    let seen: unknown;
+    const r = await createHttpChat({ fetch }).send({
+      messages: [{ role: "system", content: "s" }, { role: "user", content }],
+      model: "m",
+      mode: "fast",
+      language: "en",
+      sessionId: null,
+      onMaskedRequest: (_m, kept) => (seen = kept),
+    });
+    const expected = [[], [{ entityType: "ORGANIZATION", start: 3, end: 12 }]];
+    expect(r.keptSpans).toEqual(expected);
+    expect(seen).toEqual(expected);
+    expect(content.slice(3, 12)).toBe("Minta Kft");
+  });
+
+  it("drops malformed or out-of-range kept spans", () => {
+    const messages = [{ role: "user" as const, content: "abc" }];
+    expect(asKeptSpans(undefined, messages)).toEqual([[]]);
+    expect(asKeptSpans([[{ type: "ORGANIZATION", start: 1, end: 9 }, { type: 3, start: 0, end: 1 }, { type: "ORGANIZATION", start: 2, end: 2 }]], messages)).toEqual([[]]);
+    expect(asKeptSpans([[{ type: "ORGANIZATION", start: 0, end: 3 }]], messages)).toEqual([[{ entityType: "ORGANIZATION", start: 0, end: 3 }]]);
   });
 
   it("maps a contract error to ApiError", async () => {

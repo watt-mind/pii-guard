@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { FALLBACK_CHAT_MODEL, SYSTEM_PROMPT, isChatModel, pickDefaultModel, type ChatClient, type ChatMessage, type ChatMode } from "../api/chat";
+import { FALLBACK_CHAT_MODEL, SYSTEM_PROMPT, isChatModel, pickDefaultModel, type ChatClient, type ChatMessage, type ChatMode, type KeptSpan } from "../api/chat";
 import { MaskedText } from "../components/MaskedText";
 import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
@@ -32,6 +32,8 @@ interface Turn {
   status: "masking" | "streaming" | "done" | "error";
   thinking: boolean;
   maskedUser: string | null;
+  /** Values in your message detected but kept by policy (gateway echo, LAB-1180). */
+  keptUser: KeptSpan[];
   maskedSystem: string | null;
   answer: string;
   maskedAnswer: string | null;
@@ -170,7 +172,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
     history.push({ role: "user", content: message });
     setTurns((ts) => [
       ...(fresh ? [] : ts.filter((t) => t.status !== "error")),
-      { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null, finishReason: null },
+      { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, keptUser: [], maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null, finishReason: null },
     ]);
     setText("");
     // Keep the keyboard user in the composer; bring the new turn into view.
@@ -188,10 +190,11 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
         language: lang,
         sessionId: fresh ? (override.sessionId ?? null) : sessionId,
         signal: controller.signal,
-        onMaskedRequest: (msgs) =>
+        onMaskedRequest: (msgs, kept) =>
           update(id, {
             status: "streaming",
             maskedUser: [...msgs].reverse().find((m) => m.role === "user")?.content ?? null,
+            keptUser: kept[kept.length - 1] ?? [],
             maskedSystem: msgs.find((m) => m.role === "system")?.content ?? null,
           }),
         onAnswer: (answer) => update(id, { answer }),
@@ -204,6 +207,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
         answer: result.answer,
         maskedAnswer: result.maskedAnswer || null,
         maskedUser: [...result.maskedMessages].reverse().find((m) => m.role === "user")?.content ?? null,
+        keptUser: result.keptSpans?.[result.keptSpans.length - 1] ?? [],
         masked: result.masked,
         ms: result.ms,
         finishReason: result.finishReason ?? null,
@@ -375,6 +379,8 @@ function TurnView({
 }) {
   const userSegments = segmentsFor(turn.maskedUser, turn.user);
   const maskedValues = userSegments.filter((s) => s.kind === "restored").length;
+  const keptValues = turn.keptUser.length;
+  const keptLine = `${keptValues} ${keptValues === 1 ? "value" : "values"} detected but kept by policy (dashed outline)`;
   const answerSegments = turn.status === "done" ? segmentsFor(turn.maskedAnswer, turn.answer) : null;
   const marked = answerSegments?.filter((s) => s.kind === "restored").length ?? 0;
   const placeholdersInAnswer = turn.maskedAnswer ? tokenize(turn.maskedAnswer).filter((t) => t.kind === "placeholder").length : 0;
@@ -385,12 +391,14 @@ function TurnView({
     <article id={`turn-${turn.id}`} aria-label="Chat turn" className="scroll-mt-24 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6">
       {/* Row 1: what you wrote | what the model received */}
       <Bubble side="you" label="You wrote">
-        <RestoredText segments={userSegments} activeKey={activeKey} onActivate={onActivate} outgoing />
+        <RestoredText segments={userSegments} activeKey={activeKey} onActivate={onActivate} outgoing kept={turn.keptUser} />
         {turn.maskedUser !== null && (
           <p className="mt-2 text-xs text-muted">
-            {maskedValues === 0
+            {maskedValues === 0 && keptValues === 0
               ? "Nothing was detected in this message, so it was sent as written."
-              : `${maskedValues} ${maskedValues === 1 ? "value" : "values"} masked before sending (${simulated ? "demo engine" : `${turn.mode} mode`}). Unmarked text was sent as written.`}
+              : maskedValues === 0
+                ? `Nothing was masked; ${keptLine}. The rest was sent as written.`
+                : `${maskedValues} ${maskedValues === 1 ? "value" : "values"} masked before sending (${simulated ? "demo engine" : `${turn.mode} mode`})${keptValues ? `; ${keptLine}` : ""}. Unmarked text was sent as written.`}
           </p>
         )}
       </Bubble>

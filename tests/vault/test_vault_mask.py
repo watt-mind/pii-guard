@@ -11,11 +11,11 @@ from hypothesis import strategies as st
 from vault_helpers import OTHER_TEST_KEY, TEST_KEY, FakeClock, span_of
 
 from pii_guard.config import Settings
+from pii_guard.languages.hu.inflection import HungarianSuffixMatcher
 from pii_guard.types import EntityType, MaskingError, Span
 from pii_guard.vault import (
     PLACEHOLDER_RE,
     ExactMatcher,
-    HungarianSuffixMatcher,
     SessionNotFoundError,
     UnmaskResult,
     Vault,

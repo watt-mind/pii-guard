@@ -531,6 +531,15 @@ runtime.
   `[redacted]`, `Bearer …` strings are cut, and the configured upstream key is removed from any
   string. Inline images are replaced by a summary (`[inline image/png, N chars]`); strings over
   20,000 characters are truncated.
+- **Masked-image thumbnails, never originals.** Each inline image in the *masked* request
+  (regions already blacked out, exactly what the upstream received) also gets a downscaled WebP
+  copy in `request.thumbnails`, so the Live traffic tab can show it. Longest side at most
+  320 px, each data URL at most 16 KiB (a 240 or 160 px copy is tried before giving up), and at
+  most 4 per event; an image that does not fit is listed as `{"index", "omitted"}`. Original
+  images are never thumbnailed or kept, at `full` either.
+- **Bounded memory.** Thumbnails add at most 64 KiB per event, so the ring buffer holds at most
+  `PII_GUARD_TRAFFIC_LOG_SIZE` × 64 KiB of them (12.5 MiB at the default 200), on top of the
+  event text (strings capped at 20,000 characters each).
 - **No session ids.** The session id is a bearer handle to the vault, so events carry only
   `session_ref`: an HMAC-SHA256 of it under a random key generated when the process starts.
   The ref groups the calls of one conversation, cannot be turned back into the id, and changes
@@ -560,7 +569,7 @@ runtime.
 | `upstream` | HTTP status, the model it reported (`"[withheld]"` when it is not model-id shaped, for example holds an e-mail address), `unresolved_placeholders` (placeholders the model invented) |
 | `usage` | Token usage as the upstream reported it (streams: when `stream_options.include_usage` is set) |
 | `timing` | See [Timing](#timing) |
-| `request` | `masked` (the body sent upstream); `original` at level `full` |
+| `request` | `masked` (the body sent upstream); `original` at level `full`; `thumbnails` when the masked body had inline images: `{"index", "width", "height", "data"}` per image (`index` counts the `image_url` parts of `messages` in order, remote URLs included), or `{"index", "omitted"}` with `too_large`, `invalid` or `limit` |
 | `response` | `masked` (the upstream's answer; streams: content per choice and the chunk count); `unmasked` at level `full` |
 
 ## Vault inspector

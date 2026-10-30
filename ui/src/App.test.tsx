@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SAMPLES } from "./content/samples";
@@ -77,22 +77,32 @@ describe("App in demo mode", () => {
   });
 
   it("streams the answer and flags a placeholder the model invented", async () => {
-    const user = userEvent.setup();
-    render(<App api={offlineApi()} mock={createMockClient()} />);
-    await screen.findByRole("button", { name: /mask document/i });
-    await user.click(screen.getByRole("radio", { name: /Property sale contract/i }));
-    await user.click(screen.getByRole("button", { name: /mask document/i }));
-    await within(screen.getByRole("tabpanel", { name: "Text" })).findByTestId("masked-text");
-    await user.click(screen.getByRole("radio", { name: "Round trip" }));
+    // Fake timers (LAB-1491): the stream sleeps 20 ms per chunk ("fast"), so waiting on
+    // wall-clock time flakes under full-suite load. Drive it deterministically instead:
+    // the notice only renders when the stream completes, so advancing the chunk sleeps
+    // is waiting on the completion signal, not the clock.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<App api={offlineApi()} mock={createMockClient()} />);
+      await screen.findByRole("button", { name: /mask document/i });
+      await user.click(screen.getByRole("radio", { name: /Property sale contract/i }));
+      await user.click(screen.getByRole("button", { name: /mask document/i }));
+      await within(screen.getByRole("tabpanel", { name: "Text" })).findByTestId("masked-text");
+      await user.click(screen.getByRole("radio", { name: "Round trip" }));
 
-    const panel = screen.getByRole("tabpanel", { name: "Text" });
-    await user.click(await within(panel).findByRole("button", { name: /invented placeholder/i }));
-    await user.selectOptions(within(panel).getByLabelText("Stream speed"), "fast");
-    await user.click(within(panel).getByRole("button", { name: /stream/i }));
+      const panel = screen.getByRole("tabpanel", { name: "Text" });
+      await user.click(await within(panel).findByRole("button", { name: /invented placeholder/i }));
+      await user.selectOptions(within(panel).getByLabelText("Stream speed"), "fast");
+      await user.click(within(panel).getByRole("button", { name: /stream/i }));
 
-    expect(await within(panel).findByTestId("chunk-stream")).toBeInTheDocument();
-    await waitFor(() => expect(within(panel).getByText("Unknown placeholder left as is")).toBeInTheDocument(), { timeout: 8000 });
-    expect(within(panel).getByTestId("restored-text")).toHaveTextContent("Bárdos Kinga");
+      expect(await within(panel).findByTestId("chunk-stream")).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+      expect(within(panel).getByText("Unknown placeholder left as is")).toBeInTheDocument();
+      expect(within(panel).getByTestId("restored-text")).toHaveTextContent("Bárdos Kinga");
+    } finally {
+      vi.useRealTimers();
+    }
   }, 15000);
 
   it("fails closed and says nothing was sent when the live API rejects the request", async () => {

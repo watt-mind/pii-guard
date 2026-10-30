@@ -42,6 +42,7 @@ from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses import ResponsesGateway
 from pii_guard.gateway.service import UpstreamError
 from pii_guard.gateway.sessions import path_session
+from pii_guard.gateway.trace import new_request_id
 
 __all__ = ["DEFAULT_MUSE_METADATA", "get_responses_gateway", "muse_catalog_url", "router"]
 
@@ -100,12 +101,16 @@ async def responses(request: Request) -> Response:
         body = json.loads(raw)
     except (ValueError, UnicodeDecodeError):
         raise InvalidChatRequestError("request body is not valid JSON") from None
+    # The traffic event id, assigned before detection (LAB-1179): even a refused call
+    # carries it, so the client can join the error to its traffic event.
+    request.state.pii_guard_request_id = new_request_id()
     response, stats = await gateway.responses(
         body,
         request.headers,
         max_text_chars=get_max_text_chars(request),
         received_at=received_at,
         path_session=path_session(request.scope),
+        request_id=request.state.pii_guard_request_id,
     )
     log_extra(request, **stats.log_fields())
     return response
