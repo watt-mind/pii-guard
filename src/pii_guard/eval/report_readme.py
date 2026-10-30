@@ -52,6 +52,10 @@ placeholders filled from the records (:func:`fill`): ``{leak:<set>:<system>}``,
 ``{langs:<set>}`` / ``{codes:<set>}`` (its languages); a system is a run-record key or an
 alias from ``aliases``.
 
+LAB-1683, two latency placeholders for the intro's "How fast" line: ``{ner_p50:<model>}``, the
+p50 of one model in the ``model_latency`` measurement, and ``{overhead_p50:<run id>}``, the
+gateway-overhead p50 of a ``pii-guard bench latency`` record (one client, not streaming).
+
 LAB-1675, ``"table_image": {"image": "results-table", "alt": "...", "summary": "..."}``: the
 compact table is shown as the generated image (light and dark, :mod:`pii_guard.eval.report_share`
 draws it from the same records), and the markdown table follows in a collapsed
@@ -466,7 +470,7 @@ def splice(
 # --- LAB-1663: the compact layout and the intro block -------------------------------------
 
 _LANGS = {"de": "German", "en": "English", "hu": "Hungarian", "pl": "Polish"}
-_FIELD = re.compile(r"\{(leak|over|partial|docs|langs|codes):([^{}]+)\}")
+_FIELD = re.compile(r"\{(leak|over|partial|docs|langs|codes|ner_p50|overhead_p50):([^{}]+)\}")
 _METRIC = {"leak": "leak", "over": "over_masking", "partial": "partial_leak"}
 
 
@@ -486,11 +490,35 @@ def _language_names(codes: Sequence[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
+def _ner_p50(spec: Mapping[str, Any], model: str, where: str) -> str:
+    ml = spec.get("model_latency") or {}
+    data = ml.get("data")
+    result = data.get("results", {}).get(model) if isinstance(data, Mapping) else None
+    if not isinstance(result, Mapping):
+        raise RecordError(f"{where}: no model_latency result {model!r} for {{ner_p50:{model}}}")
+    return fmt_duration(result["p50_ms"])
+
+
+def _overhead_p50(index: Mapping[str, Any], run_id: str, where: str) -> str:
+    run = next((r for r in index.get("latency") or [] if r["run_id"] == run_id), None)
+    cell = next(
+        (c for c in (run or {}).get("cells", []) if c["concurrency"] == 1 and not c["stream"]),
+        None,
+    )
+    if cell is None:
+        raise RecordError(f"{where}: no single-client latency cell in {run_id!r}")
+    return fmt_duration(cell["overhead_ms"]["p50"])
+
+
 def fill(template: str, index: Mapping[str, Any], spec: Mapping[str, Any], where: str) -> str:
     """``template`` with every ``{field:set[:system]}`` replaced from the records."""
 
     def one(m: re.Match[str]) -> str:
         field, arg = m.group(1), m.group(2)
+        if field == "ner_p50":
+            return _ner_p50(spec, arg, where)
+        if field == "overhead_p50":
+            return _overhead_p50(index, arg, where)
         fixture_set, _, system = arg.partition(":")
         info = _set_info(index, fixture_set, where)
         if field == "docs":

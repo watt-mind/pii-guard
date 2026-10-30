@@ -10,7 +10,7 @@ import pytest
 
 from pii_guard import cli
 from pii_guard.eval.record import RecordError
-from pii_guard.eval.report_readme import END, START, parse_spec, render_block, splice
+from pii_guard.eval.report_readme import END, START, fill, parse_spec, render_block, splice
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -246,3 +246,30 @@ def test_model_latency_line_quotes_one_model_of_a_measurement() -> None:
         render_block(_index(), [], spec)
     with pytest.raises(RecordError, match="model_latency"):
         parse_spec({**SPEC, "model_latency": {"file": "x"}}, "config")
+
+
+def test_latency_placeholders_fill_from_the_records() -> None:
+    """LAB-1683: the intro's "How fast" line quotes the records, never a typed number."""
+    index = {
+        **_index(),
+        "latency": [
+            {
+                "run_id": "lat-cpu",
+                "hardware": "Test CPU",
+                "cells": [
+                    {"concurrency": 1, "stream": True, "overhead_ms": {"p50": 49.4}},
+                    {"concurrency": 1, "stream": False, "overhead_ms": {"p50": 54.8}},
+                ],
+            }
+        ],
+    }
+    spec = parse_spec(
+        {**SPEC, "model_latency": {"file": "x.json", "model": "new", "label": "NER"}}, "c"
+    )
+    spec["model_latency"]["data"] = {"results": {"new": {"p50_ms": 42.8, "p95_ms": 49.6}}}
+    text = fill("NER {ner_p50:new}, gateway {overhead_p50:lat-cpu}.", index, spec, "c")
+    assert text == "NER 43 ms, gateway 55 ms."
+    with pytest.raises(RecordError, match="no model_latency result"):
+        fill("{ner_p50:missing}", index, spec, "c")
+    with pytest.raises(RecordError, match="single-client"):
+        fill("{overhead_p50:nope}", index, spec, "c")
