@@ -93,7 +93,8 @@ every date in a public dataset. A prediction that overlaps one and matches no go
 neither credited nor charged: it is left out of precision and over-masking and counted as
 `unscored_predictions`. Recall and leak rate don't change. A sample converted before ignore
 regions existed falls back to a per-type rule (`scorer.LEGACY_UNSCORED_TYPES`:
-`DATE_OF_BIRTH` on Ai4Privacy).
+`DATE_OF_BIRTH` on Ai4Privacy); the committed Ai4Privacy sample carries ignore regions since
+LAB-1222, so the fallback now only applies to records of the earlier sample.
 
 **Corrected labels.** A public set's gold can be plainly wrong: Gretel finance labels German set
 phrases (`Damen`, `Herren`, `Im Rahmen`), common nouns (`Saldo`) and template slots
@@ -631,14 +632,16 @@ components of the commercial PII-Masking-2M set need a commercial license.
 **Policy-excluded** labels are left out of the gold spans, so they count neither as leaks nor
 as misses; the manifest counts them per language (about 3 per document). The converter keeps
 each as an [ignore region](#metrics), so a prediction on one is neither credited nor charged
-in precision and over-masking. The committed sample predates ignore regions (refreshing it
-needs the 920 MB download and new runs), so for now the scorer applies the per-type fallback:
-`DATE_OF_BIRTH` predictions are not scored on this set, because the set labels every date
-`DATE` (Presidio's and PrivAiTe's `DATE_TIME` maps to `DATE_OF_BIRTH`). A masked title or a
-bare town still counts as over-masking until the sample is refreshed. The stored runs were
-re-scored this way from their counts (LAB-1213; their records say `rescored`): for example
-fast mode's precision went from 83.5 % to 92.8 % and its over-masking from 12.5 % to 2.4 %, a
-change of method, not of the model. There is no `ORGANIZATION` label, so `ORGANIZATION`
+in precision and over-masking: 1,452 regions in the 600 documents (de 452, en 504, hu 496).
+The committed sample has carried them since LAB-1222 (same rows, same gold spans, same
+manifest; only `meta.ignore` was added), so a masked title or bare town no longer counts as
+over-masking. On the same code (`323d859`), fast mode's precision on the refreshed sample is
+98.9 % against 98.1 % on the earlier one and its over-masking 0.3 % against 1.2 % (269
+predictions unscored); rules are unchanged (98.5 %, 0.1 %). Recall and leak can't move with
+this, by construction. Runs on the earlier sample (before LAB-1222, re-scored by the per-type
+fallback: `DATE_OF_BIRTH` only, records marked `rescored`, LAB-1213) are listed under the
+earlier-fixture table in [benchmarks.md](benchmarks.md#ai4privacy); the comparison models and
+the baselines have not been re-run on the refreshed sample yet. There is no `ORGANIZATION` label, so `ORGANIZATION`
 predictions (kept, never masked) still count against precision here.
 
 **Caveats.**

@@ -191,6 +191,20 @@ def test_breakdown_splits_the_headline_and_adds_up() -> None:
     }
 
 
+def test_a_card_found_as_payment_card_counts_for_a_bank_account_gold() -> None:
+    # Gold sets built before PAYMENT_CARD label cards BANK_ACCOUNT; the scorer counts a
+    # PAYMENT_CARD prediction on one as found, so the breakdown must too (LAB-1222).
+    docs = _docs()
+    card = docs[1].spans[0]
+    found = {
+        docs[1].text: [Span(card.start, card.end, E.PAYMENT_CARD, card.text, 0.9, "t")],
+    }
+    block = summarize(run_documents(docs, _Fixed(found)))
+    micro = block["detection"]["overlap"]["micro"]
+    assert block["validity"]["per_type"]["BANK_ACCOUNT"]["invalid"]["found"] == 1
+    assert v._sums(block["validity"])["found"] == micro["tp_gold"]
+
+
 def test_headline_is_the_same_with_or_without_the_breakdown() -> None:
     public, private = summarize(_results()), summarize(_results("synthetic"))
     assert "validity" in public and "validity" not in private
