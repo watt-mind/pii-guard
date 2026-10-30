@@ -310,6 +310,28 @@ def test_a_span_is_cut_at_newlines_and_around_tracking_tokens() -> None:
     assert detect(text, (f"CP279078509AT {CARD}", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, CARD)]
 
 
+def test_a_short_remainder_on_the_next_line_is_dropped() -> None:
+    # LAB-1604: the span runs over the newline into the next CSV row's id column.
+    iban = "GB82 WEST 1234 5698 7654 32"
+    text = f"id,name,iban\n1,Jane Placeholder,{iban}\n2,Teszt Elek,x\n"
+    assert detect(text, (f"{iban}\n2", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, iban)]
+    text = f"Account: {iban}\n17 lines\n"
+    assert detect(text, (f"{iban}\n17", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, iban)]
+    text = 'name,phone\n"Ann",07700900316\n2,"Bob",x\n'
+    assert detect(text, ("07700900316\n2", "PHONE")) == [(E.PHONE, "07700900316")]
+
+
+def test_a_long_piece_on_the_next_line_is_still_judged() -> None:
+    # Only a remainder too short to be a number of these types is dropped.
+    text = "Account: 12345678\n87654321\n"
+    assert detect(text, ("12345678\n87654321", "BANK_ACCOUNT")) == [
+        (E.BANK_ACCOUNT, "12345678"),
+        (E.BANK_ACCOUNT, "87654321"),
+    ]
+    text = 'name,phone\n"Ann",07700900316\n'
+    assert detect(text, ("07700900316\n", "PHONE")) == [(E.PHONE, "07700900316")]
+
+
 @pytest.mark.parametrize(
     ("text", "value"),
     [
