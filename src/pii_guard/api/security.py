@@ -13,8 +13,11 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hmac
 import json
+import re
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -45,6 +48,26 @@ def looks_like_endpoint_key(credential: str) -> bool:
     exact lowercase prefix; a differently cased one simply fails resolution.
     """
     return credential.strip().lower().startswith(ENDPOINT_KEY_PREFIX)
+
+
+# ASCII letters and digits: a token occurrence touching one of these continues a longer word.
+_TOKEN_BYTES = frozenset(b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+
+# A run of base64 characters (both alphabets) and its padding; disjoint classes, no backtracking.
+_BASE64_RUN = re.compile(rb"[A-Za-z0-9+/_-]+=*")
+
+
+def _base64_decodings(field: bytes) -> list[bytes]:
+    """``field`` decoded as standard and as URL-safe base64, padding optional (LAB-1591)."""
+    padded = field.rstrip(b"=") + b"=" * (-len(field.rstrip(b"=")) % 4)
+    decodings = []
+    for altchars in (None, b"-_"):
+        try:
+            decodings.append(base64.b64decode(padded, altchars=altchars, validate=True))
+        except (binascii.Error, ValueError):
+            continue
+    return decodings
 
 
 _WILDCARD_BINDS = {"0.0.0.0", "::", "[::]", ""}  # noqa: S104 - names, not a bind
@@ -116,9 +139,10 @@ class BearerTokenMiddleware:
     """Require ``PII_GUARD_API_TOKEN`` on every route but ``/healthz``.
 
     The token is accepted as ``X-PII-Guard-Token: <token>`` or ``Authorization: Bearer <token>``.
-    An ``Authorization`` header carrying the token in any shape (another scheme, a tab or extra
-    padding as separator, no scheme at all) authenticates too, and is removed from the request
-    after the check, so the gateway never forwards it upstream (LAB-1570). So is an
+    An ``Authorization`` header carrying the token in any shape (another scheme, a tab, extra
+    padding or punctuation as separator, no scheme at all, inside an HTTP ``Basic`` credential)
+    authenticates too, and is removed from the request after the check, so the gateway never
+    forwards it upstream (LAB-1570, LAB-1591). So is an
     ``x-api-key`` carrying it (Anthropic clients, LAB-1605). Clients that bring
     their own upstream key (no ``PII_GUARD_UPSTREAM_API_KEY``) send it in ``Authorization`` and
     the token in the header.
@@ -134,27 +158,42 @@ class BearerTokenMiddleware:
     def _matches(self, value: bytes) -> bool:
         return hmac.compare_digest(value.strip(), self.token)
 
-    def _carries_token(self, value: bytes) -> bool:
-        """Whether an ``Authorization`` value carries the token in any shape (LAB-1570).
+    def _scan(self, data: bytes) -> tuple[bool, bool]:
+        """Whether the token occurs anywhere in ``data``, and whether it occurs standalone.
 
-        The value is split on whitespace as bytes (ASCII), as Latin-1 text (how Starlette
-        decodes headers) and as UTF-8 text (Unicode spaces such as U+00A0 or U+2003), and
-        every field is compared in constant time. The whole value counts as a field too. Any
-        match both authenticates and marks the header for stripping: fail closed, so no
-        spelling of the token survives to the upstream provider.
+        Every window of ``data`` the length of the token is compared in constant time, with no
+        early exit, so the time taken depends on the length of ``data`` only. An occurrence is
+        standalone when no ASCII letter or digit touches it on either side: ``key:<token>``,
+        ``"<token>"`` or ``token=<token>`` are standalone, ``<token>x`` is not (LAB-1591).
         """
-        whole = value.strip()
-        # The whole value, what follows a scheme (a token with inner spaces), each field.
-        fields = [whole, *whole.split(None, 1)[1:], *value.split()]
-        fields += [f.encode("latin-1") for f in value.decode("latin-1").split()]
-        fields += [
-            f.encode("utf-8", "surrogateescape")
-            for f in value.decode("utf-8", "surrogateescape").split()
-        ]
-        found = False
-        for field in fields:  # no early exit: every field is compared
-            found |= hmac.compare_digest(field, self.token)
-        return found
+        size = len(self.token)
+        found = standalone = False
+        for i in range(len(data) - size + 1):  # no early exit: every window is compared
+            hit = hmac.compare_digest(data[i : i + size], self.token)
+            before = i == 0 or data[i - 1] not in _TOKEN_BYTES
+            after = i + size == len(data) or data[i + size] not in _TOKEN_BYTES
+            found |= hit
+            standalone |= hit & before & after
+        return found, standalone
+
+    def _carries_token(self, value: bytes) -> tuple[bool, bool]:
+        """Whether a credential header carries the token: ``(strip, authenticate)``.
+
+        The raw value is scanned (LAB-1570: any scheme, any separator, whitespace or
+        punctuation; LAB-1591), and so is every run of base64 characters in it that decodes,
+        standard or URL-safe: an HTTP ``Basic`` credential such as
+        ``base64(user:<token>)`` or ``base64(<token>:)``, with or without the scheme. Any
+        occurrence strips the header, fail closed, so no spelling of the token reaches the
+        upstream provider; a standalone occurrence also authenticates. A token glued to other
+        letters or digits (``<token>x``) is stripped but does not authenticate.
+        """
+        found, standalone = self._scan(value)
+        for field in _BASE64_RUN.findall(value):
+            for decoded in _base64_decodings(field):
+                hit, alone = self._scan(decoded)
+                found |= hit
+                standalone |= alone
+        return found, standalone
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or scope.get("path") in _PUBLIC_PATHS:
@@ -189,9 +228,11 @@ class BearerTokenMiddleware:
         for name, value in headers:
             # ``x-api-key`` too: Anthropic clients send their key there, and /v1/messages
             # passes it upstream as a "bring your own key" (LAB-1605).
-            if name.lower() in (b"authorization", b"x-api-key") and self._carries_token(value):
-                ok = True
-                continue  # never forwarded upstream as a "bring your own key"
+            if name.lower() in (b"authorization", b"x-api-key"):
+                strip, authenticates = self._carries_token(value)
+                ok |= authenticates
+                if strip:
+                    continue  # never forwarded upstream as a "bring your own key"
             kept.append((name, value))
         headers = kept
         if not ok:

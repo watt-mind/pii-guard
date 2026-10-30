@@ -47,11 +47,15 @@ With `PII_GUARD_API_TOKEN` set, `/e/{endpoint_id}/v1` routes are admitted only b
 key sent as `Authorization: Bearer <key>` (any letter case, ASCII space padding). Calling one
 with only the API token, as either header, returns 403; earlier releases could fall through to
 local owner access. An endpoint key sent together with `X-PII-Guard-Token` is also 403, and an
-endpoint key on a route outside `/e/` is 401. The gateway removes an `Authorization` header
-when one of its whitespace-separated fields (or the whole value) equals the API token, so the
-token is not forwarded to the provider as a bring-your-own key. Other encodings are not
-detected: an HTTP Basic credential that contains the token, or the token joined to other text
-by punctuation (such as `key:<token>`), is forwarded unchanged.
+endpoint key on a route outside `/e/` is 401. The gateway removes an `Authorization` (or `x-api-key`) header
+that contains the API token anywhere in its value, so the token is not forwarded to the
+provider as a bring-your-own key. That covers the token after any scheme or separator
+(whitespace, a tab, a non-breaking space), joined to other text by punctuation (`key:<token>`,
+`<token>,x`, `"<token>"`, `token=<token>`), and inside a base64 HTTP Basic credential
+(`user:<token>` or `<token>:`, padded or not). The token authenticates the request in those
+shapes too. Glued to other letters or digits (`<token>x`), it does not authenticate, but the
+header is still removed. A bring-your-own key that only shares part of the token is forwarded
+unchanged.
 
 ## Isolation and lifetime
 
