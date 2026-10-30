@@ -118,6 +118,15 @@ def gates(base: dict[str, Any], m: dict[str, Any], p95_ratio: float | None) -> d
     return g
 
 
+def selection_split(directory: Path, cand: str) -> dict[str, Any] | None:
+    """Leak and over-masking of ``cand`` on the LAB-1625 selection split, or ``None``."""
+    path = directory / f"{cand}.json"
+    if not path.is_file():
+        return None
+    block = json.loads(path.read_text(encoding="utf-8"))["all"]
+    return {k: block[k] for k in ("leak", "over", "leaked", "values", "over_masked", "masked")}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--date", required=True)
@@ -125,6 +134,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--json", type=Path)
     parser.add_argument("--ticket", default="LAB-1535", help="record slug (LAB-1547 for v4.1)")
     parser.add_argument("--candidates", nargs="+", default=list(CANDIDATES), help="in order")
+    parser.add_argument(
+        "--selection",
+        type=Path,
+        help="LAB-1625: a directory of selection_v42.py score JSONs (<candidate>.json); gate "
+        "passers are then ranked on that split (leak, then over-masking) instead",
+    )
     args = parser.parse_args(argv)
     global TICKET
     TICKET = args.ticket.lower()
@@ -137,6 +152,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         res = json.loads(args.latency.read_text(encoding="utf-8"))["results"]
         p95 = {k: v["p95_ms"] / res["v20"]["p95_ms"] for k, v in res.items()}
     report: dict[str, Any] = {"v20": {"metrics": base}}
+    if args.selection:
+        report["v20"]["selection_v42"] = selection_split(args.selection, "v20")
     winners: list[tuple[float, float, int, str]] = []
     for i, cand in enumerate(args.candidates):
         m = metrics(args.date, cand)
@@ -144,8 +161,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             continue
         g = gates(base, m, p95.get(cand))
         report[cand] = {"metrics": m, "gates": g, "p95_ratio": p95.get(cand)}
+        sel = m["agent-traffic-dev"]
+        if args.selection:
+            split = selection_split(args.selection, cand)
+            report[cand]["selection_v42"] = split
+            sel = split or {"leak": float("inf"), "over": float("inf")}
         if g["all_gates"] and g["beats_v20"]:
-            sel = m["agent-traffic-dev"]
             winners.append((sel["leak"], sel["over"], i, cand))
     report["selected"] = min(winners)[3] if winners else "v20 (stays)"
     text = json.dumps(report, indent=2)

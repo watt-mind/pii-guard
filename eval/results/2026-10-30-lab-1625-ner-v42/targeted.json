@@ -1,0 +1,284 @@
+{
+  "de-genitive-de-train.jsonl": {
+    "documents": 1500,
+    "gold_spans": {
+      "BANK_ACCOUNT": 286,
+      "EMAIL": 278,
+      "PERSON": 3416,
+      "PHONE": 588
+    },
+    "distinct_full_names": 672,
+    "names_in_eval_texts": 0
+  },
+  "de-genitive-de-dev.jsonl": {
+    "documents": 100,
+    "gold_spans": {
+      "BANK_ACCOUNT": 20,
+      "EMAIL": 19,
+      "PERSON": 234,
+      "PHONE": 36
+    },
+    "distinct_full_names": 204,
+    "names_in_eval_texts": 0
+  },
+  "hu-surname-given-hu-train.jsonl": {
+    "documents": 1500,
+    "gold_spans": {
+      "EMAIL": 459,
+      "PERSON": 2959
+    },
+    "distinct_full_names": 310,
+    "names_in_eval_texts": 0
+  },
+  "hu-surname-given-hu-dev.jsonl": {
+    "documents": 100,
+    "gold_spans": {
+      "EMAIL": 31,
+      "PERSON": 213
+    },
+    "distinct_full_names": 105,
+    "names_in_eval_texts": 0
+  },
+  "dates-hu-train.jsonl": {
+    "documents": 800,
+    "gold_spans": {
+      "DATE_OF_BIRTH": 596,
+      "EMAIL": 324,
+      "PERSON": 800
+    },
+    "distinct_full_names": 293,
+    "names_in_eval_texts": 0
+  },
+  "dates-hu-dev.jsonl": {
+    "documents": 50,
+    "gold_spans": {
+      "DATE_OF_BIRTH": 34,
+      "EMAIL": 25,
+      "PERSON": 50
+    },
+    "distinct_full_names": 46,
+    "names_in_eval_texts": 0
+  },
+  "dates-en-train.jsonl": {
+    "documents": 800,
+    "gold_spans": {
+      "DATE_OF_BIRTH": 608,
+      "EMAIL": 316,
+      "PERSON": 800
+    },
+    "distinct_full_names": 479,
+    "names_in_eval_texts": 0
+  },
+  "dates-en-dev.jsonl": {
+    "documents": 50,
+    "gold_spans": {
+      "DATE_OF_BIRTH": 44,
+      "EMAIL": 22,
+      "PERSON": 50
+    },
+    "distinct_full_names": 49,
+    "names_in_eval_texts": 0
+  },
+  "dates-de-train.jsonl": {
+    "documents": 800,
+    "gold_spans": {
+      "DATE_OF_BIRTH": 609,
+      "EMAIL": 334,
+      "PERSON": 800
+    },
+    "distinct_full_names": 482,
+    "names_in_eval_texts": 0
+  },
+  "dates-de-dev.jsonl": {
+    "documents": 50,
+    "gold_spans": {
+      "DATE_OF_BIRTH": 43,
+      "EMAIL": 19,
+      "PERSON": 50
+    },
+    "distinct_full_names": 49,
+    "names_in_eval_texts": 0
+  },
+  "numbers-hu-train.jsonl": {
+    "documents": 300,
+    "gold_spans": {
+      "BANK_ACCOUNT": 154,
+      "PERSON": 300
+    },
+    "distinct_full_names": 194,
+    "names_in_eval_texts": 0
+  },
+  "numbers-hu-dev.jsonl": {
+    "documents": 30,
+    "gold_spans": {
+      "BANK_ACCOUNT": 16,
+      "PERSON": 30
+    },
+    "distinct_full_names": 29,
+    "names_in_eval_texts": 0
+  },
+  "numbers-en-train.jsonl": {
+    "documents": 300,
+    "gold_spans": {
+      "BANK_ACCOUNT": 158,
+      "PERSON": 300
+    },
+    "distinct_full_names": 238,
+    "names_in_eval_texts": 0
+  },
+  "numbers-en-dev.jsonl": {
+    "documents": 30,
+    "gold_spans": {
+      "BANK_ACCOUNT": 10,
+      "PERSON": 30
+    },
+    "distinct_full_names": 30,
+    "names_in_eval_texts": 0
+  },
+  "numbers-de-train.jsonl": {
+    "documents": 300,
+    "gold_spans": {
+      "BANK_ACCOUNT": 144,
+      "PERSON": 300
+    },
+    "distinct_full_names": 239,
+    "names_in_eval_texts": 0
+  },
+  "numbers-de-dev.jsonl": {
+    "documents": 30,
+    "gold_spans": {
+      "BANK_ACCOUNT": 13,
+      "PERSON": 30
+    },
+    "distinct_full_names": 30,
+    "names_in_eval_texts": 0
+  },
+  "decontam": {
+    "method": {
+      "shingles": "word 5-grams of NFKC case-folded text",
+      "minhash": "128 hashes, LSH 32 bands x 4 rows",
+      "threshold": "exact Jaccard >= 0.8",
+      "exact": "SHA-256 of the whitespace-folded text"
+    },
+    "documents": 6740,
+    "dropped": 0,
+    "dropped_exact": 0,
+    "dropped_near": 0,
+    "by_eval_set": {},
+    "files": {
+      "eval/generated/v42-mix/targeted/de-genitive-de-train.jsonl": {
+        "documents": 1500,
+        "kept": 1500,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/de-genitive-de-dev.jsonl": {
+        "documents": 100,
+        "kept": 100,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/hu-surname-given-hu-train.jsonl": {
+        "documents": 1500,
+        "kept": 1500,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/hu-surname-given-hu-dev.jsonl": {
+        "documents": 100,
+        "kept": 100,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/dates-hu-train.jsonl": {
+        "documents": 800,
+        "kept": 800,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/dates-hu-dev.jsonl": {
+        "documents": 50,
+        "kept": 50,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/dates-en-train.jsonl": {
+        "documents": 800,
+        "kept": 800,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/dates-en-dev.jsonl": {
+        "documents": 50,
+        "kept": 50,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/dates-de-train.jsonl": {
+        "documents": 800,
+        "kept": 800,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/dates-de-dev.jsonl": {
+        "documents": 50,
+        "kept": 50,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/numbers-hu-train.jsonl": {
+        "documents": 300,
+        "kept": 300,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/numbers-hu-dev.jsonl": {
+        "documents": 30,
+        "kept": 30,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/numbers-en-train.jsonl": {
+        "documents": 300,
+        "kept": 300,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/numbers-en-dev.jsonl": {
+        "documents": 30,
+        "kept": 30,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/numbers-de-train.jsonl": {
+        "documents": 300,
+        "kept": 300,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      },
+      "eval/generated/v42-mix/targeted/numbers-de-dev.jsonl": {
+        "documents": 30,
+        "kept": 30,
+        "dropped_exact": 0,
+        "dropped_near": 0,
+        "by_eval_set": {}
+      }
+    },
+    "examples": []
+  }
+}

@@ -85,11 +85,18 @@ LABELS = {
     "kept out of the loss (LAB-1547)",
     "v41-a2": "pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS "
     "taught as O (LAB-1547)",
+    "v42-b1": "pii-guard fast, NER v4.2 candidate B1: v4.1-A1 mix, implausible third-party birth "
+    "dates taught as O, v4.2 targeted data (LAB-1625)",
+    "v42-b2": "pii-guard fast, NER v4.2 candidate B2: v4.1-A1 mix, uncued third-party birth "
+    "dates out of the loss, v4.2 targeted data (LAB-1625)",
+    "v42-b3": "pii-guard fast, NER v4.2 candidate B3: B1 with the v4.2 targeted data twice "
+    "(LAB-1625)",
+    "v42-b4": "pii-guard fast, NER v4.2 candidate B4: soup 0.5 v2.0 + 0.5 B1 (LAB-1625)",
 }
 #: Tickets whose v2.0 runs are selection-only re-scores (LAB-1494): their records get a system
 #: key and label of their own, so the report's latest-per-system pick keeps the published v2.0
 #: rows (timed on a quiet machine) instead of these, timed on a loaded one.
-RESCORE_TICKETS = ("LAB-1494", "LAB-1512", "LAB-1535", "LAB-1547")
+RESCORE_TICKETS = ("LAB-1494", "LAB-1512", "LAB-1535", "LAB-1547", "LAB-1625")
 
 
 def system_extra(ticket: str, candidate: str) -> dict[str, Any]:
@@ -113,6 +120,8 @@ TICKETS = {
     "LAB-1535": "NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol",
     "LAB-1547": "NER v4.1 candidates (v4-A recipe, loose addresses treated, v4.1 data) vs v2.0, "
     "LAB-1535 protocol",
+    "LAB-1625": "NER v4.2 candidates (v4.1-A1 mix, birth-date labels treated, v4.2 targeted "
+    "data) vs v2.0, LAB-1535 gates",
 }
 
 
@@ -205,9 +214,10 @@ def _score(args: argparse.Namespace) -> int:
             "LAB-1512",
             "LAB-1535",
             "LAB-1547",
+            "LAB-1625",
         ):
             notes.append(
-                "Selection set. No v3.1, v3.2, v3.3, v4 or v4.1 mix holds any agent-traffic "
+                "Selection set. No v3.1, v3.2, v3.3, v4, v4.1 or v4.2 mix holds any agent-traffic "
                 "generator document, so it is unseen by every candidate, as it was for v2.0."
             )
         records = build_records(
