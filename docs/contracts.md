@@ -1667,7 +1667,12 @@ describes the oldest enabled endpoint. `state` is `ready`, `needs_key` (sponsore
 sponsorship is unavailable) or `disabled`. `issue_key: true` issues one endpoint key, returned
 raw only in that response, while the endpoint has no active key. `meta_api_key` converts a
 `needs_key` sponsored default endpoint, in place, to an own-key `meta` endpoint on
-`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The
+`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The key is
+checked for shape first (LAB-1463): surrounding whitespace is dropped, and anything that is not
+one token of 20 to 4096 printable ASCII characters without spaces, quotes or `://` is refused
+with `422 invalid_provider_key` before anything is saved, so the endpoint stays `needs_key` and
+never falls back to sponsored inference. The message names the expected shape, never the value.
+This is a format check only; no provider call verifies the key on save. The
 operation is one atomic store update (a single conditional write on the Blob store, re-read and
 retried up to three times after a conflict), so repeat sign-ins and concurrent first requests never create a second
 endpoint. It spends no daily request or token budget and takes no runtime.
