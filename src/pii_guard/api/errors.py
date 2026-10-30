@@ -73,6 +73,11 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
         422,
         "Hosted upstream destinations must use public HTTPS on port 443.",
     ),
+    "unsupported_api": (
+        400,
+        "`POST /v1/messages`: the Anthropic Messages API is not served; use the "
+        "OpenAI-compatible routes. Nothing is forwarded.",
+    ),
     "unauthorized": (401, "`PII_GUARD_API_TOKEN` is set and the request has no valid token."),
     "traffic_log_not_local": (
         403,
