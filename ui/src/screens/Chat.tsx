@@ -12,6 +12,7 @@ import { alignLoose, alignRestored, tokenize, type RestoredSegment } from "../li
 import { toRunError, type RunError } from "../lib/run";
 import { errorCopy, statusFromMessage } from "../lib/errorCopy";
 import { readPref, writePref } from "../lib/storage";
+import { useHostedSession } from "../hosted/session";
 
 /** Where the last model used in Chat is remembered (per viewer, best effort). */
 export const MODEL_PREF = "chat-model";
@@ -63,6 +64,10 @@ interface Props {
 }
 
 const ALL_MODES: readonly ChatMode[] = ["fast", "audit"];
+
+/** Hosted, fast mode runs on the PII Guard server, not on the owner's machine (LAB-1619). */
+const HOSTED_FAST_HINT =
+  "The default and the production path. Rules + the NER model on the PII Guard server: finds names, addresses and structured data in milliseconds, with no detection model call and nothing sent to a third party.";
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
   {
@@ -556,9 +561,11 @@ interface ComposerProps {
 function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, language, onLanguage, model, onModel, models, needsModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
   const chatIds = models.ids.filter(isChatModel);
   const options = model && !chatIds.includes(model) ? [model, ...chatIds] : chatIds;
+  const hosted = useHostedSession() !== null;
+  const hintOf = (m: (typeof MODES)[number]) => (hosted && m.id === "fast" ? HOSTED_FAST_HINT : m.hint);
   const modeHint = mock
     ? "The demo engine runs a small rule set in your browser in both modes; the AI detector and the real model need the live API."
-    : MODES.find((m) => m.id === mode)!.hint;
+    : hintOf(MODES.find((m) => m.id === mode)!);
   return (
     <section aria-label="New message" className="space-y-3 rounded-xl border border-line bg-surface p-4 sm:p-5">
       <div role="group" aria-labelledby="chat-samples-label" className="flex flex-wrap items-center gap-2">
@@ -606,7 +613,7 @@ function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, lan
             name="chat-mode"
           value={mode}
           onChange={onMode}
-          options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: m.hint }))}
+          options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: hintOf(m) }))}
           />
         </span>
         <label className="flex items-center gap-2 text-sm text-muted">

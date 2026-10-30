@@ -6,6 +6,11 @@ import { Button, Card, ConfirmAction, Input, KeyValues, Metric, Notice, PageHead
 import type { ServerStatusState } from "../hooks/useServerStatus";
 import { useNow } from "../hooks/useNow";
 import { metaFor } from "../lib/entities";
+import { relativeTime } from "../lib/time";
+import { useHostedSession } from "../hosted/session";
+import type { Endpoint } from "../projects/api";
+import { localRequest } from "../projects/request";
+import { getSelectedProject, setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 
 export interface VaultProps {
   status: ServerStatusState;
@@ -27,6 +32,46 @@ type DetailState = { state: "idle" } | { state: "loading" } | { state: "ok"; det
 const SOURCES: SessionSource[] = ["path", "prompt_cache_key", "default", "header", "api"];
 const mono = (s: ReactNode) => <code className="font-mono text-xs">{s}</code>;
 
+/**
+ * Hosted has no "Send demo traffic" (LAB-1619). A call through an endpoint keeps its session under
+ * that endpoint, so the project-wide view stays empty after a first call: say where it is, and
+ * offer the switch when the project has exactly one endpoint.
+ */
+function HostedEmpty() {
+  const endpointSelected = useSelectedEndpoint() !== null;
+  const project = getSelectedProject();
+  const [only, setOnly] = useState<Endpoint | null>(null);
+  useEffect(() => {
+    if (endpointSelected || !project) return;
+    let live = true;
+    localRequest<{ endpoints: Endpoint[] }>(`/v1/projects/${encodeURIComponent(project)}/endpoints`).then(
+      (data) => {
+        const enabled = Array.isArray(data.endpoints) ? data.endpoints.filter((e) => e.enabled) : [];
+        if (live) setOnly(enabled.length === 1 ? enabled[0]! : null);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [endpointSelected, project]);
+  if (endpointSelected)
+    return <p className="py-6 text-center text-sm text-muted">No sessions on this endpoint yet. Send a call through it from your client, or open Connect to send a test request.</p>;
+  return (
+    <div className="space-y-3 py-4 text-center text-sm text-muted">
+      <p>
+        No sessions in this view. Calls through an endpoint keep their sessions under that endpoint: pick it in the header menu (Inspect activity &amp; vault), or open a call
+        in Logs.
+      </p>
+      {only && (
+        <Button size="sm" className="h-auto! min-h-8 max-w-full py-1.5 whitespace-normal! pointer-coarse:min-h-11" onClick={() => setSelectedEndpoint(only.id)}>
+          Show the sessions of {only.name}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function errorOf(err: unknown): { code: string; message: string } {
   if (err instanceof ApiError) return { code: err.code, message: err.message };
   return {
@@ -35,13 +80,7 @@ function errorOf(err: unknown): { code: string; message: string } {
   };
 }
 
-function ago(iso: string | null, now: number): string {
-  if (!iso) return "not recorded";
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return s < 5 ? "just now" : `${s} s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min ago`;
-}
+const ago = (iso: string | null, now: number): string => relativeTime(iso, now);
 
 function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
@@ -57,6 +96,7 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
   const server = status.state === "ok" ? status.status : null;
   const mode = server?.vault_inspect ?? (server ? "masked" : null);
   const usable = live && server !== null && mode !== "off";
+  const hosted = useHostedSession() !== null;
 
   const [list, setList] = useState<ListState>({ state: "loading" });
   const [source, setSource] = useState<SessionSource | "all">("all");
@@ -209,7 +249,11 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
     <div className="space-y-6">
       <PageHeader
         title="Vault"
-        lead="The vault sessions this server holds: where each came from, and which placeholder stands for which value. For troubleshooting a value that was or wasn't restored. Values are shown as redacted hints; originals only on demand, when the server runs the inspector in full mode on localhost."
+        lead={
+          hosted
+            ? "The vault sessions of this project: where each came from, and which placeholder stands for which value. For troubleshooting a value that was or wasn't restored. Values are shown as redacted hints; originals are never shown on the hosted service."
+            : "The vault sessions this server holds: where each came from, and which placeholder stands for which value. For troubleshooting a value that was or wasn't restored. Values are shown as redacted hints; originals only on demand, when the server runs the inspector in full mode on localhost."
+        }
       />
 
       {!usable ? (
@@ -266,11 +310,14 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
                     Couldn't list the sessions: {list.message}
                   </p>
                 )}
-                {list.state === "ok" && sessions.length === 0 && (
-                  <p className="py-6 text-center text-sm text-muted">
-                    No live sessions. Send traffic through the gateway (Overview or Logs: "Send demo traffic") or mask a text in the Playground.
-                  </p>
-                )}
+                {list.state === "ok" && sessions.length === 0 &&
+                  (hosted ? (
+                    <HostedEmpty />
+                  ) : (
+                    <p className="py-6 text-center text-sm text-muted">
+                      No live sessions. Send traffic through the gateway (Overview or Logs: "Send demo traffic") or mask a text in the Playground.
+                    </p>
+                  ))}
                 {list.state === "ok" && sessions.length > 0 && shown.length === 0 && <p className="py-6 text-center text-sm text-muted">No session matches.</p>}
                 <ul className="space-y-1" aria-label="Vault sessions">
                   {shown.map((s) => (
