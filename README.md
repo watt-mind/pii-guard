@@ -87,11 +87,11 @@ with 95 % intervals there.
 | PrivAiTe | 12.7 % | 2.4 % | 4.0 % | 4.4 % | 27.6 % | 9.5 % |
 | Presidio | 24.3 % | 12.4 % | 12.8 % | 36.5 % | **18.8 %** | 29.6 % |
 | LLM Guard | 45.1 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 43.8 % ‡ |
-| PII Guard rules only (no name detection) | 41.6 % | 45.3 % | 56.0 % | 40.9 % | 80.7 % | 63.1 % |
+| PII Guard rules only (no name detection) | 41.0 % | 45.3 % | 56.0 % | 40.9 % | 80.7 % | 63.1 % |
 
-Detection p50 on the `smoke` set: fast 45 ms, PrivAiTe 170 ms*, Presidio 88 ms*, LLM Guard 110 ms* (`*` averaged over several runs), each on the machine in its run record: compare loosely.
+Detection p50 on the `smoke` set: fast 38 ms, PrivAiTe 105 ms, Presidio 131 ms, LLM Guard 69 ms (`*` averaged over several runs), each on the machine in its run record: compare loosely.
 
-Records behind the fast row: [Hand-written](eval/results/runs/2026-10-29-lab-1500-smoke.json), [Agent traffic](eval/datasets/results/2026-10-28-datasets-agent-traffic-fast.json), [Nemotron-PII](eval/datasets/results/2026-10-28-datasets-nemotron-pii-fast.json), [CEE-PII](eval/datasets/results/2026-10-28-datasets-cee-pii-fast.json), [Gretel finance](eval/datasets/results/2026-10-28-datasets-gretel-finance-fast.json), [Ai4Privacy](eval/datasets/results/2026-10-28-datasets-ai4privacy-fast.json); every other cell is in the [run log](docs/benchmarks.md#run-log) and [eval/datasets/results/](eval/datasets/results/).
+Records behind the fast row: [Hand-written](eval/results/runs/2026-10-30-lab-1496-smoke-fast.json), [Agent traffic](eval/datasets/results/2026-10-28-datasets-agent-traffic-fast.json), [Nemotron-PII](eval/datasets/results/2026-10-28-datasets-nemotron-pii-fast.json), [CEE-PII](eval/datasets/results/2026-10-28-datasets-cee-pii-fast.json), [Gretel finance](eval/datasets/results/2026-10-28-datasets-gretel-finance-fast.json), [Ai4Privacy](eval/datasets/results/2026-10-28-datasets-ai4privacy-fast.json); every other cell is in the [run log](docs/benchmarks.md#run-log) and [eval/datasets/results/](eval/datasets/results/).
 <!-- results:end -->
 
 † **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
@@ -101,7 +101,7 @@ leaks **13.8 %** ([ablation](docs/benchmarks.md#ai4privacy)), so on unseen text 
 Ai4Privacy data too ([configurations](eval/results/2026-10-27-comparison/README.md#systems)).
 
 - **Where fast mode is weak:** finance text (19.1 %, level with Presidio's 18.8 %), and over-masking:
-  1.1 % on the hand-written set and 1.7 % on agent traffic, but 26.4 % on CEE-PII, where
+  1.1 % on the hand-written set and 1.7 % on agent traffic, but 26.3 % on CEE-PII, where
   reference numbers without a cue word come out as IDs
   ([model card](training/ner/model-card.md#limitations)).
 - **Audit mode** (opt-in: rules + NER + Muse Spark Open, one hosted Baseten call per message,

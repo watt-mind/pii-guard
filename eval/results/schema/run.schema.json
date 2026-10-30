@@ -56,7 +56,8 @@
       "additionalProperties": false,
       "properties": {
         "commit": {"type": "string", "pattern": "^([0-9a-f]{7,40}|unknown)$"},
-        "dirty": {"type": "boolean"},
+        "dirty": {"type": "boolean", "description": "Whether a tracked file under src/, eval/fixtures/, scripts/, pyproject.toml or uv.lock differed from the commit (LAB-1496). Docs and results churn does not count; older records counted any tracked change."},
+        "dirty_paths": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Which of those files differed (at most 50). Absent in records made before LAB-1496."},
         "pii_guard_version": {"type": ["string", "null"]},
         "note": {"type": ["string", "null"]}
       }

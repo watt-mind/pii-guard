@@ -20,7 +20,7 @@ export const MEASURED = "Fictional German, English and Hungarian data · measure
 export const SETS = ["Hand-written de + en + hu (51)", "CEE-PII (451)", "Nemotron-PII (300)"] as const;
 type Row = { system: string; leak: readonly string[]; f1: readonly string[]; ours?: boolean };
 export const COMPARISON: readonly Row[] = [
-  { system: "PII Guard", leak: ["0.0", "0.4", "0.7"], f1: ["94.3", "82.6", "89.4"], ours: true },
+  { system: "PII Guard", leak: ["0.0", "0.4", "0.7"], f1: ["94.6", "82.7", "89.4"], ours: true },
   { system: "PrivAiTe", leak: ["12.7", "4.4", "4.0"], f1: ["55.2", "34.2", "80.8"] },
   { system: "Presidio", leak: ["24.3", "36.5", "12.8"], f1: ["64.9", "41.4", "66.4"] },
   { system: "LLM Guard", leak: ["45.1", "75.8", "28.8"], f1: ["53.2", "24.7", "72.9"] },
@@ -48,7 +48,7 @@ export const LATENCY = { value: "~34 ms", label: "Gateway overhead per request",
 
 /** Our NER against other open PII models, the same rules around each. Sorted by leak. */
 export const OPEN_MODELS = [
-  { model: "PII Guard NER v2.0", id: "watt-mind/pii-guard-ner-xlmr-base", leak: "0.0", f1: "94.3", over: "1.1", ours: true },
+  { model: "PII Guard NER v2.0", id: "watt-mind/pii-guard-ner-xlmr-base", leak: "0.0", f1: "94.6", over: "1.1", ours: true },
   { model: "bardsai multilang v1", id: "bardsai/eu-pii-anonimization-multilang", leak: "1.2", f1: "93.4", over: "10.4" },
   { model: "Wismut nym-pii", id: "Wismut/nym-pii-multilingual", leak: "4.0", f1: "90.6", over: "6.0" },
   { model: "tabularisai eu-pii-safeguard", id: "tabularisai/eu-pii-safeguard", leak: "5.8", f1: "91.9", over: "4.6" },
@@ -79,7 +79,7 @@ export const IMAGE_LIMITS = { all: "37.9", presidio: "13.3", text: "15.0", ids: 
  * Where it's weaker, from the same report: Gretel finance (PII Guard fast vs Presidio, 27–28 Oct),
  * over-masking on CEE-PII, and MAPA EUR-Lex (21 EU languages, 42 docs).
  */
-export const WEAKER = { gretel: "19.0", gretelPresidio: "18.8", ceeOverMasking: "26.4", mapaLeak: "8.5" } as const;
+export const WEAKER = { gretel: "19.0", gretelPresidio: "18.8", ceeOverMasking: "26.3", mapaLeak: "8.5" } as const;
 
 /**
  * Real coding agents through the gateway: docs/integrations/harness-matrix-2026-10-29.md
