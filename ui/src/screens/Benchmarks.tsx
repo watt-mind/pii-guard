@@ -214,8 +214,9 @@ const SORT_DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
 /** A `sort` hash value (`key` or `key:dir`) as sort state, or the default (LAB-1133). */
 function parseSort(value: string | undefined): SortState {
   const [key, dir] = value?.split(":") ?? [];
-  const defaultDir = key ? SORT_DEFAULT_DIR[key as SortKey] : undefined;
-  if (!defaultDir) return DEFAULT_SORT;
+  // Own keys only: `sort=constructor` must not resolve to Object.prototype.
+  if (!key || !Object.prototype.hasOwnProperty.call(SORT_DEFAULT_DIR, key)) return DEFAULT_SORT;
+  const defaultDir = SORT_DEFAULT_DIR[key as SortKey];
   const validDir = dir === "asc" || dir === "desc" ? dir : defaultDir;
   return { key: key as SortKey, dir: validDir };
 }
