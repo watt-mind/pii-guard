@@ -501,9 +501,6 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Report-only while the allow-list settles: findings show as annotations on the PR but do
-    # not fail ci-ok yet (follow-up ticket to make it blocking).
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

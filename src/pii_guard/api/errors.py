@@ -134,7 +134,7 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
         "The text to mask contains a placeholder this session already issued.",
     ),
     "vault_not_configured": (
-        500,
+        503,
         "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
     ),
     "masking_failed": (500, "Masking or re-identification could not complete."),

@@ -41,7 +41,13 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
-from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
+from pii_guard.types import (
+    EntityType,
+    MaskingError,
+    PiiGuardError,
+    Span,
+    VaultNotConfiguredError,
+)
 from pii_guard.vault.fold import FoldedText, dropped, fold_value, fold_views, spaced
 from pii_guard.vault.inflection import (
     InflectionMatcher,
@@ -1826,7 +1832,7 @@ class Vault:
         """
         key = settings.tenant_key_bytes()
         if key is None:
-            raise MaskingError("PII_GUARD_TENANT_KEY is not set", code="vault_not_configured")
+            raise VaultNotConfiguredError("PII_GUARD_TENANT_KEY is not set")
         kwargs.setdefault("case_sensitive_placeholders", settings.vault_case_sensitive_placeholders)
         kwargs.setdefault("max_sessions", settings.vault_max_sessions)
         kwargs.setdefault("max_entries", settings.vault_max_entries)

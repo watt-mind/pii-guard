@@ -222,6 +222,14 @@ def test_masked_content_retention_is_capped_but_stream_continues(monkeypatch: An
     assert restorer.masked_content() == {}  # only the cache-seeding copy is dropped
 
 
+def test_tool_call_retention_is_capped_but_stream_continues(monkeypatch: Any) -> None:
+    restorer = _restorer(monkeypatch, MAX_MASKED_CONTENT_CHARS=10)
+    call = {"index": 0, "function": {"name": "send_email", "arguments": '{"to": "a long value"}'}}
+    out = restorer.process(json.dumps({"choices": [{"index": 0, "delta": {"tool_calls": [call]}}]}))
+    assert "a long value" in out[0]  # the client still gets the arguments
+    assert restorer.masked_tool_calls() == {}  # only the traffic-log copy is dropped (LAB-1189)
+
+
 def test_unmasker_count_is_capped(monkeypatch: Any) -> None:
     restorer = _restorer(monkeypatch, MAX_UNMASKERS=1)
     chunk = {
