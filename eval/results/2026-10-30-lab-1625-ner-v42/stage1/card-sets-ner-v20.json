@@ -1,0 +1,44 @@
+{
+  "smoke": {
+    "documents": 51,
+    "leak": 0.046243,
+    "over_masking": 0.011111,
+    "f1": 0.897915
+  },
+  "agent-traffic-dev": {
+    "documents": 300,
+    "leak": 0.003859,
+    "over_masking": 0.016687,
+    "f1": 0.959202
+  },
+  "agent-traffic": {
+    "documents": 990,
+    "leak": 0.00485,
+    "over_masking": 0.014092,
+    "f1": 0.953571
+  },
+  "ai4privacy": {
+    "documents": 600,
+    "leak": 0.004119,
+    "over_masking": 0.00367,
+    "f1": 0.992898
+  },
+  "nemotron-pii": {
+    "documents": 300,
+    "leak": 0.012912,
+    "over_masking": 0.012291,
+    "f1": 0.881277
+  },
+  "cee-pii": {
+    "documents": 451,
+    "leak": 0.015873,
+    "over_masking": 0.121951,
+    "f1": 0.814795
+  },
+  "gretel-finance": {
+    "documents": 400,
+    "leak": 0.204449,
+    "over_masking": 0.218796,
+    "f1": 0.709774
+  }
+}

@@ -12,17 +12,7 @@ import { YourText } from "./Highlight";
 import { LabelledCovers } from "./LabelledCovers";
 import { restoredSegments } from "./landing";
 
-/*
- * The landing's image showcase (LAB-1466, labels render LAB-1484, English specimen LAB-1509),
- * loaded on demand. A fictional specimen ID card and a message naming its holder, masked in one
- * vault session by the real API with the hosted preview's setup (src/content/imageLabels*.json):
- * each printed value is covered by a box carrying its placeholder, the photo and face are covered
- * solid, and the masked transcript and summary go with the image. The model's answer comes back
- * with the real name: a recorded Muse Spark answer to the masked message, summary and transcript
- * (scripts/record_image_labels.py, LAB-1524). Kept regions are outlined in --region-kept, as on the console's Images
- * screen; signatures and stamps are kept, as on the hosted preview (ADR 0014). The English card
- * is the default; the Hungarian one is a click away.
- */
+// Annotated visual example with separately recorded OCR and text-only model answer.
 
 /** The answer with each placeholder put back, from the message's own values (as /v1/unmask does). */
 function restore(text: string, masked: string, message: string): string {
@@ -84,7 +74,7 @@ export default function ImageShowcase() {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <p aria-hidden="true" className="text-sm font-medium text-ink">Specimen</p>
         <SegmentedControl label="Specimen" options={SPECIMENS} value={picked} onChange={setPicked} />
-        <p className="text-xs text-muted">Fictional, AI-generated and overprinted SPECIMEN.</p>
+        <p className="text-xs text-muted">Annotated illustration · fictional, AI-generated and overprinted SPECIMEN.</p>
       </div>
       <Showcase key={card.sample.id} card={card} />
     </div>
@@ -105,7 +95,7 @@ function Showcase({ card }: { card: ShowcaseCard }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane headingLevel={3} id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the face detector on the PII Guard server. Dashed: text found by OCR and the rules.">
+        <Pane headingLevel={3} id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: portrait and signature fixture annotations, not detector output. Dashed: recorded OCR and rules.">
           <div className="space-y-3">
             <YourText text={card.message} masked={message.masked} />
             <Figure card={card} alt={card.sample.alt} compact>
@@ -116,7 +106,7 @@ function Showcase({ card }: { card: ShowcaseCard }) {
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
             <Zoom card={card} masked={false} className="max-sm:hidden" />
             <div className="min-w-0 space-y-1.5">
-            <Caption>Found on the card</Caption>
+            <Caption>Regions in this illustration</Caption>
             <ul aria-label="Region legend" className="flex flex-wrap gap-1.5">
               {rows.map((row) => (
                 <li key={row.type} className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs text-muted">
@@ -137,10 +127,10 @@ function Showcase({ card }: { card: ShowcaseCard }) {
             <Metric label="as placeholders" value={tokenized.length} className="min-w-12" />
           </dl>
         </Boundary>
-        <Pane headingLevel={3} id="image-sent" side="model" eyebrow="Placeholders only" title="What the model gets" className="lg:flex-1" footer={`Recorded ${day} by the real masker with the hosted preview's setup; the covers are drawn in your browser from the recorded boxes.`}>
+        <Pane headingLevel={3} id="image-sent" side="model" eyebrow="Placeholders only" title="What the model gets" className="lg:flex-1" footer={`Annotated illustration: portrait and signature geometry comes from synthetic fixture annotations, not detector output. OCR and text were recorded ${day}. Live detection may differ.`}>
           <div className="space-y-3">
             <MaskedText text={message.masked} />
-            <Figure card={card} alt={`The same card as the model gets it: the photo and face covered, labeled PHOTO with the holder's placeholder; the ${[...new Set(types)].join(", ")} each covered by a box printed with its placeholder. The expiry date, sex and nationality are not personal data and stay readable.${card.maskedNote ?? ""}`}>
+            <Figure card={card} alt={`The same card as the model gets it: the annotated portrait and signature covered, portrait labeled PHOTO with the holder's placeholder; the ${[...new Set(types)].join(", ")} each covered by a box printed with its placeholder. The expiry date, sex and nationality are not personal data and stay readable.${card.maskedNote ?? ""}`}>
               <LabelledCovers regions={regions} width={image.width} height={image.height} />
             </Figure>
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
@@ -167,7 +157,7 @@ function Showcase({ card }: { card: ShowcaseCard }) {
         </Pane>
       </div>
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane headingLevel={3} id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="Muse Spark’s recorded answer, from the masked message, summary and transcript only.">
+        <Pane headingLevel={3} id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="Muse Spark’s earlier recorded answer, from the unchanged masked message, summary and transcript only; not a new run on this illustration.">
           <MaskedText text={answer.masked} />
         </Pane>
         <Boundary direction="inbound" label="PII Guard boundary: placeholders are restored on the way back" />

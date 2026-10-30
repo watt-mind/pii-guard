@@ -28,6 +28,7 @@ format: ## apply ruff fixes and formatting
 FAST_COV_FLOOR := 90
 
 test: ## fast suite as pull-request CI runs it: parallel, no slow tests, line coverage, its floor
+	HYPOTHESIS_PROFILE=$${HYPOTHESIS_PROFILE:-ci} \
 	COVERAGE_CORE=sysmon COVERAGE_BRANCH=false \
 		uv run --no-sync pytest -n auto --dist worksteal -m "not slow" --cov-fail-under=$(FAST_COV_FLOOR)
 

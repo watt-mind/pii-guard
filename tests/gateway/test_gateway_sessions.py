@@ -478,6 +478,7 @@ def test_recreated_session_id_starts_with_clean_cache_and_issued_ids() -> None:
 # --- LAB-1580: owner on the session, incarnations in shared caches, /v1/unmask -------------
 
 
+@pytest.mark.slow
 def test_binding_flood_cannot_evict_a_live_sessions_owner() -> None:
     # The old per-vault index forgot its oldest of 16384 bindings; a flood of distinct
     # bindings then let a second identity claim the victim's session. The owner now lives

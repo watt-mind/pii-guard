@@ -41,7 +41,8 @@ The output is a pure function of the records (no timestamps), so ``pii-guard eva
 Records stay as they were written; :func:`display_record` renames what they display at read
 time. Mode ``strict`` was renamed ``audit`` (LAB-1186), so older records' labels, titles, notes
 and latency cell modes show ``audit`` while their run IDs, system keys and files keep
-``strict``, and history stays traceable.
+``strict``, and history stays traceable. LAB-1625's candidate B3 was published as NER v4.2, so
+its records' label shows ``NER v4.2 (published, LAB-1625)``.
 """
 
 from __future__ import annotations
@@ -83,6 +84,11 @@ _DISPLAY_RENAMES = (
     (re.compile(r"\bpii-guard strict\b"), "pii-guard audit"),
     (re.compile(r"\bstrict mode\b"), "audit mode"),
     (re.compile(r"\bStrict mode\b"), "Audit mode"),
+    # B3 was published as v4.2 (LAB-1625): same weights, sha256 40e8406c.
+    (
+        re.compile(r"\bNER v4\.2 candidate B3: B1 with the v4\.2 targeted data twice \(LAB-1625\)"),
+        "NER v4.2 (published, LAB-1625)",
+    ),
 )
 _MODE_RENAMES = {"strict": "audit"}
 

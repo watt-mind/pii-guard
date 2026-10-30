@@ -151,7 +151,8 @@ def main(config: str, gpu: str = "A10G", data: str = "") -> None:
         raise SystemExit("--data takes <corpus>@<rev>[,...]")
     on_volume = {s.split("@", 1)[0] for s in mounted}
     files: dict[str, bytes] = {}
-    for rel in dict.fromkeys([*cfg["train"], *cfg["dev"]]):
+    # LAB-1625: report-only dev files (``report_dev``) go with the call too.
+    for rel in dict.fromkeys([*cfg["train"], *cfg["dev"], *cfg.get("report_dev", [])]):
         if not rel.startswith(DATA_PREFIX):
             check_payload([rel])
             files[rel] = (ROOT / rel).read_bytes()

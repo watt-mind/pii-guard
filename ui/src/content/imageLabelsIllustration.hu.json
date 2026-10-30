@@ -1,0 +1,224 @@
+{
+  "recorded": "2026-10-30",
+  "provenance": {
+    "kind": "annotated-illustration",
+    "image_sha256": "ae5eb3ac9969e6ab552b835fe5bd26a55c3d4b7eed0e8ec8cf537021a85c1ec5",
+    "geometry": "eval/fixtures/visual/labels.json: composition portrait and signature annotations; repository renderer padding, no label expansion",
+    "text_recording": "imageLabelsRecording.json",
+    "note": "OCR, message, summary, transcript and text-only Muse answer retained from the original recording. Visual boxes are annotations, not detector output. No detection metrics claimed."
+  },
+  "message": {
+    "masked": "[[PERSON_1d345d]] is the seller. Is her ID card attached, and is it still valid?"
+  },
+  "image": {
+    "media_type": "image/png",
+    "width": 1012,
+    "height": 638,
+    "transcript": "KITALÁLT MINTAHATÓSÁG - FICTIONAL SPECIMEN AUTHORITY\nAZONOSÍTÓ KÁRTYA : IDENTITY CARD\nCsaládi név / Surname\n[[PERSON_1d345d]]\nUtónév / Given names\n[[PERSON_1d345d]]\nSzületési idő / Date of birth\n[[DATE_OF_BIRTH_35f841]]\nOkmanyszam / Document no.\n[[ID_DOCUMENT_19dacf]]\n[[ID_DOCUMENT_94a883]]\nErvényes / Expiry\n2031.06.30.\nNem/ Sex\nF\nAllampolgarsag / Nationality\nUTO\nMINTA / SPECIMEN : MI által generált fiktív minta - Al-generated fictional specimen",
+    "summary": {
+      "document_type": "id_card",
+      "holder": "[[PERSON_1d345d]]",
+      "holder_match": "exact",
+      "holder_confidence": 1.0,
+      "document_number": "[[ID_DOCUMENT_19dacf]]",
+      "issuing_country": null,
+      "expiry": null,
+      "expired": false,
+      "mrz_present": false,
+      "mrz_valid": null,
+      "fields_found": {
+        "date_of_birth": "[[DATE_OF_BIRTH_35f841]]",
+        "document_number": "[[ID_DOCUMENT_19dacf]]",
+        "given_names": "[[PERSON_1d345d]]",
+        "surname": "[[PERSON_1d345d]]"
+      },
+      "fields_uncertain": []
+    },
+    "regions": [
+      {
+        "entity_type": "PERSON",
+        "box": [
+          320,
+          130,
+          390,
+          148
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_1d345d]]",
+        "label": "[[PERSON_1d345d]]",
+        "match": "exact",
+        "match_confidence": 1.0,
+        "cover_box": [
+          318,
+          128,
+          444,
+          150
+        ],
+        "label_lines": [
+          "[[PERSON_1d345d]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "PERSON",
+        "box": [
+          319,
+          171,
+          393,
+          195
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[PERSON_1d345d]]",
+        "label": "[[PERSON_1d345d]]",
+        "match": "exact",
+        "match_confidence": 1.0,
+        "cover_box": [
+          317,
+          169,
+          443,
+          197
+        ],
+        "label_lines": [
+          "[[PERSON_1d345d]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "DATE_OF_BIRTH",
+        "box": [
+          320,
+          221,
+          436,
+          240
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.8,
+        "policy": "mask",
+        "placeholder": "[[DATE_OF_BIRTH_35f841]]",
+        "label": "[[DATE_OF_BIRTH_35f841]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          318,
+          219,
+          489,
+          242
+        ],
+        "label_lines": [
+          "[[DATE_OF_BIRTH_35f841]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "box": [
+          319,
+          267,
+          427,
+          286
+        ],
+        "source": "ocr",
+        "detector": "captions",
+        "score": 0.95,
+        "policy": "mask",
+        "placeholder": "[[ID_DOCUMENT_19dacf]]",
+        "label": "[[ID_DOCUMENT_19dacf]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          317,
+          265,
+          478,
+          288
+        ],
+        "label_lines": [
+          "[[ID_DOCUMENT_19dacf]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_DOCUMENT",
+        "box": [
+          320,
+          302,
+          453,
+          331
+        ],
+        "source": "ocr",
+        "detector": "rules",
+        "score": 0.85,
+        "policy": "mask",
+        "placeholder": "[[ID_DOCUMENT_94a883]]",
+        "label": "[[ID_DOCUMENT_94a883]]",
+        "match": "new",
+        "match_confidence": null,
+        "cover_box": [
+          318,
+          300,
+          484,
+          333
+        ],
+        "label_lines": [
+          "[[ID_DOCUMENT_94a883]]"
+        ],
+        "label_px": 13
+      },
+      {
+        "entity_type": "ID_PHOTO",
+        "box": [
+          48,
+          120,
+          288,
+          432
+        ],
+        "source": "annotation",
+        "policy": "mask",
+        "label": "PHOTO · [[PERSON_1d345d]]",
+        "cover_box": [
+          46,
+          118,
+          290,
+          434
+        ],
+        "label_lines": [
+          "PHOTO · [[PERSON_1d345d]]"
+        ],
+        "label_px": 17
+      },
+      {
+        "entity_type": "SIGNATURE",
+        "box": [
+          70,
+          465,
+          307,
+          563
+        ],
+        "source": "annotation",
+        "policy": "mask",
+        "label": "SIGNATURE",
+        "cover_box": [
+          68,
+          463,
+          309,
+          565
+        ],
+        "label_lines": [
+          "SIGNATURE"
+        ],
+        "label_px": 41
+      }
+    ]
+  },
+  "answer": {
+    "masked": "Yes, the ID card of [[PERSON_1d345d]] is attached and it is still valid (expiry 2031.06.30).",
+    "model": "muse-spark-1.3",
+    "by": "Muse Spark, reading the masked message, summary and transcript"
+  }
+}

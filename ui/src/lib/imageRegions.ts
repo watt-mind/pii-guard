@@ -46,7 +46,8 @@ export function percentBox(box: ImageRegion["box"], width: number, height: numbe
  * the right). `label_lines`/`label_px` are how the server fitted the label (recorded by
  * scripts/record_image_labels.py), so the browser prints it at the same size. Never a value.
  */
-export interface LabelledRegion extends ImageRegion {
+export interface LabelledRegion extends Omit<ImageRegion, "source"> {
+  source: ImageRegion["source"] | "annotation";
   placeholder?: string | null;
   label?: string | null;
   cover_box?: ImageRegion["box"] | null;
@@ -150,12 +151,12 @@ export function summarizeRegions(regions: readonly ImageRegion[]): RegionSummary
 export interface LegendRow {
   type: EntityType;
   count: number;
-  sources: ImageRegion["source"][];
+  sources: LabelledRegion["source"][];
   kept: boolean;
 }
 
 /** One row per type, in order of first appearance, with where it came from. */
-export function legendRows(regions: readonly ImageRegion[]): LegendRow[] {
+export function legendRows(regions: readonly LabelledRegion[]): LegendRow[] {
   const rows = new Map<EntityType, LegendRow>();
   for (const r of regions) {
     const row = rows.get(r.entity_type) ?? { type: r.entity_type, count: 0, sources: [], kept: true };
