@@ -35,6 +35,7 @@ from pii_guard.api.routes.traffic import traffic_stream
 from pii_guard.config import Settings
 from pii_guard.gateway import GatewayConfig, Mode, build_mode_detectors
 from pii_guard.observability import ObservabilitySettings, TrafficLogConfigError
+from pii_guard.vault import PLACEHOLDER_RE
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
@@ -140,6 +141,64 @@ def test_streamed_event_has_masked_and_restored_content() -> None:
     assert "[[EMAIL_" in event["response"]["masked"]["content"]["0"]
     assert EMAILS[0] in event["response"]["unmasked"]["content"]["0"]
     assert event["response"]["chunks"] > 3
+
+
+def streamed_tool_call_upstream() -> httpx.MockTransport:
+    """Streams one ``send_email`` tool call whose arguments carry the request's email
+    placeholder split across chunks, after a short text answer."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        found = PLACEHOLDER_RE.findall(json.dumps(body["messages"]))
+        ident = next(i for kind, i in found if kind == "EMAIL")
+        args = json.dumps({"to": f"[[EMAIL_{ident}]]"})
+        cut = args.index("[[") + 4
+        events = [
+            chunk({"role": "assistant", "content": "Sending."}),
+            chunk(
+                {
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "id": "call_0",
+                            "type": "function",
+                            "function": {"name": "send_email", "arguments": ""},
+                        }
+                    ]
+                }
+            ),
+            chunk({"tool_calls": [{"index": 0, "function": {"arguments": args[:cut]}}]}),
+            chunk({"tool_calls": [{"index": 0, "function": {"arguments": args[cut:]}}]}),
+            chunk({}, finish="tool_calls"),
+        ]
+        out = "".join(f"data: {json.dumps(e)}\n\n" for e in events) + "data: [DONE]\n\n"
+        return httpx.Response(
+            200, content=out.encode(), headers={"content-type": "text/event-stream"}
+        )
+
+    return httpx.MockTransport(handler)
+
+
+@pytest.mark.parametrize("traffic", ["masked", "full"])
+def test_streamed_tool_call_arguments_are_kept(traffic: str) -> None:
+    with TestClient(make(streamed_tool_call_upstream(), traffic=traffic)) as client:
+        r = chat(client, stream=True)
+        assert r.status_code == 200 and "data: [DONE]" in r.text
+        (event,) = events(client)
+    response = event["response"]
+    assert response["masked"]["content"] == {"0": "Sending."}
+    (masked_call,) = response["masked"]["tool_calls"]["0"]
+    assert masked_call["id"] == "call_0" and masked_call["type"] == "function"
+    assert masked_call["function"]["name"] == "send_email"
+    assert PLACEHOLDER_RE.search(masked_call["function"]["arguments"])
+    assert EMAILS[0] not in json.dumps(response["masked"])
+    if traffic == "masked":
+        assert "unmasked" not in response
+        return
+    (restored_call,) = response["unmasked"]["tool_calls"]["0"]
+    assert restored_call["function"]["name"] == "send_email"
+    assert json.loads(restored_call["function"]["arguments"]) == {"to": EMAILS[0]}
+    assert response["unmasked"]["content"]["0"] == "Sending."
 
 
 def test_blocked_request_is_recorded_with_types_only() -> None:

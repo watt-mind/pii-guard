@@ -424,3 +424,17 @@ def test_up_generates_a_tenant_key_when_none_is_configured(
     key = settings.tenant_key.get_secret_value()
     assert len(bytes.fromhex(key)) == 32
     assert key != TENANT_KEY
+
+
+def test_up_honours_gateway_mode_from_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LAB-1365: a .env-only PII_GUARD_GATEWAY_MODE survives `up`'s defaults."""
+    import os
+
+    from pii_guard.gateway.config import GatewayConfig
+
+    dotenv = f"PII_GUARD_TENANT_KEY={TENANT_KEY}\nPII_GUARD_GATEWAY_MODE=audit\n"
+    _settings_up_serves(tmp_path, monkeypatch, dotenv)
+    assert os.environ["PII_GUARD_GATEWAY_MODE"] == "audit"
+    assert GatewayConfig().mode.value == "audit"

@@ -154,7 +154,7 @@ GATEWAY_ERRORS: dict[str, tuple[str, str | None]] = {
         "A new session is needed while every vault slot is held by an active request; retry.",
     ),
     "vault_not_configured": (
-        "pii_guard.types:MaskingError",
+        "pii_guard.types:VaultNotConfiguredError",
         None,
     ),
     "detection_failed": (

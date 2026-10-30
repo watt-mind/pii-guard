@@ -12,6 +12,7 @@ pii-guard eval injection --detectors rules,llm   # leak rate per prompt-injectio
 pii-guard eval ... --record SLUG [--record-extra FILE.json]  # also write a run record
 pii-guard eval record SCORECARD.json --slug SLUG  # run record(s) from a saved scorecard
 pii-guard eval report [--check]  # index.json, charts and docs/benchmarks.md from the records
+pii-guard eval gate [--gates FILE] [--runs-dir DIR]  # regression gate (eval/gates.json), 0/1/2
 pii-guard eval datasets list|fetch|check|run  # registered datasets (docs/datasets.md)
 ```
 
@@ -192,6 +193,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pii_guard.eval.report_cli import main as report_main
 
         return report_main(argv[1:])
+    if argv[:1] == ["gate"]:  # ``pii-guard eval gate``: quality regression gate vs run records
+        from pii_guard.eval.gate import main as gate_main
+
+        return gate_main(argv[1:])
     args = build_parser().parse_args(argv)
     if args.record_extra and not args.record:
         print("pii-guard eval: --record-extra needs --record SLUG", file=sys.stderr)
@@ -343,8 +348,19 @@ def _with_usage_cost(
 def _record(
     scorecard: dict[str, Any], slug: str, extra: dict[str, Any] | None, runs_dir: Path
 ) -> int:
-    """Write the run record(s) for ``scorecard`` and rebuild the benchmark report."""
-    from pii_guard.eval.record import RecordError, build_records, host_info, write_records
+    """Write the run record(s) for ``scorecard`` and rebuild the benchmark report.
+
+    With a non-default ``--runs-dir`` the report rebuild is skipped (LAB-1368): rebuilding
+    ``docs/benchmarks.md`` from a lone probe record would overwrite the committed page.
+    The default path rebuilds the committed docs as before.
+    """
+    from pii_guard.eval.record import (
+        DEFAULT_RUNS_DIR,
+        RecordError,
+        build_records,
+        host_info,
+        write_records,
+    )
     from pii_guard.eval.report_cli import main as report_main
 
     try:
@@ -355,4 +371,11 @@ def _record(
         return 2
     for path in paths:
         print(f"pii-guard eval: wrote {path}", file=sys.stderr)
+    if Path(runs_dir) != DEFAULT_RUNS_DIR:
+        print(
+            "pii-guard eval: --record: custom --runs-dir, skipping docs/benchmarks.md "
+            "rebuild (run `pii-guard eval report` for the committed runs dir)",
+            file=sys.stderr,
+        )
+        return 0
     return report_main(["--runs-dir", str(runs_dir)])

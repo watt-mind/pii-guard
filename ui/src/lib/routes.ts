@@ -10,6 +10,8 @@ export interface Route {
   tab: PlaygroundTab;
   /** The Connect screen's client tab; only meaningful when `section` is "connect". */
   client?: string;
+  /** The open vault session's ref; only meaningful when `section` is "vault". */
+  ref?: string;
   /** The Evaluation screen's filters; only meaningful when `section` is "evaluation". */
   evaluation?: EvaluationParams;
 }
@@ -75,6 +77,9 @@ export function hashOf(route: Route): string {
     const query = evaluationQuery(route.evaluation);
     return query ? `#evaluation?${query}` : "#evaluation";
   }
+  // A vault session deep link; refs change on restart, so a stale one lands on the
+  // existing "session is gone" state (LAB-1333).
+  if (route.section === "vault" && route.ref) return `#vault/${route.ref}`;
   return `#${route.section}`;
 }
 
@@ -113,8 +118,8 @@ export function parseHash(hash: string): { route: Route; redirect: boolean } | n
   if (legacy) return { route: legacy, redirect: true };
   // No hash, and the skip link's #main, are not routes: the section stays as it is.
   if (hash === "" || hash === "#" || hash === "#main") return null;
-  // Client ids contain hyphens (`muse-code`); section ids don't.
-  const m = /^#([a-z]+)(?:\/([a-z][a-z-]*))?(\?[^#]*)?$/.exec(hash);
+  // Client ids contain hyphens (`muse-code`); section ids don't. A vault ref is `s_<hex>`.
+  const m = /^#([a-z]+)(?:\/([^/?#]+))?(\?[^#]*)?$/.exec(hash);
   // Any other unknown hash lands on the Overview, with the URL cleaned up.
   if (!m || !SECTION_IDS.has(m[1]!)) return { route: DEFAULT_ROUTE, redirect: true };
   const section = m[1] as Section;
@@ -135,6 +140,13 @@ export function parseHash(hash: string): { route: Route; redirect: boolean } | n
     if (query === undefined) return { route: { section, tab: "text" }, redirect: false };
     return { route: { section, tab: "text", evaluation: parseEvaluationQuery(query) }, redirect: false };
   }
+  // #vault/<ref> deep-links an open session (LAB-1333); anything else after a section
+  // is not a route and rewrites to the section.
+  if (section === "vault" && query === undefined) {
+    if (sub === undefined) return { route: { section, tab: "text" }, redirect: false };
+    if (/^s_[0-9a-f]{1,32}$/i.test(sub)) return { route: { section, tab: "text", ref: sub }, redirect: false };
+    return { route: { section, tab: "text" }, redirect: true };
+  }
   return { route: { section, tab: "text" }, redirect: sub !== undefined || query !== undefined };
 }
 
@@ -146,4 +158,5 @@ export const sameRoute = (a: Route, b: Route) =>
   a.section === b.section &&
   (a.section !== "playground" || a.tab === b.tab) &&
   (a.section !== "connect" || a.client === b.client) &&
-  (a.section !== "evaluation" || evaluationQuery(a.evaluation) === evaluationQuery(b.evaluation));
+  (a.section !== "evaluation" || evaluationQuery(a.evaluation) === evaluationQuery(b.evaluation)) &&
+  (a.section !== "vault" || a.ref === b.ref);

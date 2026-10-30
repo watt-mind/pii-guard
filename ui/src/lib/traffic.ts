@@ -271,7 +271,8 @@ export interface Choice {
 
 /**
  * The answer's choices: a `chat.completion` body (non-streamed), or a stream's collected
- * content per choice (`{"content": {"0": "..."}}`, as the traffic log keeps it).
+ * content and tool calls per choice (`{"content": {"0": "..."}, "tool_calls": {"0": [...]}}`,
+ * as the traffic log keeps it; each tool-call list is shaped like `message.tool_calls`).
  */
 export function responseChoices(body: unknown): Choice[] {
   if (!isRecord(body)) return [];
@@ -288,12 +289,18 @@ export function responseChoices(body: unknown): Choice[] {
       ];
     });
   }
-  if (isRecord(body.content)) {
-    return Object.entries(body.content)
-      .filter(([, v]) => typeof v === "string")
-      .map(([k, v]) => ({ index: Number(k), content: v as string, toolCalls: [] }));
-  }
-  return [];
+  const content = isRecord(body.content) ? body.content : {};
+  const tools = isRecord(body.tool_calls) ? body.tool_calls : {};
+  if (!isRecord(body.content) && !isRecord(body.tool_calls)) return [];
+  const keys = [...new Set([...Object.keys(content), ...Object.keys(tools)])];
+  return keys
+    .map((k) => ({
+      index: Number(k),
+      content: typeof content[k] === "string" ? content[k] : null,
+      toolCalls: toolCallsOf(tools[k]),
+    }))
+    .filter((c) => c.content !== null || c.toolCalls.length)
+    .sort((a, b) => a.index - b.index);
 }
 
 /** The original / restored text with each value marked against its placeholder; null when they don't line up. */

@@ -132,6 +132,16 @@ describe("payloads", () => {
     expect(responseChoices(stream.response?.unmasked)[0]!.content).toContain("1051 Budapest, Minta utca 12.");
   });
 
+  it("reads a stream's collected tool calls next to its content", () => {
+    const call = (args: string) => ({ index: 0, id: "call_0", type: "function", function: { name: "send_email", arguments: args } });
+    const masked = { content: { "0": "Sending." }, tool_calls: { "0": [call('{"to": "[[EMAIL_7f3a]]"}')], "1": [call("{}")] } };
+    const choices = responseChoices(masked);
+    expect(choices.map((c) => c.index)).toEqual([0, 1]);
+    expect(choices[0]).toEqual({ index: 0, content: "Sending.", toolCalls: [{ name: "send_email", arguments: '{"to": "[[EMAIL_7f3a]]"}' }] });
+    expect(choices[1]).toMatchObject({ content: null, toolCalls: [{ name: "send_email", arguments: "{}" }] });
+    expect(responseChoices({ content: {} })).toEqual([]);
+  });
+
   it("keeps an image part as its summary", () => {
     const img = recorded.find((e) => e.entities?.images)!;
     const [m] = requestMessages(img.request?.original);

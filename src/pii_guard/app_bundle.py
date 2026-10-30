@@ -460,6 +460,39 @@ class _QuietShutdown(logging.Filter):
         return not getattr(self.server, "should_exit", False)
 
 
+def _dotenv_value(key: str) -> str | None:
+    """The value of ``key`` in ``.env`` in the working directory, if set (LAB-1365).
+
+    ``up`` applies its own defaults (the dashboard is the point of ``up``) only when
+    neither the process environment nor ``.env`` sets a key; pydantic-settings would
+    otherwise lose to the ``os.environ.update`` below. Minimal ``KEY=value`` parse:
+    comments and blank lines skipped, optional quotes stripped.
+    """
+    from pathlib import Path
+
+    try:
+        text = Path(".env").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, _, raw = stripped.partition("=")
+        if name.strip() != key:
+            continue
+        value = raw.strip().strip('"').strip("'").strip()
+        return value or None
+    return None
+
+
+def _up_value(key: str, default: str) -> str:
+    """Process env, else ``.env``, else ``up``'s default (LAB-1365)."""
+    import os
+
+    return os.environ.get(key) or _dotenv_value(key) or default
+
+
 def _tenant_key_configured() -> bool:
     """Whether the environment or ``.env`` sets a tenant key (LAB-1356).
 
@@ -495,11 +528,11 @@ def run_up(opts: UpOptions) -> int:
     env: dict[str, str] = {
         "PII_GUARD_HOST": opts.host,
         "PII_GUARD_PORT": str(opts.port),
-        "PII_GUARD_METRICS": os.environ.get("PII_GUARD_METRICS") or "true",
-        "PII_GUARD_SERVER_TIMING": os.environ.get("PII_GUARD_SERVER_TIMING") or "true",
-        "PII_GUARD_GATEWAY_MODE": os.environ.get("PII_GUARD_GATEWAY_MODE") or "fast",
+        "PII_GUARD_METRICS": _up_value("PII_GUARD_METRICS", "true"),
+        "PII_GUARD_SERVER_TIMING": _up_value("PII_GUARD_SERVER_TIMING", "true"),
+        "PII_GUARD_GATEWAY_MODE": _up_value("PII_GUARD_GATEWAY_MODE", "fast"),
     }
-    traffic_log = opts.traffic_log or os.environ.get("PII_GUARD_TRAFFIC_LOG") or "masked"
+    traffic_log = opts.traffic_log or _up_value("PII_GUARD_TRAFFIC_LOG", "masked")
     if traffic_log == "off":
         traffic_log = "masked"  # the dashboard is the point of `up`
     env["PII_GUARD_TRAFFIC_LOG"] = traffic_log

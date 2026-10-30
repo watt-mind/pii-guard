@@ -213,6 +213,15 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   const trafficHandle = useTraffic({ forceFixture, connect: trafficOpened ? traffic?.connect : idleConnect, fixtureIntervalMs: traffic?.fixtureIntervalMs });
   const [logFocus, setLogFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [vaultFocus, setVaultFocus] = useState<{ ref: string; nonce: number } | null>(null);
+  // A #vault/<ref> deep link opens that session once the section mounts (LAB-1333); the
+  // nonce is derived from the ref, so a different deep link reopens the detail.
+  const routeVaultRef = route.section === "vault" ? (route.ref ?? null) : null;
+  const routeVaultNonce =
+    routeVaultRef === null
+      ? 0
+      : [...routeVaultRef].reduce((n, c) => (n * 31 + c.charCodeAt(0)) | 0, 7);
+  const vaultFocusProp =
+    vaultFocus ?? (routeVaultRef !== null ? { ref: routeVaultRef, nonce: routeVaultNonce } : null);
 
   const [sampleId, setSampleId] = useState<string | null>(DEFAULT_SAMPLE.id);
   const [text, setText] = useState(DEFAULT_SAMPLE.text);
@@ -457,7 +466,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
                 focus={logFocus}
                 onOpenSession={(ref) => {
                   setVaultFocus({ ref, nonce: Date.now() });
-                  openSection("vault");
+                  navigate({ section: "vault", tab: "text", ref }, "push");
                 }}
               />
             )}
@@ -465,7 +474,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           </section>
           <section id="section-vault" aria-label="Vault" hidden={section !== "vault"}>
             {sectionOpened("vault") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading vault…</p>}>
-            <Vault status={status} live={engine.engine === "api"} active={section === "vault"} client={vault} focus={vaultFocus} />
+            <Vault status={status} live={engine.engine === "api"} active={section === "vault"} client={vault} focus={vaultFocusProp} onSelectRef={(ref) => navigate({ section: "vault", tab: route.tab, ref: ref ?? undefined }, ref ? "push" : "replace")} />
             </Suspense></PageLoadBoundary>}
           </section>
           <section id="section-connect" aria-label="Connect" hidden={section !== "connect"}>
