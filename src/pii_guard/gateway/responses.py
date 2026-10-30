@@ -283,7 +283,7 @@ class ResponsesGateway:
         forwarding = time.perf_counter()
         payload = gw._forwarded(body, session, stats, add_responses_note)
         try:
-            check_upstream_payload(payload)
+            check_upstream_payload(payload, stats.image_payload_bytes)
         except PayloadTooLargeError:
             stats.log("blocked")
             raise
