@@ -1810,6 +1810,7 @@ Share of labelled regions masked with IoU >= 0.5. `specimens` are official speci
 | `2026-10-27-visual-specimens-rules-captions` | `specimens` | 65 | 24 | 90.8% | 83.8% | 76.7% | 15.0% | 37.9% | 4.0% |
 | `2026-10-27-visual-specimens-rules-llm` | `specimens` | 65 | 24 | 90.8% | 83.8% | 76.7% | 27.7% | 46.6% | 3.1% |
 | `2026-10-27-visual-specimens-rules-llm-captions` | `specimens` | 65 | 24 | 90.8% | 83.8% | 80.0% | 29.2% | 47.8% | 4.8% |
+| `2026-10-30-visual-specimens-rules-captions-security-print` | `specimens` | 65 | 24 | 90.8% | 83.8% | 83.3% | 20.8% | 42.4% | 4.7% |
 
 ## Segmenters: SAM 3.1 API vs on-device
 
@@ -1869,6 +1870,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-30 | `2026-10-30-visual-specimens-rules-captions-security-print` | pii-guard image masking (sam-3.1 + tesseract + rules+captions) | specimens | — | recorded | `b1c3b15` | Apple M1 Max, Tesseract 5.5.3 (hun+eng), OMP_THREAD_LIMIT=1 on a shared, heavily loaded machine (load average ~25); SAM 3.1 remote | ≈ $0.00 |
 | 2026-10-29 | `2026-10-29-lab-1535-eu-inflection-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | eu-inflection | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `4c4ad56` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1535-en-court-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | en-court-smoke | en | recorded | `4c4ad56` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1535-eu-smoke-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | eu-smoke | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `4c4ad56` (dirty) | — | — |
@@ -2678,13 +2680,13 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-glimmer-zero-shot-llm-low` | pii-guard Muse Glimmer (low) | smoke | en, hu | imported | `c759b54` | Modal, 1x NVIDIA H100 80 GB, vLLM (vllm/vllm-openai:muse-glimmer), bf16 | ≈ $4.00, 60 GPU-min, shared |
 | 2026-10-27 | `2026-10-27-visual-specimens-rules-llm-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
 | 2026-10-27 | `2026-10-27-visual-specimens-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
-| 2026-10-27 | `2026-10-27-visual-specimens-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
+| 2026-10-27 | `2026-10-27-visual-specimens-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules+captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-visual-specimens-rules` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.65 |
 | 2026-10-27 | `2026-10-27-visual-specimens-person-prompt` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `84b6422` | — | ≈ $0.65 |
 | 2026-10-27 | `2026-10-27-visual-specimens-id-photo-prompt` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `84b6422` | — | ≈ $0.65 |
 | 2026-10-27 | `2026-10-27-visual-fictional-rules-llm-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
 | 2026-10-27 | `2026-10-27-visual-fictional-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote; Muse Spark Open remote (Baseten) | — |
-| 2026-10-27 | `2026-10-27-visual-fictional-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
+| 2026-10-27 | `2026-10-27-visual-fictional-rules-captions` | pii-guard image masking (sam-3.1 + tesseract + rules+captions) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.00 |
 | 2026-10-27 | `2026-10-27-visual-fictional-rules` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | recorded | `dbe5c8e` | Apple M1 Max, Tesseract 5.5.3 (hun+eng); SAM 3.1 remote | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-visual-fictional-muse-image` | pii-guard image masking (sam-3.1 + tesseract + rules) | specimens | — | imported | `88e98bd` | — | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-segment-small-detectors-specimens` | segmenter yunet-2023mar+yolos-tiny-signature (no OCR) | specimens | — | recorded | `02c510e` | arm64 CPU, one process; host load average 18 (shared with other jobs) | $0.00 |
@@ -2700,13 +2702,13 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-presidio-image-tuned` | Presidio Image Redactor (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-presidio-image` | Presidio Image Redactor (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-pii-guard-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.00 |
-| 2026-10-27 | `2026-10-27-image-baselines-specimens-pii-guard-rules` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.65 |
+| 2026-10-27 | `2026-10-27-image-baselines-specimens-pii-guard-rules` | pii-guard image masking (sam-3.1 + tesseract + rules+captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.65 |
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-eka-tuned` | Eka PII Redaction (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-specimens-eka` | Eka PII Redaction (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-fictional-presidio-image-tuned` | Presidio Image Redactor (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-fictional-presidio-image` | Presidio Image Redactor (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-fictional-pii-guard-rules-llm` | pii-guard image masking (sam-3.1 + tesseract + rules + llm:muse-spark-open + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.00 |
-| 2026-10-27 | `2026-10-27-image-baselines-fictional-pii-guard-rules` | pii-guard image masking (sam-3.1 + tesseract + rules + captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.24 |
+| 2026-10-27 | `2026-10-27-image-baselines-fictional-pii-guard-rules` | pii-guard image masking (sam-3.1 + tesseract + rules+captions) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | ≈ $0.24 |
 | 2026-10-27 | `2026-10-27-image-baselines-fictional-eka-tuned` | Eka PII Redaction (hun+eng OCR, 2000 px) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-27 | `2026-10-27-image-baselines-fictional-eka` | Eka PII Redaction (defaults) | specimens | — | recorded | `b9b2b43` | Apple M1 Max, CPU only, Tesseract 5.5.3; SAM 3.1 remote (pii-guard rows) | — |
 | 2026-10-26 | `2026-10-26-rules-muse-spark-smoke-hu` | pii-guard rules + Muse Spark 1.3 | smoke | hu | imported | `62b64fc` | local harness; the LLM detector is a remote API call | — |
