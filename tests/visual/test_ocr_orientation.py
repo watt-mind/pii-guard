@@ -278,7 +278,7 @@ def test_a_middling_reading_asks_osd(fake_tesseract: FakeTesseract) -> None:
 def test_osd_saying_upright_costs_no_pass(fake_tesseract: FakeTesseract, answer: int) -> None:
     fake_tesseract.upside_good = 2
     fake_tesseract.osd = answer
-    read = TesseractOcr(upscale_to=None, deskew=False).read(bar_page().rotate(180))
+    read = TesseractOcr(upscale_to=None, deskew=False, suppress=False).read(bar_page().rotate(180))
     # 0: upright, no second pass. 45: OSD can't be trusted, so upside down is read too.
     assert read.frame.identity == (answer == 0)
     assert len(fake_tesseract.calls) == (1 if answer == 0 else 2)
@@ -304,7 +304,7 @@ def test_osd_running_out_of_time_fails_closed(fake_tesseract: FakeTesseract) -> 
 
 def test_orientation_can_be_turned_off(fake_tesseract: FakeTesseract) -> None:
     page = bar_page().rotate(180, expand=True)
-    regions = text_regions(page, [RuleDetector()], ocr=TesseractOcr(orient=False))
+    regions = text_regions(page, [RuleDetector()], ocr=TesseractOcr(orient=False, suppress=False))
     assert not regions
     assert len(fake_tesseract.calls) == 1
 

@@ -21,6 +21,7 @@ __all__ = [
     "PayloadTooLargeError",
     "PiiGuardError",
     "Span",
+    "VaultNotConfiguredError",
 ]
 
 
@@ -200,6 +201,13 @@ class MaskingError(PiiGuardError):
 
     code = "masking_failed"
     status_code = 500
+
+
+class VaultNotConfiguredError(PiiGuardError):
+    """The tenant key is unset, not hex or too short. Misconfiguration, not a bug."""
+
+    code = "vault_not_configured"
+    status_code = 503
 
 
 class PayloadTooLargeError(PiiGuardError):

@@ -50,7 +50,8 @@ from collections.abc import Iterable, Sequence
 from copy import copy
 from dataclasses import dataclass
 
-from pii_guard.detect.normalize import NormalizedText, normalize_for_detection
+from pii_guard.detect.normalize import NormalizedText, normalize_for_detection, spaced_view
+from pii_guard.detect.rules._base import VALIDATED_ID_DOCUMENT
 from pii_guard.detect.suffix_trim import trim_name_suffixes
 from pii_guard.registry import create_detector
 from pii_guard.types import DetectionError, Detector, EntityType, Span
@@ -104,7 +105,14 @@ class _Cand:
 
 
 def _is_authoritative(span: Span, authoritative: frozenset[str]) -> bool:
-    return span.detector in authoritative and span.entity_type in STRUCTURED_TYPES
+    if span.detector not in authoritative:
+        return False
+    # A checksum- or label-validated ID_DOCUMENT rule span counts as authoritative too: the
+    # checksum is the validation, so it wins an exact-range conflict with a higher-score NER
+    # number span (LAB-1380). Bare format-only ID hits carry no such subtype.
+    return span.entity_type in STRUCTURED_TYPES or (
+        span.entity_type is EntityType.ID_DOCUMENT and span.subtype == VALIDATED_ID_DOCUMENT
+    )
 
 
 class _Intervals:
@@ -492,6 +500,9 @@ class DetectionPipeline:
         cleaned text (invisible characters dropped, lookalikes folded), so an obfuscated value
         is found whole by all of them; their spans are mapped back to ``text``, covering any
         invisible characters inside a value. Text with nothing to clean is passed unchanged.
+        A text with a same-case zero-width separator is also detected as a spaced view
+        (:func:`~pii_guard.detect.normalize.spaced_view`), so a first sighting written as
+        two words reaches every detector as two words (LAB-1252).
         """
         return self._detect_texts([text], language, batched=False)[0]
 
@@ -506,9 +517,19 @@ class DetectionPipeline:
         return self._detect_texts(list(texts), language, batched=True)
 
     def _detect_texts(self, texts: list[str], language: str, *, batched: bool) -> list[list[Span]]:
-        norms = [normalize_for_detection(text) for text in texts]
-        seen = [n.text if n.changed else t for n, t in zip(norms, texts, strict=True)]
-        spans: list[list[Span]] = [[] for _ in texts]
+        # A text with a same-case zero-width separator is also detected as a second, spaced
+        # view (LAB-1252): the view is the same length, so its spans map back offset for
+        # offset. The extra views ride along as pseudo-texts, keeping batching intact.
+        views = list(texts)
+        parent = list(range(len(texts)))
+        for i, text in enumerate(texts):
+            alt = spaced_view(text)
+            if alt is not None:
+                parent.append(i)
+                views.append(alt)
+        norms = [normalize_for_detection(view) for view in views]
+        seen = [n.text if n.changed else v for n, v in zip(norms, views, strict=True)]
+        spans: list[list[Span]] = [[] for _ in views]
         for detector in self.detectors:
             batch = getattr(detector, "detect_batch", None) if batched else None
             try:
@@ -527,14 +548,17 @@ class DetectionPipeline:
                 raise DetectionError(
                     f"detector {detector.name!r} failed ({type(exc).__name__})"
                 ) from exc
-            for i, found in enumerate(found_all):
+            for j, found in enumerate(found_all):
                 kept = [s for s in found if s.score >= self.min_score]
-                if norms[i].changed:
-                    kept = [_to_original(norms[i], texts[i], s) for s in kept]
-                spans[i].extend(kept)
+                if parent[j] != j or norms[j].changed:
+                    # A spaced view is the same length as its text, so the offsets map back
+                    # onto it; re-slicing covers the separator itself.
+                    kept = [_to_original(norms[j], texts[parent[j]], s) for s in kept]
+                spans[j].extend(kept)
         order = [d.name for d in self.detectors]
         out: list[list[Span]] = []
-        for text, candidates in zip(texts, spans, strict=True):
+        for i, text in enumerate(texts):
+            candidates = [s for j, group in enumerate(spans) if parent[j] == i for s in group]
             resolved = resolve_spans(
                 text,
                 candidates,

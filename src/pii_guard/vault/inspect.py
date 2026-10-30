@@ -58,6 +58,13 @@ class EntryView:
     origin: Origin
     #: The placeholder of the value this one is a casing or layout variant of.
     variant_of: str | None = None
+    #: The detector of the first span that created the entry (LAB-1332); ``None`` when
+    #: unknown or recorded before this field existed.
+    detector: str | None = None
+    #: Vault-clock seconds of the first and latest masked occurrence (LAB-1332); ``None``
+    #: until the entry's first occurrence is assembled.
+    first_seen: float | None = None
+    last_seen: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,4 +147,7 @@ def _view(entry: _Entry, origin: Origin, variant_of: str | None = None) -> Entry
         count=entry.count,
         origin=origin,
         variant_of=variant_of,
+        detector=entry.detector,
+        first_seen=entry.first_seen,
+        last_seen=entry.last_seen,
     )

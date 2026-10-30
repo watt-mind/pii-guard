@@ -24,7 +24,7 @@ from collections.abc import Iterable, Sequence
 
 from pii_guard.detect.pipeline import DEFAULT_KEEP_TYPES, resolve_spans
 from pii_guard.types import EntityType, Span
-from pii_guard.vault.fold import fold_text, fold_value, fold_views
+from pii_guard.vault.fold import FoldedText, fold_text, fold_value, fold_views
 from pii_guard.vault.inflection import inflection_for
 from pii_guard.vault.known import KnownValue, KnownValues
 
@@ -55,13 +55,18 @@ class KnownValuesDetector:
     def __repr__(self) -> str:
         return f"KnownValuesDetector(values={len(self._values)})"
 
-    def detect(self, text: str, language: str = "hu") -> list[Span]:
+    def detect(
+        self,
+        text: str,
+        language: str = "hu",
+        views: tuple[FoldedText, ...] | None = None,
+    ) -> list[Span]:
         if not self._values:
             return []
         taken = bytearray(len(text))
         spans: list[Span] = []
         # Longest values first, so "Teszt Elek" wins over a separately loaded "Elek".
-        for item, start, end in self._values.occurrences(text, language):
+        for item, start, end in self._values.occurrences(text, language, views):
             if end <= start or any(taken[start:end]):
                 continue
             taken[start:end] = b"\x01" * (end - start)
@@ -77,6 +82,7 @@ def merge_known(
     language: str = "hu",
     *,
     keep_types: Iterable[EntityType] = DEFAULT_KEEP_TYPES,
+    views: tuple[FoldedText, ...] | None = None,
 ) -> list[Span]:
     """``spans`` (already resolved) plus the known values' spans, resolved again.
 
@@ -85,7 +91,7 @@ def merge_known(
     follows a known stem (it stays outside the placeholder, as in the vault).
     """
     detector = known if isinstance(known, KnownValuesDetector) else KnownValuesDetector(known)
-    found = detector.detect(text, language)
+    found = detector.detect(text, language, views)
     if not found:
         return list(spans)
     return resolve_spans(

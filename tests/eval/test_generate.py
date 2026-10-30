@@ -31,7 +31,7 @@ from pii_guard.eval.generate import (
     parse_split,
     plan_document,
 )
-from pii_guard.eval.identities import Value
+from pii_guard.eval.identities import _HU_TOWNS, Value
 from pii_guard.types import EntityType as E
 
 LIVE_KEY = os.environ.get("META_API_KEY")
@@ -109,6 +109,20 @@ def test_hungarian_templates_include_a_land_registry_extract() -> None:
     plan = plan_document("hu", 1, 0, kind="land-registry")
     types = {v.entity_type for v in plan.required}
     assert {E.PARCEL_NUMBER_HU, E.PERSON, E.ADDRESS, E.ORGANIZATION} <= types
+
+
+@pytest.mark.parametrize("kind", ["land-registry", "power-of-attorney"])
+def test_land_registry_office_is_in_the_property_town(kind: str) -> None:
+    """The office that registers a property sits in the property's own town (LAB-1105)."""
+    for seed in range(30):
+        plan = plan_document("hu", seed, 0, kind=kind)
+        office = next(v.text for v in plan.values if v.field == "org_name" and "Hivatal" in v.text)
+        parcel = next(i for i, v in enumerate(plan.values) if v.field == "parcel")
+        prop = plan.values[parcel + 1].text  # the property's fields: parcel, address
+        town = prop.split(",")[0].split(" ", 1)[1]
+        assert any(
+            t == town and office.startswith(adjective.split()[0]) for t, adjective, _ in _HU_TOWNS
+        ), seed
 
 
 def test_unknown_language_or_kind() -> None:

@@ -108,7 +108,15 @@ DEFAULT_POLICY: Mapping[EntityType, str] = {t: DEFAULT_POLICIES[t] for t in TEXT
 #: Ai4Privacy labels every date ``DATE``, which pii-guard's policy excludes, so a
 #: ``DATE_OF_BIRTH`` prediction there can be neither confirmed nor refuted.
 LEGACY_UNSCORED_TYPES: Mapping[str, frozenset[EntityType]] = {
-    "public-ai4privacy": frozenset({EntityType.DATE_OF_BIRTH}),
+    "public-ai4privacy": frozenset(
+        {
+            EntityType.DATE_OF_BIRTH,
+            EntityType.ORGANIZATION,
+            EntityType.VEHICLE_PLATE,
+            EntityType.PARCEL_NUMBER_HU,
+            EntityType.COMPANY_ID_HU,
+        }
+    ),
 }
 
 #: Fixed, public key for evaluation runs only, so placeholders are reproducible.
@@ -571,6 +579,20 @@ class DetectorAnalyzer:
         if self.pipeline is None:
             raise DetectionError("no detector could be loaded")
         return self.pipeline.detect(text, language)
+
+    def usage(self) -> dict[str, dict[str, int]]:
+        """Request and token counters of the detectors that meter them (the LLM detector's
+        ``usage``), by detector name; empty when none does. Counts only, never content."""
+        out: dict[str, dict[str, int]] = {}
+        for name, detector in zip(self.loaded, self.detectors, strict=True):
+            counters = getattr(detector, "usage", None)
+            if isinstance(counters, Mapping):
+                out[name] = {
+                    str(k): v
+                    for k, v in counters.items()
+                    if isinstance(v, int) and not isinstance(v, bool)
+                }
+        return out
 
 
 @dataclass(frozen=True, slots=True)

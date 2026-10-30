@@ -174,29 +174,26 @@ def test_components_use_a_registered_pack() -> None:
 
 
 def test_the_hungarian_profile_asks_for_every_type_as_before() -> None:
-    from pii_guard.detect.llm import ENTITY_DESCRIPTIONS, LANGUAGES, language_profile
+    from pii_guard.detect.llm import ENTITY_DESCRIPTIONS, language_profile
 
     assert language_profile("hu").entity_types == tuple(ENTITY_DESCRIPTIONS)
-    assert set(LANGUAGES) == {"de", "en", "hu", "pl"}
-    assert LANGUAGES["en"].allow_suffix is False
-    with pytest.raises(KeyError):
-        LANGUAGES["en-GB"]
+    assert set(packs()) == {"de", "en", "hu", "pl"}
+    assert language_profile("en").allow_suffix is False
 
 
-def test_old_import_paths_still_work() -> None:
-    from pii_guard.detect.rules import en, hu
-    from pii_guard.eval import HungarianForms
-    from pii_guard.languages.en import rules as en_rules
-    from pii_guard.languages.hu import rules as hu_rules
-    from pii_guard.languages.hu.inflection import HungarianSuffixMatcher
-    from pii_guard.vault import HungarianSuffixMatcher as FromVault
-    from pii_guard.vault.inflection import EnglishPossessiveMatcher
+def test_pre_language_pack_aliases_are_gone() -> None:
+    import importlib
 
-    assert hu is hu_rules and en is en_rules
-    assert FromVault is HungarianSuffixMatcher
-    assert EnglishPossessiveMatcher().suffix_pattern("Smith", EntityType.PERSON)
-    assert HungarianForms().stem_variants("Anna", EntityType.PERSON)
-    with pytest.raises(AttributeError):
-        import pii_guard.vault.inflection as inflection
+    import pii_guard.detect.llm as llm
+    import pii_guard.eval as pg_eval
+    import pii_guard.vault as vault
+    import pii_guard.vault.inflection as inflection
 
-        _ = inflection.NoSuchMatcher  # type: ignore[attr-defined]
+    for name in ("pii_guard.detect.rules.hu", "pii_guard.detect.rules.en"):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(name)
+    assert not hasattr(inflection, "HungarianSuffixMatcher")
+    assert not hasattr(inflection, "EnglishPossessiveMatcher")
+    assert not hasattr(vault, "HungarianSuffixMatcher")
+    assert not hasattr(pg_eval, "HungarianForms")
+    assert not hasattr(llm, "LANGUAGES")

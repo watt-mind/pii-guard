@@ -168,7 +168,8 @@ class BearerTokenMiddleware:
             scheme, _, credential = value.partition(b" ")
             return credential.strip() if scheme.lower() == b"bearer" else None
 
-        if scope.get("path", "").startswith("/e/") and any(
+        path = scope.get("path", "")
+        if (path.startswith("/e/") or path == "/muse-code/models") and any(
             name.lower() == b"authorization"
             and (credential := bearer_credential(value)) is not None
             and looks_like_endpoint_key(credential.decode("latin-1"))

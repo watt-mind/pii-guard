@@ -177,3 +177,26 @@ def test_scorecard_api_for_other_tools() -> None:
     text = render_markdown(card)
     assert "`abc123`" in text
     assert "## Per entity type: `en`" in text
+
+
+def test_record_to_custom_runs_dir_leaves_benchmarks_untouched(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LAB-1368: --record --runs-dir DIR must not rewrite docs/benchmarks.md."""
+    import hashlib
+
+    from pii_guard.eval.cli import _record
+
+    monkeypatch.chdir(REPO_ROOT)
+    before = (REPO_ROOT / "docs" / "benchmarks.md").read_bytes()
+    digest_before = hashlib.sha256(before).hexdigest()
+    card = build_scorecard(
+        run_documents(load_fixtures([HU]), DetectorAnalyzer(["rules"])),
+        detectors=["rules"],
+        fixture_paths=[HU],
+    )
+    runs_dir = tmp_path / "runs"
+    assert _record(card, "probe-custom-dir", None, runs_dir) == 0
+    assert list(runs_dir.glob("*.json")), "the probe record lands in the custom dir"
+    after = (REPO_ROOT / "docs" / "benchmarks.md").read_bytes()
+    assert hashlib.sha256(after).hexdigest() == digest_before

@@ -40,6 +40,7 @@ import unicodedata
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from importlib.resources.abc import Traversable
+from typing import Any
 
 from pii_guard.detect.rules._base import _Hit
 from pii_guard.types import EntityType
@@ -199,12 +200,12 @@ def _trie_pattern(cues: Sequence[Cue]) -> str:
     A plain alternation of a hundred cues is tried cue by cue at every word start, which made
     the rule detector ten times slower; the trie tries each character once.
     """
-    trie: dict[str, dict] = {}
+    trie: dict[str, Any] = {}  # char -> subtree; the "" key holds the end kinds (a set)
     for cue in cues:
-        node = trie
+        node: dict[str, Any] = trie
         for ch in cue.key.replace("-", " "):
             node = node.setdefault(ch, {})
-        ends = node.setdefault("", set())
+        ends: set[str] = node.setdefault("", set())
         ends.add("suffix" if cue.suffix else ("word" if cue.key[-1].isalnum() else "any"))
 
     def build(node: dict) -> str:

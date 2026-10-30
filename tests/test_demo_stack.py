@@ -104,3 +104,11 @@ def test_configured_model_and_fallback_off(monkeypatch: pytest.MonkeyPatch) -> N
 def test_unknown_mode() -> None:
     with pytest.raises(ValueError, match="mode"):
         demo_stack.plan(mode="strict")
+
+
+def test_mock_plan_marks_the_upstream_as_the_mock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LAB-1311: `make demo` runs the API as plain `serve`, so the plan marks its separate
+    mock upstream process through the environment for /v1/status and Connect."""
+    p = demo_stack.plan(force_mock=True, ui=False)
+    assert p.upstream == "mock"
+    assert p.env["PII_GUARD_UPSTREAM_MOCK"] == "true"

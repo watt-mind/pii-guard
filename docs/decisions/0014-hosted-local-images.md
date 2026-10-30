@@ -70,6 +70,18 @@ sponsored or BYOK model needs its own provider cost reservation and a body limit
 the token allowance must not stand in for it. API-key image access is also left for a later,
 separately reviewed change.
 
+**Update (LAB-1439).** Chat image parts are now an operator opt-in
+(`PII_GUARD_HOSTED_CHAT_IMAGES`, default off) for signed-in Google owners on their own
+connection only. The sponsored route still refuses them: it has no reconciled per-image
+price. The chat body limit grows by `PII_GUARD_HOSTED_CHAT_MAX_IMAGES` base64 images, and a
+body without an image part still has the text limit. Each image counts once against the
+daily image count. It reserves a fixed `PII_GUARD_HOSTED_IMAGE_INPUT_TOKENS` provider input
+charge and 32 KiB for its masked transcript. The gateway's payload bound leaves out the masked
+images' own bytes, so the image bytes are never charged as text tokens. The pipeline is the
+same as `/v1/mask/image`: the on-device segmenter, Tesseract, the owner's visual policy with
+stricter operator overrides, the hosted pixel cap and deadline, and the one-job pool, checked
+before admission. Guard API keys stay text-only for chat images and for `/v1/mask/image`.
+
 ## Consequences
 
 Hosted owners can mask images without any remote processor of originals. Signatures are not

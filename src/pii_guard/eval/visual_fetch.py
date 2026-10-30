@@ -132,6 +132,18 @@ class RateLimiter:
         self._last = now
 
 
+class _Robots(RobotFileParser):
+    """A robots.txt parser whose all/nothing flags are declared for the type checker.
+
+    ``RobotFileParser`` sets ``allow_all`` / ``disallow_all`` in ``__init__`` and ``read()``
+    sets them from the status code, but typeshed leaves them out; we set them ourselves
+    because the fetch goes through our own client and rate limiter.
+    """
+
+    allow_all: bool
+    disallow_all: bool
+
+
 class Blocked(Exception):
     """A request that robots.txt or the server refused. The message is the reason."""
 
@@ -144,20 +156,20 @@ class PoliteFetcher:
     limiter: RateLimiter = field(default_factory=RateLimiter)
     user_agent: str = USER_AGENT
     requests: int = 0
-    _robots: dict[str, RobotFileParser] = field(default_factory=dict)
+    _robots: dict[str, _Robots] = field(default_factory=dict)
 
     def _get(self, url: str) -> httpx.Response:
         self.limiter.wait()
         self.requests += 1
         return self.client.get(url, headers={"User-Agent": self.user_agent}, timeout=60.0)
 
-    def robots(self, url: str) -> RobotFileParser:
+    def robots(self, url: str) -> _Robots:
         parts = urllib.parse.urlsplit(url)
         origin = f"{parts.scheme}://{parts.netloc}"
         parser = self._robots.get(origin)
         if parser is not None:
             return parser
-        parser = RobotFileParser(origin + "/robots.txt")
+        parser = _Robots(origin + "/robots.txt")
         try:
             response = self._get(origin + "/robots.txt")
         except httpx.HTTPError:

@@ -482,7 +482,7 @@ def test_no_tenant_key_fails_closed() -> None:
         response = http.post(
             "/v1/chat/completions", json={"model": "m", "messages": conversation_turn_one()}
         )
-    assert response.status_code == 500
+    assert response.status_code == 503
     assert response.json()["error"]["code"] == "vault_not_configured"
     assert upstream.requests == []
 

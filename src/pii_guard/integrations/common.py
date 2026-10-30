@@ -67,6 +67,9 @@ CANARY_PROMPT = (
 
 _TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 _SESSION_PATH_RE = re.compile(r"^(.*?)/s/([A-Za-z0-9_-]{1,128})(/.*)?$")
+# A project endpoint's base URL (docs/projects.md). It has no /s/<session> form: the gateway
+# routes /e/<id>/v1/... only, so a session prefix would turn every call into a 401.
+_ENDPOINT_PATH_RE = re.compile(r"^(?:.*/)?e/[A-Za-z0-9_-]{1,128}/v1$")
 
 
 class ConnectError(Exception):
@@ -96,6 +99,11 @@ def _without_session(url: str) -> str:
     match = _SESSION_PATH_RE.match(parts.path)
     path = (match.group(1) + (match.group(3) or "")) if match else parts.path
     return urlunsplit(parts._replace(path=path))
+
+
+def is_endpoint_url(url: str) -> bool:
+    """``url`` is a project endpoint base URL, ``{origin}/e/<endpoint>/v1``."""
+    return bool(_ENDPOINT_PATH_RE.match(urlsplit(url.rstrip("/")).path))
 
 
 def session_url(gateway_url: str, existing: str | None = None) -> str:

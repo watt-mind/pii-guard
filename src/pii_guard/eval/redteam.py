@@ -231,7 +231,7 @@ def build_targets(
         placeholders = sorted(
             {
                 ph
-                for start, end, ph in result.replacements
+                for start, end, ph in result.replacements or ()
                 if any(start < s.end and s.start < end for s in spans)
             }
         )

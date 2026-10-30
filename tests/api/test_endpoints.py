@@ -190,7 +190,7 @@ def test_validation_error_does_not_echo_text(api: TestClient) -> None:
 @pytest.mark.parametrize("path", ["/v1/mask", "/v1/unmask"])
 def test_vault_endpoints_fail_closed_without_tenant_key(client: TestClient, path: str) -> None:
     response = client.post(path, json={"text": SAMPLE_TEXT, "session_id": "s_x"})
-    assert response.status_code == 500
+    assert response.status_code == 503
     error = response.json()["error"]
     assert error["code"] == "vault_not_configured"
     assert "PII_GUARD_TENANT_KEY" in error["message"]
@@ -202,7 +202,7 @@ def test_invalid_tenant_key_fails_closed_without_echo() -> None:
     bad_key = "zz-not-hex-zz"
     with TestClient(create_app(Settings(tenant_key=bad_key))) as client:
         response = client.post("/v1/mask", json={"text": SAMPLE_TEXT})
-    assert response.status_code == 500
+    assert response.status_code == 503
     assert response.json()["error"]["code"] == "vault_not_configured"
     assert bad_key not in response.text
 
@@ -215,6 +215,21 @@ def test_detector_names_are_configurable() -> None:
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "detection_failed"
     assert "masked_text" not in response.text
+
+
+def test_max_text_chars_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LAB-1095: PII_GUARD_MAX_TEXT_CHARS wires into app.state.max_text_chars."""
+    from pii_guard.config import get_settings
+
+    monkeypatch.setenv("PII_GUARD_MAX_TEXT_CHARS", "12345")
+    get_settings.cache_clear()
+    try:
+        settings = Settings()
+        assert settings.max_text_chars == 12345
+        app = create_app(settings)
+        assert app.state.max_text_chars == 12345
+    finally:
+        get_settings.cache_clear()
 
 
 def test_registry_analyzer_requires_detectors() -> None:

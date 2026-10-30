@@ -43,6 +43,7 @@ from pii_guard.detect.rules._base import (
     NOT_IN_WORD_AFTER,
     NUM_END,
     NUM_START,
+    VALIDATED_ID_DOCUMENT,
     Rule,
     _Hit,
     context_before,
@@ -147,7 +148,7 @@ def _find_hu_personal_id(text: str) -> Iterator[_Hit]:
                 continue  # "Order 75302022056", "ticket: 28309121692": a reference (LAB-1327)
             else:
                 score = 0.85
-            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score)
+            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score, VALIDATED_ID_DOCUMENT)
 
 
 # --- ID document numbers ----------------------------------------------------
@@ -194,11 +195,17 @@ def _find_id_document(text: str) -> Iterator[_Hit]:
     """ID card, passport, driving licence and residence permit numbers next to their label."""
     for m in _ID_AFTER_LABEL_RE.finditer(text):
         known = _ID_FORMAT_RE.fullmatch(m.group("id")) is not None
-        yield _Hit(m.start("id"), m.end("id"), EntityType.ID_DOCUMENT, 0.95 if known else 0.85)
+        yield _Hit(
+            m.start("id"),
+            m.end("id"),
+            EntityType.ID_DOCUMENT,
+            0.95 if known else 0.85,
+            VALIDATED_ID_DOCUMENT,
+        )
     for m in _ID_FORMAT_RE.finditer(text):
         before = text[max(0, m.start() - _ID_CONTEXT_WINDOW) : m.start()]
         if _ID_LABEL_RE.search(before) or _ID_LABEL_AFTER_RE.match(text, m.end()):
-            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, 0.95)
+            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, 0.95, VALIDATED_ID_DOCUMENT)
 
 
 _BARE_ID_CARD_RE = re.compile(rf"(?<![\w\-./]){_ID_CARD}(?![\w\-]|[./]\w)")
@@ -230,12 +237,24 @@ def _find_mrz(text: str) -> Iterator[_Hit]:
         if "<<" not in m.group("l1"):
             continue  # the name field always has a "<<" separator
         valid = is_valid_mrz_td3(m.group("l1"), m.group("l2"))
-        yield _Hit(m.start("l1"), m.end("l2"), EntityType.ID_DOCUMENT, 0.99 if valid else 0.8)
+        yield _Hit(
+            m.start("l1"),
+            m.end("l2"),
+            EntityType.ID_DOCUMENT,
+            0.99 if valid else 0.8,
+            VALIDATED_ID_DOCUMENT,
+        )
     for m in _MRZ_TD1_RE.finditer(text):
         if "<<" not in m.group("l3"):
             continue
         valid = is_valid_mrz_td1(m.group("l1"), m.group("l2"), m.group("l3"))
-        yield _Hit(m.start("l1"), m.end("l3"), EntityType.ID_DOCUMENT, 0.99 if valid else 0.8)
+        yield _Hit(
+            m.start("l1"),
+            m.end("l3"),
+            EntityType.ID_DOCUMENT,
+            0.99 if valid else 0.8,
+            VALIDATED_ID_DOCUMENT,
+        )
 
 
 # --- Bank accounts ----------------------------------------------------------
@@ -332,6 +351,14 @@ _NOT_PLACES = frozenset({
     "Euro", "Euró", "Forint", "Darab", "Január", "Február", "Március", "Április",
     "Május", "Június", "Július", "Augusztus", "Szeptember", "Október", "November", "December",
     "Ezer", "Millió",
+    # English month names and abbreviations: `ls -la` and other tool output puts one
+    # after a bare size or count ("1203 Oct 28"), which is not a settlement (LAB-1476).
+    "January", "February", "March", "April", "May", "June", "July", "August",
+    "September", "October",
+    "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct",
+    "Nov", "Dec",
+    # Hungarian month abbreviations, as typed with a capital ("Okt", not "okt.").
+    "Febr", "Márc", "Ápr", "Máj", "Jún", "Júl", "Szept", "Okt",
 })  # fmt: skip
 
 
@@ -351,9 +378,13 @@ def _find_postcode(text: str) -> Iterator[_Hit]:
             # neither number is a postcode (LAB-1227). A cued postcode always counts.
             if legal_form_after(text, place.end()) or reference_or_amount_before(text, m.start()):
                 continue
-            # The postcode check works like a checksum: only a consistent pair is boosted.
+            # A bare pair needs a gazetteer-known settlement: a month abbreviation from
+            # tool output ("1203 Oct 28") or any other unknown word is not one (LAB-1476).
             settlement = _settlement(place.group(1))
-            consistent = settlement is not None and _postcodes_agree(m.group("code"), settlement)
+            if settlement is None:
+                continue
+            # The postcode check works like a checksum: only a consistent pair is boosted.
+            consistent = _postcodes_agree(m.group("code"), settlement)
             score = 0.85 if consistent else 0.75
         else:
             continue
