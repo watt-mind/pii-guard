@@ -187,6 +187,20 @@ def test_single_backslash_escape_in_json_arguments_is_not_read_as_json() -> None
     assert body["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] == arguments
 
 
+def test_escaped_backslash_before_u005b_is_not_corrupted_in_json_arguments() -> None:
+    """``\\\\u005b[EMAIL_x]]`` has a literal backslash before ``u005b`` and must stay valid JSON."""
+    session = _session()
+    ph = _placeholder(session, EMAIL, EntityType.EMAIL)
+    arguments = '{"p": "\\\\u005b' + ph[1:] + '"}'
+    body = completion(
+        "", tool_calls=[{"type": "function", "function": {"name": "f", "arguments": arguments}}]
+    )
+    restore_completion(session, body)
+    restored = body["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    assert restored == arguments
+    assert json.loads(restored) == {"p": "\\u005b" + ph[1:]}
+
+
 def test_unknown_escaped_placeholder_is_left_and_counted() -> None:
     session = _session()
     written = "\\[\\[EMAIL_000000\\]\\]"
@@ -322,7 +336,7 @@ def test_streamed_double_escape_split_at_the_backslashes_stays_as_is() -> None:
     """A cut between the backslashes of ``\\\\[`` must not make the second one look single."""
     session = _session()
     ph = _placeholder(session, EMAIL, EntityType.EMAIL)
-    written = "x\\\\" + _escaped(ph)[1:]  # "x\\[\[EMAIL_x\]\]": the "\[" after "\\" is no escape
+    written = "x\\\\" + _escaped(ph)[1:]  # "x\\[\\[EMAIL_x\\]\\]": the "\[" after "\\" is no escape
     for cut in range(len(written) + 1):
         payloads = [
             chunk(

@@ -46,13 +46,21 @@ EXEMPT_TYPES: frozenset[EntityType] = frozenset(
 _IDENTIFIER_RE = re.compile(r"[\w.:-]+")
 
 
+def _is_declared_name(raw: str, names: frozenset[str]) -> bool:
+    norm = normalize_value(raw)
+    if norm in names:
+        return True
+    parts = norm.split(".")
+    return len(parts) > 1 and all(p and p in names for p in parts)
+
+
 def tool_names(body: Mapping[str, Any]) -> frozenset[str]:
     """The names of the tools and tool namespaces the request declares (normalized).
 
     Responses API: ``tools[].name`` and a namespace's ``tools[].tools[].name``. Chat
     Completions: ``tools[].function.name`` (and ``tools[].custom.name``), the flat
-    ``tools[].name``, and the legacy ``functions[].name``. Only identifier-shaped names
-    (no whitespace) count.
+    ``tools[].name``, and the legacy ``functions[].name``. Only identifier-shaped names (no
+    whitespace) count.
     """
     names: set[str] = set()
 
@@ -141,7 +149,7 @@ def without_tool_names(
             if kind != "identifier"
             or s.detector == KNOWN_DETECTOR
             or s.entity_type not in EXEMPT_TYPES
-            or normalize_value(text[s.start : s.end]) not in names
+            or not _is_declared_name(text[s.start : s.end], names)
         ]
         for text, found, kind in zip(texts, spans, slot_kinds, strict=True)
     ]
@@ -181,8 +189,8 @@ def identifier_keeps_tool_names(
         return False
     for surface, placeholder in zip(match.groups(), placeholders, strict=True):
         value = original(placeholder)
-        if value is None or normalize_value(value) not in names:
+        if value is None or not _is_declared_name(value, names):
             return False
-        if normalize_value(surface) not in names:
+        if not _is_declared_name(surface, names):
             return False
     return True
