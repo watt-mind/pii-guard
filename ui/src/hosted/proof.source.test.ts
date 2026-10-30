@@ -66,7 +66,7 @@ describe("landing numbers match their sources (LAB-1499)", () => {
     for (const row of COMPARISON) {
       const c = cells(section("smoke"), SYSTEMS[row.system]!);
       expect(c[DOCS], row.system).toBe(String(SMOKE_DOCS));
-      expect(c[P50]!.replace("*", ""), row.system).toBe(`${row.p50} ms`);
+      expect(c[P50]!.replaceAll("*", ""), row.system).toBe(`${row.p50} ms`);
     }
   });
 
