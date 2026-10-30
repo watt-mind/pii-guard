@@ -20,7 +20,12 @@ import pytest
 from api_helpers import TEST_TENANT_KEY
 from fastapi.testclient import TestClient
 
-from pii_guard.api.app import DETECTING_PATHS, RETRY_AFTER_SECONDS, create_app
+from pii_guard.api.app import (
+    DETECTING_PATHS,
+    HOSTED_DETECTING_PATHS,
+    RETRY_AFTER_SECONDS,
+    create_app,
+)
 from pii_guard.app_bundle import Status, create_bundle_app
 from pii_guard.config import Settings
 from pii_guard.detect import stack
@@ -39,6 +44,14 @@ NON_DETECTING_POSTS = frozenset(
         "/v1/projects/{project_id}/endpoints",
         "/v1/projects/{project_id}/endpoints/models",
         "/v1/projects/{project_id}/endpoints/{endpoint_id}/keys",
+    }
+)
+#: POST routes hosted mode adds (``pii_guard.hosted.routes``) that never run a detector.
+HOSTED_NON_DETECTING_POSTS = frozenset(
+    {
+        "/v1/account/api-keys",
+        "/v1/account/connections",
+        "/v1/account/first-run",
     }
 )
 
@@ -190,6 +203,15 @@ def test_every_post_route_is_classified() -> None:
     app = create_app(Settings(tenant_key=TEST_TENANT_KEY, detectors=("rules",)))
     posts = {path for path, ops in app.openapi()["paths"].items() if "post" in ops}
     assert posts == DETECTING_PATHS | NON_DETECTING_POSTS
+
+
+def test_every_hosted_post_route_is_classified(tmp_path: Any) -> None:
+    """Hosted mode adds its own POST routes; each must detect (and wait) or be listed (LAB-1601)."""
+    app = _hosted_app(tmp_path)
+    posts = {path for path, ops in app.openapi()["paths"].items() if "post" in ops}
+    detecting = DETECTING_PATHS | HOSTED_DETECTING_PATHS
+    assert detecting.isdisjoint(NON_DETECTING_POSTS | HOSTED_NON_DETECTING_POSTS)
+    assert posts == detecting | NON_DETECTING_POSTS | HOSTED_NON_DETECTING_POSTS
 
 
 def test_no_ner_in_the_stack_means_no_warm_up(monkeypatch: pytest.MonkeyPatch) -> None:

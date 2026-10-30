@@ -49,7 +49,8 @@ logger = logging.getLogger("pii_guard.api")
 
 #: The routes that run detectors (``POST``), so wait for a loading NER model (LAB-1303). Every
 #: other route answers at once while it loads. ``tests/api/test_ner_warmup.py`` checks that
-#: each ``POST`` route of the app is either here or in its non-detecting list.
+#: each ``POST`` route of the app, hosted or not, is either here (or in
+#: ``HOSTED_DETECTING_PATHS``) or in its non-detecting lists.
 DETECTING_PATHS = frozenset(
     {
         "/v1/analyze",
@@ -61,6 +62,9 @@ DETECTING_PATHS = frozenset(
         "/v1/messages/count_tokens",
     }
 )
+#: The hosted-only routes that run detectors, added to ``DETECTING_PATHS`` in hosted mode.
+#: ``/v1/demo`` masks a sample through the gateway (LAB-1601).
+HOSTED_DETECTING_PATHS = frozenset({"/v1/demo"})
 #: Seconds a refused client is told to wait before retrying ``503 detector_loading``.
 RETRY_AFTER_SECONDS = 5
 
@@ -295,7 +299,9 @@ def create_app(
         NerWarmupMiddleware,
         warmup=warmup,
         timeout=settings.ner_warmup_timeout,
-        detecting_paths=DETECTING_PATHS | {"/v1/demo"} if settings.hosted else DETECTING_PATHS,
+        detecting_paths=(
+            DETECTING_PATHS | HOSTED_DETECTING_PATHS if settings.hosted else DETECTING_PATHS
+        ),
     )
     if inspect_mode is not InspectMode.OFF and not settings.hosted:
         app.add_middleware(SessionRecorderMiddleware, directory=app.state.vault_directory)
