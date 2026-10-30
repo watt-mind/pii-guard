@@ -33,7 +33,6 @@ from test_responses import ResponsesUpstream, muse_body
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
 from pii_guard.gateway import Gateway, GatewayConfig, Mode, build_mode_detectors
-from pii_guard.gateway import service as gateway_service
 from pii_guard.gateway.outbound import (
     MIN_DIGITS,
     MIN_MODEL_CHARS,
@@ -41,7 +40,7 @@ from pii_guard.gateway.outbound import (
     blocks,
     check_slots,
 )
-from pii_guard.gateway.request import TextSlot
+from pii_guard.gateway.request import ImageSlot, TextSlot
 from pii_guard.observability import ObservabilitySettings
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import Unmasked, Vault
@@ -279,11 +278,13 @@ def test_image_transcript_passes_when_masked() -> None:
 def test_image_transcript_is_blocked_when_a_value_survives(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real = gateway_service.image_annotation
+    # LAB-1689 sweeps the generated annotation before attaching it. Inject a fault
+    # after that sweep so this still exercises a value surviving all masking.
+    real = ImageSlot.annotate
     monkeypatch.setattr(
-        gateway_service,
-        "image_annotation",
-        lambda number, outcome: real(number, outcome) + f"\nOwner: {PERSON}",
+        ImageSlot,
+        "annotate",
+        lambda slot, text: real(slot, text + f"\nOwner: {PERSON}"),
     )
     upstream = MockUpstream()
     with TestClient(image_app(upstream)) as client:

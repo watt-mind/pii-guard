@@ -1,7 +1,7 @@
 """One pii-guard configuration over one fixture file, with what a comparison run needs to record.
 
 ```
-python -m pii_guard.eval.baselines.suite --system fast --fixtures eval/fixtures/hu-smoke.jsonl \
+python -m pii_guard.eval.baselines.suite --system fast --fixtures eval/fixtures/hu-smoke.jsonl \\
     --json OUT.json [--markdown OUT.md]
 ```
 
@@ -148,7 +148,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         run["ner"] = ner_identity()
     llm = next((d for d in analyzer.detectors if d.name == "llm"), None)
     if llm is not None:
-        usage = dict(llm.usage)
+        usage: dict[str, int] = dict(getattr(llm, "usage", {}) or {})
         warm_usage = warm.get("llm", {})
         doc_usage = {k: v - warm_usage.get(k, 0) for k, v in usage.items()}
         cost = cost_usd(doc_usage)

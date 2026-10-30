@@ -17,15 +17,37 @@ Upstream ``error`` events are replaced by a generic error: they may quote the ma
 
 from __future__ import annotations
 
+import asyncio
 import json
-from collections.abc import AsyncIterator, Callable
-from typing import Any
+import time
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping
+from contextlib import suppress
+from typing import TYPE_CHECKING, Any
+
+import httpx
 
 from pii_guard.gateway.opaque_ids import upstream_ids
-from pii_guard.gateway.restore import MESSAGE_TEXT_FIELDS, JsonEscapingSession, ToolInputSession
+from pii_guard.gateway.restore import (
+    MESSAGE_TEXT_FIELDS,
+    JsonEscapingSession,
+    ToolInputSession,
+    restore_text,
+)
+from pii_guard.types import PiiGuardError, Span
 from pii_guard.vault import StreamUnmasker, VaultSession
 
-__all__ = ["SseRestorer", "iter_sse_data", "sse_event"]
+if TYPE_CHECKING:
+    from pii_guard.gateway.trace import CallTrace
+    from pii_guard.observability import RequestTimer
+
+__all__ = [
+    "SseRestorer",
+    "iter_sse_data",
+    "sse_event",
+    "stream_sse_events",
+    "timed_lines",
+    "timed_sse_lines",
+]
 
 DONE = "[DONE]"
 
@@ -40,6 +62,138 @@ MAX_UNMASKERS = 1024
 
 class StreamTooLargeError(RuntimeError):
     """A stream retention cap was passed; the caller ends the stream with a generic error."""
+
+
+async def timed_sse_lines(
+    response: httpx.Response,
+    timer: RequestTimer,
+    timeout: float,  # noqa: ASYNC109 - a per-stream deadline, not a call timeout
+) -> AsyncIterator[str]:
+    """The upstream's lines; time spent waiting on them counts as upstream time.
+
+    The whole stream has a total deadline (LAB-1566), separate from the per-read
+    httpx timeout: past it the stream ends with the generic stream error.
+    """
+    lines = response.aiter_lines().__aiter__()
+    deadline = time.perf_counter() + timeout
+    while True:
+        waiting = time.perf_counter()
+        remaining = deadline - waiting
+        if remaining <= 0:
+            raise TimeoutError("upstream stream deadline exceeded")
+        try:
+            line = await asyncio.wait_for(lines.__anext__(), remaining)
+        except StopAsyncIteration:
+            timer.add("upstream", time.perf_counter() - waiting)
+            return
+        timer.add("upstream", time.perf_counter() - waiting)
+        if line.startswith("data:"):
+            timer.mark_first_data()
+        yield line
+
+
+timed_lines = timed_sse_lines
+
+
+async def stream_sse_events(
+    source: AsyncIterator[bytes],
+    *,
+    response: httpx.Response,
+    timer: RequestTimer,
+    trace: CallTrace,
+    stats: Any,
+    restorer: Any,
+    session: VaultSession,
+    seed_cache: Callable[[Mapping[int, tuple[str, list[Span]]]], None],
+    on_error: Callable[[Exception], Iterable[bytes]],
+) -> AsyncIterator[bytes]:
+    """Hand ``source``'s events to the client; time suspended in ``yield`` is the
+    client's (read speed, backpressure), not overhead."""
+    outcome = "ok"
+    try:
+        try:
+            async for chunk in source:
+                sending = time.perf_counter()
+                try:
+                    yield chunk
+                finally:
+                    timer.add("client", time.perf_counter() - sending)
+        except Exception as exc:
+            # Fail closed: stop the stream with an error event, no exception text.
+            outcome = f"stream_error:{type(exc).__name__}"
+            sending = time.perf_counter()
+            try:
+                for err_chunk in on_error(exc):
+                    yield err_chunk
+            finally:
+                timer.add("client", time.perf_counter() - sending)
+    except (GeneratorExit, asyncio.CancelledError):
+        # The client went away mid-stream (the server closes or cancels this generator).
+        # The answer is partial: record it as such and never seed the cache with it.
+        if outcome == "ok":
+            outcome = "client_disconnected"
+        raise
+    finally:
+        if hasattr(source, "aclose"):
+            await source.aclose()
+        await response.aclose()
+        _finalize_sse_stream(
+            outcome=outcome,
+            timer=timer,
+            trace=trace,
+            stats=stats,
+            restorer=restorer,
+            session=session,
+            seed_cache=seed_cache,
+        )
+
+
+def _finalize_sse_stream(
+    *,
+    outcome: str,
+    timer: RequestTimer,
+    trace: CallTrace,
+    stats: Any,
+    restorer: Any,
+    session: VaultSession,
+    seed_cache: Callable[[Mapping[int, tuple[str, list[Span]]]], None],
+) -> None:
+    stats.upstream_ms = timer.stages["upstream"] * 1000
+    stats.unresolved = len(restorer.unresolved)
+    if trace.recording and getattr(restorer, "usage", None):
+        trace.usage = restorer.usage
+    if outcome == "ok":
+        _seed_restored_stream(session, restorer, trace, seed_cache)
+    stats.log(outcome)
+    if trace.payloads:
+        trace.stream_masked = restorer.masked_content()
+        if hasattr(restorer, "masked_tool_calls"):
+            trace.stream_masked_tools = restorer.masked_tool_calls()
+        trace.stream_chunks = restorer.chunks
+    if outcome == "ok":
+        trace.finish()
+    elif outcome == "client_disconnected":
+        trace.finish(outcome=outcome, error={"code": outcome})
+    else:
+        trace.finish(outcome="stream_error", error={"code": "stream_failed"})
+
+
+def _seed_restored_stream(
+    session: VaultSession,
+    restorer: Any,
+    trace: CallTrace,
+    seed_cache: Callable[[Mapping[int, tuple[str, list[Span]]]], None],
+) -> None:
+    with suppress(PiiGuardError):
+        restored = {}
+        for index, masked in restorer.masked_content().items():
+            text, spans, _ = restore_text(session, masked)
+            restored[index] = (text, spans)
+        seed_cache(restored)
+        if trace.full:
+            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
+            if hasattr(restorer, "restored_tool_calls"):
+                trace.stream_restored_tools = restorer.restored_tool_calls()
 
 
 async def iter_sse_data(lines: AsyncIterator[str]) -> AsyncIterator[str]:

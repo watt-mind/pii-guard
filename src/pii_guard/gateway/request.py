@@ -584,22 +584,22 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
     elif content is not None:
         raise InvalidChatRequestError(f"{where}.content must be a string, an array or null")
 
-    for name in _TEXT_FIELDS:
-        value = message.get(name)
+    for field_name in _TEXT_FIELDS:
+        value = message.get(field_name)
         if isinstance(value, str):
-            out.slots.append(_text_slot(message, name, name))
+            out.slots.append(_text_slot(message, field_name, field_name))
         elif value is not None:
-            _collect_json(message, name, out, name)
-    for name in _REASONING_LISTS:
-        if message.get(name) is not None:
-            _collect_reasoning_blocks(message, name, f"{where}.{name}", out)
+            _collect_json(message, field_name, out, field_name)
+    for field_name in _REASONING_LISTS:
+        if message.get(field_name) is not None:
+            _collect_reasoning_blocks(message, field_name, f"{where}.{field_name}", out)
     if message.get("annotations") is not None:
         _collect_json(message, "annotations", out, "annotations")
     if message.get("audio") is not None:
         _collect_message_audio(message, f"{where}.audio", out)
-    for name in ("cache_control", "prefix", "tool_call_id"):
-        if name in message:
-            _check_json(message, name, f"{where}.{name}", out)
+    for field_name in ("cache_control", "prefix", "tool_call_id"):
+        if field_name in message:
+            _check_json(message, field_name, f"{where}.{field_name}", out)
 
     name = message.get("name")
     if isinstance(name, str) and role != "function":
@@ -710,8 +710,7 @@ def _collect_part(
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
-    allowed = _PART_KEYS.get(part_type) if isinstance(part_type, str) else None
-    if allowed is None:
+    if not isinstance(part_type, str) or (allowed := _PART_KEYS.get(part_type)) is None:
         shown = part_type if isinstance(part_type, str) and len(part_type) <= 32 else "unknown"
         raise UnsupportedContentError(
             f"{where}: content parts of type {shown!r} are not supported; the gateway masks "

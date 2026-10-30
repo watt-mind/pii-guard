@@ -668,12 +668,12 @@ def label_image(
         label = matcher.assign(holder_value, EntityType.PERSON)
         holder = _Holder(label, frozenset(name_tokens(holder_value)))
         matches[label.match or "new"] = matches.get(label.match or "new", 0) + 1
-        for name in ("surname", "given_names", "name"):
-            for finding in person_fields.get(name, ()):
+        for field_key in ("surname", "given_names", "name"):
+            for finding in person_fields.get(field_key, ()):
                 if set(name_tokens(finding.text)) <= holder.tokens:
                     holder_findings.add(id(finding))
                     summary_fields.append(
-                        SummaryField(name, label.placeholder or "", label.match or "new")
+                        SummaryField(field_key, label.placeholder or "", label.match or "new")
                     )
     mrz_document: str | None = None
     if mrz_data is not None and mrz_data.document_number:

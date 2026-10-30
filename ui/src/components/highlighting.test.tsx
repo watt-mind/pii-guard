@@ -30,7 +30,7 @@ describe("HighlightedText", () => {
     expect(clone.textContent).toBe(text);
   });
 
-  it("reports hover and focus with the span's placeholder as key", () => {
+  it("reports hover and focus with the span's placeholder as key, and dismisses on Escape", () => {
     const onActivate = vi.fn();
     const { container } = render(<HighlightedText text={text} spans={spans} activeKey={null} onActivate={onActivate} />);
     const [person, , org] = container.querySelectorAll("mark");
@@ -38,6 +38,8 @@ describe("HighlightedText", () => {
     expect(onActivate).toHaveBeenLastCalledWith("[[PERSON_7f3a]]", person);
     fireEvent.focus(org!);
     expect(onActivate).toHaveBeenLastCalledWith("span:36:46", org);
+    fireEvent.keyDown(org!, { key: "Escape" });
+    expect(onActivate).toHaveBeenLastCalledWith(null);
     fireEvent.blur(org!);
     expect(onActivate).toHaveBeenLastCalledWith(null);
   });
@@ -89,12 +91,13 @@ describe("Legend and EntityTable", () => {
   });
 
   it("maps placeholders to types without any value column", () => {
-    render(
+    const onActivate = vi.fn();
+    const { container } = render(
       <EntityTable
         entities={[{ placeholder: "[[PERSON_7f3a]]", entity_type: "PERSON", count: 2 }]}
         spans={spans}
         activeKey={null}
-        onActivate={() => {}}
+        onActivate={onActivate}
       />,
     );
     const table = screen.getByRole("table");
@@ -102,5 +105,10 @@ describe("Legend and EntityTable", () => {
     expect(table).toHaveTextContent("2×");
     expect(table).toHaveTextContent("Multilingual NER");
     expect(table).not.toHaveTextContent("Teszt Elek");
+    const chip = container.querySelector("[data-placeholder='[[PERSON_7f3a]]']")!;
+    fireEvent.focus(chip);
+    expect(onActivate).toHaveBeenLastCalledWith("[[PERSON_7f3a]]", chip);
+    fireEvent.keyDown(chip, { key: "Escape" });
+    expect(onActivate).toHaveBeenLastCalledWith(null);
   });
 });

@@ -11,7 +11,7 @@ import re
 import pytest
 from vault_helpers import TEST_KEY, FakeClock, span_of
 
-import pii_guard.vault.vault as vault_module
+import pii_guard.vault.session as session_module
 from pii_guard.config import Settings
 from pii_guard.types import EntityType, MaskingError
 from pii_guard.vault import DEFAULT_MAX_ENTRIES, SessionNotFoundError, Vault
@@ -127,7 +127,7 @@ def test_explicit_session_entry_limit_fails_closed_at_mask_time(clock: FakeClock
 
 def test_reserved_foreign_tokens_are_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     # LAB-1565: foreign placeholder-shaped tokens are reserved in an LRU, not forever.
-    monkeypatch.setattr(vault_module, "_MAX_RESERVED", 3)
+    monkeypatch.setattr(session_module, "_MAX_RESERVED", 3)
     vault = Vault(TEST_KEY)
     session, _ = vault.session_or_create("box")
     for i in range(6):
@@ -141,7 +141,7 @@ def test_touched_generations_are_bounded_and_remasking_still_works(
 ) -> None:
     # LAB-1565: _touched is pruned; a memo older than the kept generations re-masks
     # from scratch with the same result.
-    monkeypatch.setattr(vault_module, "_MAX_TOUCHED", 4)
+    monkeypatch.setattr(session_module, "_MAX_TOUCHED", 4)
     vault = Vault(TEST_KEY)
     session, _ = vault.session_or_create("box")
     emails = [f"user{i}.teszt@example.com" for i in range(10)]

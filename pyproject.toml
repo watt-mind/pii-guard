@@ -31,6 +31,7 @@ Repository = "https://github.com/watt-mind/pii-guard"
 
 [project.scripts]
 pii-guard = "pii_guard.cli:main"
+wattmind-pii-guard = "pii_guard.cli:main"
 
 # Language packs (docs/languages.md). A separate distribution adds a language the same way.
 [project.entry-points."pii_guard.languages"]
@@ -118,19 +119,84 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # bugbear
-    "UP",  # pyupgrade
-    "SIM", # simplify
-    "RUF", # ruff-specific
-    "S",   # bandit (security)
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # bugbear
+    "UP",     # pyupgrade
+    "SIM",    # simplify
+    "RUF",    # ruff-specific
+    "S",      # bandit (security)
+    "C901",   # mccabe complexity
+    "PLR0912", # too many branches
+    "PLR0915", # too many statements
+    "SLF001", # private member access
+    "DTZ",    # flake8-datetimez
+    "PTH",    # flake8-use-pathlib
+    "ASYNC",  # flake8-async
 ]
 
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-branches = 15
+max-statements = 60
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915", "ASYNC"]
+"deploy/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
+"eval/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
+"examples/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
+"scripts/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
+"training/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
+# Legacy complexity / private-member / async-timeout exemptions in src/ (to be burned down in follow-up PRs):
+"src/pii_guard/api/app.py" = ["C901", "PLR0915"]
+"src/pii_guard/api/routes/_common.py" = ["SLF001"]
+"src/pii_guard/api/routes/chat.py" = ["SLF001"]
+"src/pii_guard/app_bundle.py" = ["C901", "PLR0915", "SLF001"]
+"src/pii_guard/bench/mock_upstream.py" = ["C901", "SLF001"]
+"src/pii_guard/detect/ner_context.py" = ["C901"]
+"src/pii_guard/detect/stack.py" = ["ASYNC109"]
+"src/pii_guard/eval/baselines/workers/llm_guard_worker.py" = ["SLF001"]
+"src/pii_guard/eval/cli.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/eval/datasets/_common.py" = ["C901", "PLR0912"]
+"src/pii_guard/eval/datasets/run.py" = ["C901", "PLR0912"]
+"src/pii_guard/eval/record.py" = ["C901", "PLR0912"]
+"src/pii_guard/eval/redteam.py" = ["SLF001"]
+"src/pii_guard/eval/report_charts.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/eval/report_index.py" = ["C901", "PLR0912"]
+"src/pii_guard/eval/report_readme.py" = ["C901", "PLR0912"]
+"src/pii_guard/eval/report_share.py" = ["PLR0915"]
+"src/pii_guard/eval/visual_labels.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/gateway/detection.py" = ["SLF001"]
+"src/pii_guard/gateway/messages.py" = ["C901", "PLR0915", "SLF001"]
+"src/pii_guard/gateway/request.py" = ["C901", "PLR0912"]
+"src/pii_guard/gateway/responses.py" = ["C901", "PLR0912", "PLR0915", "SLF001"]
+"src/pii_guard/gateway/responses_request.py" = ["C901", "PLR0912"]
+"src/pii_guard/gateway/responses_restore.py" = ["C901", "PLR0912"]
+"src/pii_guard/gateway/service.py" = ["C901", "PLR0912", "PLR0915", "SLF001"]
+"src/pii_guard/gateway/shell_context.py" = ["C901", "PLR0912"]
+"src/pii_guard/gateway/stream.py" = ["C901", "PLR0912"]
+"src/pii_guard/gateway/trace.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/hosted/egress.py" = ["ASYNC109"]
+"src/pii_guard/hosted/middleware.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/hosted/quotas.py" = ["SLF001"]
+"src/pii_guard/hosted/runtime.py" = ["SLF001"]
+"src/pii_guard/languages/conformance.py" = ["C901", "PLR0912"]
+"src/pii_guard/languages/cues.py" = ["C901"]
+"src/pii_guard/languages/hu/inflection.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/observability/traffic.py" = ["SLF001"]
+"src/pii_guard/projects/blob.py" = ["SLF001"]
+"src/pii_guard/projects/first_run.py" = ["SLF001"]
+"src/pii_guard/projects/middleware.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/projects/runtime.py" = ["SLF001"]
+"src/pii_guard/projects/store.py" = ["PLR0912", "SLF001"]
+"src/pii_guard/visual/labels.py" = ["C901", "PLR0912", "PLR0915"]
+"src/pii_guard/visual/masking.py" = ["ASYNC109"]
+"src/pii_guard/visual/ocr.py" = ["C901", "PLR0912"]
+"src/pii_guard/visual/render.py" = ["C901"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

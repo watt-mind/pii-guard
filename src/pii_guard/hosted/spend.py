@@ -135,7 +135,7 @@ class _State:
             or type(data["enabled"]) is not bool
             or type(data["day"]) is not str
             or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", data["day"])
-            or datetime.strptime(data["day"], "%Y-%m-%d").date().isoformat() != data["day"]
+            or datetime.strptime(data["day"], "%Y-%m-%d").date().isoformat() != data["day"]  # noqa: DTZ007
             or data["day"] > today
             or not 0 <= data["daily_charged"] <= data["charged_total"] <= MAX_MONEY
             or not 0 <= data["daily_refunded"] <= data["daily_charged"]

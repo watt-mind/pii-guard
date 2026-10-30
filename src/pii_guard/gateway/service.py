@@ -44,7 +44,7 @@ import threading
 import time
 import weakref
 from collections import Counter, OrderedDict
-from collections.abc import AsyncIterator, Callable, Coroutine, Mapping
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterable, Mapping
 from contextlib import suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -75,7 +75,7 @@ from pii_guard.gateway.request import (
     TextSlot,
     collect_texts,
 )
-from pii_guard.gateway.restore import restore_completion, restore_text
+from pii_guard.gateway.restore import restore_completion
 from pii_guard.gateway.sessions import (
     SESSION_HEADER,
     SESSION_SOURCE_HEADER,
@@ -83,7 +83,15 @@ from pii_guard.gateway.sessions import (
     client_identity,
     resolve_session,
 )
-from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_data, sse_event
+from pii_guard.gateway.stream import (
+    DONE,
+    SseRestorer,
+    error_event,
+    iter_sse_data,
+    sse_event,
+    stream_sse_events,
+    timed_sse_lines,
+)
 from pii_guard.gateway.tool_names import (
     identifier_keeps_tool_names,
     tool_names,
@@ -142,7 +150,7 @@ _UNSET: Any = object()
 #: The largest masked upstream payload (bytes) the current request was admitted for. Hosted
 #: admission charges this bound in advance (hosted/quotas.py); None means no bound (local).
 #: The vault leases (session, client identity) the current request holds, set by
-#: :meth:`Gateway._with_session_lease` (module-level, LAB-1584: a ContextVar per gateway
+#: :meth:`Gateway.with_session_lease` (module-level, LAB-1584: a ContextVar per gateway
 #: instance is never collected).
 _REQUEST_SESSIONS: ContextVar[list[tuple[VaultSession, str]] | None] = ContextVar(
     "pii_guard_request_sessions", default=None
@@ -342,7 +350,7 @@ def _leased_class(cls: type[StreamingResponse]) -> type[StreamingResponse]:
             try:
                 await super(leased, self).__call__(scope, receive, send)  # type: ignore[arg-type]
             finally:
-                self._pii_guard_release()
+                self.pii_guard_release()
 
         leased = type(
             f"Leased{cls.__name__}", (cls,), {"__call__": __call__, "_pii_guard_leased": True}
@@ -411,6 +419,22 @@ class Gateway:
 
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
+
+    def bind_shared_state(
+        self,
+        *,
+        detect_workers: dict[Mode, BoundedWorkers],
+        session_holds: dict[str, Any],
+        holds_lock: Any,
+        issued_ids: IssuedIds,
+        session_incarnations: OrderedDict[str, Any],
+    ) -> None:
+        """Bind per-runtime session state and shared detector worker pools to this gateway."""
+        self._detect_workers = detect_workers
+        self._session_holds = session_holds
+        self._holds_lock = holds_lock
+        self.issued_ids = issued_ids
+        self._session_incarnations = session_incarnations
 
     # --- the upstream client ------------------------------------------------------------
 
@@ -503,7 +527,7 @@ class Gateway:
 
     # --- request parsing -----------------------------------------------------------------
 
-    def _mode(self, headers: Mapping[str, str]) -> Mode:
+    def mode(self, headers: Mapping[str, str]) -> Mode:
         raw = headers.get(MODE_HEADER)
         try:
             mode = self.config.mode if raw is None or not raw.strip() else parse_mode(raw)[0]
@@ -517,13 +541,17 @@ class Gateway:
             refuse_remote(self.settings, "audit detection")
         return mode
 
+    _mode = mode
+
     @staticmethod
-    def _mode_alias(headers: Mapping[str, str]) -> str | None:
+    def mode_alias(headers: Mapping[str, str]) -> str | None:
         """The deprecated mode name in the request header (``strict``), else ``None``."""
         raw = (headers.get(MODE_HEADER) or "").strip().lower()
         return raw if raw in DEPRECATED_MODE_ALIASES else None
 
-    def _language(self, headers: Mapping[str, str]) -> str:
+    _mode_alias = mode_alias
+
+    def language(self, headers: Mapping[str, str]) -> str:
         raw = headers.get(LANGUAGE_HEADER)
         if raw is None or not raw.strip():
             return self.settings.default_language
@@ -531,7 +559,9 @@ class Gateway:
             raise InvalidChatRequestError(f"{LANGUAGE_HEADER} must be a language tag like 'hu'")
         return raw.strip()
 
-    def _echo(self, headers: Mapping[str, str]) -> bool:
+    _language = language
+
+    def echo(self, headers: Mapping[str, str]) -> bool:
         raw = headers.get(ECHO_HEADER)
         if raw is None or raw.strip() == "":
             return False
@@ -539,7 +569,29 @@ class Gateway:
             raise InvalidChatRequestError(f"{ECHO_HEADER} must be 'masked'")
         return True
 
-    def _session(
+    _echo = echo
+
+    def validate_limits(
+        self,
+        collected: CollectedTexts,
+        max_text_chars: int | None,
+        *,
+        text_label: str = "a message text",
+    ) -> None:
+        if max_text_chars is not None and any(
+            len(s.text) > max_text_chars for s in collected.slots
+        ):
+            raise PayloadTooLargeError(f"{text_label} is longer than {max_text_chars} characters")
+        if len(collected.images) > self.config.max_images:
+            raise PayloadTooLargeError(
+                f"a request may carry at most {self.config.max_images} inline images"
+            )
+        if any(len(img.data) > self.config.max_image_bytes for img in collected.images):
+            raise PayloadTooLargeError(
+                f"an inline image is larger than {self.config.max_image_bytes} bytes"
+            )
+
+    def session(
         self,
         headers: Mapping[str, str],
         body: Mapping[str, Any],
@@ -550,7 +602,7 @@ class Gateway:
         """The request's vault session: header, URL path, ``prompt_cache_key``, default
         (:mod:`pii_guard.gateway.sessions`). Recorded on ``stats`` and ``trace``.
 
-        The request holds the session until :meth:`_release_session`, which every caller
+        The request holds the session until :meth:`release_session`, which every caller
         must call once masking finished or failed."""
         identity = client_identity(headers)
         with self._holds_lock:
@@ -579,7 +631,9 @@ class Gateway:
         trace.session_source = source.value
         return session, created
 
-    async def _with_session_lease(
+    _session = session
+
+    async def with_session_lease(
         self, work: Coroutine[Any, Any, tuple[Response, RequestStats]]
     ) -> tuple[Response, RequestStats]:
         """Keep request pins through upstream work and the stream's final cleanup."""
@@ -613,7 +667,7 @@ class Gateway:
                 # call too, and on garbage collection for a response nobody calls. Release
                 # is idempotent: it pops what is still held.
                 response.__class__ = _leased_class(type(response))
-                response._pii_guard_release = release  # type: ignore[attr-defined]
+                response.pii_guard_release = release  # type: ignore[attr-defined]
                 weakref.finalize(response, release)
             else:
                 release()
@@ -624,8 +678,10 @@ class Gateway:
         finally:
             _REQUEST_SESSIONS.reset(token)
 
-    def _release_session(self, session: VaultSession, created: bool, *, masked: bool) -> None:
-        """End the hold :meth:`_session` took, once masking finished (``masked``) or failed.
+    _with_session_lease = with_session_lease
+
+    def release_session(self, session: VaultSession, created: bool, *, masked: bool) -> None:
+        """End the hold :meth:`session` took, once masking finished (``masked``) or failed.
 
         A refused request used to drop the session it created at once, under any concurrent
         request that had already resolved the same client-named id (404 for that one,
@@ -652,7 +708,9 @@ class Gateway:
             self.issued_ids.drop(session_id)
             self._session_incarnations.pop(session_id, None)
 
-    def _forwarded(
+    _release_session = release_session
+
+    def forwarded(
         self,
         body: dict[str, Any],
         session: VaultSession,
@@ -671,7 +729,9 @@ class Gateway:
             text = json.dumps(body, ensure_ascii=False)
         return text.encode("utf-8")
 
-    def _upstream_url(self) -> str:
+    _forwarded = forwarded
+
+    def upstream_url(self) -> str:
         base = self.settings.upstream_base_url
         if not base:
             raise UpstreamNotConfiguredError(
@@ -680,7 +740,9 @@ class Gateway:
         base = base.rstrip("/")
         return base if base.endswith("/chat/completions") else base + "/chat/completions"
 
-    def _upstream_headers(self, headers: Mapping[str, str]) -> dict[str, str]:
+    _upstream_url = upstream_url
+
+    def upstream_headers(self, headers: Mapping[str, str]) -> dict[str, str]:
         out = {
             **self.upstream_extra_headers,
             "Content-Type": "application/json",
@@ -696,22 +758,56 @@ class Gateway:
             out["Authorization"] = headers["authorization"]
         return out
 
+    _upstream_headers = upstream_headers
+
+    async def send_upstream(
+        self,
+        url: str,
+        payload: bytes,
+        headers: dict[str, str],
+        *,
+        timer: RequestTimer,
+        stats: RequestStats,
+        forwarding_started: float | None = None,
+    ) -> tuple[httpx.Response, float]:
+        client = self.upstream_client()
+        request = client.build_request(
+            "POST",
+            url,
+            content=payload,
+            headers=headers,
+            timeout=self.upstream_timeout(),
+        )
+        started = time.perf_counter()
+        if forwarding_started is not None:
+            timer.add("forward", started - forwarding_started)
+        timer.upstream_sent = started
+        try:
+            response = await client.send(request, stream=True)
+            await self.bound_upstream_response(response)
+        except httpx.HTTPError as exc:
+            timer.add("upstream", time.perf_counter() - started)
+            stats.log("upstream_unreachable")
+            raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
+        except UpstreamError:
+            # A refused (compressed or oversized) hosted response counts like no response.
+            timer.add("upstream", time.perf_counter() - started)
+            stats.log("upstream_unreachable")
+            raise
+        timer.add("upstream_ttfb", time.perf_counter() - started)
+        timer.add("upstream", time.perf_counter() - started)
+        return response, started
+
     # --- detection and masking -----------------------------------------------------------
 
-    async def _detect_all(
+    def _partition_cached_slots(
         self,
         slots: list[TextSlot],
         detector: ModeDetector,
         session: VaultSession,
         language: str,
         stats: RequestStats,
-        kept: list[list[Span]] | None = None,
-    ) -> list[list[Span]]:
-        """The spans to mask, per slot. ``kept``, when given, gets the spans kept by policy,
-        per slot (the echo reports them, LAB-1180). The cache holds both."""
-        # Audit mode without an LLM key: 503 detection_unavailable before anything is detected,
-        # cached, segmented or sent (LAB-1290). Runs first in chat and responses alike.
-        detector.require_available()
+    ) -> tuple[list[list[Span] | None], dict[bytes, tuple[str, list[int], Any]]]:
         results: list[list[Span] | None] = [None] * len(slots)
         pending: dict[bytes, tuple[str, list[int], Any]] = {}
         for index, slot in enumerate(slots):
@@ -736,46 +832,65 @@ class Gateway:
                 continue
             stats.cache_misses += 1
             pending[key[1]] = (slot.text, [index], key)
+        return results, pending
 
-        if pending:
-            workers = self._detect_workers.get(detector.mode)
-            if workers is None:
-                workers = BoundedWorkers(
-                    self.config.concurrency, f"pii-guard-detect-{detector.mode.value}"
-                )
-                self._detect_workers[detector.mode] = workers
+    async def _run_pending_detections(
+        self,
+        pending: dict[bytes, tuple[str, list[int], Any]],
+        results: list[list[Span] | None],
+        detector: ModeDetector,
+        language: str,
+        stats: RequestStats,
+    ) -> None:
+        workers = self._detect_workers.get(detector.mode)
+        if workers is None:
+            workers = BoundedWorkers(
+                self.config.concurrency, f"pii-guard-detect-{detector.mode.value}"
+            )
+            self._detect_workers[detector.mode] = workers
 
-            async def run(text: str) -> tuple[list[Span], dict[str, float]]:
-                return await workers.run(detector.resolve, text, language)
+        async def run(text: str) -> tuple[list[Span], dict[str, float]]:
+            return await workers.run(detector.resolve, text, language)
 
-            async def run_all(texts: list[str]) -> list[tuple[list[Span], dict[str, float]]]:
-                # Fast mode: one job for every uncached text, so the NER model batches them
-                # (LAB-1279). Timings are per job; the first output carries them.
-                found, timings = await workers.run(detector.resolve_many, texts, language)
-                return [(spans, timings if i == 0 else {}) for i, spans in enumerate(found)]
+        async def run_all(texts: list[str]) -> list[tuple[list[Span], dict[str, float]]]:
+            # Fast mode: one job for every uncached text, so the NER model batches them
+            # (LAB-1279). Timings are per job; the first output carries them.
+            found, timings = await workers.run(detector.resolve_many, texts, language)
+            return [(spans, timings if i == 0 else {}) for i, spans in enumerate(found)]
 
-            started = time.perf_counter()
-            jobs = list(pending.values())
-            texts = [text for text, _, _ in jobs]
-            work = run_all(texts) if detector.batches else asyncio.gather(*map(run, texts))
-            try:
-                outputs = await asyncio.wait_for(work, timeout=self.config.detection_timeout)
-            except TimeoutError:
-                raise DetectionError(
-                    f"detection timed out after {self.config.detection_timeout:g}s "
-                    f"({detector.mode.value} mode)"
-                ) from None
-            except PiiGuardError:  # DetectionError, BlockedEntityError: already safe to return
-                raise
-            except Exception as exc:
-                raise DetectionError(f"detection failed ({type(exc).__name__})") from exc
-            finally:
-                stats.detect_ms = (time.perf_counter() - started) * 1000
-            stats.detector_ms = detector_timings(timings for _, timings in outputs)
-            for (_, indices, key), (spans, _) in zip(jobs, outputs, strict=True):
-                self.cache.put(key, spans)
-                for index in indices:
-                    results[index] = spans
+        started = time.perf_counter()
+        jobs = list(pending.values())
+        texts = [text for text, _, _ in jobs]
+        work = run_all(texts) if detector.batches else asyncio.gather(*map(run, texts))
+        try:
+            outputs = await asyncio.wait_for(work, timeout=self.config.detection_timeout)
+        except TimeoutError:
+            raise DetectionError(
+                f"detection timed out after {self.config.detection_timeout:g}s "
+                f"({detector.mode.value} mode)"
+            ) from None
+        except PiiGuardError:  # DetectionError, BlockedEntityError: already safe to return
+            raise
+        except Exception as exc:
+            raise DetectionError(f"detection failed ({type(exc).__name__})") from exc
+        finally:
+            stats.detect_ms = (time.perf_counter() - started) * 1000
+        stats.detector_ms = detector_timings(timings for _, timings in outputs)
+        for (_, indices, key), (spans, _) in zip(jobs, outputs, strict=True):
+            self.cache.put(key, spans)
+            for index in indices:
+                results[index] = spans
+
+    def _apply_policies_and_known(
+        self,
+        slots: list[TextSlot],
+        results: list[list[Span] | None],
+        detector: ModeDetector,
+        session: VaultSession,
+        language: str,
+        stats: RequestStats,
+        kept: list[list[Span]] | None,
+    ) -> list[list[Span]]:
         decisions = [detector.policies.apply(r or []) for r in results]
         out = [decision.masked for decision in decisions]
         if kept is not None:
@@ -801,6 +916,29 @@ class Gateway:
             stats.forced.update(s.entity_type.value for s in spans if s.forced_by)
         return out
 
+    async def detect_all(
+        self,
+        slots: list[TextSlot],
+        detector: ModeDetector,
+        session: VaultSession,
+        language: str,
+        stats: RequestStats,
+        kept: list[list[Span]] | None = None,
+    ) -> list[list[Span]]:
+        """The spans to mask, per slot. ``kept``, when given, gets the spans kept by policy,
+        per slot (the echo reports them, LAB-1180). The cache holds both."""
+        # Audit mode without an LLM key: 503 detection_unavailable before anything is detected,
+        # cached, segmented or sent (LAB-1290). Runs first in chat and responses alike.
+        detector.require_available()
+        results, pending = self._partition_cached_slots(slots, detector, session, language, stats)
+        if pending:
+            await self._run_pending_detections(pending, results, detector, language, stats)
+        return self._apply_policies_and_known(
+            slots, results, detector, session, language, stats, kept
+        )
+
+    _detect_all = detect_all
+
     @staticmethod
     def _with_known(
         text: str,
@@ -814,7 +952,7 @@ class Gateway:
         detector.policies.apply(s for s in merged if s.detector == KNOWN_DETECTOR)
         return merged
 
-    def _mask(
+    def mask(
         self,
         slots: list[TextSlot],
         spans: list[list[Span]],
@@ -839,6 +977,8 @@ class Gateway:
             session.mask(r.text, [], language=language, remask=True, since=r.generation)
             for r in results
         ]
+
+    _mask = mask
 
     @staticmethod
     def _write(
@@ -895,8 +1035,21 @@ class Gateway:
                     number = (slot.text, slot.number) if whole and slot.number else None
                     session.note_json_leaf(match.group(0), number)
 
+    def write(
+        self,
+        slots: list[TextSlot],
+        masked: list[str],
+        session: VaultSession,
+        language: str,
+        remask: bool,
+        since: int | None = None,
+        names: frozenset[str] = frozenset(),
+        issued: frozenset[str] = frozenset(),
+    ) -> None:
+        self._write(slots, masked, session, language, remask, since, names, issued)
+
     @staticmethod
-    def _recheck(
+    def recheck(
         body: Mapping[str, Any],
         collect: Callable[[object], CollectedTexts],
         session: VaultSession,
@@ -913,7 +1066,9 @@ class Gateway:
         if stats.outbound.hits:
             raise OutboundCheckFailedError(stats.outbound.hits)
 
-    def _seed_cache(
+    _recheck = recheck
+
+    def seed_cache(
         self,
         session: VaultSession,
         language: str,
@@ -934,7 +1089,9 @@ class Gateway:
                 self.cache.put(key, spans)
                 stats.seeded += 1
 
-    async def _mask_images(
+    _seed_cache = seed_cache
+
+    async def mask_images(
         self,
         images: list[ImageSlot],
         detector: ModeDetector,
@@ -978,7 +1135,16 @@ class Gateway:
             slot.write(url)
             stats.image_payload_bytes += len(url)
             if outcome.summary is not None:
-                slot.annotate(image_annotation(number, outcome))
+                # An image can register a common-word name (e.g. "Placeholder"). The
+                # generated helper, summary keys and transcript headings are new text too;
+                # sweep the complete annotation after every image has joined the session.
+                # The unchanged outbound re-check still refuses any surviving known value.
+                annotation = session.mask(
+                    image_annotation(number, outcome), [], language=language, remask=True
+                )
+                slot.annotate(annotation)
+
+    _mask_images = mask_images
 
     # --- the endpoint --------------------------------------------------------------------
 
@@ -998,7 +1164,7 @@ class Gateway:
         timer = RequestTimer(received_at)
         trace = CallTrace(self.observability, timer, body, request_id=request_id)
         try:
-            response, stats = await self._with_session_lease(
+            response, stats = await self.with_session_lease(
                 self._chat_completions(
                     body,
                     headers,
@@ -1018,49 +1184,27 @@ class Gateway:
             trace.finish()
         return response, stats
 
-    async def _chat_completions(
+    async def _mask_chat_request(
         self,
-        body: object,
+        body: dict[str, Any],
+        collected: CollectedTexts,
         headers: Mapping[str, str],
         *,
-        max_text_chars: int | None,
+        detector: ModeDetector,
+        language: str,
+        path_session: str | None,
         timer: RequestTimer,
         trace: CallTrace,
-        path_session: str | None = None,
-    ) -> tuple[Response, RequestStats]:
-        url = self._upstream_url()
-        mode = self._mode(headers)
-        language = self._language(headers)
-        trace.mode, trace.language = mode.value, language
-        echo = self._echo(headers)
-        stats = RequestStats(mode=mode, mode_alias=self._mode_alias(headers))
-        trace.stats = stats
-        collected = collect_texts(body)
-        body = cast(dict[str, Any], body)  # collect_texts checked it
-        too_long = max_text_chars is not None and any(
-            len(s.text) > max_text_chars for s in collected.slots
-        )
-        if too_long:
-            raise PayloadTooLargeError(f"a message text is longer than {max_text_chars} characters")
-        if len(collected.images) > self.config.max_images:
-            raise PayloadTooLargeError(
-                f"a request may carry at most {self.config.max_images} inline images"
-            )
-        if any(len(img.data) > self.config.max_image_bytes for img in collected.images):
-            raise PayloadTooLargeError(
-                f"an inline image is larger than {self.config.max_image_bytes} bytes"
-            )
-        detector = self.detectors[mode]
-        session, created = self._session(headers, body, path_session, stats, trace)
-        stream = bool(body.get("stream"))
-        stats.stream = stream
+        stats: RequestStats,
+    ) -> tuple[VaultSession, bytes, list[list[Span]], float]:
+        session, created = self.session(headers, body, path_session, stats, trace)
         stats.texts = len(collected.slots)
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
+        kept: list[list[Span]] = []
         try:
             with timer.span("detect"):
-                kept: list[list[Span]] = []
-                spans = await self._detect_all(
+                spans = await self.detect_all(
                     collected.slots, detector, session, language, stats, kept
                 )
                 names = tool_names(body)
@@ -1072,72 +1216,46 @@ class Gateway:
                 )
                 issued = self.issued_ids.of(session.session_id)
                 spans = without_opaque_ids(collected.slots, spans, issued)
-            # Every older entry has scanned every text by the end of _mask: an image's remask
+            # Every older entry has scanned every text by the end of mask: an image's remask
             # needs only the entries this request added (LAB-1278).
             generation = session.generation
             before = _counts_of(session)
             with timer.span("mask"):
-                masked = self._mask(collected.slots, spans, session, language)
+                masked = self.mask(collected.slots, spans, session, language)
             _count_masked(stats, before, session)
             if collected.images:
                 with timer.span("image"):
-                    await self._mask_images(collected.images, detector, language, stats, session)
+                    await self.mask_images(collected.images, detector, language, stats, session)
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                self._write(
+                self.write(
                     collected.slots, masked, session, language, remask, generation, names, issued
                 )
                 collected.finalize()
             _count_masked(stats, before, session)
             with timer.span("mask"):
-                self._recheck(body, collect_texts, session, language, stats, names, issued)
+                self.recheck(body, collect_texts, session, language, stats, names, issued)
             forwarding = time.perf_counter()
-            payload = self._forwarded(body, session, stats, add_chat_note)
+            payload = self.forwarded(body, session, stats, add_chat_note)
             check_upstream_payload(payload, stats.image_payload_bytes)
         except BaseException:
             stats.log("blocked")
-            self._release_session(session, created, masked=False)
+            self.release_session(session, created, masked=False)
             raise
-        self._release_session(session, created, masked=True)
-        if trace.payloads:
-            trace.masked_request = payload
-        # The client's messages as masked: the note is a flag, not a message, so a UI that
-        # picks the first system message still finds its own.
-        masked_messages = _masked_messages(body)[int(stats.note) :] if echo else None
-        kept_spans = (
-            _kept_spans(collected.slots, kept, len(body["messages"]) - int(stats.note))
-            if echo
-            else None
-        )
-        client = self.upstream_client()
-        request = client.build_request(
-            "POST",
-            url,
-            content=payload,
-            headers=self._upstream_headers(headers),
-            timeout=self.upstream_timeout(),
-        )
-        started = time.perf_counter()
-        timer.add("forward", started - forwarding)
-        timer.upstream_sent = started
-        try:
-            response = await client.send(request, stream=True)
-            await self.bound_upstream_response(response)
-        except httpx.HTTPError as exc:
-            timer.add("upstream", time.perf_counter() - started)
-            stats.log("upstream_unreachable")
-            raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
-        except UpstreamError:
-            # A refused (compressed or oversized) hosted response counts like no response.
-            timer.add("upstream", time.perf_counter() - started)
-            stats.log("upstream_unreachable")
-            raise
-        timer.add("upstream_ttfb", time.perf_counter() - started)
-        timer.add("upstream", time.perf_counter() - started)
+        self.release_session(session, created, masked=True)
+        return session, payload, kept, forwarding
 
-        stats.upstream_status = response.status_code
-        out_headers = stats.headers(session.session_id)
+    async def _check_chat_upstream(
+        self,
+        response: httpx.Response,
+        *,
+        started: float,
+        stream: bool,
+        timer: RequestTimer,
+        stats: RequestStats,
+        out_headers: dict[str, str],
+    ) -> JSONResponse | None:
         if response.status_code >= 400:
             try:
                 raw = await _read_limited(response)
@@ -1149,7 +1267,7 @@ class Gateway:
             stats.upstream_ms = (time.perf_counter() - started) * 1000
             timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
             stats.log("upstream_error")
-            return _upstream_error(response.status_code, raw, out_headers), stats
+            return _upstream_error(response.status_code, raw, out_headers)
 
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
         if stream and not is_sse:
@@ -1164,206 +1282,267 @@ class Gateway:
                 "upstream did not return an event stream; retry without stream",
                 code="upstream_did_not_stream",
             ) from None
+        return None
 
-        if not stream:
-            try:
-                raw = await _read_bounded(response, self.config.upstream_max_response_bytes)
-            except httpx.HTTPError as exc:
-                raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
-            finally:
-                await response.aclose()
-            stats.upstream_ms = (time.perf_counter() - started) * 1000
-            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
-            if trace.payloads:
-                trace.upstream_body = raw
-            building = time.perf_counter()
-            try:
-                answer = json.loads(raw)
-            except ValueError:
-                stats.log("upstream_invalid")
-                raise UpstreamError("upstream returned a body that is not JSON") from None
-            if not isinstance(answer, dict):
-                raise UpstreamError("upstream returned a body that is not a JSON object")
-            masked_answer = _masked_answer(answer) if echo else None
-            self.issued_ids.add(session.session_id, upstream_ids(answer))
-            report = restore_completion(session, answer)
-            stats.unresolved = len(report.unresolved)
-            self._seed_cache(session, language, detector, report.restored_spans, stats)
-            out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
-            if echo:
-                answer["pii_guard"] = {
-                    "masked_messages": masked_messages,
-                    "kept_spans": kept_spans,
-                    "placeholder_note": stats.note,
-                    "masked_answer": masked_answer,
-                }
-            stats.log("ok")
-            if trace.full:
-                trace.answer = answer
-            elif trace.recording and isinstance(answer.get("usage"), dict):
-                trace.usage = answer["usage"]
-            record_usage(answer.get("usage"))
-            result = JSONResponse(answer, headers=out_headers)
-            timer.add("response", time.perf_counter() - building)
-            timer.finish()
-            return result, stats
+    async def _complete_chat_json(
+        self,
+        response: httpx.Response,
+        *,
+        started: float,
+        timer: RequestTimer,
+        trace: CallTrace,
+        stats: RequestStats,
+        session: VaultSession,
+        language: str,
+        detector: ModeDetector,
+        out_headers: dict[str, str],
+        echo_data: dict[str, Any] | None,
+    ) -> tuple[Response, RequestStats]:
+        try:
+            raw = await _read_bounded(response, self.config.upstream_max_response_bytes)
+        except httpx.HTTPError as exc:
+            raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
+        finally:
+            await response.aclose()
+        stats.upstream_ms = (time.perf_counter() - started) * 1000
+        timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+        if trace.payloads:
+            trace.upstream_body = raw
+        building = time.perf_counter()
+        try:
+            answer = json.loads(raw)
+        except ValueError:
+            stats.log("upstream_invalid")
+            raise UpstreamError("upstream returned a body that is not JSON") from None
+        if not isinstance(answer, dict):
+            raise UpstreamError("upstream returned a body that is not a JSON object")
+        masked_answer = _masked_answer(answer) if echo_data is not None else None
+        self.issued_ids.add(session.session_id, upstream_ids(answer))
+        report = restore_completion(session, answer)
+        stats.unresolved = len(report.unresolved)
+        self.seed_cache(session, language, detector, report.restored_spans, stats)
+        out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
+        if echo_data is not None:
+            answer["pii_guard"] = {**echo_data, "masked_answer": masked_answer}
+        stats.log("ok")
+        if trace.full:
+            trace.answer = answer
+        elif trace.recording and isinstance(answer.get("usage"), dict):
+            trace.usage = answer["usage"]
+        record_usage(answer.get("usage"))
+        result = JSONResponse(answer, headers=out_headers)
+        timer.add("response", time.perf_counter() - building)
+        timer.finish()
+        return result, stats
 
+    def _complete_chat_stream(
+        self,
+        response: httpx.Response,
+        *,
+        timer: RequestTimer,
+        trace: CallTrace,
+        stats: RequestStats,
+        session: VaultSession,
+        language: str,
+        detector: ModeDetector,
+        out_headers: dict[str, str],
+        echo_data: dict[str, Any] | None,
+    ) -> tuple[Response, RequestStats]:
         restorer = SseRestorer(
             session,
             on_ids=lambda ids: self.issued_ids.add(session.session_id, ids),
             keep_restored_tools=trace.full,
         )
         trace.streaming = True
-
-        async def timed_lines() -> AsyncIterator[str]:
-            """The upstream's lines; time spent waiting on them counts as upstream time.
-
-            The whole stream has a total deadline (LAB-1566), separate from the per-read
-            httpx timeout: past it the stream ends with the generic stream error.
-            """
-            lines = response.aiter_lines().__aiter__()
-            deadline = time.perf_counter() + self.config.upstream_stream_timeout
-            while True:
-                waiting = time.perf_counter()
-                remaining = deadline - waiting
-                if remaining <= 0:
-                    raise TimeoutError("upstream stream deadline exceeded")
-                try:
-                    line = await asyncio.wait_for(lines.__anext__(), remaining)
-                except StopAsyncIteration:
-                    timer.add("upstream", time.perf_counter() - waiting)
-                    return
-                timer.add("upstream", time.perf_counter() - waiting)
-                if line.startswith("data:"):
-                    timer.mark_first_data()
-                yield line
-
-        echoed_answer = False
-
-        def answer_event() -> bytes:
-            content = restorer.masked_content()
-            # A choice past the retention cap has no copy; mark it rather than omit it, so
-            # a truncated echo is not mistaken for a short answer (LAB-1581).
-            truncated = restorer.masked_truncated()
-            choices = [
-                {"index": i, "content": None, "truncated": True}
-                if i in truncated
-                else {"index": i, "content": content[i]}
-                for i in sorted({*content, *truncated})
-            ]
-            return sse_event(
-                json.dumps(
-                    {"object": "pii_guard.masked_answer", "choices": choices},
-                    ensure_ascii=False,
-                )
-            )
-
-        async def produce() -> AsyncIterator[bytes]:
-            """The restored events; every await in here is upstream time or pii-guard's own."""
-            nonlocal echoed_answer
-            if echo:
-                yield sse_event(
-                    json.dumps(
-                        {
-                            "object": "pii_guard.masked_request",
-                            "messages": masked_messages,
-                            "kept_spans": kept_spans,
-                            "placeholder_note": stats.note,
-                        },
-                        ensure_ascii=False,
-                    )
-                )
-            async for data in iter_sse_data(timed_lines()):
-                trace.scan_usage(data)
-                scan_usage(data)
-                # A usage chunk only settlement asked for never reaches the client.
-                shown = client_chunk(data)
-                if shown is None:
-                    continue
-                unmasking = time.perf_counter()
-                outs = restorer.process(shown)
-                timer.add("unmask", time.perf_counter() - unmasking)
-                for out in outs:
-                    timer.mark_first_event()
-                    if out == DONE and echo and not echoed_answer:
-                        echoed_answer = True
-                        yield answer_event()
-                    yield sse_event(out)
-                    if out == DONE:
-                        return
-            unmasking = time.perf_counter()
-            outs = restorer.finish()
-            timer.add("unmask", time.perf_counter() - unmasking)
-            for out in outs:
-                yield sse_event(out)
-            if echo and not echoed_answer:
-                echoed_answer = True
-                yield answer_event()
-
-        async def events() -> AsyncIterator[bytes]:
-            """Hand ``produce()``'s events to the client; time suspended in ``yield`` is the
-            client's (read speed, backpressure), not overhead."""
-            outcome = "ok"
-            source = produce()
-            try:
-                try:
-                    async for chunk in source:
-                        sending = time.perf_counter()
-                        try:
-                            yield chunk
-                        finally:
-                            timer.add("client", time.perf_counter() - sending)
-                except Exception as exc:
-                    # Fail closed: stop the stream with an error event, no exception text.
-                    outcome = f"stream_error:{type(exc).__name__}"
-                    sending = time.perf_counter()
-                    try:
-                        if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
-                            failed = error_event(exc.code, exc.message)
-                        else:
-                            failed = error_event("stream_failed", "the response stream failed")
-                        yield sse_event(failed)
-                        yield sse_event(DONE)
-                    finally:
-                        timer.add("client", time.perf_counter() - sending)
-            except (GeneratorExit, asyncio.CancelledError):
-                # The client went away mid-stream (the server closes or cancels this generator).
-                # The answer is partial: record it as such and never seed the cache with it.
-                if outcome == "ok":
-                    outcome = "client_disconnected"
-                raise
-            finally:
-                await source.aclose()
-                await response.aclose()
-                stats.upstream_ms = timer.stages["upstream"] * 1000
-                stats.unresolved = len(restorer.unresolved)
-                if outcome == "ok":
-                    with suppress(PiiGuardError):
-                        restored = {}
-                        for index, masked in restorer.masked_content().items():
-                            text, spans, _ = restore_text(session, masked)
-                            restored[index] = (text, spans)
-                        self._seed_cache(session, language, detector, restored, stats)
-                        if trace.full:
-                            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
-                            trace.stream_restored_tools = restorer.restored_tool_calls()
-                stats.log(outcome)
-                if trace.payloads:
-                    trace.stream_masked = restorer.masked_content()
-                    trace.stream_masked_tools = restorer.masked_tool_calls()
-                    trace.stream_chunks = restorer.chunks
-                if outcome == "ok":
-                    trace.finish()
-                elif outcome == "client_disconnected":
-                    trace.finish(outcome=outcome, error={"code": outcome})
-                else:
-                    trace.finish(outcome="stream_error", error={"code": "stream_failed"})
-
+        lines = timed_sse_lines(response, timer, self.config.upstream_stream_timeout)
+        source = _produce_chat_events(lines, restorer, timer, trace, echo_data)
+        events = stream_sse_events(
+            source,
+            response=response,
+            timer=timer,
+            trace=trace,
+            stats=stats,
+            restorer=restorer,
+            session=session,
+            seed_cache=lambda restored: self.seed_cache(
+                session, language, detector, restored, stats
+            ),
+            on_error=_chat_stream_error,
+        )
         out_headers["Cache-Control"] = "no-cache"
         return (
-            StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
+            StreamingResponse(events, media_type="text/event-stream", headers=out_headers),
             stats,
         )
+
+    async def _chat_completions(
+        self,
+        body: object,
+        headers: Mapping[str, str],
+        *,
+        max_text_chars: int | None,
+        timer: RequestTimer,
+        trace: CallTrace,
+        path_session: str | None = None,
+    ) -> tuple[Response, RequestStats]:
+        url = self.upstream_url()
+        mode = self.mode(headers)
+        language = self.language(headers)
+        trace.mode, trace.language = mode.value, language
+        echo = self.echo(headers)
+        stats = RequestStats(mode=mode, mode_alias=self.mode_alias(headers))
+        trace.stats = stats
+        collected = collect_texts(body)
+        body = cast(dict[str, Any], body)  # collect_texts checked it
+        self.validate_limits(collected, max_text_chars)
+        detector = self.detectors[mode]
+        stream = bool(body.get("stream"))
+        stats.stream = stream
+        session, payload, kept, forwarding = await self._mask_chat_request(
+            body,
+            collected,
+            headers,
+            detector=detector,
+            language=language,
+            path_session=path_session,
+            timer=timer,
+            trace=trace,
+            stats=stats,
+        )
+        if trace.payloads:
+            trace.masked_request = payload
+        # The client's messages as masked: the note is a flag, not a message, so a UI that
+        # picks the first system message still finds its own.
+        echo_data = (
+            {
+                "masked_messages": _masked_messages(body)[int(stats.note) :],
+                "kept_spans": _kept_spans(
+                    collected.slots, kept, len(body["messages"]) - int(stats.note)
+                ),
+                "placeholder_note": stats.note,
+            }
+            if echo
+            else None
+        )
+        response, started = await self.send_upstream(
+            url,
+            payload,
+            self.upstream_headers(headers),
+            timer=timer,
+            stats=stats,
+            forwarding_started=forwarding,
+        )
+        stats.upstream_status = response.status_code
+        out_headers = stats.headers(session.session_id)
+        err_response = await self._check_chat_upstream(
+            response,
+            started=started,
+            stream=stream,
+            timer=timer,
+            stats=stats,
+            out_headers=out_headers,
+        )
+        if err_response is not None:
+            return err_response, stats
+        if not stream:
+            return await self._complete_chat_json(
+                response,
+                started=started,
+                timer=timer,
+                trace=trace,
+                stats=stats,
+                session=session,
+                language=language,
+                detector=detector,
+                out_headers=out_headers,
+                echo_data=echo_data,
+            )
+        return self._complete_chat_stream(
+            response,
+            timer=timer,
+            trace=trace,
+            stats=stats,
+            session=session,
+            language=language,
+            detector=detector,
+            out_headers=out_headers,
+            echo_data=echo_data,
+        )
+
+
+def _chat_echo_answer_event(restorer: SseRestorer) -> bytes:
+    content = restorer.masked_content()
+    # A choice past the retention cap has no copy; mark it rather than omit it, so
+    # a truncated echo is not mistaken for a short answer (LAB-1581).
+    truncated = restorer.masked_truncated()
+    choices = [
+        {"index": i, "content": None, "truncated": True}
+        if i in truncated
+        else {"index": i, "content": content[i]}
+        for i in sorted({*content, *truncated})
+    ]
+    return sse_event(
+        json.dumps(
+            {"object": "pii_guard.masked_answer", "choices": choices},
+            ensure_ascii=False,
+        )
+    )
+
+
+def _chat_stream_error(exc: Exception) -> Iterable[bytes]:
+    if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
+        failed = error_event(exc.code, exc.message)
+    else:
+        failed = error_event("stream_failed", "the response stream failed")
+    return (sse_event(failed), sse_event(DONE))
+
+
+async def _produce_chat_events(
+    lines: AsyncIterator[str],
+    restorer: SseRestorer,
+    timer: RequestTimer,
+    trace: CallTrace,
+    echo_data: dict[str, Any] | None,
+) -> AsyncIterator[bytes]:
+    """The restored events; every await in here is upstream time or pii-guard's own."""
+    echoed_answer = False
+    if echo_data is not None:
+        yield sse_event(
+            json.dumps(
+                {
+                    "object": "pii_guard.masked_request",
+                    "messages": echo_data["masked_messages"],
+                    "kept_spans": echo_data["kept_spans"],
+                    "placeholder_note": echo_data["placeholder_note"],
+                },
+                ensure_ascii=False,
+            )
+        )
+    async for data in iter_sse_data(lines):
+        trace.scan_usage(data)
+        scan_usage(data)
+        # A usage chunk only settlement asked for never reaches the client.
+        shown = client_chunk(data)
+        if shown is None:
+            continue
+        unmasking = time.perf_counter()
+        outs = restorer.process(shown)
+        timer.add("unmask", time.perf_counter() - unmasking)
+        for out in outs:
+            timer.mark_first_event()
+            if out == DONE and echo_data is not None and not echoed_answer:
+                echoed_answer = True
+                yield _chat_echo_answer_event(restorer)
+            yield sse_event(out)
+            if out == DONE:
+                return
+    unmasking = time.perf_counter()
+    outs = restorer.finish()
+    timer.add("unmask", time.perf_counter() - unmasking)
+    for out in outs:
+        yield sse_event(out)
+    if echo_data is not None and not echoed_answer:
+        yield _chat_echo_answer_event(restorer)
 
 
 def _flatten(content: object) -> str:

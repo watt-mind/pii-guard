@@ -946,7 +946,9 @@ def _run_baseline(
     from pii_guard.eval.baselines.base import BaselineUnavailable
 
     if factory is None:
-        from pii_guard.eval.baselines.image import create_image_baseline as factory
+        from pii_guard.eval.baselines.image import create_image_baseline
+
+        factory = create_image_baseline
     try:
         baseline = factory(args.baseline)
     except BaselineUnavailable as exc:

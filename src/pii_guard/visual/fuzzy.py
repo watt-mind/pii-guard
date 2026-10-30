@@ -339,7 +339,7 @@ def parse_date(text: str, *, yymmdd: bool = False) -> dt.date | None:
         if len(digits) != 6:
             return None
         yy, mm, dd = int(digits[:2]), int(digits[2:4]), int(digits[4:])
-        pivot = (dt.date.today().year + 20) % 100
+        pivot = (dt.datetime.now(dt.UTC).date().year + 20) % 100
         year = (2000 if yy <= pivot else 1900) + yy
         return _date(year, mm, dd)
     for pattern, order in _DATE_PATTERNS:

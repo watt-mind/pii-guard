@@ -66,9 +66,9 @@ def test_foreign_token_survives_round_trip_and_is_unresolved(session: VaultSessi
 def test_foreign_token_is_never_issued(
     session: VaultSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from pii_guard.vault import vault as vault_module
+    from pii_guard.vault import session as session_module
 
-    real = vault_module.derive_id
+    real = session_module.derive_id
     # Force the first candidate id to be the foreign one, then fall back to the real HMAC.
     calls: list[int] = []
 
@@ -76,7 +76,7 @@ def test_foreign_token_is_never_issued(
         calls.append(length)
         return "deadbeef"[:length] if len(calls) == 1 else real(key, sid, etype, normalized, length)
 
-    monkeypatch.setattr(vault_module, "derive_id", forced)
+    monkeypatch.setattr(session_module, "derive_id", forced)
     text = f"{FOREIGN} {NAME} írt."
     masked = session.mask(text, [span_of(text, NAME, "PERSON")], language="en")
     assert masked.startswith(FOREIGN + " ")

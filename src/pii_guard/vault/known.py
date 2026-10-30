@@ -17,6 +17,7 @@ import re
 import threading
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from pii_guard.types import EntityType, PiiGuardError
 from pii_guard.vault.fold import FoldedText, fold_value, fold_views
@@ -71,6 +72,8 @@ def known_values_from(
     """
     out: list[KnownValue] = []
     for index, item in enumerate(items):
+        value: Any
+        raw_type: Any
         if isinstance(item, KnownValue):
             value, raw_type = item.value, item.entity_type
         elif isinstance(item, dict):

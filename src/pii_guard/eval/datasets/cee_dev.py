@@ -77,7 +77,9 @@ def epoch_ms(rng: random.Random) -> str:
 
 def stamp14(rng: random.Random) -> str:
     """A ``yyyymmddhhmmss`` stamp in 2024-2026."""
-    t = dt.datetime(2024, 1, 1) + dt.timedelta(seconds=rng.randint(0, 3 * 365 * 86400))
+    t = dt.datetime(2024, 1, 1, tzinfo=dt.UTC) + dt.timedelta(
+        seconds=rng.randint(0, 3 * 365 * 86400)
+    )
     return t.strftime("%Y%m%d%H%M%S")
 
 

@@ -50,6 +50,7 @@ import sys
 import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from pii_guard.detect import ner_resolve
@@ -770,9 +771,7 @@ class NerDetector:
         if shared is not None:
             return shared
         backend: NerBackend
-        if self.backend_kind == "gliner" or os.path.isfile(
-            os.path.join(self.model, "gliner_config.json")
-        ):
+        if self.backend_kind == "gliner" or (Path(self.model) / "gliner_config.json").is_file():
             from pii_guard.detect import ner_gliner
 
             if not ner_gliner.dependencies_available():
