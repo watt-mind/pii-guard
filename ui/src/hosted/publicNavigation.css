@@ -60,26 +60,7 @@
 @media (min-width: 640px) { .public-footer-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } .public-footer-project { grid-column: auto; } }
 @media (min-width: 1024px) { .public-account > .public-source-link { display: inline-flex; } }
 
-/* Public brand palette; data/status colors retain their shared meaning. */
-.public-teal-theme {
-  --primary: #006b64;
-  --primary-hover: #00564f;
-  --on-primary: #ffffff;
-  --accent: #007d73;
-  --accent-soft: #e0f3ef;
-  --accent-ink: #005c54;
-  --accent-gradient: linear-gradient(92deg, #14b8a6, #006b64);
-  --accent-wash: linear-gradient(90deg, #d4f1e9, #e0f3ef);
-}
-.dark .public-teal-theme {
-  --primary: #4fdbc8;
-  --primary-hover: #73e4d4;
-  --on-primary: #003731;
-  --accent: #4fdbc8;
-  --accent-soft: #10332e;
-  --accent-ink: #9de9dd;
-  --accent-wash: linear-gradient(90deg, #10332e, #143c36);
-}
+/* Public navigation uses the shared teal brand palette from index.css. */
 .public-teal-theme .public-nav [aria-current],
 .public-teal-theme .public-nav .public-resource-current { text-decoration-color: var(--accent); }
 .public-teal-theme .public-footer a:hover { color: var(--accent-ink); }
