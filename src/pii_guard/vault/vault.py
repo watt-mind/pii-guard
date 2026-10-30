@@ -1932,6 +1932,10 @@ class Vault:
             self._purge_locked(force=True)
             return len(self._sessions)
 
+    def session_count(self) -> int:
+        """Current number of stored sessions without purging."""
+        return len(self._sessions)
+
     def session(
         self, session_id: str | None = None, *, authorize: Authorize | None = None
     ) -> VaultSession:

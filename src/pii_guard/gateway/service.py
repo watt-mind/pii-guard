@@ -420,6 +420,22 @@ class Gateway:
     def __repr__(self) -> str:
         return f"Gateway(mode={self.config.mode.value}, cache={self.cache!r})"
 
+    def bind_shared_state(
+        self,
+        *,
+        detect_workers: dict[Mode, BoundedWorkers],
+        session_holds: dict[str, Any],
+        holds_lock: Any,
+        issued_ids: IssuedIds,
+        session_incarnations: OrderedDict[str, Any],
+    ) -> None:
+        """Bind per-runtime session state and shared detector worker pools to this gateway."""
+        self._detect_workers = detect_workers
+        self._session_holds = session_holds
+        self._holds_lock = holds_lock
+        self.issued_ids = issued_ids
+        self._session_incarnations = session_incarnations
+
     # --- the upstream client ------------------------------------------------------------
 
     def upstream_timeout(self) -> httpx.Timeout:
