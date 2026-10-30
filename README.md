@@ -1,3 +1,5 @@
+# PII Guard
+
 <p align="center">
   <picture>
     <source media="(max-width: 600px)" srcset="docs/assets/banner-narrow.svg">
@@ -16,6 +18,12 @@
   <a href="docs/decisions/0005-synthetic-data-only.md"><img alt="Fictional data only" src="https://img.shields.io/badge/data-fictional%20only-b6f36b"></a>
 </p>
 
+> **Status: hackathon build** for the Meta Global AI Developer Hackathon (October 26 –
+> November 4, 2026). It works end to end; it is not production-hardened yet
+> ([what is missing](docs/why-pii-guard.md#what-is-not-here-yet), [roadmap](docs/roadmap.md)).
+> **No authentication by default:** keep it on loopback or behind an authenticating proxy, or
+> set `PII_GUARD_API_TOKEN` ([operations.md](docs/operations.md#exposure-and-authentication)).
+
 **For teams building AI agents in Europe's regulated professions** (legal, health, finance, HR,
 public sector). Their useful data is personal data: a case file, a referral letter, an HR
 folder. Under GDPR, sending it to a third-party model is a legal risk; not sending it means the
@@ -23,7 +31,11 @@ agent can't do the job. PII Guard is a drop-in proxy in between: change one base
 name, address, ID and face is swapped for a reversible placeholder before the request leaves
 your network, then restored in the answer, even mid-stream and inside tool calls.
 
-**Try it live: https://guard.watt-mind.com**. Run the guest demo with no sign-up and no key, or sign in with Google for your own gateway endpoint. Use fictional data only; it is a hackathon demo with a capped sponsored allowance.
+| You are… | Start here |
+|---|---|
+| Evaluating the hackathon entry | [Meta's models](#metas-large-models-teach-metas-small-open-model-runs) and [Results](#results) |
+| Putting an agent behind it | [Quickstart](#quickstart), then [Built for agents](#built-for-agents-tool-calls-and-streaming) |
+| Checking the EU/GDPR fit | [docs/eu-regulation.md](docs/eu-regulation.md) and the [threat model](docs/privacy-model.md) |
 
 **Why it matters in the EU.** The GDPR requires data minimization (Art. 5) and lists
 pseudonymization among example by-design and security measures (Art. 25, 32). Placeholders
@@ -32,26 +44,80 @@ themselves settle Chapter V transfer obligations. Pseudonymized data stay person
 whoever holds the mapping: a technical measure, not a compliance certificate. Sources, the 2025
 CJEU ruling, DORA and the AI Act: [docs/eu-regulation.md](docs/eu-regulation.md).
 
-**Try it offline** (no key; needs [uv](https://docs.astral.sh/uv/) and
-[pnpm](https://pnpm.io/)): `git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard && make demo`,
-then open http://localhost:5173. Once the package is on PyPI (it is not yet), one command
-will do it without a clone: `uvx --from wattmind-pii-guard pii-guard up`.
-[More ways to run it](#try-it).
+## Contents
+
+- [Quickstart](#quickstart)
+- [How it works](#how-it-works)
+- [Meta's large models teach, Meta's small open model runs](#metas-large-models-teach-metas-small-open-model-runs)
+- [Results](#results)
+- [Built for agents: tool calls and streaming](#built-for-agents-tool-calls-and-streaming)
+- [Why PII Guard](#why-pii-guard)
+- [What you can see in the demo](#what-you-can-see-in-the-demo)
+- [Try it](#try-it)
+- [Contributing, security, license](#contributing-security-license)
+
+## Quickstart
+
+| Path | What you run | Needs |
+|---|---|---|
+| **Live demo** | [guard.watt-mind.com](https://guard.watt-mind.com): guest demo with no sign-up and no key, or sign in with Google for your own gateway endpoint. Fictional data only; capped sponsored allowance | a browser |
+| **Offline, from source** | `git clone https://github.com/watt-mind/pii-guard.git && cd pii-guard && make demo`, then open http://localhost:5173 | [uv](https://docs.astral.sh/uv/) and [pnpm](https://pnpm.io/); no key |
+| **Planned: no clone** | `uvx --from wattmind-pii-guard pii-guard up` — not runnable yet; there is no PyPI package yet | [uv](https://docs.astral.sh/uv/) |
+
+[More ways to run it](#try-it), including Docker and putting a coding agent behind it.
 
 <p align="center">
   <img src="docs/assets/demo/demo.webp" alt="Demo of the console in the light theme with fictional English data: the Overview counts real gateway calls, a support email is masked in the Playground, the same session continues in Chat and comes back restored, Logs shows each call, and Connect gives the commands for a client" width="100%">
 </p>
 
-<p align="center"><sub>Recorded from <code>pii-guard up</code> in fast mode (rules only, no NER, so free-text names pass); the offline mock upstream echoes the masked text back (with a key, the same flow runs on Muse Spark). <b>▶ Video walkthrough:</b> <i>link coming with the submission</i><!-- LAB-1123: video link --></sub></p>
+<p align="center"><sub>Recorded from <code>pii-guard up</code> with the offline mock upstream; a fast-mode recording with the NER on is planned. <b>▶ Video walkthrough:</b> <i>link coming with the submission</i><!-- LAB-1123: video link --></sub></p>
+
+## How it works
+
+```
+ your app / agent ──► pii-guard ──────────────────────────────► LLM provider
+                      │ 1. extract text, tool calls, image regions    │
+                      │ 2. detect (rules → NER → optional audit LLM)  │
+                      │ 3. apply policies, pseudonymize (keyed)       │
+                      │ 4. mask image regions (SAM 3.1 + OCR)         │
+                      │◄──────────────── response (streamed) ─────────┘
+                      │ 5. restore placeholders, chunk by chunk
+ your app / agent ◄───┘
+```
+
+The mapping between real values and placeholders **never leaves PII Guard**. Design and
+engineering choices: [docs/architecture.md](docs/architecture.md); API guide and
+reference: [docs/api.md](docs/api.md), [guard.watt-mind.com/#api](https://guard.watt-mind.com/#api); threat model:
+[docs/privacy-model.md](docs/privacy-model.md); everything else: [docs/INDEX.md](docs/INDEX.md).
+
+### Modes
+
+| Mode | Detection | Leaves your machine? | Use it for |
+|---|---|---|---|
+| `fast` (default) | Rules + on-device NER; no model call | Only the masked request, to your LLM provider | Everyday agent traffic |
+| `fast` without the `ner` extra | Rules only; free-text names need known values | Only the masked request | Offline runs, CI, structured data |
+| `audit` (opt-in per request, `X-PII-Guard-Mode: audit`) | Rules + NER + an LLM detector (one hosted call per message; fails closed when the call fails) | The unmasked text goes to the audit endpoint you configure | The measured upper bound and teaching data, not production traffic |
+
+Sessions, headers and settings: [docs/architecture-gateway.md](docs/architecture-gateway.md).
+
+### What it detects
+
+People, addresses, emails, phone numbers, dates of birth, national and document IDs
+(including Hungarian tax and TAJ numbers), bank accounts and payment cards, vehicle plates,
+parcel numbers and secrets such as API keys — plus faces, ID photos and signatures in images.
+Full taxonomy, per-language validators and defaults: [docs/entities.md](docs/entities.md).
 
 ## Meta's large models teach, Meta's small open model runs
 
 | Job | Meta model | Evidence |
 |---|---|---|
-| **Runs in production (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa base** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels, public PII datasets in 24 EU languages and hard negatives; published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2`. Runs on CPU, no GPU needed ([time per message](#results)) | [model card](training/ner/model-card.md), [training](docs/models.md#ner-v4-v41-and-v42-v42-is-published), [selection](eval/results/2026-10-30-lab-1625-ner-v42/README.md) |
+| **Runs by default (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa base** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels, public PII datasets in 24 EU languages and hard negatives; published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2`. Runs on CPU, no GPU needed ([time per message](#results)) | [model card](training/ner/model-card.md), [training](docs/models.md#ner-v4-v41-and-v42-v42-is-published), [selection](eval/results/2026-10-30-lab-1625-ner-v42/README.md) |
 | **Teaches it, and audits:** labels 4,964 fictional documents for distillation; the optional audit mode and upper bound | **Muse Glimmer 30B** (open weights, Apache-2.0); **Muse Spark Open** (open weights) on Baseten partner inference | [Glimmer run](eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [audit runs](docs/benchmarks.md#smoke) |
 | **Sees images:** faces, ID photos and signatures, filled before the image leaves | **SAM 3.1** (Meta Model API) for signatures; faces and ID photos on-device (YuNet); OCR for printed text | [specimen results](eval/results/visual/specimens.md) |
 
+Naming in one line: **Muse Glimmer** is the small open-weight teacher, **Muse Spark Open** is
+the open-weight audit model, and **Muse Spark 1.3** is the hosted downstream model in the demo;
+the full assignment is in [docs/models.md](docs/models.md#which-model-does-what).
 **Muse** (Wonder, Spark 1.3) also writes the fictional benchmark ([models](docs/models.md#which-model-does-what)),
 **Muse Spark Open** red-teams the masking ([red team](eval/results/2026-10-27-redteam/README.md)), and
 **Muse Spark 1.3** is the demo's downstream model, which only ever sees placeholders.
@@ -64,6 +130,11 @@ yourself; hosted models only see fictional or already-masked text. All jobs, wit
 [docs/why-pii-guard.md](docs/why-pii-guard.md#3-built-on-metas-models-end-to-end).
 
 ## Results
+
+Headline: in fast mode, nothing leaked on the hand-written set and almost nothing on agent
+traffic — the first row of the generated tables below — while the baselines leak visibly more
+on the same sets. The chart is the summary; the full generated tables are collapsed under it,
+and [docs/benchmarks.md](docs/benchmarks.md) has every set, language and run.
 
 Leak = labeled personal values still readable in what the model receives (lower is safer).
 Over-masking = masked spans that were not personal data (lower is better). Fast mode is the
@@ -78,6 +149,9 @@ except where marked †).
   <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/leak-vs-latency-dark.svg">
   <img src="docs/benchmarks/leak-vs-latency.svg" alt="Leak rate vs latency">
 </picture>
+
+<details>
+<summary>Full generated tables: leak and over-masking on every fixture set</summary>
 
 <!-- results:start -->
 <!-- Generated by `pii-guard eval report` from the run records and the `readme` section of docs/benchmarks/config.json; edit those, not this block. -->
@@ -109,6 +183,8 @@ Over-masking: share of masked spans that are not personal data; lower is better 
 Records behind the fast row: Hand-written ([1](eval/results/runs/2026-10-30-lab-1625-pl-smoke-v42-b3.json) · [2](eval/results/runs/2026-10-30-lab-1625-smoke-v42-b3.json)), [Agent traffic](eval/results/runs/2026-10-30-lab-1625-agent-traffic-v42-b3.json), [Nemotron-PII](eval/results/runs/2026-10-30-lab-1625-nemotron-pii-v42-b3.json), [CEE-PII](eval/results/runs/2026-10-30-lab-1625-cee-pii-v42-b3.json), [Gretel finance](eval/results/runs/2026-10-30-lab-1625-gretel-finance-v42-b3.json), [Gretel finance, corrected labels](eval/results/runs/2026-10-30-lab-1625-gretel-finance-corrected-v42-b3.json), [Ai4Privacy](eval/results/runs/2026-10-30-lab-1625-ai4privacy-v42-b3.json); every other cell is in the [run log](docs/benchmarks.md#run-log).
 <!-- results:end -->
 
+</details>
+
 † **In-distribution:** the NER was trained on other rows of the same dataset (the OpenPII
 train split; no evaluated row was trained on), so this cell is not a win. The same recipe
 trained without those rows leaked far more on an earlier version of this sample
@@ -132,6 +208,17 @@ leak less than fast mode. ‡ LLM Guard's model was fine-tuned on Ai4Privacy dat
 - **Caveats:** the sets are small (tens to hundreds of documents per language); headline sets
   are hand-written or public because Muse-generated fixtures flatter Muse-based detection.
 
+### What it does not do
+
+- It is not a compliance certificate: pseudonymized data stay personal data for whoever holds
+  the mapping ([eu-regulation.md](docs/eu-regulation.md)).
+- It is not production-hardened yet, and fast mode is weak on finance text and on reference
+  numbers without a cue word (above).
+- It does not authenticate callers by default (see the status note at the top).
+
+The full list: [what is not here yet](docs/why-pii-guard.md#what-is-not-here-yet) and the
+[roadmap](docs/roadmap.md).
+
 ## Built for agents: tool calls and streaming
 
 The gateway speaks the OpenAI chat API, so an agent framework only changes its base URL. It
@@ -149,7 +236,7 @@ from openai import OpenAI
 
 client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="unused")
 stream = client.chat.completions.create(
-    model="muse-spark-1.3",
+    model="muse-spark-1.3",  # any model your upstream serves; the guard is provider-neutral
     stream=True,
     tools=my_tools,  # your agent's tools, unchanged
     messages=[
@@ -160,13 +247,17 @@ stream = client.chat.completions.create(
 ```
 
 It also serves the Responses API, so coding agents run behind it unmodified. **Four real
-harnesses, pi, OpenCode, Codex and Muse Code**, did a two-turn task on a fictional customer file
-(`cat` it, reply with an email, then edit the file) through the gateway on Muse Spark: across
-**115 agent requests, none of the 9 fictional values reached the model**, refused turns went from
-7 of 15 to **0 of 10** after the placeholder note, and 8 of 10 turns finished, with real values
-restored in the answers and on disk. Streaming, multi-turn sessions and tool calls (`read`,
-`write`, `bash`, `edit`) passed in all four; the one Codex failure was a regex-escaped placeholder,
-since fixed ([#221](https://github.com/watt-mind/pii-guard/pull/221)). Ten turns is a small sample, not a benchmark
+harnesses — pi, OpenCode, Codex and Muse Code** — did a two-turn task on a fictional customer
+file (`cat` it, reply with an email, then edit the file) through the gateway on Muse Spark:
+
+- Across **115 agent requests, none of the 9 fictional values reached the model**.
+- Refused turns went from 7 of 15 to **0 of 10** after the placeholder note; 8 of 10 turns
+  finished, with real values restored in the answers and on disk.
+- Streaming, multi-turn sessions and tool calls (`read`, `write`, `bash`, `edit`) passed in
+  all four; the one Codex failure was a regex-escaped placeholder, since fixed
+  ([#221](https://github.com/watt-mind/pii-guard/pull/221)).
+
+Ten turns is a small sample, not a benchmark
 ([matrix and setup](docs/integrations/harness-matrix-2026-10-29.md),
 [Muse Code guide](docs/integrations/muse-code.md)). Sessions, headers, modes and settings:
 [docs/architecture-gateway.md](docs/architecture-gateway.md).
@@ -213,7 +304,11 @@ At phone width: [Text](docs/assets/demo/5-mask-mobile.webp) ·
 
 ## Try it
 
-**Once the package is published** (there is no PyPI package or GitHub release yet), one
+**Before you expose it:** there is no authentication by default. Keep PII Guard on loopback or
+behind an authenticating proxy, or set `PII_GUARD_API_TOKEN`
+([operations.md](docs/operations.md#exposure-and-authentication)).
+
+**Planned — once the package is published** (there is no PyPI package or GitHub release yet), one
 command, with no clone, Node or Docker, only [uv](https://docs.astral.sh/uv/), starts the
 API, the OpenAI-compatible gateway and the web UI with the live dashboard on
 http://localhost:8787, with an offline mock upstream unless you pass `--upstream-url`:
@@ -247,28 +342,6 @@ A set `PII_GUARD_NER_MODEL` without the extra stops startup instead of quietly r
 only. Docker: `docker compose --profile demo up --build` (the demo image is 1.9 GB on arm64
 with CPU-only torch; [operations.md](docs/operations.md#docker)). More:
 [docs/operations.md](docs/operations.md).
-
-## How it works
-
-```
- your app / agent ──► pii-guard ──────────────────────────────► LLM provider
-                      │ 1. extract text, tool calls, image regions    │
-                      │ 2. detect (rules → NER → optional audit LLM)  │
-                      │ 3. apply policies, pseudonymize (keyed)       │
-                      │ 4. mask image regions (SAM 3.1 + OCR)         │
-                      │◄──────────────── response (streamed) ─────────┘
-                      │ 5. restore placeholders, chunk by chunk
- your app / agent ◄───┘
-```
-
-The mapping between real values and placeholders **never leaves PII Guard**. Design and
-engineering choices: [docs/architecture.md](docs/architecture.md); API guide and
-reference: [docs/api.md](docs/api.md), [guard.watt-mind.com/#api](https://guard.watt-mind.com/#api); threat model:
-[docs/privacy-model.md](docs/privacy-model.md); everything else: [docs/INDEX.md](docs/INDEX.md).
-
-> **Status: hackathon build** for the Meta Global AI Developer Hackathon (October 26 –
-> November 4, 2026). It works end to end; it is not production-hardened yet. What is missing:
-> [docs/why-pii-guard.md](docs/why-pii-guard.md#what-is-not-here-yet), [docs/roadmap.md](docs/roadmap.md).
 
 ## Contributing, security, license
 
