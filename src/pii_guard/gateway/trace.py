@@ -88,10 +88,13 @@ class CallTrace:
         observability: Observability | None,
         timer: RequestTimer,
         body: object,
+        request_id: str | None = None,
     ) -> None:
         self.observability = observability
         self.timer = timer
-        self.request_id = new_request_id()
+        # The route may assign the id up front (LAB-1179) so the error handler can stamp
+        # even refused calls with the id of the traffic event recorded for them.
+        self.request_id = request_id or new_request_id()
         self.recording = observability is not None and observability.recording
         self.payloads = observability is not None and observability.traffic.enabled
         self.full = observability is not None and observability.traffic.full
@@ -257,6 +260,9 @@ def _entities(stats: RequestStats | None) -> dict[str, Any] | None:
     out: dict[str, Any] = {
         "detected": dict(sorted(stats.spans.items())),
         "masked": dict(sorted((k, v) for k, v in stats.masked.items() if v)),
+        # Fail-closed overrides the resolver forced over a keep type (LAB-1248, LAB-1228):
+        # counts by entity type only, never values or detector internals beyond the type.
+        "forced_masks": dict(sorted((k, v) for k, v in stats.forced.items() if v)),
         "texts": stats.texts,
     }
     if stats.images:

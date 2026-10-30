@@ -127,3 +127,28 @@ def test_wrong_offsets_fail_detection_and_forward_nothing(stream: bool) -> None:
     assert upstream.requests == []
     for value in (*EMAILS, "Teszt Elek"):
         assert value not in response.text
+
+
+def test_blocked_response_carries_the_request_id_of_its_traffic_event() -> None:
+    """LAB-1179: a refused call joins its `blocked` traffic event via the request id header."""
+    from pii_guard.api.app import create_app
+    from pii_guard.observability import ObservabilitySettings
+
+    upstream = MockUpstream()
+    settings = _settings(policy_overrides="EMAIL=block")
+    app = create_app(settings, ObservabilitySettings(traffic_log="masked"))
+    app.state.gateway_transport = upstream.transport()
+    with TestClient(app) as http:
+        response = http.post(
+            "/v1/chat/completions",
+            json={"model": "m", "messages": conversation_turn_one()},
+        )
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "blocked_entity"
+        request_id = response.headers.get("x-pii-guard-request-id")
+        assert request_id
+        events = http.get("/v1/traffic").json()["events"]
+    (event,) = [e for e in events if e["id"] == request_id]
+    assert event["outcome"] == "blocked"
+    for value in (*EMAILS, "Teszt Elek"):
+        assert value not in response.text

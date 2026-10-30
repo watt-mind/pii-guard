@@ -223,6 +223,8 @@ export interface TrafficConnectOptions {
   backlog?: number;
   onEvents: (events: TrafficEvent[]) => void;
   onStatus: (status: TrafficStatus) => void;
+  /** The server restarted (a new `boot` id): events after this point start a new run. */
+  onRestart?: (boot: string) => void;
 }
 
 export interface TrafficConnection {
@@ -384,6 +386,10 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     const restarted = page.boot !== null && boot !== null && page.boot !== boot;
     if (page.boot !== null) boot = page.boot;
     if (restarted) lastSeq = 0;
+    // The cursor reset hides the break: tell the feed a new run starts here (LAB-1366),
+    // so the Logs screen can mark it instead of silently mixing the two runs. This fires
+    // before the after>0 refetch, whose page carries the already-seen boot id.
+    if (restarted) options.onRestart?.(page.boot ?? boot ?? "");
     if (restarted && after > 0) return false;
     emit(page.events);
     return true;

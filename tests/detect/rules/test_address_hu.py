@@ -53,6 +53,14 @@ def test_full_address_with_a_consistent_postcode(
     assert addresses(detector, context.format(address)) == [(address, hu.SCORE_CONSISTENT)]
 
 
+def test_consistent_postcode_case_from_lab_1298(detector: RuleDetector) -> None:
+    """LAB-1298: this exact invocation failed once in a full local xdist run and passes
+    alone. Pinned verbatim so a recurrence reproduces without the full suite."""
+    assert addresses(detector, "lakcím: 1051 Budapest, Minta utca 12. 3/5. ), Vevő") == [
+        ("1051 Budapest, Minta utca 12. 3/5.", hu.SCORE_CONSISTENT)
+    ]
+
+
 def test_the_span_has_the_right_offsets(detector: RuleDetector) -> None:
     text = "Lakcím: 6720 Szeged, Képzelt tér 4. Telefon: 06 30 123 4567"
     [span] = [s for s in detector.detect(text) if s.entity_type is E.ADDRESS]

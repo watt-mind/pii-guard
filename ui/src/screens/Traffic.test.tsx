@@ -33,6 +33,7 @@ function fakeConnect() {
         opts!.onEvents(events);
       }),
     status: (s: TrafficStatus) => act(() => opts!.onStatus(s)),
+    restart: (boot: string) => act(() => opts!.onRestart!(boot)),
   };
 }
 
@@ -432,5 +433,18 @@ describe("Endpoint traffic in project Logs (LAB-1492)", () => {
     f.push([viaEndpoint(huChat, "ep_a", "Synthetic CLI")]);
     const list = await screen.findByTestId("call-list");
     expect(within(list).queryByTitle(/^Endpoint:/)).toBeNull();
+  });
+});
+
+describe("backend restart", () => {
+  it("marks the new run with a divider above its first call", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([huChat, huStream]);
+    expect(screen.queryByText(/Server restarted/)).toBeNull();
+    f.restart("boot_b");
+    f.push([refused]);
+    expect(await screen.findByText(/Server restarted/)).toBeInTheDocument();
+    expect(screen.getByText(/sessions are keyed per server process/i)).toBeInTheDocument();
   });
 });
