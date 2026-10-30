@@ -472,7 +472,7 @@ def _render_and_vault(request: Request, requested: Render | None) -> tuple[Rende
 
 _OPTIONS_DOC = {
     "session_id": "The vault session to mask in (`labels` only). Omitted: a new one is created "
-    "and returned. Unknown or expired: 404 `not_found`.",
+    "and returned. Unknown, expired or bound to another client identity: 404 `not_found`.",
     "render": "`labels` (default, `PII_GUARD_IMAGE_RENDER`) or `opaque`. Without a tenant key "
     "the default falls back to `opaque`; an explicit `labels` is then 500 "
     "`vault_not_configured`.",

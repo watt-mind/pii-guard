@@ -54,7 +54,8 @@ class MaskRequest(BaseModel):
         default=None,
         description="Vault session to mask in (1-128 characters). Omitted or `null`: a new "
         "session is created and returned. An existing id reuses its mapping, so the same "
-        "value keeps the same placeholder across calls. Unknown or expired: 404 `not_found`.",
+        "value keeps the same placeholder across calls. Unknown, expired or bound to another "
+        "client identity: 404 `not_found`.",
     )
 
 

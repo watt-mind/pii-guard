@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from pii_guard.api.deps import Analyzer, get_analyzer, get_language, get_policies, get_vault
 from pii_guard.api.errors import error_responses
-from pii_guard.api.routes._common import check_text_size, log_extra, v1_router
+from pii_guard.api.routes._common import check_text_size, log_extra, owned_session, v1_router
 from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import Span
@@ -48,8 +48,8 @@ class AnalyzeRequest(BaseModel):
     session_id: SessionId | None = Field(
         default=None,
         description="Optional vault session (1-128 characters, as on `/v1/mask`) whose "
-        'pre-loaded known values are merged in (`detector: "known"`). Unknown or expired: '
-        "404 `not_found`. Never creates a session.",
+        'pre-loaded known values are merged in (`detector: "known"`). Unknown, expired or '
+        "bound to another client identity: 404 `not_found`. Never creates a session.",
     )
 
 
@@ -118,13 +118,16 @@ def analyze(
     With ``session_id`` the session's known values are merged in as ``/v1/mask`` does
     (``detector: "known"``). The vault is only resolved then, so analyze without a session
     needs no tenant key. Nothing is stored and no session is created; an unknown or expired
-    session is a 404. Known spans of a ``keep`` type report ``mask``: ``/v1/mask`` masks them."""
+    session is a 404, as is one a gateway request bound to another client identity (LAB-1590).
+    Known spans of a ``keep`` type report ``mask``: ``/v1/mask`` masks them."""
     check_text_size(request, body.text)
     language = get_language(request, body.language)
     known_session = None
     if body.session_id is not None:
         vault: Vault = get_vault(request)
-        known_session = vault.session(body.session_id)  # SessionNotFoundError -> 404
+        # Unknown, expired or bound to another client identity -> 404 (LAB-1590): the known
+        # spans would tell a foreign caller which values the session holds.
+        known_session = owned_session(vault, body.session_id, request)
     spans = analyzer.analyze(body.text, language)
     if known_session is not None and (known := known_session.known_values):
         spans = merge_known(body.text, spans, known, language, keep_types=policies.keep_types)

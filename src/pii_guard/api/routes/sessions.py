@@ -19,7 +19,12 @@ from pydantic import BaseModel, Field
 
 from pii_guard.api.deps import get_vault
 from pii_guard.api.errors import error_responses
-from pii_guard.api.routes._common import ephemeral_session, log_extra, v1_router
+from pii_guard.api.routes._common import (
+    ephemeral_session,
+    log_extra,
+    owned_session,
+    v1_router,
+)
 from pii_guard.vault import Vault, VaultSession
 from pii_guard.vault.known import KnownValue, known_values_from
 
@@ -165,6 +170,8 @@ def add_known_values(
 ) -> dict[str, object]:
     """Add known values to an existing session (404 if it is unknown or expired).
 
-    A refused request (an invalid value, or more than the session may hold) adds nothing."""
+    A refused request (an invalid value, or more than the session may hold) adds nothing.
+    A session a gateway request bound to another client identity is a 404 too, and nothing is
+    added to it (LAB-1590)."""
     values = _validated(request, body.known_values)
-    return _add(request, vault.session(session_id), values)
+    return _add(request, owned_session(vault, session_id, request), values)
