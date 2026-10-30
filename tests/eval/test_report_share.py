@@ -113,7 +113,7 @@ def test_every_image_in_every_size_and_theme_and_byte_stable() -> None:
 def test_hero_says_lower_left_is_better_and_prints_every_number() -> None:
     svg = hero(_index(), parse_share(SHARE, "cfg"), (1600, 900), LIGHT)
     assert "lower-left is better" in svg
-    for text in ("0.2 %", "0.7 %", "16.6 %", "33.4 %", "38.8 %", "Ours (internal-id-free)"):
+    for text in ("0.2%", "0.7%", "16.6%", "33.4%", "38.8%", "Ours (internal-id-free)"):
         assert text in svg
 
 
@@ -132,7 +132,7 @@ def test_results_table_prints_every_cell_and_bolds_the_lowest_per_metric() -> No
     bold = re.findall(r'<tspan fill="[^"]+" font-weight="700">([^<]+)</tspan>', svg)
     # Set A: ours lowest on both; set B: the tool on leak (18.8 < 19.0), ours on over-masking.
     assert bold == ["0.2%", "0.7%", "24.0%", "18.8%"]
-    assert "Set B (5 docs · en): Ours fast leak 19.0 %, over-masking 24.0 %" in svg
+    assert "Set B (5 docs · en): Ours fast leak 19.0%, over-masking 24.0%" in svg
 
 
 def test_how_it_works_shows_all_steps_and_only_placeholders_cross() -> None:
@@ -241,7 +241,7 @@ README_SPEC = {
 def test_fill_reads_every_field_from_the_records() -> None:
     spec = parse_spec(README_SPEC, "cfg")
     text = "{leak:a:own} {over:a:tool} {partial:a:own} {docs:a} {langs:a} {codes:a}"
-    assert fill(text, _index(), spec, "cfg") == "0.2 % 33.4 % 0.1 % 7 German and English de, en"
+    assert fill(text, _index(), spec, "cfg") == "0.2% 33.4% 0.1% 7 German and English de, en"
     with pytest.raises(RecordError, match="no leak"):
         fill("{leak:b:rules}", _index(), spec, "cfg")
     with pytest.raises(RecordError, match="no fixture set"):
@@ -260,8 +260,8 @@ def test_compact_block_bolds_the_lowest_per_row_and_metric() -> None:
         "| Set B · 5 docs (en) | 19.0%&nbsp;·&nbsp;**24.0%** | **18.8%**&nbsp;·&nbsp;75.0% |"
         in lines
     )
-    assert "Partial on a: 0.1 %." in lines
-    assert "- On b, 19.0 % against 18.8 % (5 docs, German and English)." in lines
+    assert "Partial on a: 0.1%." in lines
+    assert "- On b, 19.0% against 18.8% (5 docs, German and English)." in lines
     assert "<details><summary>How</summary>" in lines
     assert any(line.startswith("Records behind the Ours column:") for line in lines)
 
@@ -280,7 +280,7 @@ def test_table_image_puts_the_text_table_in_a_details_block() -> None:
     )
     block = render_compact(_index(), spec)
     assert 'srcset="docs/benchmarks/results-table-dark.svg"' in block
-    assert 'alt="Ours 0.2 % &quot;q&quot;"' in block
+    assert 'alt="Ours 0.2% &quot;q&quot;"' in block
     pic, details = block.index("<picture>"), block.index("<details><summary>Table as text")
     table, end = block.index("| Leak · over-masking |"), block.index("</details>")
     assert pic < details < table < end < block.index("Partial on a:")
@@ -290,9 +290,9 @@ def test_table_image_puts_the_text_table_in_a_details_block() -> None:
 
 def test_intro_block_embeds_the_hero_in_both_themes() -> None:
     block = render_intro(_index(), parse_spec(README_SPEC, "cfg"))
-    assert "- Leak 0.2 %, over-masking 0.7 %." in block
+    assert "- Leak 0.2%, over-masking 0.7%." in block
     assert 'srcset="docs/benchmarks/hero-dark.svg"' in block
-    assert 'alt="Ours 0.2 % &quot;quoted&quot;"' in block
+    assert 'alt="Ours 0.2% &quot;quoted&quot;"' in block
     doc = f"a\n{INTRO_START}\nold\n{INTRO_END}\nb\n"
     out = splice(doc, block, "README.md", start_mark=INTRO_START, end_mark=INTRO_END)
     assert "old" not in out and out.endswith(f"{INTRO_END}\nb\n")

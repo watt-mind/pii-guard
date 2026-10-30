@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080" role="img" aria-labelledby="t d" font-family="Inter, &#x27;Helvetica Neue&#x27;, Helvetica, Arial, sans-serif">
 <title id="t">Leak and over-masking on every set</title>
-<desc id="d">Grouped bars of leak and over-masking per fixture set. Hand-written: PII Guard (fast, NER v4.2) leak 0.0 %, over-masking 1.3 %, PrivAiTe leak 13.0 %, over-masking 25.7 %, Presidio leak 25.5 %, over-masking 26.1 %, LLM Guard leak 46.3 %, over-masking 33.7 %. Agent traffic: PII Guard (fast, NER v4.2) leak 0.2 %, over-masking 0.7 %, PrivAiTe leak 2.4 %, over-masking 35.2 %, Presidio leak 16.6 %, over-masking 33.4 %, LLM Guard leak 20.2 %, over-masking 16.9 %. Nemotron-PII: PII Guard (fast, NER v4.2) leak 0.6 %, over-masking 1.5 %, PrivAiTe leak 4.0 %, over-masking 5.6 %, Presidio leak 12.8 %, over-masking 32.0 %, LLM Guard leak 28.8 %, over-masking 0.6 %. CEE-PII: PII Guard (fast, NER v4.2) leak 0.8 %, over-masking 7.3 %, PrivAiTe leak 4.4 %, over-masking 59.2 %, Presidio leak 36.5 %, over-masking 52.5 %, LLM Guard leak 75.8 %, over-masking 66.4 %. Gretel finance: PII Guard (fast, NER v4.2) leak 19.1 %, over-masking 24.4 %, PrivAiTe leak 27.7 %, over-masking 46.5 %, Presidio leak 18.8 %, over-masking 75.4 %, LLM Guard leak 59.3 %, over-masking 17.0 %.</desc>
+<desc id="d">Grouped bars of leak and over-masking per fixture set. Hand-written: PII Guard (fast, NER v4.2) leak 0.0%, over-masking 1.3%, PrivAiTe leak 13.0%, over-masking 25.7%, Presidio leak 25.5%, over-masking 26.1%, LLM Guard leak 46.3%, over-masking 33.7%. Agent traffic: PII Guard (fast, NER v4.2) leak 0.2%, over-masking 0.7%, PrivAiTe leak 2.4%, over-masking 35.2%, Presidio leak 16.6%, over-masking 33.4%, LLM Guard leak 20.2%, over-masking 16.9%. Nemotron-PII: PII Guard (fast, NER v4.2) leak 0.6%, over-masking 1.5%, PrivAiTe leak 4.0%, over-masking 5.6%, Presidio leak 12.8%, over-masking 32.0%, LLM Guard leak 28.8%, over-masking 0.6%. CEE-PII: PII Guard (fast, NER v4.2) leak 0.8%, over-masking 7.3%, PrivAiTe leak 4.4%, over-masking 59.2%, Presidio leak 36.5%, over-masking 52.5%, LLM Guard leak 75.8%, over-masking 66.4%. Gretel finance: PII Guard (fast, NER v4.2) leak 19.1%, over-masking 24.4%, PrivAiTe leak 27.7%, over-masking 46.5%, Presidio leak 18.8%, over-masking 75.4%, LLM Guard leak 59.3%, over-masking 17.0%.</desc>
 <rect x="0" y="0" width="1080" height="1080" fill="#FFFFFF"/>
 <text x="56" y="89.4" font-size="41.8" fill="#16171B" font-weight="700">Leak and over-masking on every set</text>
 <text x="56" y="128.2" font-size="22.8" fill="#55565F">Same documents and scorer for every tool within a set · lower is better</text>
@@ -17,105 +17,105 @@
 <text x="199.9" y="211.6" font-size="19.9" fill="#16171B" font-weight="700">Leak</text>
 <line x1="199.9" y1="233" x2="199.9" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
 <text x="199.9" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">0%</text>
-<line x1="283.1" y1="233" x2="283.1" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="283.1" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">20%</text>
-<line x1="366.2" y1="233" x2="366.2" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="366.2" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">40%</text>
-<line x1="449.3" y1="233" x2="449.3" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="449.3" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">60%</text>
-<line x1="532.4" y1="233" x2="532.4" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="532.4" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">80%</text>
+<line x1="284.2" y1="233" x2="284.2" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="284.2" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">20%</text>
+<line x1="368.4" y1="233" x2="368.4" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="368.4" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">40%</text>
+<line x1="452.7" y1="233" x2="452.7" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="452.7" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">60%</text>
+<line x1="536.9" y1="233" x2="536.9" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="536.9" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">80%</text>
 <rect x="199.9" y="251" width="2" height="24" fill="#3D7A0C"/>
-<text x="207.6" y="268.8" font-size="16.1" fill="#2F6108" font-weight="700">0.0 %</text>
-<rect x="199.9" y="279.5" width="53.9" height="24" fill="#0072B2"/>
-<text x="259.5" y="297.3" font-size="16.1" fill="#55565F">13.0 %</text>
-<rect x="199.9" y="308.1" width="105.8" height="24" fill="#C84E00"/>
-<text x="311.4" y="325.9" font-size="16.1" fill="#55565F">25.5 %</text>
-<rect x="199.9" y="336.6" width="192.4" height="24" fill="#A0558A"/>
-<text x="398.1" y="354.4" font-size="16.1" fill="#55565F">46.3 %</text>
+<text x="207.6" y="268.8" font-size="16.1" fill="#2F6108" font-weight="700">0.0%</text>
+<rect x="199.9" y="279.5" width="54.6" height="24" fill="#0072B2"/>
+<text x="260.2" y="297.3" font-size="16.1" fill="#55565F">13.0%</text>
+<rect x="199.9" y="308.1" width="107.2" height="24" fill="#C84E00"/>
+<text x="312.9" y="325.9" font-size="16.1" fill="#55565F">25.5%</text>
+<rect x="199.9" y="336.6" width="195" height="24" fill="#A0558A"/>
+<text x="400.7" y="354.4" font-size="16.1" fill="#55565F">46.3%</text>
 <rect x="199.9" y="397.4" width="2" height="24" fill="#3D7A0C"/>
-<text x="207.6" y="415.2" font-size="16.1" fill="#2F6108" font-weight="700">0.2 %</text>
-<rect x="199.9" y="426" width="10" height="24" fill="#0072B2"/>
-<text x="215.7" y="443.8" font-size="16.1" fill="#55565F">2.4 %</text>
-<rect x="199.9" y="454.6" width="68.8" height="24" fill="#C84E00"/>
-<text x="274.4" y="472.3" font-size="16.1" fill="#55565F">16.6 %</text>
-<rect x="199.9" y="483.1" width="84" height="24" fill="#A0558A"/>
-<text x="289.6" y="500.9" font-size="16.1" fill="#55565F">20.2 %</text>
+<text x="207.6" y="415.2" font-size="16.1" fill="#2F6108" font-weight="700">0.2%</text>
+<rect x="199.9" y="426" width="10.2" height="24" fill="#0072B2"/>
+<text x="215.8" y="443.8" font-size="16.1" fill="#55565F">2.4%</text>
+<rect x="199.9" y="454.6" width="69.7" height="24" fill="#C84E00"/>
+<text x="275.4" y="472.3" font-size="16.1" fill="#55565F">16.6%</text>
+<rect x="199.9" y="483.1" width="85.1" height="24" fill="#A0558A"/>
+<text x="290.8" y="500.9" font-size="16.1" fill="#55565F">20.2%</text>
 <rect x="199.9" y="543.9" width="2.4" height="24" fill="#3D7A0C"/>
-<text x="208" y="561.7" font-size="16.1" fill="#2F6108" font-weight="700">0.6 %</text>
-<rect x="199.9" y="572.5" width="16.7" height="24" fill="#0072B2"/>
-<text x="222.4" y="590.3" font-size="16.1" fill="#55565F">4.0 %</text>
-<rect x="199.9" y="601" width="53.1" height="24" fill="#C84E00"/>
-<text x="258.7" y="618.8" font-size="16.1" fill="#55565F">12.8 %</text>
-<rect x="199.9" y="629.6" width="119.9" height="24" fill="#A0558A"/>
-<text x="325.5" y="647.4" font-size="16.1" fill="#55565F">28.8 %</text>
+<text x="208" y="561.7" font-size="16.1" fill="#2F6108" font-weight="700">0.6%</text>
+<rect x="199.9" y="572.5" width="16.9" height="24" fill="#0072B2"/>
+<text x="222.6" y="590.3" font-size="16.1" fill="#55565F">4.0%</text>
+<rect x="199.9" y="601" width="53.8" height="24" fill="#C84E00"/>
+<text x="259.4" y="618.8" font-size="16.1" fill="#55565F">12.8%</text>
+<rect x="199.9" y="629.6" width="121.5" height="24" fill="#A0558A"/>
+<text x="327.1" y="647.4" font-size="16.1" fill="#55565F">28.8%</text>
 <rect x="199.9" y="690.4" width="3.3" height="24" fill="#3D7A0C"/>
-<text x="208.9" y="708.2" font-size="16.1" fill="#2F6108" font-weight="700">0.8 %</text>
-<rect x="199.9" y="718.9" width="18.2" height="24" fill="#0072B2"/>
-<text x="223.8" y="736.7" font-size="16.1" fill="#55565F">4.4 %</text>
-<rect x="199.9" y="747.5" width="151.7" height="24" fill="#C84E00"/>
-<text x="357.4" y="765.3" font-size="16.1" fill="#55565F">36.5 %</text>
-<rect x="199.9" y="776.1" width="315" height="24" fill="#A0558A"/>
-<text x="520.6" y="793.9" font-size="16.1" fill="#55565F">75.8 %</text>
-<rect x="199.9" y="836.8" width="79.2" height="24" fill="#3D7A0C"/>
-<text x="284.9" y="854.6" font-size="16.1" fill="#2F6108" font-weight="700">19.1 %</text>
-<rect x="199.9" y="865.4" width="114.9" height="24" fill="#0072B2"/>
-<text x="320.6" y="883.2" font-size="16.1" fill="#55565F">27.7 %</text>
-<rect x="199.9" y="894" width="77.9" height="24" fill="#C84E00"/>
-<text x="283.6" y="911.8" font-size="16.1" fill="#55565F">18.8 %</text>
-<rect x="199.9" y="922.5" width="246.5" height="24" fill="#A0558A"/>
-<text x="452.2" y="940.3" font-size="16.1" fill="#55565F">59.3 %</text>
+<text x="209" y="708.2" font-size="16.1" fill="#2F6108" font-weight="700">0.8%</text>
+<rect x="199.9" y="718.9" width="18.4" height="24" fill="#0072B2"/>
+<text x="224.1" y="736.7" font-size="16.1" fill="#55565F">4.4%</text>
+<rect x="199.9" y="747.5" width="153.8" height="24" fill="#C84E00"/>
+<text x="359.4" y="765.3" font-size="16.1" fill="#55565F">36.5%</text>
+<rect x="199.9" y="776.1" width="319.2" height="24" fill="#A0558A"/>
+<text x="524.9" y="793.9" font-size="16.1" fill="#55565F">75.8%</text>
+<rect x="199.9" y="836.8" width="80.3" height="24" fill="#3D7A0C"/>
+<text x="286" y="854.6" font-size="16.1" fill="#2F6108" font-weight="700">19.1%</text>
+<rect x="199.9" y="865.4" width="116.5" height="24" fill="#0072B2"/>
+<text x="322.1" y="883.2" font-size="16.1" fill="#55565F">27.7%</text>
+<rect x="199.9" y="894" width="79" height="24" fill="#C84E00"/>
+<text x="284.6" y="911.8" font-size="16.1" fill="#55565F">18.8%</text>
+<rect x="199.9" y="922.5" width="249.9" height="24" fill="#A0558A"/>
+<text x="455.5" y="940.3" font-size="16.1" fill="#55565F">59.3%</text>
 <text x="629.1" y="211.6" font-size="19.9" fill="#16171B" font-weight="700">Over-masking</text>
 <line x1="629.1" y1="233" x2="629.1" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
 <text x="629.1" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">0%</text>
-<line x1="712.2" y1="233" x2="712.2" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="712.2" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">20%</text>
-<line x1="795.3" y1="233" x2="795.3" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="795.3" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">40%</text>
-<line x1="878.4" y1="233" x2="878.4" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="878.4" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">60%</text>
-<line x1="961.5" y1="233" x2="961.5" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
-<text x="961.5" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">80%</text>
-<rect x="629.1" y="251" width="5.5" height="24" fill="#3D7A0C"/>
-<text x="640.3" y="268.8" font-size="16.1" fill="#2F6108" font-weight="700">1.3 %</text>
-<rect x="629.1" y="279.5" width="106.7" height="24" fill="#0072B2"/>
-<text x="741.5" y="297.3" font-size="16.1" fill="#55565F">25.7 %</text>
-<rect x="629.1" y="308.1" width="108.5" height="24" fill="#C84E00"/>
-<text x="743.3" y="325.9" font-size="16.1" fill="#55565F">26.1 %</text>
-<rect x="629.1" y="336.6" width="139.9" height="24" fill="#A0558A"/>
-<text x="774.7" y="354.4" font-size="16.1" fill="#55565F">33.7 %</text>
+<line x1="713.3" y1="233" x2="713.3" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="713.3" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">20%</text>
+<line x1="797.6" y1="233" x2="797.6" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="797.6" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">40%</text>
+<line x1="881.8" y1="233" x2="881.8" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="881.8" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">60%</text>
+<line x1="966.1" y1="233" x2="966.1" y2="969.3" stroke="#E3E4E9" stroke-width="1.5"/>
+<text x="966.1" y="990.2" font-size="14.5" fill="#55565F" text-anchor="middle">80%</text>
+<rect x="629.1" y="251" width="5.6" height="24" fill="#3D7A0C"/>
+<text x="640.3" y="268.8" font-size="16.1" fill="#2F6108" font-weight="700">1.3%</text>
+<rect x="629.1" y="279.5" width="108.2" height="24" fill="#0072B2"/>
+<text x="742.9" y="297.3" font-size="16.1" fill="#55565F">25.7%</text>
+<rect x="629.1" y="308.1" width="110" height="24" fill="#C84E00"/>
+<text x="744.8" y="325.9" font-size="16.1" fill="#55565F">26.1%</text>
+<rect x="629.1" y="336.6" width="141.8" height="24" fill="#A0558A"/>
+<text x="776.6" y="354.4" font-size="16.1" fill="#55565F">33.7%</text>
 <rect x="629.1" y="397.4" width="3.1" height="24" fill="#3D7A0C"/>
-<text x="637.8" y="415.2" font-size="16.1" fill="#2F6108" font-weight="700">0.7 %</text>
-<rect x="629.1" y="426" width="146.4" height="24" fill="#0072B2"/>
-<text x="781.2" y="443.8" font-size="16.1" fill="#55565F">35.2 %</text>
-<rect x="629.1" y="454.6" width="139" height="24" fill="#C84E00"/>
-<text x="773.7" y="472.3" font-size="16.1" fill="#55565F">33.4 %</text>
-<rect x="629.1" y="483.1" width="70.3" height="24" fill="#A0558A"/>
-<text x="705.1" y="500.9" font-size="16.1" fill="#55565F">16.9 %</text>
-<rect x="629.1" y="543.9" width="6.3" height="24" fill="#3D7A0C"/>
-<text x="641" y="561.7" font-size="16.1" fill="#2F6108" font-weight="700">1.5 %</text>
-<rect x="629.1" y="572.5" width="23.4" height="24" fill="#0072B2"/>
-<text x="658.2" y="590.3" font-size="16.1" fill="#55565F">5.6 %</text>
-<rect x="629.1" y="601" width="132.9" height="24" fill="#C84E00"/>
-<text x="767.7" y="618.8" font-size="16.1" fill="#55565F">32.0 %</text>
-<rect x="629.1" y="629.6" width="2.6" height="24" fill="#A0558A"/>
-<text x="637.4" y="647.4" font-size="16.1" fill="#55565F">0.6 %</text>
-<rect x="629.1" y="690.4" width="30.3" height="24" fill="#3D7A0C"/>
-<text x="665.1" y="708.2" font-size="16.1" fill="#2F6108" font-weight="700">7.3 %</text>
-<rect x="629.1" y="718.9" width="246.1" height="24" fill="#0072B2"/>
-<text x="880.8" y="736.7" font-size="16.1" fill="#55565F">59.2 %</text>
-<rect x="629.1" y="747.5" width="218" height="24" fill="#C84E00"/>
-<text x="852.8" y="765.3" font-size="16.1" fill="#55565F">52.5 %</text>
-<rect x="629.1" y="776.1" width="275.9" height="24" fill="#A0558A"/>
-<text x="910.7" y="793.9" font-size="16.1" fill="#55565F">66.4 %</text>
-<rect x="629.1" y="836.8" width="101.3" height="24" fill="#3D7A0C"/>
-<text x="736.1" y="854.6" font-size="16.1" fill="#2F6108" font-weight="700">24.4 %</text>
-<rect x="629.1" y="865.4" width="193.1" height="24" fill="#0072B2"/>
-<text x="827.9" y="883.2" font-size="16.1" fill="#55565F">46.5 %</text>
-<rect x="629.1" y="894" width="313.4" height="24" fill="#C84E00"/>
-<text x="948.2" y="911.8" font-size="16.1" fill="#55565F">75.4 %</text>
-<rect x="629.1" y="922.5" width="70.4" height="24" fill="#A0558A"/>
-<text x="705.2" y="940.3" font-size="16.1" fill="#55565F">17.0 %</text>
+<text x="637.9" y="415.2" font-size="16.1" fill="#2F6108" font-weight="700">0.7%</text>
+<rect x="629.1" y="426" width="148.4" height="24" fill="#0072B2"/>
+<text x="783.2" y="443.8" font-size="16.1" fill="#55565F">35.2%</text>
+<rect x="629.1" y="454.6" width="140.9" height="24" fill="#C84E00"/>
+<text x="775.6" y="472.3" font-size="16.1" fill="#55565F">33.4%</text>
+<rect x="629.1" y="483.1" width="71.3" height="24" fill="#A0558A"/>
+<text x="706" y="500.9" font-size="16.1" fill="#55565F">16.9%</text>
+<rect x="629.1" y="543.9" width="6.4" height="24" fill="#3D7A0C"/>
+<text x="641.1" y="561.7" font-size="16.1" fill="#2F6108" font-weight="700">1.5%</text>
+<rect x="629.1" y="572.5" width="23.7" height="24" fill="#0072B2"/>
+<text x="658.5" y="590.3" font-size="16.1" fill="#55565F">5.6%</text>
+<rect x="629.1" y="601" width="134.8" height="24" fill="#C84E00"/>
+<text x="769.5" y="618.8" font-size="16.1" fill="#55565F">32.0%</text>
+<rect x="629.1" y="629.6" width="2.7" height="24" fill="#A0558A"/>
+<text x="637.4" y="647.4" font-size="16.1" fill="#55565F">0.6%</text>
+<rect x="629.1" y="690.4" width="30.7" height="24" fill="#3D7A0C"/>
+<text x="665.5" y="708.2" font-size="16.1" fill="#2F6108" font-weight="700">7.3%</text>
+<rect x="629.1" y="718.9" width="249.4" height="24" fill="#0072B2"/>
+<text x="884.2" y="736.7" font-size="16.1" fill="#55565F">59.2%</text>
+<rect x="629.1" y="747.5" width="221" height="24" fill="#C84E00"/>
+<text x="855.7" y="765.3" font-size="16.1" fill="#55565F">52.5%</text>
+<rect x="629.1" y="776.1" width="279.7" height="24" fill="#A0558A"/>
+<text x="914.4" y="793.9" font-size="16.1" fill="#55565F">66.4%</text>
+<rect x="629.1" y="836.8" width="102.7" height="24" fill="#3D7A0C"/>
+<text x="737.5" y="854.6" font-size="16.1" fill="#2F6108" font-weight="700">24.4%</text>
+<rect x="629.1" y="865.4" width="195.7" height="24" fill="#0072B2"/>
+<text x="830.5" y="883.2" font-size="16.1" fill="#55565F">46.5%</text>
+<rect x="629.1" y="894" width="317.7" height="24" fill="#C84E00"/>
+<text x="952.5" y="911.8" font-size="16.1" fill="#55565F">75.4%</text>
+<rect x="629.1" y="922.5" width="71.4" height="24" fill="#A0558A"/>
+<text x="706.2" y="940.3" font-size="16.1" fill="#55565F">17.0%</text>
 <text x="56" y="265" font-size="18.1" fill="#16171B" font-weight="700">Hand-written</text>
 <text x="56" y="286.7" font-size="15.4" fill="#55565F">62 docs</text>
 <text x="56" y="304.8" font-size="15.4" fill="#55565F">de, en, hu, pl</text>
