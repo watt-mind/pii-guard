@@ -143,3 +143,71 @@ def test_the_leak_property_catches_an_unmasked_inflected_form(
     with pytest.raises(AssertionError, match="left unmasked"):
         leak_check("fi", "Anna", "Annas", "Anna: Annas .")  # fi: no pack, exact matching
     leak_check("de", "Anna", "Annas", "Anna: Annas .")  # the de pack's genitive matcher
+
+
+# --- Synthetic corpus part (LAB-1143) ---------------------------------------------------------
+
+
+def _corpus_pack(**kwargs: object) -> LanguagePack:
+    return LanguagePack(
+        code="zz",
+        name="Zedish",
+        prompt=GOOD_PROMPT,
+        smoke_fixtures=("zz-a.jsonl",),
+        **kwargs,  # type: ignore[arg-type]
+    )
+
+
+def _corpus_findings(pack: LanguagePack) -> list[str]:
+    return [
+        f"{f.severity}: {f.message}" for f in check_structure(pack) if f.check == "structure.corpus"
+    ]
+
+
+def test_a_pack_without_a_corpus_reports_the_smoke_set_fallback() -> None:
+    assert _corpus_findings(_corpus_pack()) == [
+        "info: no synthetic corpus: the language is measured on its smoke set only"
+    ]
+
+
+def test_a_corpus_needs_both_generator_and_templates() -> None:
+    from pii_guard.languages.de.identities import GermanIdentities
+
+    only_generator = _corpus_findings(_corpus_pack(identity_generator=GermanIdentities))
+    assert only_generator == ["error: identity_generator without corpus_templates: add both"]
+    templates = files("pii_guard.languages.de").joinpath("corpus.toml")
+    only_templates = _corpus_findings(_corpus_pack(corpus_templates=templates))
+    assert only_templates == ["error: corpus_templates without identity_generator: add both"]
+
+
+def test_corpus_templates_must_match_the_generator(tmp_path: Path) -> None:
+    from pii_guard.languages.de.identities import GermanIdentities
+
+    bad = tmp_path / "corpus.toml"
+    bad.write_text(
+        'language = "zz"\nlanguage_name = "Zedish"\ninflection_rule = "none"\n'
+        "[field_labels]\n"
+        '[[kinds]]\nid = "x"\ntitle = "X"\nbrief = "b"\nregister = "r"\nlength = "1-2"\n'
+        'parties = [{ role = "a", label = "A", kind = "person", fields = ["name", "taj"] }]\n',
+        encoding="utf-8",
+    )
+    found = "\n".join(
+        _corpus_findings(_corpus_pack(identity_generator=GermanIdentities, corpus_templates=bad))
+    )
+    assert "kind 'x', party 'a': the generator's person has no field 'taj'" in found
+    assert "field 'name' has no entry in [field_labels]" in found
+
+    not_a_generator = _corpus_findings(
+        _corpus_pack(identity_generator=lambda rng: object(), corpus_templates=bad)
+    )
+    assert any("not an IdentityGenerator" in m for m in not_a_generator)
+
+
+def test_corpus_templates_must_declare_the_pack_language(tmp_path: Path) -> None:
+    from pii_guard.languages.de.identities import GermanIdentities
+
+    templates = files("pii_guard.languages.de").joinpath("corpus.toml")
+    found = _corpus_findings(
+        _corpus_pack(identity_generator=GermanIdentities, corpus_templates=templates)
+    )
+    assert found == ["error: corpus_templates declare language 'de', expected 'zz'"]

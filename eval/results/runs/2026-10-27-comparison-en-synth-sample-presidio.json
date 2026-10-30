@@ -23,6 +23,7 @@
   },
   "system": {
     "family": "comparison",
+    "role": "tool",
     "tool": "presidio",
     "version": "2.2.365",
     "label": "Presidio",

@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -18,6 +19,7 @@ from starlette.requests import Request
 
 import pii_guard.api.routes._common as common
 import pii_guard.gateway.stream as stream_module
+from pii_guard.config import Settings
 from pii_guard.gateway import GatewayConfig
 from pii_guard.gateway.stream import SseRestorer, iter_sse_data
 from pii_guard.types import Span
@@ -232,9 +234,10 @@ def test_unmasker_count_is_capped(monkeypatch: Any) -> None:
         restorer.process(json.dumps(chunk))
 
 
-def test_body_read_has_a_time_deadline(monkeypatch: Any) -> None:
-    monkeypatch.setattr(common, "BODY_READ_TIMEOUT_SECONDS", 0.05)
-    scope = {"type": "http", "method": "POST", "headers": []}
+def test_body_read_has_a_time_deadline() -> None:
+    # The deadline comes from Settings.body_read_timeout (PII_GUARD_BODY_READ_TIMEOUT, LAB-1581).
+    app = SimpleNamespace(state=SimpleNamespace(settings=Settings(body_read_timeout=0.05)))
+    scope = {"type": "http", "method": "POST", "headers": [], "app": app}
 
     async def slow_receive() -> dict[str, Any]:
         await asyncio.sleep(5)
@@ -243,6 +246,17 @@ def test_body_read_has_a_time_deadline(monkeypatch: Any) -> None:
     request = Request(scope, slow_receive)
     with pytest.raises(common.BodyReadTimeoutError):
         asyncio.run(common._read_body_capped(request, 10**6))
+
+
+def test_body_read_deadline_defaults_without_app_settings() -> None:
+    request = Request({"type": "http", "method": "POST", "headers": []})
+    assert common.body_read_timeout(request) == common.BODY_READ_TIMEOUT_SECONDS == 30.0
+    assert Settings().body_read_timeout == 30.0
+
+
+def test_body_read_deadline_reads_the_env_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PII_GUARD_BODY_READ_TIMEOUT", "90")
+    assert Settings().body_read_timeout == 90.0
 
 
 def test_ensure_connected_refuses_a_gone_client() -> None:

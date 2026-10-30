@@ -1,0 +1,129 @@
+/* Hallmark · genre: modern-minimal · macrostructure: reference workbench
+ * design-system: ui/DESIGN.md · tone: calm, precise · anchor hue: plum
+ * Hallmark · pre-emit critique: P5 H4 E4 S5 R5 V4 */
+/* Scalar on the house tokens (LAB-1586).
+ *
+ * The hosted CSP allows styles from this origin only (no 'unsafe-inline'), and Scalar injects
+ * its base theme as a <style> element, which the browser refuses. So every variable the base
+ * theme would set is set here, from a stylesheet file, on the page's wrapper: the reference
+ * inherits it whether or not the injected theme applies. The house tokens switch with html.dark,
+ * so the reference follows the page's theme. */
+.pii-guard-api,
+.pii-guard-api .light-mode,
+.pii-guard-api .dark-mode {
+  --scalar-custom-header-height: 3.75rem;
+  --scalar-sidebar-width: 232px;
+  --scalar-content-max-width: 1048px;
+  --scalar-heading-1: 24px;
+  --scalar-heading-2: 20px;
+  --scalar-bold: 500;
+  --scalar-font: var(--font-sans);
+  --scalar-font-code: var(--font-mono);
+  --scalar-text-decoration: underline;
+  --scalar-text-decoration-hover: underline;
+  --scalar-radius: 4px;
+  --scalar-radius-lg: 6px;
+  --scalar-radius-xl: 8px;
+
+  --scalar-background-1: var(--canvas);
+  --scalar-background-2: var(--surface);
+  --scalar-background-3: var(--surface-2);
+  --scalar-background-accent: var(--accent-soft);
+  --scalar-color-1: var(--ink);
+  --scalar-color-2: var(--muted);
+  --scalar-color-3: var(--faint);
+  --scalar-color-accent: var(--accent-ink);
+  --scalar-border-color: var(--line);
+
+  --scalar-color-green: var(--guard-ink);
+  --scalar-color-red: var(--danger);
+  --scalar-color-orange: var(--warn);
+  --scalar-color-yellow: var(--warn);
+  --scalar-color-blue: #1f5fa8;
+  --scalar-color-purple: #6a3db8;
+  --scalar-color-query: var(--guard-ink);
+
+  --scalar-link-color: var(--ink);
+  --scalar-link-color-hover: var(--ink);
+  --scalar-button-1: var(--primary);
+  --scalar-button-1-hover: var(--primary-hover);
+  --scalar-button-1-color: var(--on-primary);
+  --scalar-tooltip-background: color-mix(in srgb, var(--ink), transparent 5%);
+  --scalar-tooltip-color: var(--canvas);
+  --scalar-color-alert: var(--warn);
+  --scalar-color-danger: var(--danger);
+  --scalar-background-alert: color-mix(in srgb, var(--warn), var(--canvas) 92%);
+  --scalar-background-danger: color-mix(in srgb, var(--danger), var(--canvas) 92%);
+
+  --scalar-sidebar-background-1: var(--canvas);
+  --scalar-sidebar-color-1: var(--ink);
+  --scalar-sidebar-color-2: var(--muted);
+  --scalar-sidebar-border-color: var(--line);
+  --scalar-sidebar-item-hover-background: var(--surface-2);
+  --scalar-sidebar-item-hover-color: var(--ink);
+  --scalar-sidebar-item-active-background: var(--accent-soft);
+  --scalar-sidebar-color-active: var(--accent-ink);
+  --scalar-sidebar-indent-border: var(--line);
+  --scalar-sidebar-indent-border-hover: var(--line-strong);
+  --scalar-sidebar-indent-border-active: var(--accent);
+  --scalar-sidebar-search-background: var(--surface);
+  --scalar-sidebar-search-color: var(--faint);
+  --scalar-sidebar-search-border-color: var(--line);
+}
+
+:root.dark .pii-guard-api,
+:root.dark .pii-guard-api .light-mode,
+:root.dark .pii-guard-api .dark-mode {
+  --scalar-color-blue: #7cb7f0;
+  --scalar-color-purple: #b79cf5;
+}
+
+@media (min-width: 1024px) {
+  .pii-guard-api,
+  .pii-guard-api .light-mode,
+  .pii-guard-api .dark-mode {
+    --scalar-custom-header-height: 3.25rem;
+  }
+}
+
+/* Keep the renderer in the same content rail as the public pages. Only its stable,
+ * unscoped classes are used; generated Vue attributes are deliberately avoided. */
+.pii-guard-api .references-rendered {
+  background: var(--surface);
+}
+
+.pii-guard-api .section-container {
+  padding-inline: 32px;
+}
+
+.pii-guard-api .section {
+  padding-block: 40px;
+}
+
+.pii-guard-api .section-columns {
+  gap: 32px;
+}
+
+.pii-guard-api .section-header {
+  letter-spacing: -0.025em;
+}
+
+.pii-guard-api .introduction-description a {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 999px) {
+  .pii-guard-api .section-container {
+    padding-inline: 0;
+  }
+
+  .pii-guard-api .section {
+    padding: 32px 24px;
+  }
+}
+
+@media (max-width: 479px) {
+  .pii-guard-api .section {
+    padding-inline: 16px;
+  }
+}

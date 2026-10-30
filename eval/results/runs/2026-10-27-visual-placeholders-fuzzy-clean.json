@@ -22,6 +22,7 @@
     "key": "visual-labels:fuzzy",
     "label": "pii-guard image placeholders (fuzzy matching)",
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": null,
     "detectors": [

@@ -384,7 +384,10 @@ class Gateway:
         self.issued_ids = IssuedIds()
         # Session id -> the VaultSession object last seen for it (LAB-1565): a different
         # object under the same id is a new incarnation (dropped/expired/rotated and
-        # re-created), so its detection-cache entries and issued-id exemptions are dropped.
+        # re-created), so its issued-id exemptions (and, eagerly, its old detection-cache
+        # entries) are dropped. Per gateway; the cache itself is keyed by incarnation
+        # (LAB-1580), so a cache shared by per-request gateways (hosted/project) starts
+        # clean too.
         self._session_incarnations: OrderedDict[str, weakref.ref[VaultSession]] = OrderedDict()
 
     def __repr__(self) -> str:
@@ -688,7 +691,13 @@ class Gateway:
             if not any(ch.isalnum() for ch in slot.text):
                 results[index] = []
                 continue
-            key = self.cache.key(session.session_id, language, detector.config_id, slot.text)
+            key = self.cache.key(
+                session.session_id,
+                language,
+                detector.config_id,
+                slot.text,
+                session.incarnation,
+            )
             cached = self.cache.get(key, slot.text)
             if cached is not None:
                 stats.cache_hits += 1
@@ -872,7 +881,9 @@ class Gateway:
         """
         for text, spans in restored.values():
             if text and any(ch.isalnum() for ch in text):
-                key = self.cache.key(session.session_id, language, detector.config_id, text)
+                key = self.cache.key(
+                    session.session_id, language, detector.config_id, text, session.incarnation
+                )
                 self.cache.put(key, spans)
                 stats.seeded += 1
 
@@ -1175,12 +1186,18 @@ class Gateway:
 
         def answer_event() -> bytes:
             content = restorer.masked_content()
+            # A choice past the retention cap has no copy; mark it rather than omit it, so
+            # a truncated echo is not mistaken for a short answer (LAB-1581).
+            truncated = restorer.masked_truncated()
+            choices = [
+                {"index": i, "content": None, "truncated": True}
+                if i in truncated
+                else {"index": i, "content": content[i]}
+                for i in sorted({*content, *truncated})
+            ]
             return sse_event(
                 json.dumps(
-                    {
-                        "object": "pii_guard.masked_answer",
-                        "choices": [{"index": i, "content": content[i]} for i in sorted(content)],
-                    },
+                    {"object": "pii_guard.masked_answer", "choices": choices},
                     ensure_ascii=False,
                 )
             )
