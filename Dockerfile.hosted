@@ -23,7 +23,7 @@ RUN mkdir -p /app/models && PYTHONPATH=/app/pin .venv/bin/python -c "import shut
 FROM ner-model AS python-build
 COPY src ./src
 COPY eval/results ./eval/results
-COPY docs/benchmarks/config.json ./docs/benchmarks/config.json
+COPY docs/benchmarks/config.json docs/benchmarks/colours.json ./docs/benchmarks/
 # Installs only the project (the dependencies are already synced) and byte-compiles only its own
 # package, so no dependency file is rewritten. venv_layer.py then copies what the install added
 # to the venv into /app/venv-project, and fails if the install removed anything.

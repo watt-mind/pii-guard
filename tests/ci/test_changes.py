@@ -57,7 +57,14 @@ NONE = dict.fromkeys(ALL, False)
             "docs/benchmarks/config.json",
             {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True},
         ),
-        ("docs/benchmarks/colours.json", {**NONE, "ui": True, "wheel": True, "hosted": True}),
+        (
+            "docs/benchmarks/colours.json",
+            {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True},
+        ),
+        (
+            "docs/openapi.json",
+            {**NONE, "ui": True, "wheel": True, "hosted": True, "hosted-image": True},
+        ),
     ],
 )
 def test_packaging_inputs(path: str, jobs: dict[str, bool]) -> None:
@@ -77,6 +84,8 @@ def test_hosted_image_always_implies_hosted() -> None:
         "ui/src/App.tsx",
         "eval/results/runs/run.json",
         "docs/benchmarks/config.json",
+        "docs/benchmarks/colours.json",
+        "docs/openapi.json",
         "Dockerfile.hosted",
         "deploy/azure/entrypoint.py",
     ):

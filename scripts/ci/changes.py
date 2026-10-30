@@ -52,12 +52,12 @@ def classify(paths: Iterable[str]) -> dict[str, bool]:
         elif (
             path.startswith("ui/")
             or path.startswith("eval/results/")
-            or path == "docs/benchmarks/config.json"
+            or path in {"docs/benchmarks/config.json", "docs/benchmarks/colours.json", "docs/openapi.json"}
         ):
             selected.update(("ui", "wheel", "hosted", "hosted-image"))
         elif path.startswith(BENCHMARK_PREFIXES):
-            # Dataset counts/colours feed the runner-side report and UI, but Dockerfile.hosted
-            # copies only eval/results and docs/benchmarks/config.json (handled above).
+            # Dataset counts feed the runner-side report and UI, while Dockerfile.hosted copies
+            # eval/results, docs/benchmarks/config.json and docs/benchmarks/colours.json (above).
             selected.update(("ui", "wheel", "hosted"))
         elif path == ".dockerignore":
             selected.update(("docker", "hosted", "hosted-image"))
