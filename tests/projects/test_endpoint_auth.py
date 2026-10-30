@@ -475,9 +475,15 @@ def _basic(credential: str, *, urlsafe: bool = False) -> str:
 def test_encoded_or_punctuation_joined_token_is_accepted_and_never_forwarded(
     gateway, authorization, with_header
 ):
+    # Stripped in every shape; only exact field equality authenticates, so alone it is 401.
     client, _, _, sent = gateway
     headers = {"Authorization": authorization, **(OWNER if with_header else {})}
     result = _plain_chat(client, headers)
+    if not with_header:
+        assert result.status_code == 401, result.text
+        assert not sent
+        assert API_TOKEN not in result.text
+        return
     assert result.status_code == 200, result.text
     assert len(sent) == 1
     assert "authorization" not in sent[0].headers
@@ -539,14 +545,15 @@ def test_byok_credentials_resembling_the_token_are_forwarded_untouched(gateway, 
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (b"Basic " + _basic("u:" + API_TOKEN).encode(), (True, True)),
-        (b"k:" + API_TOKEN.encode(), (True, True)),
+        (b"Bearer " + API_TOKEN.encode(), (True, True)),
+        (b"Basic " + _basic("u:" + API_TOKEN).encode(), (True, False)),
+        (b"k:" + API_TOKEN.encode(), (True, False)),
         (API_TOKEN.encode() + b"9", (True, False)),
         (b"Basic " + _basic("u:other").encode(), (False, False)),
         (b"Basic !!not-base64!!", (False, False)),
         (b"", (False, False)),
     ],
-    ids=["basic", "colon", "glued", "basic-other", "invalid-base64", "empty"],
+    ids=["bearer", "basic", "colon", "glued", "basic-other", "invalid-base64", "empty"],
 )
 def test_carries_token_reports_strip_and_authenticate(value, expected):
     middleware = BearerTokenMiddleware(lambda *_: None, API_TOKEN)  # type: ignore[arg-type]
@@ -571,3 +578,36 @@ def test_x_api_key_follows_the_same_shapes(value, stripped):
     assert status == 200
     assert seen is not None
     assert ((b"x-api-key", value) not in seen) is stripped
+
+
+@pytest.mark.parametrize("value_first", [False, True], ids=["token-first", "oversized-first"])
+def test_credential_headers_past_the_scan_cap_are_stripped_unauthenticated(value_first):
+    import anyio
+
+    oversized = (b"authorization", b"Bearer " + API_TOKEN.encode() + b" " + b"0" * 9000)
+    bearer = (b"x-api-key", API_TOKEN.encode())
+    # Alone, an oversized header never authenticates, even with the token as a field.
+    status, seen = anyio.run(_through_middleware, "/v1/chat/completions", [oversized])
+    assert status == 401
+    assert seen is None
+    # With the X header: stripped unscanned. Past the cap, later headers are stripped too.
+    raw = [oversized, bearer] if value_first else [bearer, oversized]
+    raw.append((b"x-pii-guard-token", API_TOKEN.encode()))
+    status, seen = anyio.run(_through_middleware, "/v1/chat/completions", raw)
+    assert status == 200
+    assert seen is not None
+    assert all(name not in (b"authorization", b"x-api-key") for name, _ in seen)
+
+
+def test_byok_header_after_the_cap_is_stripped():
+    import anyio
+
+    raw = [
+        (b"authorization", b"Bearer " + b"0" * 9000),
+        (b"x-api-key", b"sk-client-own-key"),
+        (b"x-pii-guard-token", API_TOKEN.encode()),
+    ]
+    status, seen = anyio.run(_through_middleware, "/v1/messages", raw)
+    assert status == 200
+    assert seen is not None
+    assert all(name not in (b"authorization", b"x-api-key") for name, _ in seen)

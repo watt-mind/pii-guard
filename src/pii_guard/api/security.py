@@ -50,9 +50,9 @@ def looks_like_endpoint_key(credential: str) -> bool:
     return credential.strip().lower().startswith(ENDPOINT_KEY_PREFIX)
 
 
-# ASCII letters and digits: a token occurrence touching one of these continues a longer word.
-_TOKEN_BYTES = frozenset(b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
+# Credential-header bytes scanned for the token per request; a credential header past it is
+# stripped without authenticating (LAB-1591).
+_SCAN_BUDGET = 8 * 1024
 
 # A run of base64 characters (both alphabets) and its padding; disjoint classes, no backtracking.
 _BASE64_RUN = re.compile(rb"[A-Za-z0-9+/_-]+=*")
@@ -139,10 +139,11 @@ class BearerTokenMiddleware:
     """Require ``PII_GUARD_API_TOKEN`` on every route but ``/healthz``.
 
     The token is accepted as ``X-PII-Guard-Token: <token>`` or ``Authorization: Bearer <token>``.
-    An ``Authorization`` header carrying the token in any shape (another scheme, a tab, extra
-    padding or punctuation as separator, no scheme at all, inside an HTTP ``Basic`` credential)
-    authenticates too, and is removed from the request after the check, so the gateway never
-    forwards it upstream (LAB-1570, LAB-1591). So is an
+    An ``Authorization`` header whose whole value or one whitespace-separated field is the token
+    (another scheme, a tab or extra padding as separator, no scheme at all) authenticates too
+    (LAB-1570). Any ``Authorization`` containing the token, in any shape (punctuation-joined,
+    inside an HTTP ``Basic`` credential), is removed from the request after the check, so the
+    gateway never forwards it upstream (LAB-1591). So is an
     ``x-api-key`` carrying it (Anthropic clients, LAB-1605). Clients that bring
     their own upstream key (no ``PII_GUARD_UPSTREAM_API_KEY``) send it in ``Authorization`` and
     the token in the header.
@@ -158,42 +159,56 @@ class BearerTokenMiddleware:
     def _matches(self, value: bytes) -> bool:
         return hmac.compare_digest(value.strip(), self.token)
 
-    def _scan(self, data: bytes) -> tuple[bool, bool]:
-        """Whether the token occurs anywhere in ``data``, and whether it occurs standalone.
+    def _occurs_in(self, data: bytes) -> bool:
+        """Whether the token occurs anywhere in ``data`` (LAB-1591).
 
-        Every window of ``data`` the length of the token is compared in constant time, with no
-        early exit, so the time taken depends on the length of ``data`` only. An occurrence is
-        standalone when no ASCII letter or digit touches it on either side: ``key:<token>``,
-        ``"<token>"`` or ``token=<token>`` are standalone, ``<token>x`` is not (LAB-1591).
+        Every window of ``data`` the length of the token is compared with
+        ``hmac.compare_digest``, with no early exit, so the time taken is independent of the
+        token's value; it grows with the length of ``data``, bounded by ``_SCAN_BUDGET``.
         """
         size = len(self.token)
-        found = standalone = False
+        found = False
         for i in range(len(data) - size + 1):  # no early exit: every window is compared
-            hit = hmac.compare_digest(data[i : i + size], self.token)
-            before = i == 0 or data[i - 1] not in _TOKEN_BYTES
-            after = i + size == len(data) or data[i + size] not in _TOKEN_BYTES
-            found |= hit
-            standalone |= hit & before & after
-        return found, standalone
+            found |= hmac.compare_digest(data[i : i + size], self.token)
+        return found
+
+    def _equals_a_field(self, value: bytes) -> bool:
+        """Whether the whole value or one whitespace-separated field equals the token (LAB-1570).
+
+        The value is split on whitespace as bytes (ASCII), as Latin-1 text (how Starlette
+        decodes headers) and as UTF-8 text (Unicode spaces such as U+00A0 or U+2003), and
+        every field is compared in constant time. The whole value counts as a field too. This
+        is the only shape that authenticates.
+        """
+        whole = value.strip()
+        # The whole value, what follows a scheme (a token with inner spaces), each field.
+        fields = [whole, *whole.split(None, 1)[1:], *value.split()]
+        fields += [f.encode("latin-1") for f in value.decode("latin-1").split()]
+        fields += [
+            f.encode("utf-8", "surrogateescape")
+            for f in value.decode("utf-8", "surrogateescape").split()
+        ]
+        found = False
+        for field in fields:  # no early exit: every field is compared
+            found |= hmac.compare_digest(field, self.token)
+        return found
 
     def _carries_token(self, value: bytes) -> tuple[bool, bool]:
         """Whether a credential header carries the token: ``(strip, authenticate)``.
 
-        The raw value is scanned (LAB-1570: any scheme, any separator, whitespace or
-        punctuation; LAB-1591), and so is every run of base64 characters in it that decodes,
-        standard or URL-safe: an HTTP ``Basic`` credential such as
-        ``base64(user:<token>)`` or ``base64(<token>:)``, with or without the scheme. Any
-        occurrence strips the header, fail closed, so no spelling of the token reaches the
-        upstream provider; a standalone occurrence also authenticates. A token glued to other
-        letters or digits (``<token>x``) is stripped but does not authenticate.
+        Strip on any match, fail closed, so no spelling of the token reaches the upstream
+        provider (LAB-1591): the token anywhere in the raw value (any scheme, separator or
+        punctuation, glued to other text), or anywhere in a run of base64 characters that
+        decodes, standard or URL-safe, such as an HTTP ``Basic`` credential
+        ``base64(user:<token>)`` or ``base64(<token>:)``. Authenticate only when the whole
+        value or one whitespace-separated field equals the token (LAB-1570).
         """
-        found, standalone = self._scan(value)
-        for field in _BASE64_RUN.findall(value):
-            for decoded in _base64_decodings(field):
-                hit, alone = self._scan(decoded)
-                found |= hit
-                standalone |= alone
-        return found, standalone
+        authenticates = self._equals_a_field(value)
+        found = authenticates | self._occurs_in(value)
+        for run in _BASE64_RUN.findall(value):
+            for decoded in _base64_decodings(run):
+                found |= self._occurs_in(decoded)
+        return found, authenticates
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or scope.get("path") in _PUBLIC_PATHS:
@@ -225,10 +240,17 @@ class BearerTokenMiddleware:
         # header authenticated, so the gateway never forwards it upstream
         # (LAB-1562, LAB-1570).
         kept: list[tuple[bytes, bytes]] = []
+        budget = _SCAN_BUDGET
         for name, value in headers:
             # ``x-api-key`` too: Anthropic clients send their key there, and /v1/messages
             # passes it upstream as a "bring your own key" (LAB-1605).
             if name.lower() in (b"authorization", b"x-api-key"):
+                if len(value) > budget:
+                    # Over the per-request scan cap: never scanned, never forwarded and never
+                    # authenticating, fail closed (LAB-1591).
+                    budget = 0
+                    continue
+                budget -= len(value)
                 strip, authenticates = self._carries_token(value)
                 ok |= authenticates
                 if strip:

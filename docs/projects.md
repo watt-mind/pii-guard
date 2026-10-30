@@ -52,9 +52,10 @@ that contains the API token anywhere in its value, so the token is not forwarded
 provider as a bring-your-own key. That covers the token after any scheme or separator
 (whitespace, a tab, a non-breaking space), joined to other text by punctuation (`key:<token>`,
 `<token>,x`, `"<token>"`, `token=<token>`), and inside a base64 HTTP Basic credential
-(`user:<token>` or `<token>:`, padded or not). The token authenticates the request in those
-shapes too. Glued to other letters or digits (`<token>x`), it does not authenticate, but the
-header is still removed. A bring-your-own key that only shares part of the token is forwarded
+(`user:<token>` or `<token>:`, padded or not). Only a header whose whole value, or one
+whitespace-separated field, equals the token also authenticates the request; in the other
+shapes the header is removed and the request needs `X-PII-Guard-Token`. A credential header
+past the 8 KB per-request scan limit is removed without authenticating. A bring-your-own key that only shares part of the token is forwarded
 unchanged.
 
 ## Isolation and lifetime
