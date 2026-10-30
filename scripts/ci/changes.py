@@ -52,7 +52,12 @@ def classify(paths: Iterable[str]) -> dict[str, bool]:
         elif (
             path.startswith("ui/")
             or path.startswith("eval/results/")
-            or path in {"docs/benchmarks/config.json", "docs/benchmarks/colours.json", "docs/openapi.json"}
+            or path
+            in {
+                "docs/benchmarks/config.json",
+                "docs/benchmarks/colours.json",
+                "docs/openapi.json",
+            }
         ):
             selected.update(("ui", "wheel", "hosted", "hosted-image"))
         elif path.startswith(BENCHMARK_PREFIXES):
