@@ -11,7 +11,7 @@ import { LeakLatencyChart, type ScatterPoint } from "../screens/BenchmarksCharts
  */
 
 const system = (key: string, label: string, short: string, family: SystemInfo["family"], color: string, shape: SystemInfo["shape"], def = false): SystemInfo => ({
-  color, shape, label, short_label: short, family, tool: key, kind: "text", detectors: [], models: [], featured: true, default: def,
+  color, shape, label, short_label: short, family, role: family === "comparison" ? "tool" : "own", tool: key, kind: "text", detectors: [], models: [], featured: true, default: def,
 });
 const metrics = (leak: number, f1: number, p50: number): Metrics => ({
   documents: 51, gold: 0, pred: 0, precision: null, recall: null, f1, f1_exact: null, macro_f1: null, leak, partial_leak: null, leak_values: 0,

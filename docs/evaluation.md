@@ -175,10 +175,16 @@ Every run worth keeping becomes one **run record**: `eval/results/runs/<YYYY-MM-
 specified by the JSON Schema `eval/results/schema/run.schema.json` (`schema_version` 1) and
 validated in the tests. A record says:
 
-- **what ran**: the system (`family` `pii-guard` or comparison, `tool`, `version`), each
+- **what ran**: the system (`family` `pii-guard` or comparison, `role`, `tool`, `version`), each
   detector with its `model`, `model_ref`, `revision`, `settings` (reasoning strength, mode,
   thresholds) and `serving`, and a derived `system.key` such as `rules+ner:xlmr-base-ft-s7` or
   `rules+llm:muse-glimmer@reasoning_strength=low` that groups runs of the same configuration;
+  `role` is `own` (a PII Guard configuration), `other-model` (another organisation's model run
+  through PII Guard's pipeline, alone or in place of its NER: bardsai, tabularisai,
+  Horizon-Labs, Wismut, Davlan, GLiNER zero-shot) or `tool` (a comparison tool). It is derived
+  from the detectors' models (`pii_guard.eval.record.system_role`), so a "best PII Guard
+  configuration" never picks someone else's model; `python -m pii_guard.eval.rescore`
+  backfills it on older records;
 - **on what**: each fixture file with its SHA-256, language, fixture set (`smoke`,
   `synth-sample` …), `origin` (`hand-written`, `generated` with the generator model, or
   `specimens`) and document count;

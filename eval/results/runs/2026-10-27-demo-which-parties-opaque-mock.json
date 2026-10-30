@@ -18,6 +18,7 @@
     "key": "demo-which-parties:opaque:mock",
     "label": "pii-guard gateway, opaque images, mock upstream",
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": null,
     "detectors": [

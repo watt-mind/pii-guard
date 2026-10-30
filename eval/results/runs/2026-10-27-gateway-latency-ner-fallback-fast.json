@@ -22,6 +22,7 @@
     "key": "gateway-latency:fast:rules+ner:bardsai/eu-pii-anonimization-multilang",
     "label": "pii-guard gateway, fast mode (rules + ner bardsai/eu-pii-anonimization-multilang)",
     "family": "pii-guard",
+    "role": "other-model",
     "tool": "pii-guard",
     "version": "0.1.0",
     "detectors": [
