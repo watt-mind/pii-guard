@@ -3,7 +3,7 @@
 > **Draft for the owner to review before submitting.** Ready-to-paste text for the Meta
 > Global AI Developer Hackathon form. Every claim matches [why-pii-guard.md](why-pii-guard.md),
 > where each one links to its evidence; if a number changes there, change it here too. Status
-> as of 2026-10-28; numbers from [benchmarks.md](benchmarks.md) on `develop`.
+> as of 2026-10-30; numbers from [benchmarks.md](benchmarks.md) on `develop`.
 
 ## Tagline (≤ 140 characters)
 
@@ -14,7 +14,7 @@ An open-source privacy firewall for AI agents: reversible, grammar-aware masking
 ## Description
 
 ```text
-pii-guard sits between an application and an LLM. It finds personal data in text and images, replaces each value with a reversible placeholder that stays the same for the whole conversation, sends only the masked request on, and puts the real values back into the answer, even while it streams. It is an OpenAI-compatible proxy, so adopting it is a change of API base URL. It is built for languages where existing tools break: in Hungarian a name changes with every grammatical case, so pii-guard keeps case endings outside the placeholder and re-inflects the name on the way back. On our hand-written test set (German, English and Hungarian, 51 documents), rules alone let 41.6 % of labelled values reach the model; the default fast mode (rules + our published NER, an XLM-RoBERTa fine-tuned on Meta's Muse Glimmer labels and public data) runs on the machine at $0 in about 18 ms per document and brings that to 0.0 %. On public test sets it never trained on it leaks 0.4–0.7 % (CEE-PII, Nemotron-PII) but 19.1 % on finance text. The optional audit mode adds a second opinion from Meta's open-weight Muse Spark Open for quality checks: 0.6 % at about 1.9 s per message. Every run is a committed record, with charts checked in CI, on fictional data only. Apache-2.0.
+pii-guard sits between an application and an LLM. It finds personal data in text and images, replaces each value with a reversible placeholder that stays the same for the whole conversation, sends only the masked request on, and puts the real values back into the answer, even while it streams. It is an OpenAI-compatible proxy, so adopting it is a change of API base URL. It is built for languages where existing tools break: in Hungarian a name changes with every grammatical case, so pii-guard keeps case endings outside the placeholder and re-inflects the name on the way back. On our hand-written test set (German, English, Hungarian and Polish, 62 documents), rules alone let 40.7 % of labelled values reach the model; the default fast mode (rules + our published NER, an XLM-RoBERTa fine-tuned on Meta's Muse Glimmer labels and public data) runs on the machine at $0, the NER taking about 43 ms per message on a laptop CPU, and brings that to 0.0 %. On public test sets it never trained on it leaks 0.6–0.8 % (Nemotron-PII, CEE-PII) but 19.1 % on finance text. The optional audit mode adds a second opinion from Meta's open-weight Muse Spark Open for quality checks: 0.6 % at about 1.9 s per message (measured on the earlier 51-document version of the hand-written set). Every run is a committed record, with charts checked in CI, on fictional data only. Apache-2.0.
 ```
 
 ## How we used Meta models

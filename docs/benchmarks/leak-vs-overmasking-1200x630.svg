@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-labelledby="t d" font-family="Inter, &#x27;Helvetica Neue&#x27;, Helvetica, Arial, sans-serif">
 <title id="t">Leak vs over-masking: lower-left is better</title>
-<desc id="d">Scatter of leak rate against over-masking rate on 990 fictional agent-traffic documents; lower-left is better. PII Guard (fast, NER v4.2): leak 0.2 %, over-masking 0.7 %; PrivAiTe: leak 2.4 %, over-masking 35.2 %; Presidio: leak 16.6 %, over-masking 33.4 %; LLM Guard: leak 20.2 %, over-masking 16.9 %; PII Guard rules only: leak 38.8 %, over-masking 0.0 %.</desc>
+<desc id="d">Scatter of leak rate against over-masking rate on 990 fictional agent-traffic documents; lower-left is better. PII Guard (fast, NER v4.2): leak 0.2%, over-masking 0.7%; PrivAiTe: leak 2.4%, over-masking 35.2%; Presidio: leak 16.6%, over-masking 33.4%; LLM Guard: leak 20.2%, over-masking 16.9%; PII Guard rules only: leak 38.8%, over-masking 0.0%.</desc>
 <rect x="0" y="0" width="1200" height="630" fill="#FFFFFF"/>
 <text x="44" y="72.2" font-size="35.2" fill="#16171B" font-weight="700">Leak vs over-masking: lower-left is better</text>
 <text x="44" y="104.8" font-size="19.2" fill="#55565F">990 fictional agent-traffic documents (de, en, hu) · same documents and scorer for every tool</text>
@@ -39,13 +39,13 @@
 <polygon points="542.4,304.1 554.3,324.9 530.4,324.9" fill="#FFFFFF" stroke="#A0558A" stroke-width="3.1"/>
 <circle cx="98.4" cy="152" r="10.4" fill="#8A8B94" stroke="#FFFFFF" stroke-width="3.1"/>
 <text x="129.3" y="464.8" font-size="18.4" fill="#2F6108" font-weight="700">PII Guard (fast, NER v4.2)</text>
-<text x="129.3" y="484.3" font-size="15.2" fill="#55565F">leak 0.2 % · over-masking 0.7 %</text>
-<text x="767.2" y="445.4" font-size="18.4" fill="#16171B" font-weight="700">PrivAiTe</text>
-<text x="767.2" y="464.9" font-size="15.2" fill="#55565F">leak 2.4 % · over-masking 35.2 %</text>
-<text x="703.8" y="344.8" font-size="18.4" fill="#16171B" font-weight="700">Presidio</text>
-<text x="703.8" y="364.2" font-size="15.2" fill="#55565F">leak 16.6 % · over-masking 33.4 %</text>
-<text x="270.8" y="312.4" font-size="18.4" fill="#16171B" font-weight="700">LLM Guard</text>
-<text x="270.8" y="331.9" font-size="15.2" fill="#55565F">leak 20.2 % · over-masking 16.9 %</text>
+<text x="129.3" y="484.3" font-size="15.2" fill="#55565F">leak 0.2% · over-masking 0.7%</text>
+<text x="905.2" y="431.2" font-size="18.4" fill="#16171B" font-weight="700">PrivAiTe</text>
+<text x="905.2" y="450.7" font-size="15.2" fill="#55565F">leak 2.4% · over-masking 35.2%</text>
+<text x="712.3" y="344.8" font-size="18.4" fill="#16171B" font-weight="700">Presidio</text>
+<text x="712.3" y="364.2" font-size="15.2" fill="#55565F">leak 16.6% · over-masking 33.4%</text>
+<text x="279.3" y="312.4" font-size="18.4" fill="#16171B" font-weight="700">LLM Guard</text>
+<text x="279.3" y="331.9" font-size="15.2" fill="#55565F">leak 20.2% · over-masking 16.9%</text>
 <text x="119.2" y="147.8" font-size="18.4" fill="#16171B" font-weight="700">PII Guard rules only</text>
-<text x="119.2" y="167.3" font-size="15.2" fill="#55565F">leak 38.8 % · over-masking 0.0 %</text>
+<text x="119.2" y="167.3" font-size="15.2" fill="#55565F">leak 38.8% · over-masking 0.0%</text>
 </svg>

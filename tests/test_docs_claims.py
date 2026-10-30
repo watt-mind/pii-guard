@@ -1,6 +1,6 @@
 """Every piece of evidence the differentiator docs cite exists in the repository (LAB-1165).
 
-`docs/why-pii-guard.md`, `docs/submission.md` and the README's "Why pii-guard" section back
+`docs/why-pii-guard.md`, `docs/submission.md` and the README back
 each claim with a link to a committed file. This test fails when a linked file or a linked
 heading goes away, so a claim can't silently lose its evidence.
 """
@@ -59,8 +59,8 @@ def test_cited_files_and_headings_exist(doc: str) -> None:
 
 def test_readme_links_the_differentiators_page() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "## Why PII Guard" in readme
-    assert "docs/why-pii-guard.md" in readme
+    # LAB-1683 dissolved the README's "Why PII Guard" section; the link to the page stays.
+    assert "](docs/why-pii-guard.md)" in readme
     assert "why-pii-guard.md" in (ROOT / "docs/INDEX.md").read_text(encoding="utf-8")
 
 
