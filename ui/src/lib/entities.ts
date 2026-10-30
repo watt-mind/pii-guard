@@ -183,7 +183,7 @@ export const UNKNOWN_META: EntityMeta = withClasses({
   group: "identifier",
 });
 
-export function groupOf(type: EntityType | null | undefined) {
+export function groupOf(type: EntityType | string | null | undefined) {
   const id = metaFor(type).group;
   return ENTITY_GROUPS.find((g) => g.id === id)!;
 }
@@ -209,8 +209,8 @@ export function subtypeLabel(subtype: string | null | undefined): string | null 
   return SUBTYPE_LABEL[subtype] ?? subtype.replace(/_/g, " ");
 }
 
-export function metaFor(type: EntityType | null | undefined): EntityMeta {
-  return type ? ENTITY_META[type] : UNKNOWN_META;
+export function metaFor(type: EntityType | string | null | undefined): EntityMeta {
+  return (type && (ENTITY_META as Record<string, EntityMeta | undefined>)[type]) || UNKNOWN_META;
 }
 
 /** Rule detections of these types are validated by a checksum; other rule hits are patterns. */
@@ -257,6 +257,14 @@ export interface DetectorLabelOptions {
   model?: string;
 }
 
+const STATIC_DETECTOR_LABELS: Record<string, string> = {
+  ner: "Multilingual NER",
+  known: "Known value (pre-loaded)",
+  demo: "Demo rules (in browser)",
+  captions: "Field captions",
+  mrz: "Machine-readable zone",
+};
+
 /** Label a detector by what actually ran, never by what it might be. */
 export function detectorLabel(detector: string, options: DetectorLabelOptions = {}): string {
   if (detector === "rules") {
@@ -264,10 +272,5 @@ export function detectorLabel(detector: string, options: DetectorLabelOptions = 
     return types.some((t) => CHECKSUM_TYPES.has(t)) ? "Rules + checksum" : "Rules";
   }
   if (detector === "llm") return options.model ? modelLabel(options.model) : "LLM detector";
-  if (detector === "ner") return "Multilingual NER";
-  if (detector === "known") return "Known value (pre-loaded)";
-  if (detector === "demo") return "Demo rules (in browser)";
-  if (detector === "captions") return "Field captions";
-  if (detector === "mrz") return "Machine-readable zone";
-  return detector;
+  return STATIC_DETECTOR_LABELS[detector] ?? detector;
 }

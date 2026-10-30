@@ -863,7 +863,7 @@ def _datasets_section(counts: Sequence[Mapping[str, Any]]) -> str:
     return render_section(counts, order)
 
 
-def current_index(root: Path = Path(".")) -> dict[str, Any]:
+def current_index(root: Path = Path()) -> dict[str, Any]:
     """The index of the repository at ``root``, as ``pii-guard eval report`` builds it."""
     index_path = root / DEFAULT_INDEX
     outputs = build_outputs(

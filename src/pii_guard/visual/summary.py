@@ -172,7 +172,7 @@ def build_summary(
         summary.issuing_country = mrz.issuing_state or None
     expires = _expiry_date(caption_fields, mrz)
     if expires is not None:
-        summary.expired = expires < (today or dt.date.today())
+        summary.expired = expires < (today or dt.datetime.now(dt.UTC).date())
         if expiry == "keep":
             summary.expiry = expires.isoformat()
     return {

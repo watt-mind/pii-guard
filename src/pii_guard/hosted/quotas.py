@@ -169,6 +169,7 @@ class Reservation:
     ) -> None:
         self._ledger = ledger
         self._usage = usage
+        self._lock = threading.Lock()
         self._released = False
         self._settled = False
         self._day, self.tokens, self.spend = day, tokens, spend
@@ -180,36 +181,25 @@ class Reservation:
         reservation, or that are not nonnegative integers, refund nothing. A reservation
         from a previous day refunds only the allocation, never today's fresh counters.
         """
-        ledger = self._ledger
-        with ledger._lock:
+        with self._lock:
             if self._settled:
                 return 0, 0
             self._settled = True
-            if type(tokens) is not int or type(spend) is not int or tokens < 0 or spend < 0:
-                return 0, 0
-            refund_tokens = self.tokens - min(tokens, self.tokens)
-            refund_spend = self.spend - min(spend, self.spend)
-            try:
-                same_day = ledger._rollover() == self._day
-            except QuotaUnavailableError:
-                same_day = False
-            if same_day:
-                usage = self._usage
-                usage.tokens -= min(refund_tokens, usage.tokens)
-                ledger._tokens -= min(refund_tokens, ledger._tokens)
-                ledger._spent_today -= min(refund_spend, ledger._spent_today)
-            else:
-                refund_tokens = 0
-            ledger._spent_allocation -= min(refund_spend, ledger._spent_allocation)
-            return refund_tokens, refund_spend
+        if type(tokens) is not int or type(spend) is not int or tokens < 0 or spend < 0:
+            return 0, 0
+        refund_tokens = self.tokens - min(tokens, self.tokens)
+        refund_spend = self.spend - min(spend, self.spend)
+        return self._ledger.refund(
+            self._usage, day=self._day, refund_tokens=refund_tokens, refund_spend=refund_spend
+        )
 
     def release(self) -> None:
         """Idempotent, thread-safe concurrency release; never refunds budget."""
-        with self._ledger._lock:
-            if not self._released:
-                self._usage.active -= 1
-                self._ledger._active -= 1
-                self._released = True
+        with self._lock:
+            if self._released:
+                return
+            self._released = True
+        self._ledger.release_active(self._usage)
 
     def __enter__(self) -> Reservation:
         return self
@@ -325,6 +315,35 @@ class QuotaLedger:
     def sponsored_killed(self) -> bool:
         with self._lock:
             return self._sponsored_killed
+
+    def refund(
+        self,
+        usage: _Usage,
+        *,
+        day: int,
+        refund_tokens: int,
+        refund_spend: int,
+    ) -> tuple[int, int]:
+        """Refund settled tokens and microdollars under the ledger lock."""
+        with self._lock:
+            try:
+                same_day = self._rollover() == day
+            except QuotaUnavailableError:
+                same_day = False
+            if same_day:
+                usage.tokens -= min(refund_tokens, usage.tokens)
+                self._tokens -= min(refund_tokens, self._tokens)
+                self._spent_today -= min(refund_spend, self._spent_today)
+            else:
+                refund_tokens = 0
+            self._spent_allocation -= min(refund_spend, self._spent_allocation)
+            return refund_tokens, refund_spend
+
+    def release_active(self, usage: _Usage) -> None:
+        """Release one active concurrency slot under the ledger lock."""
+        with self._lock:
+            usage.active -= 1
+            self._active -= 1
 
     def admit(
         self,

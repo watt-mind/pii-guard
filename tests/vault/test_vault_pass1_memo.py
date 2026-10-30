@@ -16,7 +16,7 @@ from vault_helpers import span_of
 
 from pii_guard.types import Span
 from pii_guard.vault import VaultSession
-from pii_guard.vault import vault as vault_module
+from pii_guard.vault import session as session_module
 
 Turn = tuple[str, list[Span], str]
 
@@ -28,14 +28,14 @@ def _person(text: str, *values: str) -> Turn:
 def _run(
     turns: list[Turn], memo: bool, case_sensitive: bool = False
 ) -> tuple[list[str], list[str], list[tuple[str, object, int]], VaultSession]:
-    previous = vault_module._MASK_MEMO
-    vault_module._MASK_MEMO = memo
+    previous = session_module._MASK_MEMO
+    session_module._MASK_MEMO = memo
     try:
         session = _session(case_sensitive)
         masked = _requests(session, turns, len(turns))
         return masked, [session.unmask(t) for t in masked], session.entities(), session
     finally:
-        vault_module._MASK_MEMO = previous
+        session_module._MASK_MEMO = previous
 
 
 def _same_with_and_without_memo(turns: list[Turn], case_sensitive: bool = False) -> list[str]:
@@ -89,8 +89,8 @@ def test_a_weak_split_whose_lemma_is_confirmed_later_is_planned_again() -> None:
     spans = [span_of(text, "Kováccsal", "PERSON")]
     outputs = []
     for memo in (True, False):
-        previous = vault_module._MASK_MEMO
-        vault_module._MASK_MEMO = memo
+        previous = session_module._MASK_MEMO
+        session_module._MASK_MEMO = memo
         try:
             session = _session(False)
             before = session.mask(text, spans)
@@ -98,7 +98,7 @@ def test_a_weak_split_whose_lemma_is_confirmed_later_is_planned_again() -> None:
             after = session.mask(text, spans)
             outputs.append((before, after, session.entities()))
         finally:
-            vault_module._MASK_MEMO = previous
+            session_module._MASK_MEMO = previous
     assert outputs[0] == outputs[1]
     before, after, _ = outputs[0]
     assert before != after
@@ -151,8 +151,8 @@ def test_other_spans_are_another_memo_entry() -> None:
 
 
 def test_memo_is_bounded_and_forgotten(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(vault_module, "_MASK_MEMO_ENTRIES", 2)
-    monkeypatch.setattr(vault_module, "_MASK_MEMO_CHARS", 50)
+    monkeypatch.setattr(session_module, "_MASK_MEMO_ENTRIES", 2)
+    monkeypatch.setattr(session_module, "_MASK_MEMO_CHARS", 50)
     session = _session(False)
     for i in range(4):
         text = f"Teszt Elek {i}. levele."

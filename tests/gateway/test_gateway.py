@@ -826,10 +826,10 @@ def _canonical(raw: bytes) -> str:
 
 @pytest.mark.parametrize("stream", [False, True])
 def test_remask_since_changes_no_masked_body(monkeypatch: pytest.MonkeyPatch, stream: bool) -> None:
-    from pii_guard.vault import vault as vault_module
+    from pii_guard.vault import session as session_module
 
     fast = _run_late_session(stream)
-    monkeypatch.setattr(vault_module, "_REMASK_SINCE", False)
+    monkeypatch.setattr(session_module, "_REMASK_SINCE", False)
     full = _run_late_session(stream)
     fast_bodies, fast_answers, fast_scanned, entries, _ = fast
     full_bodies, full_answers, full_scanned, _, _ = full
@@ -848,10 +848,10 @@ def test_remask_since_changes_no_masked_body(monkeypatch: pytest.MonkeyPatch, st
 
 @pytest.mark.parametrize("stream", [False, True])
 def test_mask_memo_changes_no_masked_body(monkeypatch: pytest.MonkeyPatch, stream: bool) -> None:
-    from pii_guard.vault import vault as vault_module
+    from pii_guard.vault import session as session_module
 
     memo = _run_late_session(stream)
-    monkeypatch.setattr(vault_module, "_MASK_MEMO", False)
+    monkeypatch.setattr(session_module, "_MASK_MEMO", False)
     scratch = _run_late_session(stream)
     assert memo[0] == scratch[0]  # forwarded bodies, byte for byte
     assert memo[1] == scratch[1]  # restored answers

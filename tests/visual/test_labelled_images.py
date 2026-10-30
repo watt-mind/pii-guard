@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import re
 from typing import Any, ClassVar
 
 import httpx
@@ -42,7 +43,7 @@ from pii_guard.visual.labels import VaultMatcher
 from pii_guard.visual.masking import ImageMasker
 from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
 from pii_guard.visual.regions import Box, Region
-from pii_guard.visual.render import LABEL_FILL, LabelBox, render_labels
+from pii_guard.visual.render import LABEL_FILL, LABEL_INK, LabelBox, render_labels
 
 TENANT_KEY = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
 GOLD = (FICTIONAL_NAME, FICTIONAL_TAJ, FICTIONAL_TAJ.replace(" ", ""), FICTIONAL_TAX_ID)
@@ -575,6 +576,123 @@ def _name_line(text: str) -> list[OcrWord]:
     return out
 
 
+def _common_word_name_gateway(name: str) -> tuple[FastAPI, list[dict[str, Any]]]:
+    """Real gateway/image pipeline with synthetic OCR and an offline upstream."""
+    forwarded: list[dict[str, Any]] = []
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        forwarded.append(body)
+        token = PLACEHOLDER_RE.search(json.dumps(body))
+        answer = token.group(0) if token else "ok"
+        if request.url.path.endswith("/responses"):
+            return httpx.Response(
+                200,
+                json={
+                    "id": "resp_test",
+                    "object": "response",
+                    "status": "completed",
+                    "model": "m",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": answer, "annotations": []}],
+                        }
+                    ],
+                },
+            )
+        return httpx.Response(
+            200,
+            json={"choices": [{"index": 0, "message": {"role": "assistant", "content": answer}}]},
+        )
+
+    settings = Settings(
+        tenant_key=TENANT_KEY,
+        upstream_base_url="http://up.invalid/v1",
+        upstream_api_key="k",
+        default_language="en",
+    )
+    config = GatewayConfig(mode="fast")
+    app = create_app(settings)
+    app.state.gateway = Gateway(
+        settings=settings,
+        vault=Vault.from_settings(settings),
+        config=config,
+        detectors=build_mode_detectors(settings, config),
+        transport=httpx.MockTransport(upstream),
+        sam=FakeSam(),  # type: ignore[arg-type]
+        ocr=FakeOcr(_name_line(f"Name: {name}")),
+    )
+    return app, forwarded
+
+
+def _common_word_name_body(name: str, responses: bool) -> dict[str, Any]:
+    url = "data:image/png;base64," + base64.b64encode(id_card_png()).decode()
+    parts = [
+        {"type": "input_text" if responses else "text", "text": f"Contract party: {name}."},
+        {"type": "input_image", "image_url": url}
+        if responses
+        else {"type": "image_url", "image_url": {"url": url}},
+    ]
+    return {
+        "model": "m",
+        "input" if responses else "messages": [{"role": "user", "content": parts}],
+    }
+
+
+@pytest.mark.parametrize("responses", [False, True], ids=["chat", "responses"])
+@pytest.mark.parametrize("name", ["PLACEHOLDER", "SUMMARY"])
+def test_image_annotation_sweeps_generated_words_matching_a_known_name(
+    name: str, responses: bool
+) -> None:
+    # LAB-1689: OCR can confirm a surname that also occurs in the generated helper or
+    # a heading. Scrub the complete generated text; do not rename one particular word.
+    app, forwarded = _common_word_name_gateway(name)
+    endpoint = "/v1/responses" if responses else "/v1/chat/completions"
+    with TestClient(app) as http:
+        response = http.post(endpoint, json=_common_word_name_body(name, responses))
+    assert response.status_code == 200, response.text
+    assert response.headers["X-PII-Guard-Outbound-Check"] == "passed"
+    assert len(forwarded) == 1
+    messages = forwarded[0]["input" if responses else "messages"]
+    parts = messages[-1]["content"]
+    annotation = parts[-1]["text"]
+    assert not re.search(rf"\b{name}\b", annotation, re.IGNORECASE)
+    token = PLACEHOLDER_RE.search(parts[0]["text"])
+    assert token is not None and token.group(0) in annotation
+    assert name in response.text.upper()  # the masked upstream answer still restores
+    image_url = parts[1]["image_url"]
+    masked_url = image_url if isinstance(image_url, str) else image_url["url"]
+    assert base64.b64decode(masked_url.split(",", 1)[1]) != id_card_png()
+
+
+@pytest.mark.parametrize("responses", [False, True], ids=["chat", "responses"])
+def test_image_annotation_fix_does_not_exempt_a_surviving_name(
+    monkeypatch: pytest.MonkeyPatch, responses: bool
+) -> None:
+    # A real masking regression in the original contract text must still fail closed,
+    # even while the generated annotation is correctly swept for this same surname.
+    original_write = Gateway._write
+
+    def faulty_write(slots: Any, masked: Any, *args: Any, **kwargs: Any) -> None:
+        original_write(slots, masked, *args, **kwargs)
+        for slot in slots:
+            if slot.text.startswith("Contract party:"):
+                slot.write(slot.text)
+
+    monkeypatch.setattr(Gateway, "_write", staticmethod(faulty_write))
+    app, forwarded = _common_word_name_gateway("PLACEHOLDER")
+    endpoint = "/v1/responses" if responses else "/v1/chat/completions"
+    with TestClient(app) as http:
+        response = http.post(endpoint, json=_common_word_name_body("PLACEHOLDER", responses))
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "outbound_check_failed"
+    assert response.headers["X-PII-Guard-Outbound-Check"] == "blocked"
+    assert forwarded == []
+    assert "Contract party:" not in response.text and "PLACEHOLDER" not in response.text
+
+
 @pytest.mark.parametrize(
     ("in_text", "on_card"),
     [
@@ -651,16 +769,61 @@ def test_transcript_keeps_the_expiry_date_when_asked() -> None:
 # --- nested duplicate labels and photo caption clipping (LAB-1488) ------------------------------
 
 
-def test_nested_same_label_cover_prints_its_label_once() -> None:
-    # The face inside its ID photo carries the same label: the inner cover is drawn (fill
-    # and border) without its own label, exactly like a labelless cover.
+@pytest.mark.parametrize("inner_first", [False, True])
+def test_nested_same_label_cover_has_one_outline_and_preserves_coverage(inner_first: bool) -> None:
+    # LAB-1688: the face must not leave a second outline inside its masked ID photo.
     image = magenta_png((400, 200))
     outer = LabelBox(Box(10, 10, 300, 150), "PHOTO · [[PERSON_a1b2c3]]")
     inner = LabelBox(Box(60, 30, 200, 120), "PHOTO · [[PERSON_a1b2c3]]")
-    assert (
-        render_labels(image, [outer, inner]).image
-        == render_labels(image, [outer, LabelBox(inner.box, None)]).image
+    boxes = [inner, outer] if inner_first else [outer, inner]
+    out = render_labels(image, boxes)
+    assert out.image == render_labels(image, [outer]).image
+    assert out.boxes == [_padded(item.box) for item in boxes]
+    assert _magenta_pixels(out.image, [_padded(outer.box), _padded(inner.box)]) == 0
+    assert load_image(out.image).getpixel((inner.box.x1 - 2, inner.box.y1 - 2)) == LABEL_FILL
+
+
+@pytest.mark.parametrize("label", ["PHOTO · [[PERSON_d4e5f6]]", "[[PERSON_a1b2c3]]", None])
+def test_nested_independent_cover_keeps_its_outline(label: str | None) -> None:
+    outer = LabelBox(Box(10, 10, 300, 150), "PHOTO · [[PERSON_a1b2c3]]")
+    inner = LabelBox(Box(60, 30, 200, 120), label)
+    out = render_labels(magenta_png((400, 200)), [outer, inner])
+    assert load_image(out.image).getpixel((inner.box.x1 - 2, inner.box.y1 - 2)) == LABEL_INK
+
+
+@pytest.mark.parametrize("photo_policy", [Policy.MASK, Policy.KEEP])
+def test_photo_outline_suppression_respects_policy_and_preserves_signature(
+    photo_policy: Policy,
+) -> None:
+    class PhotoSam(FakeSam):
+        def segment(self, image: bytes, entity_types: object = None) -> list[Region]:
+            return [
+                Region(EntityType.ID_PHOTO, Box(20, 40, 210, 260), None, "sam"),
+                *super().segment(image, entity_types),
+            ]
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    outcome = ImageMasker(
+        sam=PhotoSam(),  # type: ignore[arg-type]
+        policies=PolicySet({EntityType.ID_PHOTO: photo_policy, EntityType.SIGNATURE: Policy.MASK}),
+        ocr=FakeOcr([]),
+        text_detector=RuleDetector(),
+    ).mask(magenta_png((640, 400)), render="labels", matcher=VaultMatcher(session))
+    photo, face, signature = (
+        next(r for r in outcome.regions if r.entity_type is kind)
+        for kind in (EntityType.ID_PHOTO, EntityType.FACE, EntityType.SIGNATURE)
     )
+    assert photo.policy is photo_policy
+    assert face.policy is Policy.MASK and face.cover_box is not None
+    assert signature.policy is Policy.MASK and signature.cover_box is not None
+    assert _magenta_pixels(outcome.image, [face.cover_box, signature.cover_box]) == 0
+    expected = LABEL_FILL if photo_policy is Policy.MASK else LABEL_INK
+    assert load_image(outcome.image).getpixel((face.cover_box.x1, face.cover_box.y1)) == expected
+    if photo_policy is Policy.MASK:
+        assert photo.cover_box is not None
+        assert _magenta_pixels(outcome.image, [photo.cover_box]) == 0
+    else:
+        assert photo.cover_box is None
 
 
 def test_nested_different_labels_still_print_both() -> None:

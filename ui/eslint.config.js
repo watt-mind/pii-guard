@@ -22,6 +22,26 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
       "@typescript-eslint/consistent-type-imports": "error",
       "no-console": ["error", { allow: ["warn", "error"] }],
+      "max-depth": ["error", 5],
+    },
+  },
+  {
+    files: [
+      "src/App.tsx",
+      "src/components/EntityTable.tsx",
+      "src/components/HighlightedText.tsx",
+      "src/components/Legend.tsx",
+      "src/components/Placeholder.tsx",
+      "src/components/RestoredText.tsx",
+      "src/hosted/PublicHeader.tsx",
+      "src/lib/entities.ts",
+      "src/lib/placeholders.ts",
+      "src/projects/ProjectSwitcher.tsx",
+      "src/screens/Policy.tsx",
+    ],
+    rules: {
+      complexity: ["error", 10],
+      "max-depth": ["error", 3],
     },
   },
   {

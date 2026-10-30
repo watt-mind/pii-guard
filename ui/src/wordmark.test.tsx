@@ -80,6 +80,15 @@ describe("wordmark: PII Guard in visible text, pii-guard only in code (LAB-1486)
     expect(shown.length).toBeGreaterThan(5);
     for (const c of shown) expect(c).not.toMatch(WRONG);
     expect(html).toContain('<meta property="og:site_name" content="PII Guard" />');
+    expect(html).toContain('<meta name="theme-color" content="#0d9488" />');
+    expect(html).toContain('<meta property="og:locale" content="en_US" />');
+    expect(html).toContain('<meta property="og:image:secure_url" content="https://guard.watt-mind.com/og-image.png" />');
+    expect(html).toContain('<meta property="og:image:type" content="image/png" />');
+    expect(html).toContain('<meta property="og:image:width" content="1200" />');
+    expect(html).toContain('<meta property="og:image:height" content="630" />');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />');
+    expect(html).toContain('<meta name="twitter:image:alt" content="PII Guard: you send a name and an email, the model sees only placeholders, you get the real values back." />');
+    expect(html).toContain('<link rel="alternate" type="text/plain" href="/llms.txt" title="LLM Documentation" />');
   });
 
   it.each([true, false])("the hosted landing and header (signed in: %s)", async (signedIn) => {

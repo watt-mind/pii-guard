@@ -352,7 +352,7 @@ def _to_entity_type(raw: object) -> EntityType | None:
         return None
     key = raw.strip().upper().replace("-", "_").replace(" ", "_")
     try:
-        entity_type = EntityType(key)
+        entity_type: EntityType | None = EntityType(key)
     except ValueError:
         entity_type = _TYPE_ALIASES.get(key)
     if entity_type is None or entity_type not in TEXT_ENTITY_TYPES:
@@ -392,8 +392,7 @@ def parse_entities(content: str) -> list[LlmEntity]:
             dropped += 1
             continue
         occurrence = item.get("occurrence")
-        valid = isinstance(occurrence, int) and not isinstance(occurrence, bool)
-        if not valid or occurrence < 1:
+        if not isinstance(occurrence, int) or isinstance(occurrence, bool) or occurrence < 1:
             occurrence = None
         entities.append(LlmEntity(entity_type, value.strip(), occurrence))
     if dropped:

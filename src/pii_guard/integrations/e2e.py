@@ -928,7 +928,7 @@ def _stability(
     for _, source in calls:
         sources[source or "-"] = sources.get(source or "-", 0) + 1
     session_ids = sorted({sid for sid, _ in calls if sid})
-    gateway = getattr(app.state, "gateway", None)
+    gateway: Any = getattr(app.state, "gateway", None)
     tokens = sorted({m.group(0) for m in PLACEHOLDER_RE.finditer(upstream_text)})
     by_value: dict[str, set[str]] = {}
     for sid in session_ids if gateway is not None else []:
@@ -953,7 +953,7 @@ def _stability(
 def _connect(args: list[str]) -> None:
     from pii_guard.integrations.cli import main as connect
 
-    with open(os.devnull, "w") as quiet:
+    with Path(os.devnull).open("w") as quiet:
         if connect(args, stdout=quiet) != 0:
             raise RuntimeError(f"pii-guard connect {args[0]} failed")
 

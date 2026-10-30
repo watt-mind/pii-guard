@@ -194,7 +194,7 @@ def _parse_span(raw: object, text: str, where: str) -> GoldSpan:
     if not 0 <= start < end <= len(text):
         raise FixtureError(f"{where}: offsets [{start}, {end}) are out of range")
     try:
-        entity_type = EntityType(raw.get("entity_type"))
+        entity_type = EntityType(raw.get("entity_type") or "")
     except ValueError:
         raise FixtureError(f"{where}: unknown entity_type") from None
     if entity_type.is_visual:

@@ -390,7 +390,7 @@ def _is_cnp(digits: str) -> bool:
 def _stamp(digits: str) -> bool:
     """True for a ``yyyymmddhhmmss`` stamp in 2000-2039."""
     try:
-        t = dt.datetime.strptime(digits, "%Y%m%d%H%M%S")
+        t = dt.datetime.strptime(digits, "%Y%m%d%H%M%S")  # noqa: DTZ007
     except ValueError:
         return False
     return 2000 <= t.year < 2040

@@ -26,7 +26,7 @@ import platform
 import re
 import sys
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -523,7 +523,7 @@ def _day_of(stamp: str | None) -> str:
             return datetime.fromisoformat(stamp).date().isoformat()
         except ValueError:
             pass
-    return date.today().isoformat()
+    return datetime.now(UTC).date().isoformat()
 
 
 def build_records(
@@ -664,7 +664,7 @@ def _visual_record(
     notes: Sequence[str],
 ) -> dict[str, Any]:
     pipe = card.get("pipeline") or {}
-    day = day or date.today().isoformat()
+    day = day or datetime.now(UTC).date().isoformat()
     sam = card.get("sam") or {}
     detectors = [
         _detector(

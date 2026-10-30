@@ -31,12 +31,11 @@ Nothing here logs or raises with request text, values, masked bodies or keys.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from contextlib import suppress
 from typing import Any, cast
 
@@ -50,7 +49,6 @@ from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
 from pii_guard.gateway.placeholder_note import add_messages_note
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_restore import iter_sse_events, sse_message
-from pii_guard.gateway.restore import restore_text
 from pii_guard.gateway.service import (
     REQUEST_ID_HEADER,
     Gateway,
@@ -63,10 +61,11 @@ from pii_guard.gateway.service import (
     _read_limited,
     check_upstream_payload,
 )
+from pii_guard.gateway.stream import stream_sse_events, timed_sse_lines
 from pii_guard.gateway.tool_names import model_words, tool_names, without_tool_names
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import RequestTimer
-from pii_guard.types import PayloadTooLargeError, PiiGuardError
+from pii_guard.types import PiiGuardError
 from pii_guard.vault import UnmaskOutputTooLargeError
 
 __all__ = ["ANTHROPIC_VERSION", "MessagesGateway", "UnsupportedApiError", "messages_url"]
@@ -178,6 +177,13 @@ def _upstream_error(status: int, raw: bytes, headers: dict[str, str]) -> JSONRes
     return JSONResponse(body, status_code=status, headers=headers)
 
 
+def _messages_stream_error(exc: Exception) -> Iterable[bytes]:
+    error = stream_error()
+    if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
+        error["error"]["message"] = exc.message
+    return (sse_message(json.dumps(error), "error"),)
+
+
 class MessagesGateway:
     """``/v1/messages`` on top of the app's :class:`Gateway` (its detectors, cache, vault)."""
 
@@ -188,11 +194,11 @@ class MessagesGateway:
         return f"MessagesGateway({self.gateway!r})"
 
     def _upstream_url(self, suffix: str) -> str:
-        self.gateway._upstream_url()  # UpstreamNotConfiguredError without a base URL
+        self.gateway.upstream_url()  # UpstreamNotConfiguredError without a base URL
         return messages_url(cast(str, self.gateway.settings.upstream_base_url), suffix)
 
     def _upstream_headers(self, headers: Mapping[str, str]) -> dict[str, str]:
-        out = self.gateway._upstream_headers(headers)
+        out = self.gateway.upstream_headers(headers)
         key = self.gateway.settings.upstream_api_key
         if key is not None:
             out.pop("Authorization", None)
@@ -221,7 +227,7 @@ class MessagesGateway:
         timer = RequestTimer(received_at)
         trace = CallTrace(self.gateway.observability, timer, body, request_id=request_id)
         try:
-            response, stats = await self.gateway._with_session_lease(
+            response, stats = await self.gateway.with_session_lease(
                 self._messages(
                     body,
                     headers,
@@ -257,31 +263,19 @@ class MessagesGateway:
         """Steps 1-2: mask body in place and return ``(session, language, detector, payload)``."""
         gw = self.gateway
         mode = stats.mode
-        language = gw._language(headers)
+        language = gw.language(headers)
         trace.mode, trace.language = mode.value, language
         collected = collect_message_texts(body)
         body = cast(dict[str, Any], body)
-        if max_text_chars is not None and any(
-            len(s.text) > max_text_chars for s in collected.slots
-        ):
-            raise PayloadTooLargeError(f"a text is longer than {max_text_chars} characters")
-        if len(collected.images) > gw.config.max_images:
-            raise PayloadTooLargeError(
-                f"a request may carry at most {gw.config.max_images} inline images"
-            )
-        if any(len(img.data) > gw.config.max_image_bytes for img in collected.images):
-            raise PayloadTooLargeError(
-                f"an inline image is larger than {gw.config.max_image_bytes} bytes"
-            )
+        gw.validate_limits(collected, max_text_chars, text_label="a text")
         detector = gw.detectors[mode]
-        session, created = gw._session(headers, body, path_session, stats, trace)
+        session, created = gw.session(headers, body, path_session, stats, trace)
         stats.texts = len(collected.slots)
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
-        masked: list[str] = []
         try:
             with timer.span("detect"):
-                spans = await gw._detect_all(collected.slots, detector, session, language, stats)
+                spans = await gw.detect_all(collected.slots, detector, session, language, stats)
                 # The model id's words count as declared names too (Claude Code, LAB-1605).
                 names = tool_names(body) | model_words(body)
                 spans = without_tool_names(
@@ -295,31 +289,75 @@ class MessagesGateway:
             generation = session.generation
             before = _counts_of(session)
             with timer.span("mask"):
-                masked = gw._mask(collected.slots, spans, session, language)
+                masked = gw.mask(collected.slots, spans, session, language)
             _count_masked(stats, before, session)
             if collected.images:
                 with timer.span("image"):
-                    await gw._mask_images(collected.images, detector, language, stats, session)
+                    await gw.mask_images(collected.images, detector, language, stats, session)
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                gw._write(
+                gw.write(
                     collected.slots, masked, session, language, remask, generation, names, issued
                 )
                 collected.finalize()
             _count_masked(stats, before, session)
             with timer.span("mask"):
-                gw._recheck(body, collect_message_texts, session, language, stats, names, issued)
+                gw.recheck(body, collect_message_texts, session, language, stats, names, issued)
             forwarding = time.perf_counter()
-            payload = gw._forwarded(body, session, stats, add_messages_note)
+            payload = gw.forwarded(body, session, stats, add_messages_note)
             check_upstream_payload(payload, stats.image_payload_bytes)
             timer.add("forward", time.perf_counter() - forwarding)
         except BaseException:
             stats.log("blocked")
-            gw._release_session(session, created, masked=False)
+            gw.release_session(session, created, masked=False)
             raise
-        gw._release_session(session, created, masked=True)
+        gw.release_session(session, created, masked=True)
         return session, language, detector, payload
+
+    async def _check_upstream(
+        self,
+        response: httpx.Response,
+        *,
+        started: float,
+        stream: bool,
+        timer: RequestTimer,
+        stats: RequestStats,
+        out_headers: dict[str, str],
+    ) -> JSONResponse | None:
+        if response.status_code >= 400:
+            try:
+                raw = await _read_limited(response)
+            except httpx.HTTPError as exc:
+                stats.log("upstream_unreachable")
+                raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
+            finally:
+                await response.aclose()
+            stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            if response.status_code in (404, 405):
+                stats.log("unsupported_api")
+                raise UnsupportedApiError(
+                    "the upstream has no Anthropic Messages API (POST .../messages answered "
+                    f"HTTP {response.status_code}); point PII_GUARD_UPSTREAM_BASE_URL at an "
+                    "Anthropic-compatible upstream, or use an OpenAI-compatible client with "
+                    "/v1/chat/completions (see the Connect page in the PII Guard console)"
+                )
+            stats.log("upstream_error")
+            return _upstream_error(response.status_code, raw, out_headers)
+
+        is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
+        if stream and not is_sse:
+            with suppress(httpx.HTTPError):
+                await response.aclose()
+            stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            stats.log("upstream_did_not_stream")
+            raise UpstreamError(
+                "upstream did not return an event stream; retry without stream",
+                code="upstream_did_not_stream",
+            ) from None
+        return None
 
     async def _messages(
         self,
@@ -334,9 +372,9 @@ class MessagesGateway:
     ) -> tuple[Response, RequestStats]:
         gw = self.gateway
         url = self._upstream_url("/messages/count_tokens" if count_tokens else "/messages")
-        mode = gw._mode(headers)
-        echo = gw._echo(headers)
-        stats = _Stats(mode=mode, mode_alias=gw._mode_alias(headers))
+        mode = gw.mode(headers)
+        echo = gw.echo(headers)
+        stats = _Stats(mode=mode, mode_alias=gw.mode_alias(headers))
         trace.stats = stats
         stream = isinstance(body, dict) and body.get("stream") is True and not count_tokens
         if echo and (stream or count_tokens):
@@ -357,65 +395,26 @@ class MessagesGateway:
         if trace.payloads:
             trace.masked_request = payload
         masked_input = _masked_messages(body) if echo else None
-        client = gw.upstream_client()
         upstream_headers = self._upstream_headers(headers)
         if stream:
             upstream_headers["Accept"] = "text/event-stream"
-        request = client.build_request(
-            "POST", url, content=payload, headers=upstream_headers, timeout=gw.upstream_timeout()
+        response, started = await gw.send_upstream(
+            url, payload, upstream_headers, timer=timer, stats=stats
         )
-        started = time.perf_counter()
-        timer.upstream_sent = started
-        try:
-            response = await client.send(request, stream=True)
-            await gw.bound_upstream_response(response)
-        except httpx.HTTPError as exc:
-            timer.add("upstream", time.perf_counter() - started)
-            stats.log("upstream_unreachable")
-            raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
-        except UpstreamError:
-            timer.add("upstream", time.perf_counter() - started)
-            stats.log("upstream_unreachable")
-            raise
-        timer.add("upstream_ttfb", time.perf_counter() - started)
-        timer.add("upstream", time.perf_counter() - started)
-
         stats.upstream_status = response.status_code
         out_headers = stats.headers(session.session_id)
-        if response.status_code >= 400:
-            try:
-                raw = await _read_limited(response)
-            except httpx.HTTPError as exc:
-                stats.log("upstream_unreachable")
-                raise UpstreamError(f"upstream response failed ({type(exc).__name__})") from None
-            finally:
-                await response.aclose()
-            stats.upstream_ms = (time.perf_counter() - started) * 1000
-            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
-            if response.status_code in (404, 405):
-                stats.log("unsupported_api")
-                raise UnsupportedApiError(
-                    "the upstream has no Anthropic Messages API (POST .../messages answered "
-                    f"HTTP {response.status_code}); point PII_GUARD_UPSTREAM_BASE_URL at an "
-                    "Anthropic-compatible upstream, or use an OpenAI-compatible client with "
-                    "/v1/chat/completions (see the Connect page in the PII Guard console)"
-                )
-            stats.log("upstream_error")
-            return _upstream_error(response.status_code, raw, out_headers), stats
-
+        err_response = await self._check_upstream(
+            response,
+            started=started,
+            stream=stream,
+            timer=timer,
+            stats=stats,
+            out_headers=out_headers,
+        )
+        if err_response is not None:
+            return err_response, stats
         if count_tokens:
             return await self._count(response, started, timer, stats, out_headers)
-        is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
-        if stream and not is_sse:
-            with suppress(httpx.HTTPError):
-                await response.aclose()
-            stats.upstream_ms = (time.perf_counter() - started) * 1000
-            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
-            stats.log("upstream_did_not_stream")
-            raise UpstreamError(
-                "upstream did not return an event stream; retry without stream",
-                code="upstream_did_not_stream",
-            ) from None
         if not stream:
             return await self._whole(
                 response,
@@ -494,7 +493,7 @@ class MessagesGateway:
             stats.log("upstream_invalid")
             raise UpstreamError("upstream tool input could not be restored") from None
         stats.unresolved = len(report.unresolved)
-        self.gateway._seed_cache(session, language, detector, report.restored_spans, stats)
+        self.gateway.seed_cache(session, language, detector, report.restored_spans, stats)
         out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
         if masked_input is not None:
             answer["pii_guard"] = {"masked_input": masked_input, "masked_output": masked_output}
@@ -524,28 +523,10 @@ class MessagesGateway:
             session, on_ids=lambda ids: issued.add(session.session_id, ids)
         )
         trace.streaming = True
-
-        async def timed_lines() -> AsyncIterator[str]:
-            # Whole-stream deadline (LAB-1566), like the chat and Responses streams.
-            lines = response.aiter_lines().__aiter__()
-            deadline = time.perf_counter() + self.gateway.config.upstream_stream_timeout
-            while True:
-                waiting = time.perf_counter()
-                remaining = deadline - waiting
-                if remaining <= 0:
-                    raise TimeoutError("upstream stream deadline exceeded")
-                try:
-                    line = await asyncio.wait_for(lines.__anext__(), remaining)
-                except StopAsyncIteration:
-                    timer.add("upstream", time.perf_counter() - waiting)
-                    return
-                timer.add("upstream", time.perf_counter() - waiting)
-                if line.startswith("data:"):
-                    timer.mark_first_data()
-                yield line
+        timeout = self.gateway.config.upstream_stream_timeout
 
         async def produce() -> AsyncGenerator[bytes, None]:
-            async for event, data in iter_sse_events(timed_lines()):
+            async for event, data in iter_sse_events(timed_sse_lines(response, timer, timeout)):
                 unmasking = time.perf_counter()
                 outs = restorer.process(event, data)
                 timer.add("unmask", time.perf_counter() - unmasking)
@@ -555,56 +536,21 @@ class MessagesGateway:
             for name, out in restorer.finish():
                 yield sse_message(out, name)
 
-        async def events() -> AsyncIterator[bytes]:
-            outcome = "ok"
-            source = produce()
-            try:
-                try:
-                    async for chunk in source:
-                        sending = time.perf_counter()
-                        try:
-                            yield chunk
-                        finally:
-                            timer.add("client", time.perf_counter() - sending)
-                except Exception as exc:
-                    outcome = f"stream_error:{type(exc).__name__}"
-                    error = stream_error()
-                    if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
-                        error["error"]["message"] = exc.message
-                    yield sse_message(json.dumps(error), "error")
-            except (GeneratorExit, asyncio.CancelledError):
-                if outcome == "ok":
-                    outcome = "client_disconnected"
-                raise
-            finally:
-                await source.aclose()
-                await response.aclose()
-                stats.upstream_ms = timer.stages["upstream"] * 1000
-                stats.unresolved = len(restorer.unresolved)
-                if trace.recording and restorer.usage:
-                    trace.usage = restorer.usage
-                if outcome == "ok":
-                    with suppress(PiiGuardError):
-                        restored = {}
-                        for index, masked in restorer.masked_content().items():
-                            text, spans, _ = restore_text(session, masked)
-                            restored[index] = (text, spans)
-                        self.gateway._seed_cache(session, language, detector, restored, stats)
-                        if trace.full:
-                            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
-                stats.log(outcome)
-                if trace.payloads:
-                    trace.stream_masked = restorer.masked_content()
-                    trace.stream_chunks = restorer.chunks
-                if outcome == "ok":
-                    trace.finish()
-                elif outcome == "client_disconnected":
-                    trace.finish(outcome=outcome, error={"code": outcome})
-                else:
-                    trace.finish(outcome="stream_error", error={"code": "stream_failed"})
-
+        events = stream_sse_events(
+            produce(),
+            response=response,
+            timer=timer,
+            trace=trace,
+            stats=stats,
+            restorer=restorer,
+            session=session,
+            seed_cache=lambda restored: self.gateway.seed_cache(
+                session, language, detector, restored, stats
+            ),
+            on_error=_messages_stream_error,
+        )
         out_headers["Cache-Control"] = "no-cache"
         return (
-            StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
+            StreamingResponse(events, media_type="text/event-stream", headers=out_headers),
             stats,
         )

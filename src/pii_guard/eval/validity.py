@@ -137,7 +137,7 @@ def validity_block(results: Sequence[DocumentResult]) -> dict[str, Any]:
     """
     from pii_guard.eval.scorer import DEFAULT_POLICY, leak_report
 
-    classes = {c: _counts() for c in CLASSES}
+    classes: dict[str, dict[str, int]] = {c: _counts() for c in CLASSES}
     other = _counts()
     per_type: dict[str, dict[str, dict[str, int]]] = {}
     for r in results:

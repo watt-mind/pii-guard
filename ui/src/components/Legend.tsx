@@ -1,5 +1,5 @@
 import type { EntityType } from "../api/types";
-import { ENTITY_META } from "../lib/entities";
+import { metaFor } from "../lib/entities";
 
 interface Props {
   counts: ReadonlyMap<EntityType, number>;
@@ -18,7 +18,7 @@ export function Legend({ counts, kept: keptTypes, activeType = null, known = 0 }
   return (
     <ul aria-label="Entity legend" className="flex flex-wrap gap-1.5">
       {entries.map(([type, n]) => {
-        const meta = ENTITY_META[type];
+        const meta = metaFor(type);
         const kept = keptTypes ? keptTypes.has(type) : meta.policy === "keep";
         return (
           <li

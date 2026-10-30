@@ -203,7 +203,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |
-| `VITE_PII_GUARD_ROBOTS` (UI build arg) | Default `disallow`: `robots.txt` keeps crawlers out. Build with `--build-arg VITE_PII_GUARD_ROBOTS=allow` only for the public production image. Dev and prod currently share one image, so prod indexing needs its own build or a runtime switch first |
+| `VITE_PII_GUARD_ROBOTS` (UI build arg) | Default `disallow`, and the hosted image keeps it. The app (`pii-guard up` and the hosted image) answers `/robots.txt` at runtime from the request host, so the build's file only matters when `ui/dist` is served by something else. That is the runtime switch: the one image promoted from dev to prod is indexable only on `guard.watt-mind.com` (`Allow: /`, with `/v1/`, `/docs`, `/openapi.json`, `/healthz` and `/readyz` disallowed). Every other host, including `guard-dev`, the `azurecontainerapps.io` hostnames and localhost, gets `Disallow: /` |
 | `VITE_PII_GUARD_DEMO_VIDEO_URL`, `VITE_PII_GUARD_DEMO_VIDEO_POSTER` (UI build args) | Unset by default: the landing's demo video slot stays hidden. Set the URL (and optionally a poster image) to show a poster with a play button above the demo |
 
 ### Browser security headers
