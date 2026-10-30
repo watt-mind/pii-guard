@@ -27,7 +27,7 @@ import {
 } from "./firstRun";
 import { SOURCE, useHostedSession } from "./session";
 
-type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoints: Endpoint[]; first: FirstRun | null; projectId: string; policyNames: Record<string, string> };
+type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoints: Endpoint[]; first: FirstRun | null; projectId: string; policyNames: Record<string, string>; latest: Record<string, number> };
 
 /**
  * Hosted Connect, "Connect your client" (LAB-1455): the first screen after sign-in. The server
@@ -54,14 +54,17 @@ export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: 
       const first = await loadFirstRun(call).catch(() => null);
       const list = await call<ProjectList>("/v1/projects");
       const projectId = getSelectedProject() ?? list.default_project_id ?? list.projects[0]?.id;
-      if (!projectId) return { first, endpoints: [], projectId: "", policyNames: {} };
+      if (!projectId) return { first, endpoints: [], projectId: "", policyNames: {}, latest: {} };
       const [data, policies] = await Promise.all([
         call<{ endpoints: Endpoint[] }>(`${projectPath(projectId)}/endpoints`),
         // Only for the card's "Default policy · v1" (LAB-1629): without it, the card says "Policy".
         call<{ policies?: PolicyVersion[] }>(`${projectPath(projectId)}/policies`).catch(() => ({ policies: [] as PolicyVersion[] })),
       ]);
-      const policyNames = Object.fromEntries((Array.isArray(policies.policies) ? policies.policies : []).map((p) => [p.policy_version_id, p.name]));
-      return { first, endpoints: (data.endpoints ?? []).filter((e) => e.enabled), projectId, policyNames };
+      const versions = Array.isArray(policies.policies) ? policies.policies : [];
+      const policyNames = Object.fromEntries(versions.map((p) => [p.policy_version_id, p.name]));
+      const latest: Record<string, number> = {};
+      for (const p of versions) latest[p.policy_id] = Math.max(latest[p.policy_id] ?? 0, p.version);
+      return { first, endpoints: (data.endpoints ?? []).filter((e) => e.enabled), projectId, policyNames, latest };
     })().then(
       (value) => live && setLoaded({ state: "ok", ...value }),
       () => live && setLoaded({ state: "failed" }),
@@ -120,6 +123,7 @@ export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: 
             call={call}
             endpoint={current}
             policyName={ok.policyNames[current.policy_version_id]}
+            newerVersion={(ok.latest[current.policy_id] ?? 0) > current.policy_version ? ok.latest[current.policy_id] : undefined}
             projectId={ok.projectId}
             state={state!}
             isDefault={isDefault}
@@ -137,6 +141,7 @@ function ConnectEndpoint({
   call,
   endpoint,
   policyName,
+  newerVersion,
   projectId,
   state,
   isDefault,
@@ -148,6 +153,8 @@ function ConnectEndpoint({
   onOpenLog?: (id: string) => void;
   endpoint: Endpoint;
   policyName?: string;
+  /** The policy's latest version, when it is newer than the one this endpoint uses. */
+  newerVersion?: number;
   projectId: string;
   state: FirstRunState;
   isDefault: boolean;
@@ -176,6 +183,13 @@ function ConnectEndpoint({
           </p>
           <p className="text-xs text-muted">
             {upstream} · {endpoint.model ? <>model <code className="font-mono text-xs whitespace-nowrap">{endpoint.model}</code></> : "your client picks the model"} · {policyName ?? "Policy"} · v{endpoint.policy_version}
+            {/* A newer version isn't applied by itself: say so where the test runs (LAB-1640). */}
+            {newerVersion !== undefined && (
+              <>
+                {" · "}
+                <a className="underline underline-offset-4 hover:text-ink" href="#projects">v{newerVersion} available in Projects</a>
+              </>
+            )}
           </p>
         </div>
         <div className="flex min-w-0 max-w-full items-center gap-2">

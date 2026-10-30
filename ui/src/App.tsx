@@ -361,7 +361,10 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           </div>
         )}
 
-        <main id="main" tabIndex={-1} className="mx-auto min-h-dvh max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
+        {/* The main landmark. On the API page the reference's own <main> (Scalar renders one) is
+            the page's main instead: a nested main, or a role on it, fails axe (LAB-1640). A div
+            with the role, so switching keeps the element and the screens' state. */}
+        <div id="main" role={apiOpen ? undefined : "main"} tabIndex={-1} className="mx-auto min-h-dvh max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
           {apiOpen && <ApiReference embedded />}
           <div hidden={apiOpen}>
           <section id="section-overview" aria-label="Overview" hidden={section !== "overview"}>
@@ -526,7 +529,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
             </Suspense></PageLoadBoundary>}
           </section>
           </div>
-        </main>
+        </div>
 
         <footer className="mx-auto max-w-[1280px] px-4 pb-10 text-xs text-faint sm:px-6">
           {caps.accounts ? (
@@ -534,7 +537,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               All sample data is fictional. This page talks only to PII Guard, never to a model provider: PII Guard masks what you send and forwards it to the model your
               endpoint or connection names.
               {/* Only where it applies, not on every screen (LAB-1629). */}
-              {section === "playground" && " The Playground round trip uses a simulated answer; the test request on Connect goes to your endpoint’s real model."}
+              {section === "playground" && tab === "text" && " The Playground round trip uses a simulated answer; the test request on Connect goes to your endpoint’s real model."}
             </>
           ) : (
             <>

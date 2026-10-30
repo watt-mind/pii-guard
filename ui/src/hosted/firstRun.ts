@@ -122,6 +122,18 @@ export interface TestRoundTrip {
 }
 
 /**
+ * The Connect test's `prompt_cache_key` for a policy version: `pgtest_` and a hex run, the
+ * whole-id shape the gateway leaves unmasked (gateway/opaque_ids.py rule 3). A free-text key
+ * such as `pii-guard-connect-test:<id>` was read by the NER as an ID document, so every test
+ * showed one masked value that wasn't in the prompt (LAB-1640). The leading `f` keeps a hex
+ * letter in the run (an all-digit run is not exempt).
+ */
+export function testSessionKey(policyVersionId: string): string {
+  const hex = Array.from(new TextEncoder().encode(policyVersionId), (b) => b.toString(16).padStart(2, "0")).join("");
+  return `pgtest_f${hex.slice(0, 127)}`;
+}
+
+/**
  * One request through the endpoint, as the owner (same-origin session, no endpoint key): the
  * gateway masks it, the endpoint's model answers, and the echo shows what the model saw.
  */
@@ -133,7 +145,7 @@ export async function sendTestRequest(endpointId: string, doFetch: typeof fetch 
     headers: { Accept: "application/json", "Content-Type": "application/json", "X-PII-Guard-Echo": "masked" },
     // One vault session per policy version (`prompt_cache_key`, LAB-1629): a value masked in an
     // earlier test stays masked in that session, so a version that keeps it would look unapplied.
-    body: JSON.stringify({ messages: [{ role: "user", content: TEST_PROMPT }], stream: false, ...(policyVersionId ? { prompt_cache_key: `pii-guard-connect-test:${policyVersionId}` } : {}) }),
+    body: JSON.stringify({ messages: [{ role: "user", content: TEST_PROMPT }], stream: false, ...(policyVersionId ? { prompt_cache_key: testSessionKey(policyVersionId) } : {}) }),
     signal,
   });
   let payload: unknown = null;
