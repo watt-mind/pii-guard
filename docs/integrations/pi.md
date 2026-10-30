@@ -56,6 +56,9 @@ pi --provider pii-guard --model muse-spark-1.3
   token itself is never written to the file.
 - `fast` mode (rules + NER) is the default for agents; `--mode audit` adds the LLM detector
   (a second opinion for quality checks: slower, and the text goes to the detector endpoint).
+- A hosted project endpoint URL (`--gateway https://<host>/e/<endpoint>/v1`) gets no
+  `headers`: the endpoint's policy sets the mode and language, and the endpoint refuses a
+  request that names others (LAB-1651), so `--mode` and `--language` don't apply there.
 - The `compat` flags make pi send `system` instead of `developer` and leave out `store`, which
   non-OpenAI upstreams may reject. The gateway accepts both fields either way.
 - Running it again is a no-op ("already up to date"). Each change keeps a backup:
