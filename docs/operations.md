@@ -435,6 +435,11 @@ footprint increase supports encrypted configuration without implementing custom 
 `uv run python -m pii_guard.visual.segment fetch` (into `PII_GUARD_MODEL_DIR`, default
 `~/.cache/pii-guard/models`). Model files are never committed.
 
+**SAM 3.1 output parser.** The Docker images install the `sam` extra, Meta's official
+`meta-sam-parser` (0.1.0, pure Python, SAM License; see NOTICE). It decodes what SAM 3.1
+returns and checks every mask. Elsewhere: `uv sync --extra sam`. Without it, pii-guard's own
+decoder reads SAM output (logged once at info level); limits and fail-closed checks are the same.
+
 ## Exposure and authentication
 
 **There is no authentication by default.** Anyone who can reach the API can mask and unmask,
