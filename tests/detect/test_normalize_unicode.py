@@ -81,7 +81,7 @@ def test_unicode_spaces_inside_identifiers(sep: str) -> None:
     card = f"4111{sep}1111{sep}1111{sep}1111"
     iban = f"GB82{sep}WEST{sep}1234{sep}5698{sep}7654{sep}32"
     assert found(f"Paid with {card} thanks; IBAN {iban}", "en") == [
-        (E.BANK_ACCOUNT, card),
+        (E.PAYMENT_CARD, card),
         (E.BANK_ACCOUNT, iban),
     ]
     phone, steuer = f"030{sep}12345678", f"12{sep}345{sep}678{sep}903"

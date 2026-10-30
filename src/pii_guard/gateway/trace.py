@@ -144,7 +144,9 @@ class CallTrace:
         if isinstance(exc, PiiGuardError):
             blocked = isinstance(exc, BlockedEntityError | OutboundCheckFailedError)
             outcome = "blocked" if blocked else "refused"
-            error = {"code": exc.code, "status": exc.status_code}
+            # The message names types and counts only, never values (the same redaction
+            # rule as API error bodies, LAB-1314). Anything else may echo the request.
+            error = {"code": exc.code, "status": exc.status_code, "message": exc.message}
             if isinstance(exc, BlockedEntityError):
                 error["entity_types"] = {t.value: n for t, n in sorted(exc.counts.items())}
             elif isinstance(exc, OutboundCheckFailedError):

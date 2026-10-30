@@ -360,3 +360,54 @@ def test_stream_lease_released_when_client_leaves_before_the_body(endpoint: str)
             await gw.aclose()
 
     asyncio.run(main())
+
+
+def test_one_client_over_its_lease_cap_gets_503_while_others_are_served() -> None:
+    """LAB-1584: in-flight requests of one identity are capped, so a flood of long streams
+    from one client can't pin every vault slot and 503 everyone else."""
+    gw = _gateway(FakeLlm())
+    gw.vault = Vault(bytes.fromhex(TEST_TENANT_KEY), max_sessions=10, max_leases_per_identity=2)
+    other = {"authorization": "Bearer other-client-not-a-key"}
+
+    async def main() -> None:
+        resume = asyncio.Event()
+        entered = 0
+
+        async def upstream(request: httpx.Request) -> httpx.Response:
+            nonlocal entered
+            entered += 1
+            await resume.wait()
+            return _upstream(request)
+
+        gw._transport = httpx.MockTransport(upstream)
+
+        def call(headers: dict[str, str], path: str) -> Any:
+            return gw.chat_completions(_body("chat", SERVE, None), headers, path_session=path)
+
+        held = [asyncio.create_task(call(BEARER, f"flood-{n}")) for n in range(2)]
+        try:
+            while entered < 2:
+                await asyncio.sleep(0.01)
+            with pytest.raises(MaskingError) as error:
+                await call(BEARER, "flood-2")
+            assert error.value.code == "vault_capacity_exhausted"
+            assert error.value.status_code == 503
+            served = asyncio.create_task(call(other, "other-box"))
+            while entered < 3:
+                await asyncio.sleep(0.01)
+            resume.set()
+            response, _ = await served
+            assert response.status_code == 200
+            for task in held:
+                response, _ = await task
+                assert response.status_code == 200
+            assert not gw.vault._leases
+            assert not gw.vault._identity_leases
+        finally:
+            resume.set()
+            for task in held:
+                task.cancel()
+            await asyncio.gather(*held, return_exceptions=True)
+            await gw.aclose()
+
+    asyncio.run(main())

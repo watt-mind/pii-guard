@@ -94,6 +94,7 @@ USAGE_KEYS = (
     "invalid_outputs",
     "refusals",
     "empty_challenged",
+    "truncated_completions",
 )
 
 #: What the prompt tells the model about each text entity type.
@@ -104,9 +105,16 @@ ENTITY_DESCRIPTIONS: dict[EntityType, str] = {
     EntityType.EMAIL: "an email address",
     EntityType.PHONE: "a phone or fax number",
     EntityType.DATE_OF_BIRTH: "a date that is someone's date of birth",
-    EntityType.NATIONAL_ID_HU_TAX: "Hungarian personal tax ID (adóazonosító jel), 10 digits",
+    EntityType.NATIONAL_ID_HU_TAX: (
+        "Hungarian personal tax ID (adóazonosító jel): exactly 10 digits starting "
+        "with 8; never the 11-digit personal number (személyi azonosító), "
+        "which is an ID_DOCUMENT"
+    ),
     EntityType.NATIONAL_ID_HU_TAJ: "Hungarian social security (TAJ) number, 9 digits",
-    EntityType.ID_DOCUMENT: "an ID card, passport or driving licence number",
+    EntityType.ID_DOCUMENT: (
+        "an ID card, passport or driving licence number, including the 11-digit "
+        "Hungarian personal number (személyi azonosító)"
+    ),
     EntityType.BANK_ACCOUNT: "a bank account number or IBAN",
     EntityType.COMPANY_ID_HU: "a company registration number (cégjegyzékszám) or company tax "
     "number (adószám)",
@@ -829,6 +837,12 @@ class LlmDetector:
             except _InvalidOutput as exc:
                 self._count(invalid_outputs=1)
                 last_error = str(exc)
+                if "truncated" in last_error:
+                    # The answer did not fit: give the retry headroom instead of repeating
+                    # the same request (fail closed either way; LAB-1173).
+                    payload = dict(payload)
+                    current = payload.get("max_tokens", self.max_tokens)
+                    payload["max_tokens"] = min((current or DEFAULT_MAX_TOKENS) * 2, 32768)
             except _Retryable as exc:
                 last_error = str(exc)
             logger.warning(
@@ -896,6 +910,7 @@ class LlmDetector:
             self._count(refusals=1)
             raise _InvalidOutput("model refused")
         if choice.get("finish_reason") == "length":
+            self._count(truncated_completions=1)
             raise _InvalidOutput("completion truncated (finish_reason=length)")
         content = message.get("content") if isinstance(message, dict) else None
         if isinstance(content, list):  # content parts

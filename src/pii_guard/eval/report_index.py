@@ -343,7 +343,47 @@ def pool(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "latency_ms": {"detect": latency("detect"), "mask": latency("mask")},
         "per_type": per_type,
         "latency_pooled": True,
+        **({"outbound_check": ob} if (ob := pool_outbound(blocks)) else {}),
         **({"validity": v} if (v := pool_validity(blocks)) else {}),
+    }
+
+
+def pool_outbound(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """The outbound re-check blocks of ``blocks`` summed, or ``None`` if one has none.
+
+    The re-check time is the mean of the blocks' p50/p95 weighted by re-checked requests (as
+    detection latency is pooled), ``None`` when one block has no time.
+    """
+    obs: list[Mapping[str, Any]] = [b["outbound_check"] for b in blocks if b.get("outbound_check")]
+    if not obs or len(obs) != len(blocks):
+        return None
+    counts = {k: sum(int(o[k]) for o in obs) for k in ("requests", "checked", "blocked")}
+    weight = sum(int(o["checked"]) for o in obs)
+    check_ms = (
+        None
+        if any(not o.get("check_ms") for o in obs) or not weight
+        else {
+            q: sum(o["check_ms"][q] * int(o["checked"]) for o in obs) / weight
+            for q in ("p50", "p95")
+        }
+    )
+    return {
+        **counts,
+        "rate": _ratio(counts["blocked"], counts["checked"]),
+        "check_ms": check_ms,
+    }
+
+
+def compact_outbound(ob: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The outbound re-check block for tables and the UI (rate 0-1, 4 decimals)."""
+    if not ob:
+        return None
+    ms = ob.get("check_ms") or {}
+    return {
+        **{k: int(ob[k]) for k in ("requests", "checked", "blocked")},
+        "rate": _r(ob["rate"]),
+        "check_p50_ms": _r(ms.get("p50"), 3),
+        "check_p95_ms": _r(ms.get("p95"), 3),
     }
 
 
@@ -463,11 +503,71 @@ def compact(block: Mapping[str, Any]) -> dict[str, Any]:
         "detect_p95_ms": _r(detect.get("p95"), 3),
         "latency_pooled": bool(block.get("latency_pooled", False)),
         "per_type": per_type,
+        **(
+            {"outbound_check": compact_outbound(block["outbound_check"])}
+            if block.get("outbound_check")
+            else {}
+        ),
         **({"validity": compact_validity(block["validity"])} if block.get("validity") else {}),
     }
 
 
 # --- Index --------------------------------------------------------------------------------
+
+
+def display_note(note: str) -> str:
+    """A run-record note as a reader reads it (LAB-1266): drop ticket ids and
+    internal machine-sharing phrasing. The record keeps the raw note; the index
+    carries this public text alongside it."""
+    s = re.sub(
+        r"machine shared with parallel agent runs",
+        "machine shared with other jobs",
+        note,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(r"\s*\(LAB-\d+\)", "", s)
+    s = re.sub(r"^LAB-\d+:?\s+", "", s)
+    s = s.strip()
+    return (s[:1].upper() + s[1:]) if s else s
+
+
+_VISUAL_PART = {
+    "tesseract": "Tesseract",
+    "rules": "rules",
+    "captions": "captions",
+    "eka": "EKA",
+    "presidio-image": "Presidio Image Redactor",
+    "efficientsam-vitt": "EfficientSAM",
+    "yolos-tiny-signature": "YOLOS-tiny (signatures)",
+}
+
+
+def visual_short_label(system: str) -> str:
+    """``visual:sam-3.1+tesseract+rules`` -> ``PII Guard: SAM 3.1 + Tesseract + rules``.
+
+    Reader-facing short labels for image-masking runs (LAB-1266); keys stay slugs."""
+    kind, _, rest = system.partition(":")
+    if not rest:
+        kind, rest = "visual", kind
+    parts: list[str] = []
+    for part in rest.split("+"):
+        if not part:
+            continue
+        if part.startswith("sam-"):
+            parts.append(f"SAM {part[4:]}")
+        elif part.startswith("yunet"):
+            parts.append("YuNet")
+        elif part.startswith("llm:"):
+            name = " ".join(w.capitalize() for w in part[4:].split("-"))
+            parts.append(f"LLM ({name})")
+        else:
+            tuned = part.endswith("-tuned")
+            base = part[:-6] if tuned else part
+            parts.append(f"{_VISUAL_PART.get(base, base)}{' (tuned)' if tuned else ''}")
+    joined = " + ".join(parts)
+    if kind == "visual-segment":
+        return f"Segmenter: {joined}"
+    return f"PII Guard: {joined}" if rest.startswith("sam-") else joined
 
 
 def _short_label(label: str) -> str:
@@ -570,6 +670,7 @@ def build_index(
                     for k in ("usd", "estimated", "gpu_minutes", "note", "shared_with")
                 },
                 "notes": list(rec["notes"]),
+                "display_note": display_note("; ".join(rec["notes"])),
                 "rescored": None
                 if not rec.get("rescored")
                 else {k: rec["rescored"][k] for k in ("by", "method", "note")},
@@ -698,6 +799,8 @@ def build_index(
                 "date": rec["date"],
                 "commit": rec["code"]["commit"],
                 "system": rec["system"]["key"],
+                "display_label": visual_short_label(str(rec["system"]["key"])),
+                "display_note": display_note("; ".join(rec["notes"])),
                 "notes": list(rec["notes"]),
                 "fixture_set": rec["fixtures"][0]["set"] if rec["fixtures"] else None,
                 "specimens": m["specimens"],

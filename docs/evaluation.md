@@ -224,8 +224,12 @@ validated in the tests. A record says:
 - **on what**: each fixture file with its SHA-256, language, fixture set (`smoke`,
   `synth-sample` …), `origin` (`hand-written`, `generated` with the generator model, or
   `specimens`) and document count;
-- **where and when**: commit, dirty flag, package version, date, hardware, and cost (tokens,
-  GPU minutes, US dollars, whether estimated, and which runs a shared cost covers);
+- **where and when**: commit, dirty flag (and `dirty_paths`, the changed files), package
+  version, date, hardware, and cost (tokens, GPU minutes, US dollars, whether estimated, and
+  which runs a shared cost covers). A run is dirty only when a tracked file under `src/`,
+  `eval/fixtures/`, `scripts/`, `pyproject.toml` or `uv.lock` differs from the commit: docs and
+  results regenerated while runs are recorded, and untracked models or scratch files, don't
+  count. Records made before LAB-1496 counted any tracked change, so most of them say dirty;
 - **what came out**: per language and overall, P/R/F1 exact and overlap, macro F1, leak and
   partial leak, over-masking, round trip and placeholder consistency when the system has them,
   detection and masking latency p50/p95, and per-entity-type counts. All counts are kept, so
@@ -339,6 +343,27 @@ With the rules detector only, pre-loading takes overall overlap recall on that s
 stay lower for Hungarian because the gold spans include the case suffix, which the placeholder
 leaves outside by design.
 
+## Outbound re-check (false blocks)
+
+`pii-guard eval --outbound-check` also replays every document through the in-process gateway
+in fast mode, with the run's own `--detectors`, against a mock upstream, each document in its
+own vault session (LAB-1505). The gateway's outbound re-check (LAB-1500) refuses a masked
+request that still holds a value the session knows; on the evaluation sets every request should
+be forwarded, so every block is a false block. Each text block of the scorecard and the run
+record gets an optional `outbound_check`: `requests`, `checked` (requests the re-check read;
+refusals before it, such as a block policy, are not), `blocked`, `rate` (`blocked / checked`,
+validated like the other rates) and `check_ms` (p50 / p95 of the re-check's own time). The
+benchmark page adds a "False blocks" column to a set's table once a run of it carries the block.
+
+`pii-guard bench latency` records the re-check's time per cell as `outbound_check_ms` (p50 /
+p95 / p99 / mean of the traffic events' `outbound_check.ms`); the latency table adds a
+"Re-check p50" column once a run carries it. Both fields are optional, so older records still
+validate.
+
+```bash
+uv run pii-guard eval --fixtures eval/fixtures --detectors rules,ner --outbound-check
+```
+
 ## Lexicons: diversity and the address rule
 
 Measured when the lexicons landed ([ADR 0009](decisions/0009-third-party-lexicons.md)).
@@ -443,7 +468,7 @@ default doesn't cover, listed here.
 
 | Tool | How it runs | Configuration | Licenses (tool; models) |
 |---|---|---|---|
-| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default); Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
+| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default) and `de_core_news_lg` for `de`; Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
 | **LLM Guard** 0.3.16 | worker process, own environment | `Anonymize(Vault())` with defaults: the `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` NER model, threshold 0.5, its default entity list, language `en` (it supports only `en` and `zh`, so Hungarian documents also go through `en`). `Deanonymize` restores. A fresh vault per document. | MIT; `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` CC-BY-NC-4.0 (non-commercial) |
 | **PrivAiTe** 0.7.3 | worker process, own environment | The proxy's `PIIEngine` in-process with the `pii` section of its shipped `config/privaite.openai.yaml`: preset `onnx` (Presidio with `fr_core_news_md` + `en_core_web_lg`, plus the ONNX `openai/privacy-filter` model), placeholder anonymization, cards masked, secrets redacted. Each document is one user message through `process_request`, as the proxy does; `process_response` restores. Its detection doesn't take a language: every text goes through its French and English configuration. | BSD-3-Clause; `openai/privacy-filter` Apache-2.0, `en_core_web_lg` MIT, `fr_core_news_md` LGPL-LR |
 
@@ -722,8 +747,8 @@ fetched once into `$PII_GUARD_MODELS_DIR/ner/` (outside the repository) and chec
 
 ```bash
 uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py score --record
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py latency
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency
 ```
 
 **Label mapping** (`LABEL_MAP` in that module; every one of the 42 labels has an entry):

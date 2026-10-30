@@ -149,10 +149,10 @@ def _screenshot(job: tuple[dict[str, Any], bool]) -> dict[str, Any]:
 
 
 def _percentile(values: Sequence[float], q: float) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    return round(ordered[min(len(ordered) - 1, round(q * (len(ordered) - 1)))])
+    from pii_guard.eval.stats import percentile as _shared
+
+    result = _shared(values, q)
+    return None if result is None else round(result)
 
 
 def run(name: str, transforms: Sequence[float], before: bool, jobs: int) -> dict[str, Any]:

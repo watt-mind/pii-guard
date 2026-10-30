@@ -439,6 +439,23 @@ describe("Upstream refusals in the drawer (LAB-1335)", () => {
     expect(await screen.findByText(/Refused\. Nothing was sent to the model\./)).toBeInTheDocument();
     expect(screen.queryByText(/The upstream refused/)).toBeNull();
   });
+
+  it("shows the server's message instead of the client-side reason (LAB-1314)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    const blocked: TrafficEvent = {
+      ...asMasked(refused),
+      outcome: "blocked",
+      error: {
+        code: "blocked_entity",
+        status: 422,
+        message: "the text contains entity types blocked by policy: EMAIL (1)",
+        entity_types: { EMAIL: 1 },
+      },
+    };
+    f.push([blocked]);
+    expect(await screen.findByText("the text contains entity types blocked by policy: EMAIL (1)")).toBeInTheDocument();
+  });
 });
 
 describe("Endpoint traffic in project Logs (LAB-1492)", () => {

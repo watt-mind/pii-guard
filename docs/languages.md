@@ -146,6 +146,17 @@ und	-
   none.
 - Dates, amounts (a currency next to the number) and numbers inside longer runs are rejected,
   and a validated rule's hit always wins.
+- A third column `after` marks a cue that follows its value, for languages that put it there
+  (Hungarian `a +36 30 123 4567 számon`, `a KA652524 számú útlevelére`):
+  `számon<TAB>PHONE<TAB>after`. The value must stand right before the cue with only spaces
+  between; same shapes and score. A phone before such a cue also needs a `+` or `0` prefix
+  (`a 2026/4471 számon iktatott` is a file number). An `after` cue must name a type, and a
+  word that only says "number" (`számú`) is a cue only together with its noun
+  (`számú útlevél*`), or every `a 4500123456 számú szerződés` would match.
+- Short national account numbers (8–11 digits) are not accepted after `Kontonummer` or
+  `account number` (LAB-1199): the negative set has 10-digit customer, order and contract
+  numbers in the same texts (`Kundennummer 7700123456`, `Auftragsnummer 4500123456`), one cue
+  word away, and IBANs (which the shape accepts) replaced bare account numbers in SEPA text.
 - Cues run for every text, like `EVERYWHERE` rules: a form in your language may carry
   English labels and the other way round. Pick words that are unambiguous next to a number;
   when two packs map one cue to different types, the text's own language wins.
@@ -271,12 +282,11 @@ prompt, and exact matching in the vault.
 
 ## German smoke results
 
-`uv run pii-guard eval --fixtures eval/fixtures/de-smoke.jsonl` (rules detector, 10 documents
-with 40 labels, 2 of them hard negatives without any):
-
-| Detector | P overlap | R overlap | R exact | Leak | Round trip |
-|---|---:|---:|---:|---:|---:|
-| `rules` | 100.0 | 52.5 | 50.0 | 43.2 | 100.0 |
+Recorded as [`2026-10-29-de-smoke-rules`](../eval/results/runs/2026-10-29-de-smoke-rules.json)
+(`uv run pii-guard eval --fixtures eval/fixtures/de-smoke.jsonl --detectors rules`;
+see the [run log](benchmarks.md#run-log) for the current numbers): rules overlap precision
+100.0, overlap recall 52.5, exact recall 50.0, leak 43.2, round trip 100.0 on 10 documents
+with 40 labels (2 of them hard negatives without any).
 
 Every structured identifier is found (addresses, emails, phones, Steuer-IDs,
 Sozialversicherungsnummern, IBANs: 100 % overlap recall); the misses are the names, dates of

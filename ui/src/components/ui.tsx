@@ -223,11 +223,11 @@ export function SegmentedControl<T extends string>({
             "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-45",
             square
               ? size === "sm"
-                ? "size-7 pointer-coarse:size-10"
-                : "size-8 pointer-coarse:size-10"
+                ? "size-7 pointer-coarse:size-11"
+                : "size-8 pointer-coarse:size-11"
               : size === "sm"
-                ? "h-7 px-2.5 text-xs pointer-coarse:h-10"
-                : "h-8 px-3 text-sm pointer-coarse:h-10",
+                ? "h-7 px-2.5 text-xs pointer-coarse:h-11 pointer-coarse:min-h-[44px]"
+                : "h-8 px-3 text-sm pointer-coarse:h-11 pointer-coarse:min-h-[44px]",
           ].join(" ")}
         >
           <input

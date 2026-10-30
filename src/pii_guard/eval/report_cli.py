@@ -18,9 +18,9 @@ function of the inputs so ``--check`` compares them byte for byte:
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
 - the results block of ``README.md`` (:mod:`pii_guard.eval.report_readme`), when the config
   has a ``readme`` section;
-- ``docs/benchmarks/colours.json``: the append-only colour registry
+- ``docs/benchmarks/colours.json``: the append-only color registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
-  needs a colour;
+  needs a color;
 - with ``--journey``, the generated block of ``docs/journey.md``.
 
 The index (:mod:`pii_guard.eval.report_index`) is a build output, never committed: the report
@@ -186,9 +186,20 @@ def _marks(s: Mapping[str, Any]) -> str:
     return ("" if s.get("complete", True) else " †") + (" ‡" if s.get("rescored") else "")
 
 
+def _false_blocks(m: Mapping[str, Any]) -> str:
+    """``0.0% (0/120)``: the outbound re-check's false blocks of a snapshot, else ``—``."""
+    ob = m.get("outbound_check")
+    if not ob:
+        return "—"
+    return f"{fmt_pct(ob['rate'], sign=True)} ({ob['blocked']}/{ob['checked']})"
+
+
 def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
+    snaps = _ordered_snapshots(index, fixture_set)
+    # The outbound re-check column only once a run of the set measured it (LAB-1505).
+    outbound = any(s["all"].get("outbound_check") for s in snaps)
     rows = []
-    for s in _ordered_snapshots(index, fixture_set):
+    for s in snaps:
         m = s["all"]
         rows.append(
             [
@@ -202,6 +213,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
                 fmt_pct(m["over_masking"], sign=True),
                 fmt_pct(m["roundtrip"], sign=True),
                 fmt_duration(m["detect_p50_ms"]) + ("*" if m["latency_pooled"] else ""),
+                *([_false_blocks(m)] if outbound else []),
                 ", ".join(s["dates"]),
                 _commits(s),
             ]
@@ -218,6 +230,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             "Over-masking",
             "Round trip",
             "Detect p50",
+            *(["False blocks"] if outbound else []),
             "Run",
             "Commit",
         ],
@@ -232,6 +245,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             "---:",
             "---:",
             "---:",
+            *(["---:"] if outbound else []),
             "---",
             "---",
         ],
@@ -495,8 +509,11 @@ def _segmenter_table(index: Mapping[str, Any]) -> str:
 
 
 def _latency_table(index: Mapping[str, Any]) -> str:
+    runs = charts.latest_latency(index)
+    # The re-check column only once a run recorded it (LAB-1505).
+    outbound = any(c.get("outbound_check_ms") for r in runs for c in r["cells"])
     rows = []
-    for run in charts.latest_latency(index):
+    for run in runs:
         for c in run["cells"]:
             o, t = c["overhead_ms"] or {}, c.get("added_ttft_ms") or {}
             det = c.get("stages_ms", {}).get("detect") or {}
@@ -512,6 +529,11 @@ def _latency_table(index: Mapping[str, Any]) -> str:
                     fmt_duration(det.get("p50")),
                     fmt_duration(t.get("p50")) if c["stream"] else "—",
                     fmt_duration(t.get("p95")) if c["stream"] else "—",
+                    *(
+                        [fmt_duration((c.get("outbound_check_ms") or {}).get("p50"))]
+                        if outbound
+                        else []
+                    ),
                     f"{run['upstream_delay_ms']:g}",
                     f"`{run['run_id']}`",
                 ]
@@ -528,6 +550,7 @@ def _latency_table(index: Mapping[str, Any]) -> str:
             "Detect p50",
             "Added TTFT p50",
             "p95",
+            *(["Re-check p50"] if outbound else []),
             "Upstream delay ms",
             "Run",
         ],
@@ -542,6 +565,7 @@ def _latency_table(index: Mapping[str, Any]) -> str:
             "---:",
             "---:",
             "---:",
+            *(["---:"] if outbound else []),
             "---:",
             "---",
         ],
@@ -589,7 +613,7 @@ def _run_log(index: Mapping[str, Any]) -> str:
 _METHOD = """\
 ## How to read this
 
-- **Leak rate** is the share of labelled values that still appear, in any surface form, in
+- **Leak rate** is the share of labeled values that still appear, in any surface form, in
   the text the model would receive after masking (case- and whitespace-insensitive, through
   the language's inflected forms, structured identifiers by their letters and digits with any
   separators). Lower is safer; it is the number that matters most. **Partial leak** counts
@@ -604,9 +628,10 @@ _METHOD = """\
   (comparison tools that can't unmask show —).
 - **Hand-written vs generated sets.** `smoke` is written by hand with inline labels and has
   adversarial look-alikes; `synth-*` sets are written by a Meta Muse model around fictional
-  identities and labelled automatically. **Generated sets flatter Muse-based detectors**: the
+  identities and labeled automatically. **Muse-generated sets flatter Muse-based detectors**: the
   same model family wrote the text and reads it, so its phrasing and its idea of what an
-  entity is match. The headline charts use the hand-written set for that reason.
+  entity is match. Converted third-party (`public`) sets carry no such advantage.
+  The headline charts use the hand-written set for that reason.
 - **Small sets.** The sets have tens of documents per language: differences of a few points
   are noise. Every number below says which set, which run date and which commit it came from.
 - **Latency** is detection time per document (p50) on the hardware in the run log; it is not
@@ -675,7 +700,7 @@ def render_page(
     if index["visual"]:
         out.append("## Image masking\n")
         out.append(
-            "Share of labelled regions masked with IoU >= 0.5. `specimens` are official "
+            "Share of labeled regions masked with IoU >= 0.5. `specimens` are official "
             "specimen ID documents published by their issuers; `fictional-specimens` are "
             "specimen-style documents built from Muse Image output (LAB-1121). The two sets "
             "hold different documents, so compare runs within a set.\n"
@@ -751,8 +776,8 @@ def build_outputs(
 ) -> dict[Path, str]:
     """Every generated file and its content, from the records in ``runs_dir``.
 
-    ``colours`` is the append-only colour registry; it is an output too, so a new system's
-    colour is committed with it and ``--check`` fails until it is. ``readme`` is an output
+    ``colours`` is the append-only color registry; it is an output too, so a new system's
+    color is committed with it and ``--check`` fails until it is. ``readme`` is an output
     only when the config has a ``readme`` section: its results block is rewritten.
     """
     records = load_records(runs_dir)
@@ -775,10 +800,16 @@ def build_outputs(
     for name, _, render in CHARTS:
         if not _drawn(index, name):
             continue
-        outputs[docs_dir / "benchmarks" / name] = render(index, headline, systems)
+        svg = render(index, headline, systems)
+        outputs[docs_dir / "benchmarks" / name] = svg
+        outputs[docs_dir / "benchmarks" / name.replace(".svg", "-dark.svg")] = charts.dark_variant(
+            svg
+        )
     for name in validity_sets(index):
-        outputs[docs_dir / "benchmarks" / validity_chart(name)] = charts.number_validity(
-            index, fixture_set=name
+        svg = charts.number_validity(index, fixture_set=name)
+        outputs[docs_dir / "benchmarks" / validity_chart(name)] = svg
+        outputs[docs_dir / "benchmarks" / validity_chart(name).replace(".svg", "-dark.svg")] = (
+            charts.dark_variant(svg)
         )
     counts = _dataset_counts(runs_dir)
     outputs[docs_dir / "benchmarks.md"] = render_page(

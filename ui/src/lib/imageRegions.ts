@@ -175,6 +175,7 @@ export const TEXT_TYPE_NOUN: Partial<Record<EntityType, string>> = {
   NATIONAL_ID_HU_TAJ: "TAJ numbers",
   ID_DOCUMENT: "ID document numbers",
   BANK_ACCOUNT: "bank accounts",
+  PAYMENT_CARD: "payment card numbers",
   COMPANY_ID_HU: "company IDs",
   ORGANIZATION: "organization names",
   PARCEL_NUMBER_HU: "parcel numbers",

@@ -95,8 +95,15 @@ def _drop_contained(hits: list[_Hit]) -> list[_Hit]:
     Partial overlaps are kept: the resolver decides those. One sweep in start order: every
     kept hit starts at or before the current one, so the current one lies inside a kept hit
     exactly when the kept hits reach (end) at least as far.
+
+    Two hits on the same span with the same score keep the earlier rule's: language-independent
+    rules run before the packs, so a 16-digit number that passes both the card (Luhn) and the
+    Hungarian giro checks is a ``PAYMENT_CARD``. Duplicates are dropped in rule order, not via
+    a ``set``, whose order follows the per-process string hash and made that choice vary
+    between runs (LAB-1102).
     """
-    ordered = sorted(set(hits), key=lambda h: (h.start, -(h.end - h.start), -h.score))
+    unique = list(dict.fromkeys(hits))
+    ordered = sorted(unique, key=lambda h: (h.start, -(h.end - h.start), -h.score))
     kept: list[_Hit] = []
     reach = -1
     for hit in ordered:

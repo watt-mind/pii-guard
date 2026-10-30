@@ -258,6 +258,24 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
 });
 
 
+describe("Benchmarks screen, deep links (LAB-1133)", () => {
+  it("opens on the filters a shared link names", async () => {
+    history.replaceState(null, "", "#evaluation?lang=en");
+    render(<App api={offlineApi()} mock={createMockClient()} loadBenchmarks={load} />);
+    const panel = screen.getByRole("region", { name: "Evaluation" });
+    await within(panel).findByRole("region", { name: "Results" });
+    expect(within(panel).getByRole("radio", { name: "English" })).toBeChecked();
+    expect(cell(resultsTable(panel), "rules", "Leak")).toBe(pct(snap("smoke", "rules").languages.en!.leak));
+  });
+
+  it("writes filter changes back to the hash, so the URL stays shareable", async () => {
+    const { user, panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    await user.click(within(panel).getByRole("radio", { name: "English" }));
+    await waitFor(() => expect(location.hash).toContain("lang=en"));
+  });
+});
+
 it("retries failed dataset and run-log reads independently", async () => {
   const user = userEvent.setup();
   const set = vi.fn().mockRejectedValueOnce(new Error("internal set path")).mockImplementation(async (name: string) => ({ snapshots: INDEX.snapshots.filter((s) => s.fixture_set === name), history: INDEX.history.filter((s) => s.fixture_set === name) }));

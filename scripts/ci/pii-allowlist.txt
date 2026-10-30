@@ -29,4 +29,5 @@ gb33bukb20201555555555
 gb82west12345698765432
 hu42117730161111101800000000
 hu78117730162048573300000006
+ka652524  # fictional: synthetic ai4privacy hu passport (eval/fixtures/public/hu-ai4privacy.jsonl), LAB-1199
 pl1234563218

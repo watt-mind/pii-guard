@@ -17,7 +17,7 @@ A `StrEnum` whose values equal their names, one member per row of
 
 | Group | Members |
 |---|---|
-| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`, `SECRET` |
+| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `PAYMENT_CARD`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`, `SECRET` |
 | Visual | `FACE`, `SIGNATURE`, `ID_PHOTO`, `STAMP` |
 
 `TEXT_ENTITY_TYPES` and `VISUAL_ENTITY_TYPES` are `frozenset`s of the two groups;
@@ -160,7 +160,7 @@ label, a consistent postcode and settlement, or valid check digits:
 
 | Scope | Entity types | Scores |
 |---|---|---|
-| all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
+| all | `BANK_ACCOUNT` (IBAN, mod 97), `PAYMENT_CARD` (issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
 | all | `SECRET` (provider key shapes, PEM private keys, `scheme://user:password@host`, values assigned to a secret-ish key, `Authorization: Bearer/Basic`; [entities.md](entities.md#language-independent)) | provider shape 0.9-0.97, private key 0.99, URL password 0.9 / user 0.85, bearer 0.9, assignment 0.85 |
 | `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labeled ID card / passport / license / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
 | `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
@@ -400,7 +400,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 502 | `upstream_unavailable` | Gateway: the upstream could not be reached or answered with something unusable. The provider's own error text is never passed on. |
 | 502 | `upstream_did_not_stream` | `POST /v1/chat/completions` with `stream: true`: the upstream answered without `text/event-stream`. The body is not read or forwarded; retry without `stream` (see [Gateway chat streaming](#gateway-chat-streaming-implemented)). |
 | 503 | `upstream_not_configured` | Gateway: the server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). |
-| 503 | `vault_capacity_exhausted` | A new vault session is needed while every session slot is held by an active request; nothing is masked or sent. Retry once a request finishes. |
+| 503 | `vault_capacity_exhausted` | A new vault session is needed while every session slot is held by an active request, or this client identity already holds `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` in-flight requests (LAB-1584; then even an existing session is refused); nothing is masked or sent. Retry once a request finishes. |
 | 503 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
@@ -1031,9 +1031,16 @@ Treatments:
   schematic placeholder notation; an
   integral float in its integer form): a number with detected personal data is replaced by
   the placeholder **string** (`"[[NATIONAL_ID_HU_TAX]]"`), because a JSON number can't
-  carry a placeholder; any other number is forwarded as the same number. A restored value
-  comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
-  string, not a number (LAB-1348). If distinct object keys mask to the same key (including
+  carry a placeholder; any other number is forwarded as the same number (LAB-1348). The
+  session records that the placeholder replaced a JSON number and its literal. When the
+  answer's tool-call arguments (chat `function.arguments` and legacy `function_call`,
+  Responses `function_call.arguments`; whole and streamed) hold that placeholder as a whole
+  string value (`"tax_id": "[[NATIONAL_ID_HU_TAX]]"`), it is restored as the original
+  number literal (`<NUMBER>`, or `<NUMBER>.0` for a float), quotes dropped (LAB-1361).
+  It stays a string inside a longer string, as an object key, in message text, and whenever
+  the same placeholder also replaced a whole string or a different number literal
+  (fail closed). The restored value is charged to the restore budget as usual. In a stream
+  the `"` before a possible placeholder is held back with it. If distinct object keys mask to the same key (including
   case or Unicode variants), the request fails closed with `400 invalid_request`, at any
   nesting depth. No values are merged or silently dropped, and nothing is forwarded
   (LAB-1568).
@@ -1338,7 +1345,7 @@ doesn't inflate them).
 | `SessionNotFoundError` (`PiiGuardError`) | `not_found` | 404 | The session id is unknown, expired or closed. Raised by `Vault.session` and by every `VaultSession` method (and so by `StreamUnmasker`) once the session is gone; the gateway fails the request instead of forwarding unrestored text. |
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
 | `VaultNotConfiguredError` (`PiiGuardError`) | `vault_not_configured` | 503 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
-| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased. |
+| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased, or any gateway request (new or existing session) from an identity already at `max_leases_per_identity` leases. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
 | `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
 
@@ -1370,6 +1377,10 @@ built on it.
   stream cleanup, releasing it on failures and cancellation as well as success.
 - If every capacity slot is leased, creating another session fails closed with HTTP 503
   `vault_capacity_exhausted`; it neither exceeds the cap nor evicts an active session.
+- An identity already holding `max_leases_per_identity` leases
+  (`PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY`) is refused with the same 503 before lookup or
+  creation, for an existing session as well as a new one, so one client can't pin every slot;
+  other identities still acquire (LAB-1584).
   Leases do not suspend sliding TTL or explicit deletion/purge semantics.
 - `VaultSession.commit(fork)` consumes the fork once and validates its entire journal against
   a private snapshot under the parent lock before publishing the state. A replay mismatch
@@ -1557,8 +1568,8 @@ accepts directories (default `eval/fixtures`). Unloadable detectors are skipped 
 warning. Markdown goes to stdout. Exit codes: 0 ok, 1 a detector or the vault failed during the
 run (fail closed, no scorecard), 2 bad arguments, fixtures or no loadable detector.
 
-The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version, detectors,
-skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
+The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag and `dirty_paths`,
+version, detectors, skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
 contains document text or labeled values.

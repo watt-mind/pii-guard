@@ -27,7 +27,7 @@ import {
   requestMessages,
   requestTools,
   responseChoices,
-  refusalReason,
+  refusalDetail,
   totalMasked,
   type Message,
 } from "../lib/traffic";
@@ -787,7 +787,7 @@ function CallDetail({
             {e.error?.entity_types ? ` · ${Object.entries(e.error.entity_types).map(([k, n]) => `${metaFor(k as EntityType).label} ×${n}`).join(", ")}` : ""}
           </p>
           <p className="mt-2 text-muted">
-            {upstreamSide ? upstreamCopy.body : refusalReason(e.error?.code, Boolean(e.entities?.images))}
+            {upstreamSide ? upstreamCopy.body : refusalDetail(e.error, Boolean(e.entities?.images))}
           </p>
         </div>
       )}

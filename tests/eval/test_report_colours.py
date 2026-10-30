@@ -41,7 +41,8 @@ def _copy_repo(tmp_path: Path) -> Path:
         "eval/datasets/results",  # per-dataset CIs (LAB-1226)
     ):
         shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
-    for rel in ("docs/benchmarks.md",):  # the index is a build output, not committed
+    # the index is a build output, not committed; README.md carries the results block
+    for rel in ("docs/benchmarks.md", "README.md"):
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / rel, tmp_path / rel)
     return tmp_path
@@ -166,5 +167,8 @@ def test_a_new_visual_system_keeps_existing_visual_colours(
     assert {k: new_visual[k] for k in old_visual} == old_visual
     assert "visual:aaa-new" in new_visual
     for path in before:
-        if path.suffix == ".svg" and path.name != "visual-recall.svg":
+        if path.suffix == ".svg" and path.name not in (
+            "visual-recall.svg",
+            "visual-recall-dark.svg",
+        ):
             assert after[path] == before[path], path
