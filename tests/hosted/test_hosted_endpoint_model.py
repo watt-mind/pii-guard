@@ -216,3 +216,33 @@ def test_form_catalog_asks_a_byok_provider_through_egress(hosted):
         headers=auth("synthetic-two"),
     )
     assert foreign.status_code == 404
+
+
+# --- LAB-1462: Muse Code through an endpoint URL ----------------------------------------------
+
+
+@pytest.mark.parametrize("routed", [False, True], ids=["root", "endpoint-path"])
+def test_endpoint_key_reads_the_pinned_muse_catalog(hosted, routed):
+    client, seen = hosted
+    endpoint = _create(client, provider="sponsored", model="muse-spark-1.3").json()
+    key = _key(client, endpoint)
+    path = f"/e/{endpoint['id']}/muse-code/models" if routed else "/muse-code/models"
+    result = client.get(path, headers={"authorization": "Bearer " + key})
+    assert result.status_code == 200, result.text
+    assert [m["id"] for m in result.json()["data"]] == ["muse-spark-1.3"]
+    assert not seen
+
+
+def test_unknown_endpoint_key_on_the_root_muse_catalog_is_401(hosted):
+    client, seen = hosted
+    result = client.get("/muse-code/models", headers={"authorization": "Bearer pg_ep_fake"})
+    assert result.status_code == 401, result.text
+    assert not seen
+
+
+def test_endpoint_key_stays_off_other_root_routes(hosted):
+    client, _ = hosted
+    endpoint = _create(client, provider="sponsored", model="muse-spark-1.3").json()
+    key = _key(client, endpoint)
+    result = client.get("/v1/models", headers={"authorization": "Bearer " + key})
+    assert result.status_code == 401, result.text
