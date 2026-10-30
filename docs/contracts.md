@@ -400,7 +400,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 502 | `upstream_unavailable` | Gateway: the upstream could not be reached or answered with something unusable. The provider's own error text is never passed on. |
 | 502 | `upstream_did_not_stream` | `POST /v1/chat/completions` with `stream: true`: the upstream answered without `text/event-stream`. The body is not read or forwarded; retry without `stream` (see [Gateway chat streaming](#gateway-chat-streaming-implemented)). |
 | 503 | `upstream_not_configured` | Gateway: the server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). |
-| 503 | `vault_capacity_exhausted` | A new vault session is needed while every session slot is held by an active request; nothing is masked or sent. Retry once a request finishes. |
+| 503 | `vault_capacity_exhausted` | A new vault session is needed while every session slot is held by an active request, or this client identity already holds `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` in-flight requests (LAB-1584; then even an existing session is refused); nothing is masked or sent. Retry once a request finishes. |
 | 503 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
@@ -1345,7 +1345,7 @@ doesn't inflate them).
 | `SessionNotFoundError` (`PiiGuardError`) | `not_found` | 404 | The session id is unknown, expired or closed. Raised by `Vault.session` and by every `VaultSession` method (and so by `StreamUnmasker`) once the session is gone; the gateway fails the request instead of forwarding unrestored text. |
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
 | `VaultNotConfiguredError` (`PiiGuardError`) | `vault_not_configured` | 503 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
-| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased. |
+| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased, or any gateway request (new or existing session) from an identity already at `max_leases_per_identity` leases. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
 | `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
 
@@ -1377,6 +1377,10 @@ built on it.
   stream cleanup, releasing it on failures and cancellation as well as success.
 - If every capacity slot is leased, creating another session fails closed with HTTP 503
   `vault_capacity_exhausted`; it neither exceeds the cap nor evicts an active session.
+- An identity already holding `max_leases_per_identity` leases
+  (`PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY`) is refused with the same 503 before lookup or
+  creation, for an existing session as well as a new one, so one client can't pin every slot;
+  other identities still acquire (LAB-1584).
   Leases do not suspend sliding TTL or explicit deletion/purge semantics.
 - `VaultSession.commit(fork)` consumes the fork once and validates its entire journal against
   a private snapshot under the parent lock before publishing the state. A replay mismatch
