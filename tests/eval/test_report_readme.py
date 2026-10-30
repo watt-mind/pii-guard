@@ -10,7 +10,15 @@ import pytest
 
 from pii_guard import cli
 from pii_guard.eval.record import RecordError
-from pii_guard.eval.report_readme import END, START, fill, parse_spec, render_block, splice
+from pii_guard.eval.report_readme import (
+    END,
+    START,
+    fill,
+    parse_spec,
+    render_block,
+    render_compact,
+    splice,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -71,8 +79,8 @@ def test_block_takes_the_latest_numbers_bolds_the_best_and_links_records() -> No
     ]
     block = render_block(_index(), counts, parse_spec(SPEC, "config"))
     assert "| Leak | Hand-written (de+en, 3 docs) | Public (7) |" in block
-    assert "| **Fast** | **0.0 %** | 2.0 % |" in block
-    assert "| Other | 12.3 % | **1.9 %** |" in block
+    assert "| **Fast** | **0.0%** | 2.0% |" in block
+    assert "| Other | 12.3% | **1.9%** |" in block
     assert "| Never run | — | — |" in block
     assert "fast 45 ms, Other 88 ms*" in block
     assert "[Hand-written](eval/results/runs/run-fast.json)" in block
@@ -84,9 +92,9 @@ def test_block_states_the_first_rows_over_masking_from_the_same_records() -> Non
     """LAB-1598: the README's over-masking figures come from the table's records, not prose."""
     counts = [_counts("fast", 0.02, "new-fast")]
     block = render_block(_index(), counts, parse_spec(SPEC, "config"))
-    assert "Over-masking of the fast row: Hand-written 1.1 %, Public 27.9 %" in block
+    assert "Over-masking of the fast row: Hand-written 1.1%, Public 27.9%" in block
     no_over = [{**c, "summary": {"documents": 7, "leak": {"value": 0.1}}} for c in counts]
-    assert "Over-masking of the fast row: Hand-written 1.1 % (" in render_block(
+    assert "Over-masking of the fast row: Hand-written 1.1% (" in render_block(
         _index(), no_over, parse_spec(SPEC, "config")
     )
 
@@ -95,8 +103,8 @@ def test_a_caveat_mark_on_the_best_cell_drops_the_bold() -> None:
     spec = json.loads(json.dumps(SPEC))
     spec["rows"][0]["marks"] = {"smoke": "†"}
     block = render_block(_index(), [], parse_spec(spec, "config"))
-    assert "| **Fast** | 0.0 % † | — |" in block
-    assert "| Other | 12.3 % | — |" in block
+    assert "| **Fast** | 0.0% † | — |" in block
+    assert "| Other | 12.3% | — |" in block
 
 
 def test_splice_replaces_only_the_marked_block() -> None:
@@ -162,9 +170,9 @@ def test_a_cell_missing_languages_is_marked_and_never_bold() -> None:
     """LAB-1656: a tool run on fewer languages is not pooled silently with complete rows."""
     spec = {"columns": [SPEC["columns"][0]], "rows": SPEC["rows"][:2]}
     block = render_block(_partial_index(), [], parse_spec(spec, "config"))
-    # Both are 0.0 %, but the winner set includes a marked cell, so nothing is bold.
-    assert "| **Fast** | 0.0 % |" in block
-    assert "| Other | 0.0 % § |" in block
+    # Both are 0.0%, but the winner set includes a marked cell, so nothing is bold.
+    assert "| **Fast** | 0.0% |" in block
+    assert "| Other | 0.0% § |" in block
     assert "§ Run on fewer languages than the set has" in block
     assert "Other on Hand-written (no en)" in block
 
@@ -172,10 +180,10 @@ def test_a_cell_missing_languages_is_marked_and_never_bold() -> None:
 def test_over_masking_table_and_per_language_line() -> None:
     spec = parse_spec({**SPEC, "over_masking_table": True, "per_language": True}, "config")
     block = render_block(_partial_index(), [_counts("fast", 0.02, "new-fast")], spec)
-    assert "Leak per language of the fast row on `smoke`: de 0.0 %, en 3.3 %." in block
+    assert "Leak per language of the fast row on `smoke`: de 0.0%, en 3.3%." in block
     assert "| Over-masking | Hand-written (de+en, 3 docs) | Public (7) |" in block
-    assert "| **Fast** | **1.1 %** | **27.9 %** |" in block  # the only number is the lowest
-    assert "| Other | 30.0 % § | — |" in block
+    assert "| **Fast** | **1.1%** | **27.9%** |" in block  # the only number is the lowest
+    assert "| Other | 30.0% § | — |" in block
     assert "Over-masking of the fast row" not in block  # the table replaces the one-liner
     with pytest.raises(RecordError, match="per_language"):
         parse_spec({**SPEC, "per_language": "yes"}, "config")
@@ -241,6 +249,20 @@ def test_model_latency_line_quotes_one_model_of_a_measurement() -> None:
         "NER per message: p50 43 ms, p95 50 ms (122 messages of about 382 characters, Test CPU, "
         "8 threads; [measurement](eval/results/x/latency.json))." in block
     )
+    compact = parse_spec(
+        {
+            "columns": SPEC["columns"][:1],
+            "rows": SPEC["rows"][:2],
+            "layout": "compact",
+            "model_latency": dict(ml),
+        },
+        "config",
+    )
+    compact["model_latency"]["data"] = {**data, "machine": "arm64 macOS-26.5.2-arm64-arm-64bit"}
+    assert (
+        "NER per message: p95 50 ms (122 messages of about 382 characters, arm64 macOS 26.5, "
+        "8 threads;" in render_compact(_index(), compact)
+    )
     spec["model_latency"]["model"] = "missing"
     with pytest.raises(RecordError, match="has no result"):
         render_block(_index(), [], spec)
@@ -267,8 +289,10 @@ def test_latency_placeholders_fill_from_the_records() -> None:
         {**SPEC, "model_latency": {"file": "x.json", "model": "new", "label": "NER"}}, "c"
     )
     spec["model_latency"]["data"] = {"results": {"new": {"p50_ms": 42.8, "p95_ms": 49.6}}}
-    text = fill("NER {ner_p50:new}, gateway {overhead_p50:lat-cpu}.", index, spec, "c")
-    assert text == "NER 43 ms, gateway 55 ms."
+    text = fill(
+        "NER {ner_p50:new} (p95 {ner_p95:new}), gateway {overhead_p50:lat-cpu}.", index, spec, "c"
+    )
+    assert text == "NER 43 ms (p95 50 ms), gateway 55 ms."
     with pytest.raises(RecordError, match="no model_latency result"):
         fill("{ner_p50:missing}", index, spec, "c")
     with pytest.raises(RecordError, match="single-client"):

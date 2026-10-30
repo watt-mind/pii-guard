@@ -52,9 +52,11 @@ placeholders filled from the records (:func:`fill`): ``{leak:<set>:<system>}``,
 ``{langs:<set>}`` / ``{codes:<set>}`` (its languages); a system is a run-record key or an
 alias from ``aliases``.
 
-LAB-1683, two latency placeholders for the intro's "How fast" line: ``{ner_p50:<model>}``, the
-p50 of one model in the ``model_latency`` measurement, and ``{overhead_p50:<run id>}``, the
-gateway-overhead p50 of a ``pii-guard bench latency`` record (one client, not streaming).
+LAB-1683, latency placeholders for the intro's "How fast" line: ``{ner_p50:<model>}`` and
+``{ner_p95:<model>}``, one model's percentiles in the ``model_latency`` measurement, and
+``{overhead_p50:<run id>}``, the gateway-overhead p50 of a ``pii-guard bench latency`` record
+(one client, not streaming). Percentages print without a space (``0.2%``), as in the rest of
+the README copy.
 
 LAB-1675, ``"table_image": {"image": "results-table", "alt": "...", "summary": "..."}``: the
 compact table is shown as the generated image (light and dark, :mod:`pii_guard.eval.report_share`
@@ -178,18 +180,27 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
     return spec
 
 
-def _model_latency_line(ml: Mapping[str, Any], where: str) -> str:
+def _machine(raw: str) -> str:
+    """``arm64 macOS-26.5.2-arm64-arm-64bit`` -> ``arm64 macOS 26.5`` (LAB-1683); else as is."""
+    m = re.match(r"^(\S+) macOS-(\d+\.\d+)", raw)
+    return f"{m.group(1)} macOS {m.group(2)}" if m else raw
+
+
+def _model_latency_line(ml: Mapping[str, Any], where: str, *, p50: bool = True) -> str:
+    """The model-latency sentence; ``p50=False`` (compact layout, LAB-1683) gives only the p95,
+    because the intro already quotes the p50."""
     data = ml.get("data")
     if not isinstance(data, Mapping):
         raise RecordError(f"{where}: model_latency {ml['file']!r} was not read")
     result = data.get("results", {}).get(ml["model"])
     if not isinstance(result, Mapping):
         raise RecordError(f"{where}: model_latency {ml['file']!r} has no result {ml['model']!r}")
+    head = f"p50 {fmt_duration(result['p50_ms'])}, " if p50 else ""
     return (
-        f"{ml['label']}: p50 {fmt_duration(result['p50_ms'])}, "
-        f"p95 {fmt_duration(result['p95_ms'])} ({data['messages']} messages of about "
-        f"{round(data['mean_chars'])} characters, {data['machine']}, "
-        f"{data['torch_threads']} threads; [measurement]({ml['file']}))."
+        f"{ml['label']}: {head}p95 {fmt_duration(result['p95_ms'])} ({data['messages']} "
+        f"messages of about {round(data['mean_chars'])} characters, "
+        f"{_machine(str(data['machine']))}, {data['torch_threads']} threads; "
+        f"[measurement]({ml['file']}))."
     )
 
 
@@ -221,7 +232,7 @@ def _col_id(col: Mapping[str, Any]) -> str:
 
 def _pct(value: float | None) -> str:
     # Rounded as both tables in docs/benchmarks.md round (one decimal of the percentage).
-    return _MISSING if value is None else f"{value * 100:.1f} %"
+    return _MISSING if value is None else f"{value * 100:.1f}%"
 
 
 def _latest_counts(counts: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], Any]:
@@ -443,9 +454,9 @@ def _table(
             if c.missing and text != _MISSING:
                 mark.append(_PARTIAL)
             marks.append(" ".join(m for m in mark if m))
-        numbers = [float(s[:-2]) for s in shown if s != _MISSING]
+        numbers = [float(s[:-1]) for s in shown if s != _MISSING]
         best = min(numbers) if numbers else None
-        winners = [i for i, s in enumerate(shown) if s != _MISSING and float(s[:-2]) == best]
+        winners = [i for i, s in enumerate(shown) if s != _MISSING and float(s[:-1]) == best]
         bold = bool(winners) and not any(marks[i] for i in winners)
         for i, text in enumerate(shown):
             cell = f"**{text}**" if bold and i in winners else text
@@ -470,7 +481,9 @@ def splice(
 # --- LAB-1663: the compact layout and the intro block -------------------------------------
 
 _LANGS = {"de": "German", "en": "English", "hu": "Hungarian", "pl": "Polish"}
-_FIELD = re.compile(r"\{(leak|over|partial|docs|langs|codes|ner_p50|overhead_p50):([^{}]+)\}")
+_FIELD = re.compile(
+    r"\{(leak|over|partial|docs|langs|codes|ner_p50|ner_p95|overhead_p50):([^{}]+)\}"
+)
 _METRIC = {"leak": "leak", "over": "over_masking", "partial": "partial_leak"}
 
 
@@ -490,13 +503,13 @@ def _language_names(codes: Sequence[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
-def _ner_p50(spec: Mapping[str, Any], model: str, where: str) -> str:
+def _ner_latency(spec: Mapping[str, Any], model: str, pct: str, where: str) -> str:
     ml = spec.get("model_latency") or {}
     data = ml.get("data")
     result = data.get("results", {}).get(model) if isinstance(data, Mapping) else None
     if not isinstance(result, Mapping):
-        raise RecordError(f"{where}: no model_latency result {model!r} for {{ner_p50:{model}}}")
-    return fmt_duration(result["p50_ms"])
+        raise RecordError(f"{where}: no model_latency result {model!r} for {{ner_{pct}:{model}}}")
+    return fmt_duration(result[f"{pct}_ms"])
 
 
 def _overhead_p50(index: Mapping[str, Any], run_id: str, where: str) -> str:
@@ -515,8 +528,8 @@ def fill(template: str, index: Mapping[str, Any], spec: Mapping[str, Any], where
 
     def one(m: re.Match[str]) -> str:
         field, arg = m.group(1), m.group(2)
-        if field == "ner_p50":
-            return _ner_p50(spec, arg, where)
+        if field in ("ner_p50", "ner_p95"):
+            return _ner_latency(spec, arg, field[-3:], where)
         if field == "overhead_p50":
             return _overhead_p50(index, arg, where)
         fixture_set, _, system = arg.partition(":")
@@ -540,9 +553,9 @@ def fill(template: str, index: Mapping[str, Any], spec: Mapping[str, Any], where
 
 def _bold_min(values: Sequence[float | None]) -> list[str]:
     shown = [_pct(v) for v in values]
-    nums = [float(t[:-2]) for t in shown if t != _MISSING]
+    nums = [float(t[:-1]) for t in shown if t != _MISSING]
     best = min(nums) if nums else None
-    return [f"**{t}**" if t != _MISSING and float(t[:-2]) == best else t for t in shown]
+    return [f"**{t}**" if t != _MISSING and float(t[:-1]) == best else t for t in shown]
 
 
 def render_compact(
@@ -578,9 +591,7 @@ def render_compact(
         docs = sum(info["documents"].values())
         label = f"{col['title']} · {docs} docs ({'+'.join(info['documents'])})"
         # No breakable space inside a cell, so a row never wraps at GitHub's 1280 px column.
-        body = [
-            f"{a}&nbsp;·&nbsp;{b}".replace(" %", "%") for a, b in zip(leaks, overs, strict=True)
-        ]
+        body = [f"{a}&nbsp;·&nbsp;{b}" for a, b in zip(leaks, overs, strict=True)]
         out.append("| " + " | ".join(_escape(c) for c in [label, *body]) + " |")
     out.append("")
     if image:
@@ -596,7 +607,7 @@ def render_compact(
     details = spec.get("details") or {}
     lines = [fill(x, index, spec, where) for x in details.get("lines") or []]
     if spec.get("model_latency"):
-        lines.append(_model_latency_line(spec["model_latency"], where))
+        lines.append(_model_latency_line(spec["model_latency"], where, p50=False))
     first = rows[0]
     refs = []
     for col in columns:
