@@ -92,7 +92,11 @@ def test_index_has_every_run_and_derived_vocabularies(
     assert index["featured"] == [k for k in CONFIG["featured"] if k in index["systems"]]
     assert sum(1 for s in index["systems"].values() if s["default"]) == 1
     assert len(index["visual"]) == sum(1 for r in records if r["kind"] == "visual")
-    assert {v["fixture_set"] for v in index["visual"]} == {"specimens", "fictional-specimens"}
+    assert {v["fixture_set"] for v in index["visual"]} == {
+        "specimens",
+        "fictional-specimens",
+        "prompt-set",
+    }
     assert index["fixture_sets"]["fictional-specimens"]["origin"] == "generated"
     dates = [r["date"] for r in index["runs"]]
     assert dates == sorted(dates)

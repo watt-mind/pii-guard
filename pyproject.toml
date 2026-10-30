@@ -187,6 +187,7 @@ conflicts = [
 ]
 
 [tool.uv.sources]
+de-core-news-lg = { url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" }
 en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }
 # torch from the PyTorch CPU index on Linux (the Docker images, CI): the PyPI Linux wheel pulls
 # the CUDA libraries (nvidia-*, triton, about 6 GB) although pii-guard runs the NER on CPU

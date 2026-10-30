@@ -6,8 +6,8 @@ entity with ``<ENTITY_TYPE>``). The only choice we make is the spaCy model per l
 because Presidio ships none for Hungarian:
 
 - ``en``: ``en_core_web_lg`` (Presidio's own default model).
-- ``hu``: ``hu_core_news_lg`` (huSpaCy), the strongest spaCy pipeline for Hungarian.
-- ``de``: ``de_core_news_lg``, the standard German spaCy pipeline. The
+- ``de``: ``de_core_news_lg``, the standard German spaCy pipeline.
+- ``hu``: ``hu_core_news_lg`` (huSpaCy), the strongest spaCy pipeline for Hungarian. The
   predefined recognizers that Presidio registers for a non-English language are the
   language-independent ones (email, IBAN, phone, IP, URL, date, crypto, ...); the
   US-specific ones are English only. It is not a package dependency: ``pii-guard baselines

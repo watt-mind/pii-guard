@@ -115,3 +115,13 @@ def test_policy_set_value_semantics() -> None:
     assert a.keep_types == PolicySet().keep_types
     assert a.overrides() == {EntityType.EMAIL: Policy.BLOCK}
     assert a.as_mapping()[EntityType.PERSON] is Policy.MASK
+
+
+def test_linkage_overrides_mask_the_default_keep_text_types() -> None:
+    from pii_guard.policy import LINKAGE_OVERRIDES
+
+    policies = PolicySet(LINKAGE_OVERRIDES)
+    assert policies.of(EntityType.ORGANIZATION) is Policy.MASK
+    assert policies.of(EntityType.COMPANY_ID_HU) is Policy.MASK
+    assert policies.keep_types == frozenset({EntityType.STAMP})  # visual only
+    assert parse_overrides("ORGANIZATION=mask,COMPANY_ID_HU=mask") == dict(LINKAGE_OVERRIDES)

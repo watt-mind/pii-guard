@@ -16,6 +16,10 @@ project has none, and it runs as one atomic store operation (one snapshot read a
 write for the Blob store, retried after a conflict; the store's lock for the local one), so
 repeat sign-ins and concurrent first requests never create a second one. No schema change: an
 existing snapshot loads as is.
+
+The owner's Meta key is checked for shape before anything is saved (LAB-1463), so an obvious
+paste mistake is refused with ``invalid_provider_key`` instead of turning the endpoint ready and
+failing at the first request. It is a format check only, never a provider call.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from pydantic import SecretStr
 
 from pii_guard.projects.blob import BlobProjectStore
 from pii_guard.projects.store import InvalidProjectConfigError, ProjectStorageError, ProjectStore
+from pii_guard.types import PiiGuardError
 from pii_guard.upstreams import PRESETS
 
 DEFAULT_ENDPOINT_NAME = "Default endpoint"
@@ -33,6 +38,36 @@ FIRST_RUN_KEY_NAME = "First-run key"
 META_BASE_URL = PRESETS["meta"].base_url
 # Conditional-write attempts on the Blob store before a conflict is reported.
 BLOB_ATTEMPTS = 3
+# The shape of a Meta API key: one token of printable ASCII, no spaces or quotes, not a URL.
+# Real keys are far longer than the floor; the ceiling matches the request body limit.
+META_KEY_MIN_CHARS = 20
+META_KEY_MAX_CHARS = 4096
+_META_KEY_REFUSED = frozenset("\"'`")
+
+
+class InvalidProviderKeyError(PiiGuardError):
+    """The provider key is obviously malformed; the message names the shape, never the value."""
+
+    code = "invalid_provider_key"
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The Meta API key is not in the expected format: one token of at least "
+            f"{META_KEY_MIN_CHARS} printable characters, without spaces, quotes or a URL."
+        )
+
+
+def check_meta_key(value: SecretStr) -> SecretStr:
+    """The key without surrounding whitespace, or :class:`InvalidProviderKeyError`."""
+    key = value.get_secret_value().strip()
+    if (
+        not META_KEY_MIN_CHARS <= len(key) <= META_KEY_MAX_CHARS
+        or any(not "!" <= char <= "~" or char in _META_KEY_REFUSED for char in key)
+        or "://" in key
+    ):
+        raise InvalidProviderKeyError()
+    return SecretStr(key)
 
 
 def endpoint_state(endpoint: dict[str, Any], *, sponsored_enabled: bool) -> str:

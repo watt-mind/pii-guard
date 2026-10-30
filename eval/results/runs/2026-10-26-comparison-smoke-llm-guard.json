@@ -22,6 +22,7 @@
   },
   "system": {
     "family": "comparison",
+    "role": "tool",
     "tool": "llm-guard",
     "version": "0.3.16",
     "label": "LLM Guard",

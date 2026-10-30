@@ -55,6 +55,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from pii_guard.config import DEFAULT_DETECTORS
+from pii_guard.eval.record import system_role
 from pii_guard.eval.report_colours import PALETTE_LATENCY, PALETTE_VISUAL, SECTIONS, assign
 from pii_guard.types import EntityType
 
@@ -560,6 +561,7 @@ def _systems(
                 "label": system["label"],
                 "short_label": _short_label(system["label"]),
                 "family": system["family"],
+                "role": system.get("role") or system_role(system),
                 "tool": system["tool"],
                 "kind": latest[key]["kind"],
                 "detectors": [d["name"] for d in system["detectors"]],

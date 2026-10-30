@@ -41,7 +41,8 @@ def _copy_repo(tmp_path: Path) -> Path:
         "eval/datasets/results",  # per-dataset CIs (LAB-1226)
     ):
         shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
-    for rel in ("docs/benchmarks.md",):  # the index is a build output, not committed
+    # the index is a build output, not committed; README.md carries the results block
+    for rel in ("docs/benchmarks.md", "README.md"):
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / rel, tmp_path / rel)
     return tmp_path

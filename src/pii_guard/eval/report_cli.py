@@ -16,6 +16,8 @@ function of the inputs so ``--check`` compares them byte for byte:
 - ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`), plus
   ``validity-<set>.svg`` for each set with a number-validity breakdown;
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
+- the results block of ``README.md`` (:mod:`pii_guard.eval.report_readme`), when the config
+  has a ``readme`` section;
 - ``docs/benchmarks/colours.json``: the append-only color registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
   needs a color;
@@ -55,6 +57,9 @@ from pii_guard.eval.report_journey import (
     load_entries,
 )
 from pii_guard.eval.report_journey import render as render_journey
+from pii_guard.eval.report_readme import parse_spec as parse_readme_spec
+from pii_guard.eval.report_readme import render_block as render_readme_block
+from pii_guard.eval.report_readme import splice as splice_readme
 from pii_guard.eval.stats import fmt_duration, fmt_pct
 
 __all__ = [
@@ -72,6 +77,8 @@ __all__ = [
 DEFAULT_INDEX = Path("eval/results/index.json")
 DEFAULT_DOCS_DIR = Path("docs")
 DEFAULT_CONFIG = Path("docs/benchmarks/config.json")
+#: Its results block is generated when the config has a ``readme`` section (LAB-1239).
+DEFAULT_README = Path("README.md")
 
 Chart = Callable[[Mapping[str, Any], str, Sequence[str]], str]
 
@@ -714,11 +721,18 @@ def render_page(
 # --- Outputs ------------------------------------------------------------------------------
 
 
-def load_config(path: Path) -> tuple[str, list[str]]:
+def _read_config(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RecordError(f"{path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RecordError(f"{path}: must be a JSON object")
+    return data
+
+
+def load_config(path: Path) -> tuple[str, list[str]]:
+    data = _read_config(path)
     headline = data.get("headline_set")
     featured = data.get("featured")
     if not isinstance(headline, str) or not isinstance(featured, list):
@@ -734,11 +748,13 @@ def build_outputs(
     ui_index_path: Path | None = None,
     docs_dir: Path = DEFAULT_DOCS_DIR,
     colours: Path = DEFAULT_REGISTRY,
+    readme: Path = DEFAULT_README,
 ) -> dict[Path, str]:
     """Every generated file and its content, from the records in ``runs_dir``.
 
     ``colours`` is the append-only color registry; it is an output too, so a new system's
-    color is committed with it and ``--check`` fails until it is.
+    color is committed with it and ``--check`` fails until it is. ``readme`` is an output
+    only when the config has a ``readme`` section: its results block is rewritten.
     """
     records = load_records(runs_dir)
     if not records:
@@ -771,20 +787,36 @@ def build_outputs(
         outputs[docs_dir / "benchmarks" / validity_chart(name).replace(".svg", "-dark.svg")] = (
             charts.dark_variant(svg)
         )
+    counts = _dataset_counts(runs_dir)
     outputs[docs_dir / "benchmarks.md"] = render_page(
-        index, headline_set=headline, featured=systems, datasets_section=_datasets_section(runs_dir)
+        index, headline_set=headline, featured=systems, datasets_section=_datasets_section(counts)
     )
+    raw_readme = _read_config(config).get("readme")
+    if raw_readme is not None:
+        spec = parse_readme_spec(raw_readme, str(config))
+        try:
+            doc = readme.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RecordError(f"{readme}: {exc}") from exc
+        block = render_readme_block(index, counts, spec)
+        outputs[readme] = splice_readme(doc, block, str(readme))
     return outputs
 
 
-def _datasets_section(runs_dir: Path) -> str:
-    """Per-dataset CIs from the counts next to ``runs_dir`` (``eval/datasets/results``)."""
-    from pii_guard.eval.datasets import REGISTRY
-    from pii_guard.eval.datasets.ci import load_counts, render_section
+def _dataset_counts(runs_dir: Path) -> list[dict[str, Any]]:
+    """The per-dataset counts next to ``runs_dir`` (``eval/datasets/results``), oldest first."""
+    from pii_guard.eval.datasets.ci import load_counts
 
-    counts_dir = runs_dir.resolve().parent.parent / "datasets" / "results"
+    return load_counts(runs_dir.resolve().parent.parent / "datasets" / "results")
+
+
+def _datasets_section(counts: Sequence[Mapping[str, Any]]) -> str:
+    """Per-dataset CIs from the counts (:mod:`pii_guard.eval.datasets.ci`)."""
+    from pii_guard.eval.datasets import REGISTRY
+    from pii_guard.eval.datasets.ci import render_section
+
     order = [(d.name, d.title, d.split) for d in REGISTRY.values()]
-    return render_section(load_counts(counts_dir), order)
+    return render_section(counts, order)
 
 
 def current_index(root: Path = Path(".")) -> dict[str, Any]:
@@ -796,6 +828,7 @@ def current_index(root: Path = Path(".")) -> dict[str, Any]:
         index_path=index_path,
         docs_dir=root / DEFAULT_DOCS_DIR,
         colours=root / DEFAULT_REGISTRY,
+        readme=root / DEFAULT_README,
     )
     index: dict[str, Any] = json.loads(outputs[index_path])
     return index
@@ -854,6 +887,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="append-only system -> colour registry",
     )
     parser.add_argument(
+        "--readme",
+        type=Path,
+        default=DEFAULT_README,
+        help="its results block is rewritten when the config has a 'readme' section",
+    )
+    parser.add_argument(
         "--journey-dir",
         type=Path,
         default=DEFAULT_ENTRIES_DIR,
@@ -897,6 +936,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ui_index_path=ui_index,
             docs_dir=args.docs_dir,
             colours=args.colours,
+            readme=args.readme,
         )
         # Always rendered, so a broken entry fails every mode; written or compared only on
         # --journey, so pull requests that add an entry never touch docs/journey.md.

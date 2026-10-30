@@ -114,6 +114,33 @@ See [setup and refusal behavior](operations.md#local-only-detection).
   exposure; it does not anonymize.
 - **Context can identify people.** "The only female judge at the Kecskemét court" identifies
   someone without containing a name. Quasi-identifiers are out of scope for v1.
+- **Masked identifiers are not anonymous context.** A placeholder hides the value (a name,
+  an e-mail address); the text around it stays readable. Someone who already holds a short
+  list of candidates can often link a masked document to the right one: the red team picks
+  the true value about twice as often as chance ([evaluation.md](evaluation.md#re-identification-red-team)).
+  Reversible tokenization does not make an input anonymous.
+
+### Opt-in: linkage protection
+
+For workloads where linkage matters more than readable context, two opt-in settings blur
+what the placeholders leave behind (LAB-1152). Neither is on by default, and neither is a
+guarantee:
+
+- **Mask the default `keep` types:**
+  `PII_GUARD_POLICY_OVERRIDES="ORGANIZATION=mask,COMPANY_ID_HU=mask"`
+  (`pii_guard.policy.LINKAGE_OVERRIDES`). A kept employer or the company that owns an e-mail
+  domain narrows the candidates.
+- **Generalize the context** with `pii_guard.vault.generalize.generalize_context` on the
+  masked text: gendered titles next to a name are dropped (`Ms`, `Herr`, `Frau`, `úr`,
+  `-né`), German gendered salutations become neutral, ages are coarsened to their decade, and
+  Hungarian case endings on a name are written in one vowel harmony (the Hungarian matcher
+  re-inflects them on unmask). It is one-way: the removed words do not come back in the
+  answer. It is a library function and an evaluation mode today; it is not yet a gateway
+  setting.
+
+What these do not touch: pronouns, role words, dates other than ages, and how the candidate
+values relate to each other. The red team's `decoys-isolated` context measures that last
+part separately ([evaluation.md](evaluation.md#re-identification-red-team)).
 - **The response is only as safe as the model.** If the model hallucinates real personal data,
   PII Guard won't remove it.
 

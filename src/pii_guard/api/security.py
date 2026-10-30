@@ -116,17 +116,44 @@ class BearerTokenMiddleware:
     """Require ``PII_GUARD_API_TOKEN`` on every route but ``/healthz``.
 
     The token is accepted as ``X-PII-Guard-Token: <token>`` or ``Authorization: Bearer <token>``.
-    A token sent in ``Authorization`` is removed from the request after the check, so the
-    gateway never forwards it upstream. Clients that bring their own upstream key (no
-    ``PII_GUARD_UPSTREAM_API_KEY``) send it in ``Authorization`` and the token in the header.
+    An ``Authorization`` header carrying the token in any shape (another scheme, a tab or extra
+    padding as separator, no scheme at all) authenticates too, and is removed from the request
+    after the check, so the gateway never forwards it upstream (LAB-1570). Clients that bring
+    their own upstream key (no ``PII_GUARD_UPSTREAM_API_KEY``) send it in ``Authorization`` and
+    the token in the header.
     """
 
     def __init__(self, app: ASGIApp, token: str) -> None:
+        if not token.strip():
+            # Fail closed: an empty token would match an empty header (LAB-1570).
+            raise ValueError("PII_GUARD_API_TOKEN is set but empty")
         self.app = app
         self.token = token.encode()
 
     def _matches(self, value: bytes) -> bool:
         return hmac.compare_digest(value.strip(), self.token)
+
+    def _carries_token(self, value: bytes) -> bool:
+        """Whether an ``Authorization`` value carries the token in any shape (LAB-1570).
+
+        The value is split on whitespace as bytes (ASCII), as Latin-1 text (how Starlette
+        decodes headers) and as UTF-8 text (Unicode spaces such as U+00A0 or U+2003), and
+        every field is compared in constant time. The whole value counts as a field too. Any
+        match both authenticates and marks the header for stripping: fail closed, so no
+        spelling of the token survives to the upstream provider.
+        """
+        whole = value.strip()
+        # The whole value, what follows a scheme (a token with inner spaces), each field.
+        fields = [whole, *whole.split(None, 1)[1:], *value.split()]
+        fields += [f.encode("latin-1") for f in value.decode("latin-1").split()]
+        fields += [
+            f.encode("utf-8", "surrogateescape")
+            for f in value.decode("utf-8", "surrogateescape").split()
+        ]
+        found = False
+        for field in fields:  # no early exit: every field is compared
+            found |= hmac.compare_digest(field, self.token)
+        return found
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or scope.get("path") in _PUBLIC_PATHS:
@@ -135,7 +162,8 @@ class BearerTokenMiddleware:
         headers: list[tuple[bytes, bytes]] = list(scope.get("headers") or [])
 
         # Endpoint authentication is confined and checked by ProjectMiddleware,
-        # which recognizes endpoint keys with this same predicate (LAB-1562).
+        # which recognizes endpoint keys with this same predicate and the same
+        # Latin-1 header decoding as Starlette (LAB-1562, LAB-1570).
         def bearer_credential(value: bytes) -> bytes | None:
             scheme, _, credential = value.partition(b" ")
             return credential.strip() if scheme.lower() == b"bearer" else None
@@ -143,7 +171,7 @@ class BearerTokenMiddleware:
         if scope.get("path", "").startswith("/e/") and any(
             name.lower() == b"authorization"
             and (credential := bearer_credential(value)) is not None
-            and looks_like_endpoint_key(credential.decode("utf-8", "replace"))
+            and looks_like_endpoint_key(credential.decode("latin-1"))
             for name, value in headers
         ):
             await self.app(scope, receive, send)
@@ -152,12 +180,12 @@ class BearerTokenMiddleware:
             name.lower() == TOKEN_HEADER.encode() and self._matches(value)
             for name, value in headers
         )
-        # Strip every Authorization carrying the token, whichever header
-        # authenticated, so the gateway never forwards it upstream (LAB-1562).
+        # Strip every Authorization carrying the token, in any shape and whichever
+        # header authenticated, so the gateway never forwards it upstream
+        # (LAB-1562, LAB-1570).
         kept: list[tuple[bytes, bytes]] = []
         for name, value in headers:
-            credential = bearer_credential(value) if name.lower() == b"authorization" else None
-            if credential is not None and self._matches(credential):
+            if name.lower() == b"authorization" and self._carries_token(value):
                 ok = True
                 continue  # never forwarded upstream as a "bring your own key"
             kept.append((name, value))
