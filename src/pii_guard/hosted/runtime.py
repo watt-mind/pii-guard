@@ -82,7 +82,7 @@ class HostedVault(Vault):
         if budget is None:
             return super()._create_locked(session_id)
         with budget.lock:
-            if sum(len(vault._sessions) for vault in budget.vaults) >= budget.maximum:
+            if sum(vault.session_count() for vault in budget.vaults) >= budget.maximum:
                 raise HostedCapacityError(
                     "Account session capacity reached; delete an unused session"
                 )
@@ -537,11 +537,13 @@ class HostedService:
         if getattr(request.state, "hosted_connection", None) is None:
             # Sponsored (operator-key) route only; a selected own connection gets neither.
             gateway.upstream_extra_headers = sponsored_upstream_headers(self.settings)
-        gateway._detect_workers = self._workers
-        gateway._session_holds = runtime.session_holds
-        gateway._holds_lock = runtime.holds_lock
-        gateway.issued_ids = runtime.issued_ids
-        gateway._session_incarnations = runtime.session_incarnations
+        gateway.bind_shared_state(
+            detect_workers=self._workers,
+            session_holds=runtime.session_holds,
+            holds_lock=runtime.holds_lock,
+            issued_ids=runtime.issued_ids,
+            session_incarnations=runtime.session_incarnations,
+        )
         request.state.hosted_gateway = gateway
         return gateway
 
