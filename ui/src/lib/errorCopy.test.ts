@@ -29,6 +29,12 @@ describe("error copy per code (LAB-1335)", () => {
     }
   });
 
+  it("says in plain words when OCR or the detectors are down (LAB-1619)", () => {
+    expect(errorCopy("ocr_unavailable").title).toBe("Text recognition is unavailable right now, so the image was not sent.");
+    expect(errorCopy("detector_loading").body).toMatch(/Retry/);
+    for (const code of ["ocr_unavailable", "detector_loading", "request_timeout"]) expect(errorCopy(code).kind).toBe("fail_closed");
+  });
+
   it("keeps the policy text for policy blocks", () => {
     const c = errorCopy("blocked_entity");
     expect(c.kind).toBe("policy");

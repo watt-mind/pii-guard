@@ -3,11 +3,13 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/http";
 import type { ServerStatus } from "../api/status";
 import { createVaultClient, type VaultClient, type VaultSessionDetail, type VaultSessionSummary } from "../api/vault";
 import { Vault } from "./Vault";
+import { HostedSessionContext, type HostedSession } from "../hosted/session";
+import { getSelectedEndpoint, setSelectedEndpoint, setSelectedProject } from "../projects/selection";
 
 const NOW = new Date().toISOString();
 const SESSIONS: VaultSessionSummary[] = [
@@ -237,6 +239,35 @@ describe("Vault", () => {
     rerender(<Vault status={{ state: "offline" }} live={false} active client={client} />);
     expect(screen.getByRole("status")).toHaveTextContent(/needs the live API/);
     expect(client.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("hosted Vault (LAB-1619)", () => {
+  const session = { account: {}, error: "", refresh: async () => {}, call: vi.fn() } as unknown as HostedSession;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setSelectedEndpoint(null);
+  });
+
+  it("says where an endpoint's sessions are, offers the one endpoint, and never mentions demo traffic", async () => {
+    setSelectedProject("project-one");
+    const doFetch = vi.fn(async () =>
+      new Response(JSON.stringify({ endpoints: [{ id: "ep-one", name: "Default endpoint", enabled: true }] }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", doFetch);
+    const client = { list: vi.fn(() => Promise.resolve({ mode: "masked", ttl_seconds: 3600, sessions: [] })), detail: vi.fn(), drop: vi.fn() } as unknown as VaultClient;
+    render(
+      <HostedSessionContext.Provider value={session}>
+        <Vault status={statusOf("masked")} live active client={client} />
+      </HostedSessionContext.Provider>,
+    );
+    expect(await screen.findByText(/No sessions in this view\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Send demo traffic/)).toBeNull();
+    expect(screen.getByText(/originals are never shown on the hosted service/)).toBeInTheDocument();
+    expect(screen.queryByText(/localhost/)).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: "Show the sessions of Default endpoint" }));
+    expect(getSelectedEndpoint()).toBe("ep-one");
   });
 });
 

@@ -181,7 +181,7 @@ export function testRecovery(error: unknown): string {
 }
 
 /**
- * A block that works by copy-paste with zero edits: with the guard key known, shell blocks
+ * A block that works by copy-paste with zero edits: with the endpoint key known, shell blocks
  * start by exporting it and the OpenAI SDK block names it inline. Without it, blocks keep
  * reading `$PII_GUARD_ENDPOINT_KEY`. Keys are `pg_ep_` + URL-safe base64: shell-safe unquoted.
  */

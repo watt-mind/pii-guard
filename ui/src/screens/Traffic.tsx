@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LABELLED_SCENARIOS, labelledScenarioFor, sendDemoTraffic, type DemoProgress, type LabelledMatch } from "../api/demoTraffic";
 import { ApiError } from "../api/http";
 import type { TrafficConnectOptions, TrafficEvent, TrafficStatus } from "../api/traffic";
@@ -62,6 +62,12 @@ export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureInterv
 
 type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 
+/**
+ * "Open session in <endpoint>" re-scopes the console, which remounts it (LAB-1619): the call
+ * to reopen, and to put focus back on, once the endpoint's log has it.
+ */
+let reopenAfterSwitch: string | null = null;
+
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
 export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession">) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
@@ -70,7 +76,7 @@ export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...r
 
 export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null, onOpenSession, demoTraffic = true }: LogsProps) {
   const [filters, setFilters] = useState<Filters>({ mode: "all", type: "all", problems: false });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => reopenAfterSwitch);
   const [cleared, setCleared] = useState(0);
   const detailRef = useRef<HTMLDivElement>(null);
   // No endpoint picked in the header: the server merges the project's endpoints (LAB-1492),
@@ -100,6 +106,12 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
   // Follow the latest call until one is picked; keep the pick while it's still in the list.
   const selected = (selectedId && filtered.find((e) => e.id === selectedId)) || filtered[filtered.length - 1] || null;
   const following = !selectedId || !filtered.some((e) => e.id === selectedId);
+
+  useEffect(() => {
+    if (!reopenAfterSwitch || selected?.id !== reopenAfterSwitch) return;
+    reopenAfterSwitch = null;
+    (document.getElementById("open-session") ?? document.getElementById("detail-title"))?.focus();
+  }, [selected?.id]);
 
   const pick = (id: string, scroll = false) => {
     setSelectedId(id);
@@ -407,7 +419,11 @@ function SourceBanner({
             {status.level === "full" ? "Originals logged" : "Placeholders only"}
           </span>
           <span className="text-xs">
-            {status.level === "full" ? "Originals are kept in memory on this machine only." : "Only what left the machine is logged: placeholders, never values."}
+            {hosted
+              ? "Only what was sent to the model is logged: placeholders, never values."
+              : status.level === "full"
+                ? "Originals are kept in memory on this machine only."
+                : "Only what left the machine is logged: placeholders, never values."}
           </span>
         </>
       )}
@@ -581,7 +597,7 @@ function EntityChips({ counts }: { counts: Partial<Record<EntityType, number>> }
   return (
     <span className="flex flex-wrap gap-1">
       {entries.map(([type, n]) => (
-        <span key={type} title={`${metaFor(type).label}: ${n} masked`} className={["rounded-md px-1.5 py-px font-mono text-2xs font-medium ring-1 ring-inset", metaFor(type).chip].join(" ")}>
+        <span key={type} title={`${metaFor(type).label}: ${n} masked`} className={["rounded-md px-1.5 py-px font-mono text-2xs font-medium whitespace-nowrap ring-1 ring-inset", metaFor(type).chip].join(" ")}>
           {metaFor(type).short} {n}
           <span className="sr-only"> {metaFor(type).label}</span>
         </span>
@@ -651,9 +667,19 @@ function CallRow({
         ) : (
           <EntityChips counts={maskedCounts(e)} />
         )}
-        <span className="shrink-0 truncate text-xs text-faint">{e.outcome === "blocked" || e.outcome === "refused" ? "not forwarded" : mockUpstream ? "mock upstream" : (e.model ?? "")}</span>
+        <RowModel label={e.outcome === "blocked" || e.outcome === "refused" ? "not forwarded" : mockUpstream ? "mock upstream" : (e.model ?? "")} />
       </span>
     </button>
+  );
+}
+
+/** The row's model: provider ids (`accounts/fireworks/models/…`) show their last segment, truncated. */
+function RowModel({ label }: { label: string }) {
+  const short = label.includes("/") ? label.slice(label.lastIndexOf("/") + 1) : label;
+  return (
+    <span className="min-w-0 max-w-[45%] truncate text-right text-xs text-faint" title={label || undefined}>
+      {short}
+    </span>
   );
 }
 
@@ -693,7 +719,7 @@ function CallDetail({
       <section aria-labelledby="detail-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 id="detail-title" className="flex flex-wrap items-center gap-2 text-lg font-normal text-ink">
+            <h2 id="detail-title" tabIndex={-1} className="flex flex-wrap items-center gap-2 text-lg font-normal text-ink outline-none">
               Call at {clock(e.time)} <OutcomeBadge outcome={e.outcome} />
             </h2>
             <p className="mt-0.5 font-mono text-xs break-all text-faint">{e.id}</p>
@@ -721,11 +747,19 @@ function CallDetail({
         </dl>
         {e.session_ref && onOpenSession && aggregated && e.endpoint ? (
           // The Vault is per endpoint: switch the console to this one, where the session lives.
-          <Button size="sm" className="mt-3" onClick={() => setSelectedEndpoint(e.endpoint!.id)}>
-            Switch to endpoint {e.endpoint.name} to open its session
+          <Button
+            size="sm"
+            className="mt-3 h-auto! min-h-8 max-w-full py-1.5 text-left whitespace-normal! pointer-coarse:min-h-11"
+            title={`Switches the console to endpoint ${e.endpoint.name}, where this call's session is kept`}
+            onClick={() => {
+              reopenAfterSwitch = e.id;
+              setSelectedEndpoint(e.endpoint!.id);
+            }}
+          >
+            <span className="min-w-0 break-words">Open session in {e.endpoint.name}</span>
           </Button>
         ) : e.session_ref && onOpenSession && (
-          <Button size="sm" className="mt-3" onClick={() => onOpenSession(e.session_ref!)}>
+          <Button id="open-session" size="sm" className="mt-3" onClick={() => onOpenSession(e.session_ref!)}>
             Open session <span className="font-mono">{e.session_ref}</span> in Vault
           </Button>
         )}

@@ -189,7 +189,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-pretty text-muted">
           {hosted && !demo
-            ? "On-device detectors find faces, ID photos and signatures; OCR plus the text detectors find identifiers printed in the image."
+            ? "Detectors on the PII Guard server find faces, ID photos and signatures; OCR plus the text detectors find identifiers printed in the image."
             : serverImages && !demo
             ? serverImages.sam
               ? "SAM 3.1 segments signatures and stamps (the original image is sent to Meta's API for that), an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."

@@ -73,7 +73,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
         className="inline-flex h-9 max-w-full min-w-0 items-center gap-2 rounded-lg pointer-coarse:h-11 border border-line-strong bg-surface px-3 text-sm text-ink transition-colors hover:bg-surface-2 aria-expanded:bg-surface-2"
       >
         <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />
-        <span className="truncate font-medium">{current?.name ?? "Choose a project"}</span>
+        <span className="truncate font-medium" title={current?.name}>{current?.name ?? "Choose a project"}</span>
         {currentEndpoint && <span className="hidden truncate text-muted sm:inline">/ {currentEndpoint.name}</span>}
         <Chevron open={open} />
       </button>
@@ -91,7 +91,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
                 onClick={() => pick(() => setSelectedProject(project.id), project.id !== currentId)}
                 className={MENU_ITEM}
               >
-                <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                <span className="min-w-0 flex-1 truncate" title={project.name}>{project.name}</span>
                 <Check on={project.id === currentId} />
               </button>
             ))}
@@ -111,7 +111,7 @@ export function ProjectSwitcher({ manage = true }: { manage?: boolean }) {
                     onClick={() => pick(() => setSelectedEndpoint(item.id), item.id !== (endpoint ?? null))}
                     className={MENU_ITEM}
                   >
-                    <span className="min-w-0 flex-1 truncate">
+                    <span className="min-w-0 flex-1 truncate" title={item.name}>
                       {item.name}
                       {/* Logs merge every endpoint here (LAB-1492); the Vault stays on the project's own playground. */}
                       {item.id === null && <span className="block text-xs text-muted">Logs of every endpoint · playground vault</span>}

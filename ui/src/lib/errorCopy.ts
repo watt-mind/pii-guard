@@ -71,6 +71,25 @@ export function errorCopy(code: string | undefined, status: number | null = null
         title: "The answer stream failed partway.",
         body: "The masked request reached the upstream, but its answer stream broke off. Nothing unmasked left PII Guard. Retry the message.",
       };
+    // Image and detector outages in plain words (LAB-1619); the code stays on the notice as small text.
+    case "ocr_unavailable":
+      return {
+        kind: "fail_closed",
+        title: "Text recognition is unavailable right now, so the image was not sent.",
+        body: "PII Guard can't read the text in images at the moment, and it never forwards an image it couldn't check. Retry in a minute.",
+      };
+    case "detector_loading":
+      return {
+        kind: "fail_closed",
+        title: "The detectors are still starting, so nothing was sent.",
+        body: "PII Guard loads its models after a restart, and never forwards what it couldn't check. Retry in a few seconds.",
+      };
+    case "request_timeout":
+      return {
+        kind: "fail_closed",
+        title: "Checking took too long, so nothing was sent.",
+        body: "PII Guard stops rather than forward something it couldn't finish checking. Retry, or try a smaller image or text.",
+      };
     default:
       return { kind: "fail_closed", title: "Blocked. Nothing was sent to the model.", body: FAIL_CLOSED };
   }
