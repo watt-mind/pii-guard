@@ -323,3 +323,57 @@ body {
   background: var(--accent-gradient);
   opacity: 0.35;
 }
+
+/* Shared feedback for the landing page and console. Content stays in place; only menus
+   move. Keep these opt-in so reduced motion has no spatial effects or delayed feedback. */
+:root {
+  --dur-press: 100ms;
+  --dur-feedback: 150ms;
+  --dur-enter: 180ms;
+}
+
+@keyframes menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes view-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button-feedback {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, transform;
+    transition-duration: var(--dur-feedback);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .button-feedback:not(:disabled):not([aria-disabled="true"]):active {
+    transform: translateY(1px);
+    transition-duration: var(--dur-press);
+  }
+
+  .menu-enter,
+  .public-disclosure[open] > .public-nav-panel,
+  .public-appearance[open] > .public-appearance-panel {
+    animation: menu-enter var(--dur-enter) var(--ease-out);
+  }
+
+  .public-disclosure > summary svg {
+    transition: transform var(--dur-feedback) var(--ease-out);
+  }
+
+  /* Playground animates its panels instead of its parent, avoiding a double fade. Hidden
+     views retain their state; showing them again restarts only this short visual cue. */
+  .console-views > section:not([hidden]):not(#section-playground),
+  .console-views [role="tabpanel"]:not([hidden]) {
+    animation: view-enter var(--dur-enter) var(--ease-out);
+  }
+}
