@@ -667,10 +667,6 @@ class NerDetector:
         local_files_only: bool = False,
     ) -> None:
         self.number_checks = number_checks
-        from pii_guard.config import get_settings
-        from pii_guard.detection_profile import is_local_only
-
-        local_files_only = local_files_only or is_local_only(get_settings())
         self.local_files_only = local_files_only
         kind = (backend_kind or os.environ.get(BACKEND_ENV_VAR) or "transformers").strip().lower()
         if kind not in BACKENDS:

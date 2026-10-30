@@ -22,7 +22,8 @@ keeps the two in sync. See [contracts.md](contracts.md#entity-policies-implement
 | `NATIONAL_ID_HU_TAX` | Hungarian personal tax ID (adóazonosító jel), 10 digits with checksum | rules, NER (v2) | mask |
 | `NATIONAL_ID_HU_TAJ` | Hungarian social security (TAJ) number, 9 digits with checksum | rules, NER (v2) | mask |
 | `ID_DOCUMENT` | ID card, passport, driving license and residence permit numbers; machine-readable zones (MRZ) of ID documents; national numbers without their own type (Hungarian személyi azonosító, US SSN, UK NINO) | rules, NER (v2), LLM (context) | mask |
-| `BANK_ACCOUNT` | IBAN (with checksum), Hungarian giro account numbers, payment card numbers (Luhn) | rules, NER (v2) | mask |
+| `BANK_ACCOUNT` | IBAN (with checksum), Hungarian giro account numbers | rules, NER (v2) | mask |
+| `PAYMENT_CARD` | Payment card numbers (issuer prefix + length + Luhn) | rules | mask |
 | `COMPANY_ID_HU` | Company registration number (cégjegyzékszám), company tax number | rules | keep |
 | `ORGANIZATION` | Company and institution names | NER, LLM | keep |
 | `PARCEL_NUMBER_HU` | Land registry parcel number (helyrajzi szám) | rules, LLM (context) | mask |
@@ -100,12 +101,16 @@ dates of birth come from the NER and LLM passes in every language.
 | IBAN, compact or grouped | `BANK_ACCOUNT` | country length (SWIFT registry) + mod 97 | all |
 | Email address, also with a punycode TLD (`xn--p1ai`) or a quoted local part | `EMAIL` | shape | all |
 | International phone number (`+<country>`, not `+36`) | `PHONE` | 8–15 digits (E.164) | all |
-| Payment card number, compact or in groups of 4 (Amex 4-6-5) | `BANK_ACCOUNT` | issuer prefix + length + Luhn | all |
+| Payment card number, compact or in groups of 4 (Amex 4-6-5) | `PAYMENT_CARD` | issuer prefix + length + Luhn | all |
 | Provider key shapes: AWS access key id, GitHub (`ghp_`, `github_pat_`), Slack (`xox?-`), Stripe (`sk_`/`rk_` `live`/`test`, `whsec_`), `sk-` style (OpenAI, Anthropic), Google (`AIza`), JWT, PEM private-key block | `SECRET` | prefix + length (+ letters and digits for `sk-`) | all |
 | Password (and a non-generic user name) in `scheme://user:password@host` | `SECRET` | not a reference (`${DB_PASSWORD}`, `<password>`) | all |
 | Value assigned to a secret-ish key (`*_KEY`, `*_TOKEN`, `*_SECRET`, `PASSWORD`, `PASSWD`, `*_PWD`, `AUTH`, `BEARER`; `.env`, YAML, JSON, shell, CLI flags) and `Authorization: Bearer/Basic <token>` | `SECRET` | a literal, not code: 4+ characters, not a reference, call, type name, boolean, number (except for passwords) or mask (`****`) | all |
 
-Payment cards use `BANK_ACCOUNT` until the taxonomy has a card type of its own.
+Payment cards have their own type, `PAYMENT_CARD` (LAB-1102), so a policy override can treat
+them apart from bank accounts. Learned detectors (NER, LLM) still report a card they find
+without the rule as `BANK_ACCOUNT`, and gold sets built before the type existed label cards
+`BANK_ACCOUNT`: the scorer counts the two types as one match (`eval/forms.py`,
+`matching_types`).
 
 `SECRET` spans carry a subtype (`Span.subtype`: `github_token`, `url_password`, `assignment`
 ...; [contracts.md](contracts.md)). A hash, UUID or git SHA is a secret only when it is assigned

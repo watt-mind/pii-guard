@@ -45,6 +45,7 @@ VALUES: dict[EntityType, str] = {
     EntityType.NATIONAL_ID_HU_TAJ: "123 456 788",
     EntityType.ID_DOCUMENT: "AB1234567",
     EntityType.BANK_ACCOUNT: "HU42 1177 3016 1111 1018 0000 0000",
+    EntityType.PAYMENT_CARD: "4000 0000 0000 0002",
     EntityType.COMPANY_ID_HU: "01-09-123456",
     EntityType.ORGANIZATION: "Mintavállalat Kft.",
     EntityType.PARCEL_NUMBER_HU: "Budapest 12345/6",

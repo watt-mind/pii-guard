@@ -65,7 +65,9 @@ def test_messages_attempt_shows_in_logs_without_the_request_text() -> None:
         (event,) = client.get("/v1/traffic").json()["events"]
     assert event["id"] == r.headers["x-pii-guard-request-id"]
     assert event["outcome"] == "refused"
-    assert event["error"] == {"code": "unsupported_api", "status": 400}
+    error = dict(event["error"])
+    assert error.pop("message")  # the API error message, types and counts only (LAB-1314)
+    assert error == {"code": "unsupported_api", "status": 400}
     # A refused call never names its model in the log (LAB-1358).
     assert event["model"] == MODEL_WITHHELD
     assert event["stream"] is True

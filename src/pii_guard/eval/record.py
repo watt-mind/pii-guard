@@ -56,6 +56,9 @@ __all__ = [
 
 RECORD_SCHEMA_VERSION = 1
 DEFAULT_RUNS_DIR = Path("eval/results/runs")
+#: At most this many changed paths are kept in a record's ``code.dirty_paths``.
+_MAX_DIRTY_PATHS = 50
+
 SCHEMA_PATH = Path("eval/results/schema/run.schema.json")
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
@@ -485,6 +488,7 @@ def _base_record(
         "code": {
             "commit": str(code.get("commit") or "unknown"),
             "dirty": bool(code.get("dirty", False)),
+            "dirty_paths": [str(p) for p in code.get("dirty_paths") or []][:_MAX_DIRTY_PATHS],
             "pii_guard_version": code.get("pii_guard_version"),
             "note": code.get("note"),
         },
@@ -546,7 +550,7 @@ def build_records(
     )
     languages = sorted(card.get("languages", {}))
     dets = [_detector(**d) for d in (detectors or [{"name": n} for n in meta.get("detectors", [])])]
-    code = {k: meta.get(k) for k in ("commit", "dirty", "pii_guard_version")}
+    code = {k: meta.get(k) for k in ("commit", "dirty", "dirty_paths", "pii_guard_version")}
     ours = _base_record(
         run_id=run_id,
         kind="text",

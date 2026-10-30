@@ -3246,43 +3246,8 @@ is not met. The rest of the gap is classification, not reading (below and LAB-16
   single-threaded on a heavily loaded machine, so the latency difference is an upper bound.
   Only poorly read, tinted pages pay for the extra pass.
 
-<!-- journey:source docs/journey/2026-10-30-lab-1199-post-value-cues.md -->
-### 94. Cues after the value: Hungarian `számon`, `számra`, `számú` + noun (2026-10-30)
-
-LAB-1199, a follow-up to LAB-1170's context-cued numbers. **Before:** a number was masked
-without a checksum only right *after* a cue word. Hungarian often puts the cue after the
-value: `a +36.37.393.9102 számon`, `a 0136-13 051 0758 számra`, `a KA652524 számú
-útlevelére`. Those stayed unmasked in rules mode whenever the checksum or numbering plan
-failed.
-
-- **`cues.tsv` takes an optional third column `after`**
-  ([`languages/cues.py`](../src/pii_guard/languages/cues.py)): the value must stand right
-  before the cue, spaces only between, with the same shapes and score (0.6). A phone before
-  such a cue also needs a `+` or `0` prefix, so `a 2026/4471 számon iktatott` stays a file
-  number. A bare `számú` names nothing (`a 4500123456 számú szerződés`); it is a cue only with
-  its noun (`számú útlevél*`, `számú bankszámla*`, `számú telefon*` ...).
-- Three new Hungarian negatives in `eval/fixtures/negative/hu-uncued-numbers.jsonl` (case,
-  file and contract numbers before `számú`, `számon`, `számra`); the whole negative set stays
-  unmasked.
-- Short account numbers after `Kontonummer` / `account number`: not accepted. The negatives
-  hold 10-digit customer and order numbers one cue word away, and SEPA text uses IBANs.
-
-Rules mode and fast mode (rules + NER v2.0), `pii-guard eval`, before is `develop` `4cd1181`,
-after is this branch (run records `eval/results/runs/2026-10-30-lab-1199-post-value-cues-*`).
-
-| set | rules leak (values) | rules over-masked | fast leak | fast over-masked |
-| -- | -- | -- | -- | -- |
-| Ai4Privacy de/en/hu (600 docs) | 1376/2185 → **1362/2185** | 1 → 1 | 8/2185 → 8/2185 | 28 → 28 |
-| Ai4Privacy hu (200 docs) | 492/752 → **478/752** | 0 → 0 | unchanged | unchanged |
-| smoke de/en/hu | 71/173 → 71/173 | 0 → 0 | 0 → 0 | 2 → 2 |
-| synth-sample en/hu | 109/253 → 109/253 | 0 → 0 | 0 → 0 | 0 → 0 |
-| company-names hu | 1/40 → 1/40 | 0 → 0 | 0 → 0 | 0 → 0 |
-
-Rules-mode Ai4Privacy leak falls from 63.0 to 62.3 % (hu 65.4 → 63.6 %) with no new
-over-masking. Fast mode is unchanged: NER v2.0 already masks these values.
-
 <!-- journey:source docs/journey/2026-10-30-lab-1220-family-firm-words.md -->
-### 95. "és Fia" in a firm name is no longer masked as a person (2026-10-30)
+### 94. "és Fia" in a firm name is no longer masked as a person (2026-10-30)
 
 LAB-1220, found in the NER v2 work (LAB-1150). In `Balogh és Fia Kkt.` ("Balogh and Son")
 and `Szabó és Fiai Kkt.`, the published NER (v2.0) tagged `Fia` / `Fiai` as `PERSON`. That is
@@ -3313,7 +3278,7 @@ Fast mode (rules + NER v2.0), before → after:
 - Cost: $0, all local.
 
 <!-- journey:source docs/journey/2026-10-30-lab-1258-csv-cell-names.md -->
-### 96. Names in CSV rows are found whole (2026-10-30)
+### 95. Names in CSV rows are found whole (2026-10-30)
 
 LAB-1258, found in LAB-1236 and again in LAB-1256's Muse Code run. **Before:** in a CSV row
 such as `2,Teszt Elek,teszt.elek@example.com`, the comma is glued to the name, so the
@@ -3365,7 +3330,7 @@ LAB-1604 (triage) tracks a separate problem: a number span that runs across a ne
 next row's id is masked as `BANK_ACCOUNT`.
 
 <!-- journey:source docs/journey/2026-10-30-lab-1359-preceding-surname.md -->
-### 97. A surname before a tagged given name joins the mask (2026-10-30)
+### 96. A surname before a tagged given name joins the mask (2026-10-30)
 
 LAB-1359, found measuring LAB-1338. **Before:** the NER model sometimes tagged only the given
 name and left out a surname that is also an everyday word, so the surname went upstream next
@@ -3404,7 +3369,7 @@ commit with the join off and on. Counts are in
 | ai4privacy (test) | 2 -> 2 | 2.43 -> 2.43 % | 1.21 -> 1.21 % | 98.05 -> 98.05 % | 96.89 -> 96.89 % |
 
 <!-- journey:source docs/journey/2026-10-30-lab-1382-secret-case-scorer.md -->
-### 98. The scorer keys `SECRET` values by case, the same as the vault (2026-10-30)
+### 97. The scorer keys `SECRET` values by case, the same as the vault (2026-10-30)
 
 LAB-1382. Since LAB-1350 the vault treats two tokens that differ only in letter case as two
 credentials with two placeholders. The eval scorer still grouped gold values case-folded, so it
@@ -3428,7 +3393,7 @@ documents, 38 gold spans: 36 `SECRET`, 2 `EMAIL`;
 - **Cost:** $0, rules only, local.
 
 <!-- journey:source docs/journey/2026-10-30-lab-1383-brace-literal-passwords.md -->
-### 99. A literal password with a `{word}` in it is masked, templates still are not (2026-10-30)
+### 98. A literal password with a `{word}` in it is masked, templates still are not (2026-10-30)
 
 LAB-1383. The secrets rule dropped any quoted value after a password key that contained a
 `{...}` group anywhere, to keep format templates like `password = "{password}"` readable. That
@@ -3453,7 +3418,7 @@ detector, same fixture file (22 documents, 36 gold `SECRET` values):
 - **Cost:** $0, rules only, local.
 
 <!-- journey:source docs/journey/2026-10-30-lab-1384-hu-e-chain-trim.md -->
-### 100. One placeholder for a name the NER cut inside -ék (2026-10-30)
+### 99. One placeholder for a name the NER cut inside -ék (2026-10-30)
 
 LAB-1384, found on the LAB-1342 stacked-suffix documents. The NER often ends a Hungarian name
 between the family or possessive suffix and the case ending: `Teszt Hajnáék|nál`,
@@ -3482,7 +3447,7 @@ before a bare `-é` is not a safe cut) and the surname outside the placeholder w
 labels only the given name. Cost: none.
 
 <!-- journey:source docs/journey/2026-10-30-lab-1477-bare-numbers-eponyms.md -->
-### 101. Ports, sizes and algorithm names stay readable in agent text (2026-10-30)
+### 100. Ports, sizes and algorithm names stay readable in agent text (2026-10-30)
 
 LAB-1477, found on LAB-1470's replay of this repository's agent-facing docs. **Before:** in
 fast mode the NER encoder still typed bare numbers as `ADDRESS`: `4096` in "up to 4096 keyed
@@ -3530,6 +3495,37 @@ Left: the three `ADDRESS` hits still over-masked on agent-traffic-dev are SKUs (
 abbreviation) or as a state code. German capitalizes nouns, so a bare number before one
 (`4096 Einträge`) is still kept: fail closed. The brand names typed `PERSON` (`Richter Gedeon`,
 `Barclays`) are LAB-1346's.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1496-clean-headline-runs.md -->
+### 101. Headline runs recorded from a clean commit (2026-10-30)
+
+LAB-1496, found in LAB-1493's critique. **Before:** the run log marked 693 of 870 run records
+"(uncommitted changes)", the fast-mode rows behind the headline among them. The flag already
+ignored untracked files (models, scratch). It came from tracked files that `pii-guard eval
+report` rewrites while runs are recorded: `docs/benchmarks.md`, the charts, the README and
+the run records themselves. So a run looked unreproducible even when its detection code was
+exactly the commit's.
+
+- **The dirty flag now covers code only**
+  ([`eval/report.py`](../src/pii_guard/eval/report.py)): a tracked change under `src/`,
+  `eval/fixtures/`, `scripts/`, `pyproject.toml` or `uv.lock`. A new `code.dirty_paths` field
+  in the run record says which files differed, so a dirty run says why.
+- **The headline rows are re-recorded** from a clean checkout of `develop` `62799b5`: fast
+  mode, rules only, Presidio, LLM Guard and PrivAiTe on `smoke` (hu/en/de), `cee-pii` and
+  `nemotron-pii`, 15 records `eval/results/runs/2026-10-30-lab-1496-*.json`, none dirty.
+
+Leaked values, before (the latest earlier record) → after:
+
+| set | fast | rules only | Presidio | LLM Guard | PrivAiTe |
+| -- | -- | -- | -- | -- | -- |
+| smoke (173 values) | 0 → 0 | 72 → 71 | 42 → 42 | 78 → 78 | 22 → 22 |
+| cee-pii (504) | 2 → 2 | 208 → 208 | 184 → 184 | 382 → 382 | 22 → 22 |
+| nemotron-pii (697) | 5 → 5 | 390 → 390 | 89 → 89 | 201 → 201 | 28 → 28 |
+
+Every count reproduces; the one change is a rules-only smoke value that later rule changes on
+`develop` now catch. Latency moved (fast smoke p50 45 → 38 ms) because these runs share a
+loaded laptop: compare latency rows loosely. The older records keep their flag, which was
+computed the old way; 693 of 885 records still say dirty. Cost: $0, local CPU.
 
 <!-- journey:source docs/journey/2026-10-30-lab-1548-hosted-cold-start.md -->
 ### 102. Hosted cold start serves the landing page first (2026-10-30)
@@ -3590,6 +3586,41 @@ Both wins hold: the Ai4Privacy leak is back to the pre-LAB-1477 level and agent 
 LAB-1477's 0 over-masked spans. The cost is two Ai4Privacy `ADDRESS` over-masks that LAB-1477
 had removed by accident (3 → 5): bare numbers in prose with no sign either way, which now stay
 masked on purpose.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1199-post-value-cues.md -->
+### 104. Cues after the value: Hungarian `számon`, `számra`, `számú` + noun (2026-10-30)
+
+LAB-1199, a follow-up to LAB-1170's context-cued numbers. **Before:** a number was masked
+without a checksum only right *after* a cue word. Hungarian often puts the cue after the
+value: `a +36.37.393.9102 számon`, `a 0136-13 051 0758 számra`, `a KA652524 számú
+útlevelére`. Those stayed unmasked in rules mode whenever the checksum or numbering plan
+failed.
+
+- **`cues.tsv` takes an optional third column `after`**
+  ([`languages/cues.py`](../src/pii_guard/languages/cues.py)): the value must stand right
+  before the cue, spaces only between, with the same shapes and score (0.6). A phone before
+  such a cue also needs a `+` or `0` prefix, so `a 2026/4471 számon iktatott` stays a file
+  number. A bare `számú` names nothing (`a 4500123456 számú szerződés`); it is a cue only with
+  its noun (`számú útlevél*`, `számú bankszámla*`, `számú telefon*` ...).
+- Three new Hungarian negatives in `eval/fixtures/negative/hu-uncued-numbers.jsonl` (case,
+  file and contract numbers before `számú`, `számon`, `számra`); the whole negative set stays
+  unmasked.
+- Short account numbers after `Kontonummer` / `account number`: not accepted. The negatives
+  hold 10-digit customer and order numbers one cue word away, and SEPA text uses IBANs.
+
+Rules mode and fast mode (rules + NER v2.0), `pii-guard eval`, before is `develop` `4cd1181`,
+after is this branch (run records `eval/results/runs/2026-10-30-lab-1199-post-value-cues-*`).
+
+| set | rules leak (values) | rules over-masked | fast leak | fast over-masked |
+| -- | -- | -- | -- | -- |
+| Ai4Privacy de/en/hu (600 docs) | 1376/2185 → **1362/2185** | 1 → 1 | 8/2185 → 8/2185 | 28 → 28 |
+| Ai4Privacy hu (200 docs) | 492/752 → **478/752** | 0 → 0 | unchanged | unchanged |
+| smoke de/en/hu | 71/173 → 71/173 | 0 → 0 | 0 → 0 | 2 → 2 |
+| synth-sample en/hu | 109/253 → 109/253 | 0 → 0 | 0 → 0 | 0 → 0 |
+| company-names hu | 1/40 → 1/40 | 0 → 0 | 0 → 0 | 0 → 0 |
+
+Rules-mode Ai4Privacy leak falls from 63.0 to 62.3 % (hu 65.4 → 63.6 %) with no new
+over-masking. Fast mode is unchanged: NER v2.0 already masks these values.
 
 <!-- journey:end -->
 

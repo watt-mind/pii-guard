@@ -3,7 +3,7 @@
 Layout (``schema_version`` 1)::
 
     {"schema_version": 1,
-     "meta": {"commit", "dirty", "pii_guard_version", "generated_at", "detectors",
+     "meta": {"commit", "dirty", "dirty_paths", "pii_guard_version", "generated_at", "detectors",
               "skipped_detectors", "languages", "fixtures": [{"path", "sha256", "documents"}],
               "usage": {...}},  # only when a detector meters requests (the LLM detector)
      "overall": <block>,
@@ -27,33 +27,71 @@ from pii_guard.eval.fixtures import file_sha256
 from pii_guard.eval.scorer import DocumentResult, summarize
 from pii_guard.eval.stats import fmt_ms, fmt_pct
 
-__all__ = ["SCHEMA_VERSION", "build_scorecard", "git_commit", "price_usage", "render_markdown"]
+__all__ = [
+    "CODE_PATHS",
+    "SCHEMA_VERSION",
+    "build_scorecard",
+    "git_commit",
+    "git_dirty_paths",
+    "price_usage",
+    "render_markdown",
+]
 
 SCHEMA_VERSION = 1
 
 
-def git_commit(cwd: str | Path | None = None) -> tuple[str, bool]:
-    """``(commit hash, dirty)`` of the working tree, or ``("unknown", False)``."""
+#: The tracked paths whose changes make a run unreproducible from its commit: the detection
+#: code, the fixtures, the scripts that drive runs and the dependency pins. Docs, generated
+#: results and the run records themselves are rewritten while runs are recorded, so a change
+#: there does not mark a run dirty (LAB-1496). Untracked files (models, scratch) never do.
+CODE_PATHS: tuple[str, ...] = ("src", "eval/fixtures", "scripts", "pyproject.toml", "uv.lock")
+
+
+def _git(args: Sequence[str], cwd: str | Path | None) -> str:
+    return subprocess.run(  # noqa: S603 - fixed git arguments, no shell
+        ["git", *args],  # noqa: S607 - git from PATH is intended
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    ).stdout
+
+
+def git_dirty_paths(cwd: str | Path | None = None) -> list[str]:
+    """Tracked files under :data:`CODE_PATHS` that differ from ``HEAD``, sorted.
+
+    Empty when the tree is clean there or outside a repository.
+    """
     try:
-        head = subprocess.run(
-            ["git", "rev-parse", "HEAD"],  # noqa: S607 - git from PATH is intended
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout.strip()
-        status = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],  # noqa: S607
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout
+        top = _git(["rev-parse", "--show-toplevel"], cwd).strip()
+        out = _git(
+            ["status", "--porcelain=v1", "-z", "--untracked-files=no", "--", *CODE_PATHS], top
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    paths: set[str] = set()
+    entries = iter(out.split("\0"))
+    for entry in entries:
+        if len(entry) < 4:
+            continue
+        paths.add(entry[3:])
+        if entry[0] in "RC":  # a rename's source path follows; the new path is the one kept
+            next(entries, None)
+    return sorted(paths)
+
+
+def git_commit(cwd: str | Path | None = None) -> tuple[str, bool]:
+    """``(commit hash, dirty)`` of the working tree, or ``("unknown", False)``.
+
+    ``dirty`` is whether :func:`git_dirty_paths` finds a changed file under
+    :data:`CODE_PATHS`.
+    """
+    try:
+        head = _git(["rev-parse", "HEAD"], cwd).strip()
     except (OSError, subprocess.SubprocessError):
         return "unknown", False
-    return head or "unknown", bool(status.strip())
+    return head or "unknown", bool(git_dirty_paths(cwd))
 
 
 def build_scorecard(
@@ -73,7 +111,11 @@ def build_scorecard(
     detector, ``meta.usage`` is added, priced with ``price`` (USD per 1M tokens: ``input``,
     ``cached``, ``output``) when that has an input or output rate.
     """
-    commit_hash, dirty = commit if commit is not None else git_commit()
+    if commit is None:
+        commit_hash, dirty = git_commit()
+        dirty_paths = git_dirty_paths() if dirty else []
+    else:
+        (commit_hash, dirty), dirty_paths = commit, []
     by_language: dict[str, list[DocumentResult]] = defaultdict(list)
     for r in results:
         by_language[r.document.language].append(r)
@@ -86,6 +128,7 @@ def build_scorecard(
         "meta": {
             "commit": commit_hash,
             "dirty": dirty,
+            "dirty_paths": dirty_paths,
             "pii_guard_version": __version__,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "detectors": list(detectors),

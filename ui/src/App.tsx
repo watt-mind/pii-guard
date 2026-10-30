@@ -29,7 +29,7 @@ import { useServerStatus, type StatusLoader } from "./hooks/useServerStatus";
 import { useTheme } from "./hooks/useTheme";
 import { useTraffic } from "./hooks/useTraffic";
 import { initialAnswer, runGuard, toRunError, type RunError, type RunResult } from "./lib/run";
-import { DEFAULT_ROUTE, PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type PlaygroundTab, type Route, type Section } from "./lib/routes";
+import { DEFAULT_ROUTE, PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type EvaluationParams, type PlaygroundTab, type Route, type Section } from "./lib/routes";
 import type { VaultClient } from "./api/vault";
 import type { KnownRow } from "./lib/knownRows";
 import { knownSignatureOf, type KnownSession } from "./lib/run";
@@ -155,8 +155,28 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
     setRouteState((prev) => (sameRoute(prev, next) ? prev : next));
     if (how !== "none") writeHash(next, how);
   }, []);
-  const openSection = useCallback((section: Section) => navigate({ section, tab: section === "playground" ? route.tab : "text" }), [navigate, route.tab]);
+  // The Evaluation screen's filters survive leaving the section: returning to it (sidebar,
+  // Back) restores the same view instead of resetting to the defaults (LAB-1133).
+  const lastEvaluation = useRef<EvaluationParams | null>(null);
+  useEffect(() => {
+    if (route.section === "evaluation" && route.evaluation) lastEvaluation.current = route.evaluation;
+  }, [route]);
+  const openSection = useCallback(
+    (section: Section) =>
+      navigate({
+        section,
+        tab: section === "playground" ? route.tab : "text",
+        ...(section === "evaluation" && lastEvaluation.current ? { evaluation: lastEvaluation.current } : {}),
+      }),
+    [navigate, route.tab],
+  );
   const openTab = useCallback((tab: PlaygroundTab) => navigate({ section: "playground", tab }), [navigate]);
+  // The open Evaluation screen reports its filters so the URL stays shareable; off-section
+  // nothing is reported, so a still-loading screen can't pull the user back (LAB-1133).
+  const reportEvaluation = useCallback(
+    (evaluation: EvaluationParams) => navigate({ section: "evaluation", tab: "text", evaluation }, "replace"),
+    [navigate],
+  );
 
   useEffect(() => {
     // An old tab link (#traffic, #benchmarks …) lands on its new place, with the URL rewritten.
@@ -461,6 +481,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
             {sectionOpened("connect") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading connect…</p>}>
             <Connect
               status={status}
+              initialClient={route.section === "connect" ? (route.client ?? null) : null}
               serverSnippets={!caps.accounts || (server !== null && hostedSnippets !== undefined)}
               loadSnippets={hostedSnippets}
               gatewayLine={!caps.accounts}
@@ -491,7 +512,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
           </section>
           <section id="section-evaluation" aria-label="Evaluation" hidden={section !== "evaluation"}>
             {sectionOpened("evaluation") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading evaluation…</p>}>
-            {opened("evaluation") && <Benchmarks load={loadBenchmarks} />}
+            {opened("evaluation") && <Benchmarks load={loadBenchmarks} initial={route.section === "evaluation" ? (route.evaluation ?? null) : undefined} onParams={route.section === "evaluation" ? reportEvaluation : undefined} />}
             </Suspense></PageLoadBoundary>}
           </section>
         </main>

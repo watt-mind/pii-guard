@@ -26,6 +26,8 @@ export interface ConnectQuickstartProps {
   /** Open the tool's vault session (Vault screen), by its traffic-log ref. */
   onOpenSession?: (ref: string) => void;
   load?: SnippetsLoader;
+  /** A `#connect/<client>` deep link names this tab first (LAB-1314). */
+  initialTool?: string | null;
 }
 
 /** One vault session per tool, kept across reloads, so the block stays the same and step 3
@@ -38,8 +40,9 @@ function sessionFor(tool: ToolId): string {
   return id;
 }
 
-export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSession, load = loadSnippets }: ConnectQuickstartProps) {
+export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSession, load = loadSnippets, initialTool = null }: ConnectQuickstartProps) {
   const [tool, setToolState] = useState<ToolId>(() => {
+    if (isTool(initialTool)) return initialTool;
     const saved = readPref("connect-tool");
     return isTool(saved) ? saved : "muse-code";
   });
@@ -62,6 +65,12 @@ export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSessio
     setSession(sessionFor(t));
     writePref("connect-tool", t);
   };
+  // A `#connect/<client>` deep link arriving while the screen is open picks that tab.
+  const [linked, setLinked] = useState(initialTool);
+  if (initialTool !== linked) {
+    setLinked(initialTool);
+    if (isTool(initialTool)) setTool(initialTool);
+  }
   const current = result?.key === key ? result.value : null;
   const snippets = current?.state === "ok" ? current.snippets : null;
   // Until the first answer, the tabs keep their place; after it, the server's list is the list.

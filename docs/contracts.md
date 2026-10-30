@@ -17,7 +17,7 @@ A `StrEnum` whose values equal their names, one member per row of
 
 | Group | Members |
 |---|---|
-| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`, `SECRET` |
+| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `PAYMENT_CARD`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`, `SECRET` |
 | Visual | `FACE`, `SIGNATURE`, `ID_PHOTO`, `STAMP` |
 
 `TEXT_ENTITY_TYPES` and `VISUAL_ENTITY_TYPES` are `frozenset`s of the two groups;
@@ -160,7 +160,7 @@ label, a consistent postcode and settlement, or valid check digits:
 
 | Scope | Entity types | Scores |
 |---|---|---|
-| all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
+| all | `BANK_ACCOUNT` (IBAN, mod 97), `PAYMENT_CARD` (issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
 | all | `SECRET` (provider key shapes, PEM private keys, `scheme://user:password@host`, values assigned to a secret-ish key, `Authorization: Bearer/Basic`; [entities.md](entities.md#language-independent)) | provider shape 0.9-0.97, private key 0.99, URL password 0.9 / user 0.85, bearer 0.9, assignment 0.85 |
 | `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labeled ID card / passport / license / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
 | `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
@@ -1568,8 +1568,8 @@ accepts directories (default `eval/fixtures`). Unloadable detectors are skipped 
 warning. Markdown goes to stdout. Exit codes: 0 ok, 1 a detector or the vault failed during the
 run (fail closed, no scorecard), 2 bad arguments, fixtures or no loadable detector.
 
-The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version, detectors,
-skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
+The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag and `dirty_paths`,
+version, detectors, skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
 contains document text or labeled values.
