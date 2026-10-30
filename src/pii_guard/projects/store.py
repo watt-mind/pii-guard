@@ -21,19 +21,21 @@ import secrets
 import sqlite3
 import stat
 import threading
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypeVar
 
 from cryptography.fernet import Fernet, InvalidToken
 from pydantic import SecretStr
 
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, EntityType, PiiGuardError
+
+T = TypeVar("T")
 
 #: The actions a project policy may give a visual type (``block`` is text-only here).
 VISUAL_POLICY_ACTIONS = frozenset({Policy.MASK, Policy.KEEP})
@@ -147,19 +149,7 @@ class ProjectStore:
     def __init__(self, path: str, key: bytes, defaults: PolicySet, detection_profile: str) -> None:
         if len(key) < 32 or detection_profile not in {"standard", "local-only"}:
             raise ValueError("Invalid project storage configuration")
-        self._lock = threading.RLock()
-        self._defaults = {t.value: defaults.of(t).value for t in TEXT_ENTITY_TYPES}
-        # A visual default the server blocks is stored as mask; the server still wins when
-        # stricter (pii_guard.projects.visual), so the image is refused either way.
-        self._defaults.update(
-            {
-                t.value: (Policy.KEEP if defaults.of(t) is Policy.KEEP else Policy.MASK).value
-                for t in VISUAL_ENTITY_TYPES
-            }
-        )
-        self._profile = detection_profile
-        derived = hmac.digest(key, b"pii-guard-project-credentials-v1", "sha256")
-        self._cipher = Fernet(base64.urlsafe_b64encode(derived))
+        self._init_common(key, defaults, detection_profile)
         try:
             location = Path(path).expanduser()
             location.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -203,38 +193,34 @@ class ProjectStore:
         except (OSError, sqlite3.Error, InvalidToken):
             raise ProjectStorageError() from None
 
-    @classmethod
-    def memory(
-        cls,
-        key: bytes,
-        defaults: PolicySet,
-        detection_profile: str,
-        snapshot: bytes | None = None,
-    ) -> ProjectStore:
-        """Build a bounded private in-memory engine; existing snapshots are never migrated."""
-        if len(key) < 32 or detection_profile not in {"standard", "local-only"}:
-            raise ProjectStorageError()
-        instance = cls.__new__(cls)
-        instance._lock = threading.RLock()
-        instance._defaults = {t.value: defaults.of(t).value for t in TEXT_ENTITY_TYPES}
-        instance._defaults.update(
+    def _init_common(self, key: bytes, defaults: PolicySet, detection_profile: str) -> None:
+        self._lock = threading.RLock()
+        self._defaults = {t.value: defaults.of(t).value for t in TEXT_ENTITY_TYPES}
+        # A visual default the server blocks is stored as mask; the server still wins when
+        # stricter (pii_guard.projects.visual), so the image is refused either way.
+        self._defaults.update(
             {
                 t.value: (Policy.KEEP if defaults.of(t) is Policy.KEEP else Policy.MASK).value
                 for t in VISUAL_ENTITY_TYPES
             }
         )
-        instance._profile = detection_profile
+        self._profile = detection_profile
         derived = hmac.digest(key, b"pii-guard-project-credentials-v1", "sha256")
-        instance._cipher = Fernet(base64.urlsafe_b64encode(derived))
-        instance._db = sqlite3.connect(":memory:", check_same_thread=False)
-        db = instance._db
+        self._cipher = Fernet(base64.urlsafe_b64encode(derived))
+
+    def _init_memory(
+        self, key: bytes, defaults: PolicySet, detection_profile: str, snapshot: bytes | None
+    ) -> None:
+        self._init_common(key, defaults, detection_profile)
+        self._db = sqlite3.connect(":memory:", check_same_thread=False)
+        db = self._db
         try:
             db.row_factory = sqlite3.Row
             if snapshot is None:
                 db.executescript(_SCHEMA)
                 db.execute(
                     "INSERT INTO store_metadata VALUES ('key_check', ?)",
-                    (instance._cipher.encrypt(b"pii-guard-project-store-v1"),),
+                    (self._cipher.encrypt(b"pii-guard-project-store-v1"),),
                 )
                 db.commit()
             else:
@@ -263,8 +249,7 @@ class ProjectStore:
                 if (
                     len(sentinels) != 1
                     or sentinels[0]["name"] != "key_check"
-                    or instance._cipher.decrypt(sentinels[0]["value"])
-                    != b"pii-guard-project-store-v1"
+                    or self._cipher.decrypt(sentinels[0]["value"]) != b"pii-guard-project-store-v1"
                 ):
                     raise ProjectStorageError()
             if db.execute("PRAGMA page_size").fetchone()[0] != 4096:
@@ -274,10 +259,32 @@ class ProjectStore:
             db.execute("PRAGMA temp_store = MEMORY")
             db.execute("PRAGMA secure_delete = ON")
             db.execute("PRAGMA trusted_schema = OFF")
-            return instance
         except Exception:
             db.close()
             raise ProjectStorageError() from None
+
+    @classmethod
+    def memory(
+        cls,
+        key: bytes,
+        defaults: PolicySet,
+        detection_profile: str,
+        snapshot: bytes | None = None,
+    ) -> ProjectStore:
+        """Build a bounded private in-memory engine; existing snapshots are never migrated."""
+        if len(key) < 32 or detection_profile not in {"standard", "local-only"}:
+            raise ProjectStorageError()
+        instance = cls.__new__(cls)
+        cls._init_memory(instance, key, defaults, detection_profile, snapshot)
+        return instance
+
+    @property
+    def total_changes(self) -> int:
+        return self._db.total_changes
+
+    def run_atomic(self, operation: Callable[[ProjectStore], T]) -> T:
+        with self._lock:
+            return operation(self)
 
     def serialized(self) -> bytes:
         """Serialize only configuration; the caller encrypts it before persistence."""
@@ -540,6 +547,51 @@ class ProjectStore:
             ).fetchall()
             return [self._endpoint_metadata(self._endpoint(db, project, row["id"])) for row in ids]
 
+    def _endpoint_credential(
+        self,
+        owner: str,
+        project: str,
+        endpoint: str,
+        provider: str,
+        base_url: str,
+        raw_key: object,
+        previous: sqlite3.Row | None,
+    ) -> bytes | None:
+        if isinstance(raw_key, SecretStr):
+            raw_key = raw_key.get_secret_value()
+        if provider == "sponsored":
+            if raw_key is not None:
+                raise InvalidProjectConfigError()
+            return None
+        if raw_key is None:
+            if previous is None or (provider, base_url) != (
+                previous["provider"],
+                previous["base_url"],
+            ):
+                raise InvalidProjectConfigError()
+            credential = previous["credential"]
+            if credential is None:
+                raise InvalidProjectConfigError()
+            return bytes(credential)
+        if (
+            not isinstance(raw_key, str)
+            or not 1 <= len(raw_key) <= 4096
+            or any(ord(c) <= 32 or ord(c) >= 127 for c in raw_key)
+            or raw_key.startswith("pg_")
+        ):
+            raise InvalidProjectConfigError()
+        envelope = json.dumps(
+            {
+                "owner": owner,
+                "project": project,
+                "endpoint": endpoint,
+                "provider": provider,
+                "base_url": base_url,
+                "key": raw_key,
+            }
+        ).encode()
+        return self._cipher.encrypt(envelope)
+
     def save_endpoint(
         self, owner: str, project: str, data: Mapping[str, Any], endpoint_id: str | None = None
     ) -> dict[str, Any]:
@@ -573,41 +625,9 @@ class ProjectStore:
             if type(enabled) is not bool:
                 raise InvalidProjectConfigError()
             endpoint = endpoint_id or secrets.token_urlsafe(18)
-            raw_key = data.get("api_key")
-            if isinstance(raw_key, SecretStr):
-                raw_key = raw_key.get_secret_value()
-            credential = None
-            if provider == "sponsored":
-                if raw_key is not None:
-                    raise InvalidProjectConfigError()
-            elif raw_key is None:
-                if previous is None or (provider, base_url) != (
-                    previous["provider"],
-                    previous["base_url"],
-                ):
-                    raise InvalidProjectConfigError()
-                credential = previous["credential"]
-                if credential is None:
-                    raise InvalidProjectConfigError()
-            else:
-                if (
-                    not isinstance(raw_key, str)
-                    or not 1 <= len(raw_key) <= 4096
-                    or any(ord(c) <= 32 or ord(c) >= 127 for c in raw_key)
-                    or raw_key.startswith("pg_")
-                ):
-                    raise InvalidProjectConfigError()
-                envelope = json.dumps(
-                    {
-                        "owner": owner,
-                        "project": project,
-                        "endpoint": endpoint,
-                        "provider": provider,
-                        "base_url": base_url,
-                        "key": raw_key,
-                    }
-                ).encode()
-                credential = self._cipher.encrypt(envelope)
+            credential = self._endpoint_credential(
+                owner, project, endpoint, provider, base_url, data.get("api_key"), previous
+            )
             values = (
                 _name(data.get("name")),
                 version_id,

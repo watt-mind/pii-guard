@@ -55,6 +55,10 @@ class BlobProjectStore:
         self._cipher = Fernet(base64.urlsafe_b64encode(derived))
         self._binding = b"pii-guard-project-snapshot-v1\0" + environment.encode() + b"\0"
 
+    @property
+    def key(self) -> bytes:
+        return self._key
+
     def _encode(self, database: bytes) -> bytes:
         if len(database) > MAX_DATABASE_BYTES:
             raise ProjectStorageError()
@@ -74,6 +78,9 @@ class BlobProjectStore:
             raise ProjectStorageError()
         return database
 
+    def run_atomic(self, operation: Callable[[ProjectStore], T]) -> T:
+        return self._run(operation)
+
     def _run(self, operation: Callable[[ProjectStore], T]) -> T:
         with self._lock:
             engine = None
@@ -90,11 +97,11 @@ class BlobProjectStore:
                 engine = ProjectStore.memory(
                     self._key, self._defaults, self._profile, self._decode(raw)
                 )
-                before = engine._db.total_changes
+                before = engine.total_changes
                 result = operation(engine)
                 # Read-only calls perform no PUT. Default creation in a GET remains an
                 # atomic mutation, exactly as in the local store.
-                if engine._db.total_changes != before:
+                if engine.total_changes != before:
                     self._blob.compare_and_swap(self._encode(engine.serialized()), etag)
                 return result
             except Exception as exc:

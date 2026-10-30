@@ -110,6 +110,18 @@ class MockUpstream:
             self.received.append(raw.decode("utf-8", errors="replace"))
             self.count += 1
 
+    def received_snapshot(self, limit: int = 100) -> dict[str, Any]:
+        with self._lock:
+            items = list(self.received)[-limit:] if limit > 0 else []
+            count = self.count
+        return {"count": count, "requests": items}
+
+    def clear_received(self) -> dict[str, Any]:
+        with self._lock:
+            self.received.clear()
+            self.count = 0
+        return {"count": 0}
+
     def reply(self, body: dict[str, Any]) -> tuple[str | None, list[dict[str, Any]] | None]:
         """``(content, tool_calls)`` for a request."""
         text = last_user_text(body)
@@ -126,6 +138,88 @@ class MockUpstream:
             }
             return None, [call]
         return f"Echo: {text}", None
+
+
+async def _handle_chat_completion(mock: MockUpstream, body: dict[str, Any]) -> Any:
+    content, tool_calls = mock.reply(body)
+    model = str(body.get("model") or MODEL)
+    prompt_tokens = _tokens(json.dumps(body["messages"], ensure_ascii=False))
+    completion_tokens = _tokens(content or json.dumps(tool_calls, ensure_ascii=False))
+    usage = {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": prompt_tokens + completion_tokens,
+    }
+    created = int(time.time())
+    if body.get("stream"):
+        include_usage = bool((body.get("stream_options") or {}).get("include_usage"))
+        return StreamingResponse(
+            _stream(mock, model, created, content, tool_calls, usage if include_usage else None),
+            media_type="text/event-stream",
+        )
+    if mock.delay_ms:
+        await asyncio.sleep(mock.delay_ms / 1000)
+    message: dict[str, Any] = {"role": "assistant", "content": content}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
+    return {
+        "id": "chatcmpl-mock",
+        "object": "chat.completion",
+        "created": created,
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "message": message,
+                "finish_reason": "tool_calls" if tool_calls else "stop",
+            }
+        ],
+        "usage": usage,
+    }
+
+
+async def _handle_responses_request(mock: MockUpstream, body: dict[str, Any]) -> Any:
+    text = last_input_text(body)
+    name = _first_function(body.get("tools")) if body.get("tool_choice") != "none" else None
+    if name is not None:
+        arguments = json.dumps({"text": text}, ensure_ascii=False)
+        item: dict[str, Any] = {
+            "type": "function_call",
+            "id": "fc_mock_1",
+            "call_id": "call_mock_1",
+            "name": name,
+            "arguments": arguments,
+            "status": "completed",
+        }
+    else:
+        part = {"type": "output_text", "text": f"Echo: {text}", "annotations": []}
+        item = {
+            "type": "message",
+            "id": "msg_mock_1",
+            "role": "assistant",
+            "status": "completed",
+            "content": [part],
+        }
+    input_tokens = _tokens(json.dumps(body.get("input"), ensure_ascii=False))
+    output_tokens = _tokens(json.dumps(item, ensure_ascii=False))
+    whole = {
+        "id": "resp_mock",
+        "object": "response",
+        "created_at": int(time.time()),
+        "status": "completed",
+        "model": str(body.get("model") or MODEL),
+        "output": [item],
+        "usage": {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+        },
+    }
+    if body.get("stream"):
+        return StreamingResponse(_response_events(mock, whole), media_type="text/event-stream")
+    if mock.delay_ms:
+        await asyncio.sleep(mock.delay_ms / 1000)
+    return whole
 
 
 def create_mock_upstream(
@@ -146,17 +240,11 @@ def create_mock_upstream(
 
     @app.get("/_mock/received")
     def received(limit: int = 100) -> dict[str, Any]:
-        with mock._lock:
-            items = list(mock.received)[-limit:] if limit > 0 else []
-            count = mock.count
-        return {"count": count, "requests": items}
+        return mock.received_snapshot(limit)
 
     @app.delete("/_mock/received")
     def reset() -> dict[str, Any]:
-        with mock._lock:
-            mock.received.clear()
-            mock.count = 0
-        return {"count": 0}
+        return mock.clear_received()
 
     @app.post("/v1/chat/completions")
     async def chat(request: Request) -> Any:
@@ -168,43 +256,7 @@ def create_mock_upstream(
             return JSONResponse({"error": {"type": "invalid_request", "code": "bad_json"}}, 400)
         if not isinstance(body, dict) or not isinstance(body.get("messages"), list):
             return JSONResponse({"error": {"type": "invalid_request", "code": "no_messages"}}, 400)
-        content, tool_calls = mock.reply(body)
-        model = str(body.get("model") or MODEL)
-        prompt_tokens = _tokens(json.dumps(body["messages"], ensure_ascii=False))
-        completion_tokens = _tokens(content or json.dumps(tool_calls, ensure_ascii=False))
-        usage = {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": prompt_tokens + completion_tokens,
-        }
-        created = int(time.time())
-        if body.get("stream"):
-            include_usage = bool((body.get("stream_options") or {}).get("include_usage"))
-            return StreamingResponse(
-                _stream(
-                    mock, model, created, content, tool_calls, usage if include_usage else None
-                ),
-                media_type="text/event-stream",
-            )
-        if mock.delay_ms:
-            await asyncio.sleep(mock.delay_ms / 1000)
-        message: dict[str, Any] = {"role": "assistant", "content": content}
-        if tool_calls:
-            message["tool_calls"] = tool_calls
-        return {
-            "id": "chatcmpl-mock",
-            "object": "chat.completion",
-            "created": created,
-            "model": model,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": message,
-                    "finish_reason": "tool_calls" if tool_calls else "stop",
-                }
-            ],
-            "usage": usage,
-        }
+        return await _handle_chat_completion(mock, body)
 
     @app.post("/v1/responses")
     async def responses(request: Request) -> Any:
@@ -216,47 +268,7 @@ def create_mock_upstream(
             return JSONResponse({"error": {"type": "invalid_request", "code": "bad_json"}}, 400)
         if not isinstance(body, dict) or "input" not in body:
             return JSONResponse({"error": {"type": "invalid_request", "code": "no_input"}}, 400)
-        text = last_input_text(body)
-        name = _first_function(body.get("tools")) if body.get("tool_choice") != "none" else None
-        if name is not None:
-            arguments = json.dumps({"text": text}, ensure_ascii=False)
-            item: dict[str, Any] = {
-                "type": "function_call",
-                "id": "fc_mock_1",
-                "call_id": "call_mock_1",
-                "name": name,
-                "arguments": arguments,
-                "status": "completed",
-            }
-        else:
-            part = {"type": "output_text", "text": f"Echo: {text}", "annotations": []}
-            item = {
-                "type": "message",
-                "id": "msg_mock_1",
-                "role": "assistant",
-                "status": "completed",
-                "content": [part],
-            }
-        input_tokens = _tokens(json.dumps(body.get("input"), ensure_ascii=False))
-        output_tokens = _tokens(json.dumps(item, ensure_ascii=False))
-        whole = {
-            "id": "resp_mock",
-            "object": "response",
-            "created_at": int(time.time()),
-            "status": "completed",
-            "model": str(body.get("model") or MODEL),
-            "output": [item],
-            "usage": {
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "total_tokens": input_tokens + output_tokens,
-            },
-        }
-        if body.get("stream"):
-            return StreamingResponse(_response_events(mock, whole), media_type="text/event-stream")
-        if mock.delay_ms:
-            await asyncio.sleep(mock.delay_ms / 1000)
-        return whole
+        return await _handle_responses_request(mock, body)
 
     return app
 

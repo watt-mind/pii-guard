@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -80,6 +81,62 @@ def prepare_project(
     return state
 
 
+def _check_endpoint_control_headers(headers: Headers, policy: Mapping[str, Any]) -> None:
+    for name in ("x-pii-guard-mode", "x-pii-guard-language", "x-pii-guard-connection"):
+        if len(headers.getlist(name)) > 1:
+            raise ProjectAccessError("Duplicate endpoint control header")
+    if headers.get("x-pii-guard-connection"):
+        raise ProjectAccessError("Endpoint upstream cannot be overridden")
+    if headers.get("x-pii-guard-mode", policy["mode"]) != policy["mode"]:
+        raise ProjectAccessError("Endpoint detection mode cannot be overridden")
+    if headers.get("x-pii-guard-language", policy["language"]) != policy["language"]:
+        raise ProjectAccessError("Endpoint language cannot be overridden")
+
+
+def _apply_endpoint_model_policy(body: dict[str, Any], endpoint: Any) -> None:
+    if endpoint.model is not None:
+        # Pinned: the configured model, whatever the client sends.
+        if "model" in body and body["model"] != endpoint.model:
+            raise ProjectAccessError("Endpoint allows only its configured model")
+        body["model"] = endpoint.model
+        return
+    # Pass-through (BYOK only; sponsored always pins): the client's model, unchanged.
+    model = body.get("model")
+    if (
+        not isinstance(model, str)
+        or not model.strip()
+        or len(model) > 256
+        or any(ord(c) < 32 or ord(c) == 127 for c in model)
+    ):
+        raise EndpointModelRequiredError(
+            "This endpoint has no pinned model: the request must name one in 'model'"
+        )
+
+
+async def _read_endpoint_json_body(receive: Receive, endpoint: Any, maximum: int) -> bytearray:
+    raw = bytearray()
+    async with asyncio.timeout(10):
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                raise ProjectAccessError("Request disconnected")
+            raw.extend(message.get("body", b""))
+            if len(raw) > maximum:
+                raise ProjectAccessError("Endpoint request body is too large")
+            if not message.get("more_body", False):
+                break
+    try:
+        body = json.loads(raw)
+    except (ValueError, UnicodeDecodeError):
+        raise ProjectAccessError("Invalid endpoint JSON request") from None
+    if not isinstance(body, dict):
+        raise ProjectAccessError("Endpoint request must be an object")
+    _apply_endpoint_model_policy(body, endpoint)
+    # Compact, so the re-serialised body the hosted limit checks next is no larger than
+    # what the client sent (default separators add about 1-2%, LAB-1651).
+    return bytearray(json.dumps(body, separators=(",", ":")).encode())
+
+
 async def endpoint_body(
     scope: Scope, receive: Receive, state: dict[str, Any], maximum: int
 ) -> tuple[Scope, Receive]:
@@ -88,55 +145,13 @@ async def endpoint_body(
     if routed is None:
         return scope, receive
     endpoint, canonical = state["project_endpoint"], routed[1]
-    headers = Headers(scope=scope)
-    for name in ("x-pii-guard-mode", "x-pii-guard-language", "x-pii-guard-connection"):
-        if len(headers.getlist(name)) > 1:
-            raise ProjectAccessError("Duplicate endpoint control header")
-    if headers.get("x-pii-guard-connection"):
-        raise ProjectAccessError("Endpoint upstream cannot be overridden")
     policy = state["project_policy"]
-    if headers.get("x-pii-guard-mode", policy["mode"]) != policy["mode"]:
-        raise ProjectAccessError("Endpoint detection mode cannot be overridden")
-    if headers.get("x-pii-guard-language", policy["language"]) != policy["language"]:
-        raise ProjectAccessError("Endpoint language cannot be overridden")
-    raw = bytearray()
-    if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}:
-        async with asyncio.timeout(10):
-            while True:
-                message = await receive()
-                if message["type"] == "http.disconnect":
-                    raise ProjectAccessError("Request disconnected")
-                raw.extend(message.get("body", b""))
-                if len(raw) > maximum:
-                    raise ProjectAccessError("Endpoint request body is too large")
-                if not message.get("more_body", False):
-                    break
-        try:
-            body = json.loads(raw)
-        except (ValueError, UnicodeDecodeError):
-            raise ProjectAccessError("Invalid endpoint JSON request") from None
-        if not isinstance(body, dict):
-            raise ProjectAccessError("Endpoint request must be an object")
-        if endpoint.model is not None:
-            # Pinned: the configured model, whatever the client sends.
-            if "model" in body and body["model"] != endpoint.model:
-                raise ProjectAccessError("Endpoint allows only its configured model")
-            body["model"] = endpoint.model
-        else:
-            # Pass-through (BYOK only; sponsored always pins): the client's model, unchanged.
-            model = body.get("model")
-            if (
-                not isinstance(model, str)
-                or not model.strip()
-                or len(model) > 256
-                or any(ord(c) < 32 or ord(c) == 127 for c in model)
-            ):
-                raise EndpointModelRequiredError(
-                    "This endpoint has no pinned model: the request must name one in 'model'"
-                )
-        # Compact, so the re-serialised body the hosted limit checks next is no larger than
-        # what the client sent (default separators add about 1-2%, LAB-1651).
-        raw = bytearray(json.dumps(body, separators=(",", ":")).encode())
+    _check_endpoint_control_headers(Headers(scope=scope), policy)
+    raw = (
+        await _read_endpoint_json_body(receive, endpoint, maximum)
+        if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}
+        else bytearray()
+    )
     filtered = [
         (k, v)
         for k, v in scope.get("headers", [])
@@ -179,68 +194,91 @@ class ProjectMiddleware:
     def __init__(self, app: ASGIApp, service: ProjectService) -> None:
         self.app, self.service = app, service
 
+    async def _resolve_endpoint_key(
+        self,
+        scope: Scope,
+        headers: Headers,
+        routed: tuple[str, str] | None,
+        scheme: str,
+        credential: str,
+    ) -> tuple[Scope, tuple[str, str], Any]:
+        if (
+            routed is None
+            and scope.get("path", "") == MUSE_CATALOG
+            and scheme.lower() == "bearer"
+            and not headers.get("x-pii-guard-token")
+        ):
+            owner = await anyio.to_thread.run_sync(self.service.store.key_endpoint, credential)
+            if owner is None:
+                raise ProjectAccessError("Invalid or revoked endpoint key")
+            scope = route_to_endpoint(scope, owner)
+            routed = endpoint_path(scope["path"])
+        if routed is None or scheme.lower() != "bearer" or headers.get("x-pii-guard-token"):
+            raise ProjectAccessError("Endpoint keys are accepted only on their endpoint path")
+        snapshot = await anyio.to_thread.run_sync(
+            self.service.store.resolve_key, credential, routed[0]
+        )
+        if snapshot is None:
+            raise ProjectAccessError("Invalid or revoked endpoint key")
+        return scope, routed, snapshot
+
+    async def _authenticate_request(
+        self, scope: Scope, headers: Headers
+    ) -> tuple[Scope, tuple[str, str] | None, Any]:
+        if (
+            len(headers.getlist("authorization")) > 1
+            or len(headers.getlist("x-pii-guard-token")) > 1
+        ):
+            raise ProjectAccessError("Duplicate authorization header")
+        auth = headers.get("authorization", "")
+        scheme, _, credential = auth.partition(" ")
+        credential = credential.strip()
+        routed = endpoint_path(scope.get("path", ""))
+        snapshot = None
+        # Same recognition as BearerTokenMiddleware (LAB-1562): any cased
+        # pg_ep_ credential is an endpoint key that must resolve here.
+        if looks_like_endpoint_key(credential) or looks_like_endpoint_key(
+            headers.get("x-pii-guard-token", "")
+        ):
+            scope, routed, snapshot = await self._resolve_endpoint_key(
+                scope, headers, routed, scheme, credential
+            )
+        elif routed is not None:
+            if self.service.settings.api_token is not None:
+                # With an API token configured, routed calls are admitted only
+                # by a resolved endpoint key. The token alone must not load an
+                # endpoint snapshot through the local-owner fallthrough in
+                # prepare_project (LAB-1562).
+                raise ProjectAccessError("Endpoint access requires an endpoint key")
+            # Local owner calls use the trusted-local management boundary.
+            if not _addr_is_loopback(scope.get("client")):
+                raise ProjectAccessError("Local owner access requires a trusted local connection")
+        if scope.get("path", "").startswith("/e/") and routed is None:
+            raise ProjectAccessError("Endpoint key cannot access this route")
+        return scope, routed, snapshot
+
+    def _check_local_management_boundary(
+        self, scope: Scope, headers: Headers, snapshot: Any
+    ) -> None:
+        if snapshot is not None or self.service.settings.api_token is not None:
+            return
+        if not (_addr_is_loopback(scope.get("client")) and _addr_is_loopback(scope.get("server"))):
+            raise ProjectAccessError("Project management requires local owner access")
+        origin = headers.get("origin")
+        if origin and urlsplit(origin).netloc != headers.get("host"):
+            raise ProjectAccessError("Project requests require the same origin")
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or self.service.settings.hosted:
             await self.app(scope, receive, send)
             return
-        path = scope.get("path", "")
         headers = Headers(scope=scope)
-        routed = endpoint_path(path)
         runtime = None
         started = False
         state: dict[str, Any] = {}
         try:
-            auth = headers.get("authorization", "")
-            if (
-                len(headers.getlist("authorization")) > 1
-                or len(headers.getlist("x-pii-guard-token")) > 1
-            ):
-                raise ProjectAccessError("Duplicate authorization header")
-            scheme, _, credential = auth.partition(" ")
-            credential = credential.strip()
-            snapshot = None
-            # Same recognition as BearerTokenMiddleware (LAB-1562): any cased
-            # pg_ep_ credential is an endpoint key that must resolve here.
-            if looks_like_endpoint_key(credential) or looks_like_endpoint_key(
-                headers.get("x-pii-guard-token", "")
-            ):
-                if (
-                    routed is None
-                    and path == MUSE_CATALOG
-                    and scheme.lower() == "bearer"
-                    and not headers.get("x-pii-guard-token")
-                ):
-                    owner = await anyio.to_thread.run_sync(
-                        self.service.store.key_endpoint, credential
-                    )
-                    if owner is None:
-                        raise ProjectAccessError("Invalid or revoked endpoint key")
-                    scope = route_to_endpoint(scope, owner)
-                    path = scope["path"]
-                    routed = endpoint_path(path)
-                if routed is None or scheme.lower() != "bearer" or headers.get("x-pii-guard-token"):
-                    raise ProjectAccessError(
-                        "Endpoint keys are accepted only on their endpoint path"
-                    )
-                snapshot = await anyio.to_thread.run_sync(
-                    self.service.store.resolve_key, credential, routed[0]
-                )
-                if snapshot is None:
-                    raise ProjectAccessError("Invalid or revoked endpoint key")
-            elif routed is not None:
-                if self.service.settings.api_token is not None:
-                    # With an API token configured, routed calls are admitted only
-                    # by a resolved endpoint key. The token alone must not load an
-                    # endpoint snapshot through the local-owner fallthrough in
-                    # prepare_project (LAB-1562).
-                    raise ProjectAccessError("Endpoint access requires an endpoint key")
-                # Local owner calls use the trusted-local management boundary.
-                if not _addr_is_loopback(scope.get("client")):
-                    raise ProjectAccessError(
-                        "Local owner access requires a trusted local connection"
-                    )
-            if path.startswith("/e/") and routed is None:
-                raise ProjectAccessError("Endpoint key cannot access this route")
+            scope, routed, snapshot = await self._authenticate_request(scope, headers)
+            path = scope.get("path", "")
             management = path == "/v1/projects" or path.startswith("/v1/projects/")
             selected = bool(
                 headers.get("x-pii-guard-project") or headers.get("x-pii-guard-endpoint")
@@ -249,15 +287,7 @@ class ProjectMiddleware:
                 # Preserve the original single local owner's default namespace.
                 await self.app(scope, receive, send)
                 return
-            if snapshot is None and self.service.settings.api_token is None:
-                if not (
-                    _addr_is_loopback(scope.get("client"))
-                    and _addr_is_loopback(scope.get("server"))
-                ):
-                    raise ProjectAccessError("Project management requires local owner access")
-                origin = headers.get("origin")
-                if origin and urlsplit(origin).netloc != headers.get("host"):
-                    raise ProjectAccessError("Project requests require the same origin")
+            self._check_local_management_boundary(scope, headers, snapshot)
             state = await anyio.to_thread.run_sync(
                 prepare_project, self.service, scope, "local-owner", snapshot
             )

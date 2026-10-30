@@ -18,8 +18,12 @@ import contextlib
 import gzip
 import html
 import logging
+import os
+import secrets
+import sys
 import threading
 import time
+import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -115,7 +119,7 @@ def _strip(status: Status) -> str:
         else f"Upstream: {status.upstream}"
     )
     detectors = ", ".join(status.detectors) or "none"
-    text = " · ".join([first, f"detectors: {detectors}", f"images: {status.images}"])
+    text = " \u00b7 ".join([first, f"detectors: {detectors}", f"images: {status.images}"])
     light, dark = ("#7c2d12", "#ffedd5"), ("#fed7aa", "#431407")
     if not status.mock:
         light, dark = ("#1e3a8a", "#dbeafe"), ("#bfdbfe", "#172554")
@@ -155,7 +159,7 @@ class _SpaFiles(StaticFiles):
 
     def __init__(self, *, directory: Path) -> None:
         super().__init__(directory=directory, html=True)
-        self._index = (directory / "index.html").read_bytes()
+        self.index_bytes = (directory / "index.html").read_bytes()
         self._gzipped: dict[tuple[str, int, int], bytes] = {}
 
     async def get_response(self, path: str, scope: Scope) -> Response:
@@ -196,7 +200,7 @@ class _SpaFiles(StaticFiles):
         )
 
     def _index_response(self) -> Response:
-        return HTMLResponse(self._index, headers={"Cache-Control": "no-cache"})
+        return HTMLResponse(self.index_bytes, headers={"Cache-Control": "no-cache"})
 
 
 def robots_txt(host: str | None, *, sitemap: bool = False) -> str:
@@ -259,7 +263,7 @@ def create_bundle_app(
     if ui_available(ui_dir):
         spa = _SpaFiles(directory=ui_dir)
         app.mount("/", spa, name="ui")
-        page = spa._index.decode("utf-8")
+        page = spa.index_bytes.decode("utf-8")
     else:
         page = _no_ui_page(status)
 
@@ -352,7 +356,6 @@ def launcher(extras: str = "") -> str:
     """
     import shlex
     import shutil
-    import sys
 
     from pii_guard import DISTRIBUTION
 
@@ -501,8 +504,6 @@ def _dotenv_value(key: str) -> str | None:
     otherwise lose to the ``os.environ.update`` below. Minimal ``KEY=value`` parse:
     comments and blank lines skipped, optional quotes stripped.
     """
-    from pathlib import Path
-
     try:
         text = Path(".env").read_text(encoding="utf-8")
     except OSError:
@@ -521,8 +522,6 @@ def _dotenv_value(key: str) -> str | None:
 
 def _up_value(key: str, default: str) -> str:
     """Process env, else ``.env``, else ``up``'s default (LAB-1365)."""
-    import os
-
     return os.environ.get(key) or _dotenv_value(key) or default
 
 
@@ -534,10 +533,6 @@ def _tenant_key_configured() -> bool:
     replaced a configured key and changed every pseudonym on each start. Settings that do
     not load are reported later, where ``up`` loads them for the server.
     """
-    import os
-
-    from pii_guard.config import Settings
-
     if os.environ.get("PII_GUARD_TENANT_KEY"):
         return True
     try:
@@ -546,16 +541,8 @@ def _tenant_key_configured() -> bool:
         return False
 
 
-def run_up(opts: UpOptions) -> int:
-    """Run ``pii-guard up`` in the foreground until Ctrl-C (or SIGTERM)."""
-    import os
-    import secrets
-    import sys
-    import webbrowser
-
-    import uvicorn
-
-    from pii_guard.config import get_settings
+def _prepare_up_env(opts: UpOptions) -> tuple[dict[str, str], str] | None:
+    """Validate flags and bind settings; return ``(env, traffic_log)`` or ``None`` on error."""
     from pii_guard.observability import TrafficLevel, TrafficLogConfigError, check_bind
 
     env: dict[str, str] = {
@@ -578,45 +565,70 @@ def run_up(opts: UpOptions) -> int:
         if not key:
             # Not echoed back: the user just typed it, and nothing key-related is ever printed.
             print("pii-guard up: the variable named by --api-key-env is not set", file=sys.stderr)
-            return 2
+            return None
         env["PII_GUARD_UPSTREAM_API_KEY"] = key
 
     try:
         check_bind(TrafficLevel(traffic_log), opts.host)
     except (TrafficLogConfigError, ValueError) as exc:
         print(f"pii-guard up: {exc}", file=sys.stderr)
-        return 2
+        return None
     if not _port_free(opts.host, opts.port):
         print(
             f"pii-guard up: port {opts.port} on {opts.host} is in use; "
             f"pick another with --port {opts.port + 1}",
             file=sys.stderr,
         )
-        return 2
+        return None
+    return env, traffic_log
 
-    os.environ.update(env)
-    get_settings.cache_clear()
-    # The banner says which detectors run and how to add NER: no startup warning about it.
-    logging.getLogger("pii_guard.detect.stack").setLevel(logging.ERROR)
+
+def _configure_up_upstream(opts: UpOptions) -> tuple[str, MockServer | None]:
+    """Start the mock server when no upstream is configured; return ``(upstream, mock)``."""
     configured = get_settings().upstream_base_url  # flag, environment or .env
-    mock: MockServer | None = None
     if opts.mock or not configured:
         mock = MockServer()
         mock.start()
         os.environ["PII_GUARD_UPSTREAM_BASE_URL"] = mock.base_url
         os.environ["PII_GUARD_UPSTREAM_API_KEY"] = ""
         get_settings.cache_clear()
-        upstream = "mock"
-    else:
-        parts = urlsplit(configured)
-        upstream = f"{parts.scheme}://{parts.hostname or ''}" + (
-            f":{parts.port}" if parts.port else ""
-        )
+        return "mock", mock
+    parts = urlsplit(configured)
+    upstream = f"{parts.scheme}://{parts.hostname or ''}" + (f":{parts.port}" if parts.port else "")
+    return upstream, None
+
+
+def _start_banner_thread(server: object, banner: str, opts: UpOptions) -> None:
+    def announce() -> None:
+        while not getattr(server, "started", False) and not getattr(server, "should_exit", False):
+            time.sleep(0.05)
+        if not getattr(server, "started", False):
+            return
+        print(banner, flush=True)
+        if opts.browser:
+            webbrowser.open(f"http://localhost:{opts.port}/")
+
+    threading.Thread(target=announce, daemon=True).start()
+
+
+def run_up(opts: UpOptions) -> int:
+    """Run ``pii-guard up`` in the foreground until Ctrl-C (or SIGTERM)."""
+    import uvicorn
+
+    from pii_guard.detect.stack import ner_choice
+
+    prepared = _prepare_up_env(opts)
+    if prepared is None:
+        return 2
+    env, traffic_log = prepared
+    os.environ.update(env)
+    get_settings.cache_clear()
+    # The banner says which detectors run and how to add NER: no startup warning about it.
+    logging.getLogger("pii_guard.detect.stack").setLevel(logging.ERROR)
+    upstream, mock = _configure_up_upstream(opts)
     try:
         try:
             settings = get_settings()
-            from pii_guard.detect.stack import ner_choice
-
             choice = ner_choice(settings)
             status = Status(
                 upstream=upstream,
@@ -645,17 +657,7 @@ def run_up(opts: UpOptions) -> int:
         quiet = _QuietShutdown(server)
         logging.getLogger("uvicorn.error").addFilter(quiet)
         banner = _banner(opts, status, traffic_log, ui=ui_available())
-
-        def announce() -> None:
-            while not server.started and not server.should_exit:
-                time.sleep(0.05)
-            if not server.started:
-                return
-            print(banner, flush=True)
-            if opts.browser:
-                webbrowser.open(f"http://localhost:{opts.port}/")
-
-        threading.Thread(target=announce, daemon=True).start()
+        _start_banner_thread(server, banner, opts)
         # uvicorn re-raises the Ctrl-C it already handled: that is a clean stop.
         with contextlib.suppress(KeyboardInterrupt):
             server.run()
