@@ -11,7 +11,7 @@
     "privaite"
   ],
   "readme": {
-    "about": "The README results table (pii-guard eval report rewrites the block between <!-- results:start --> and <!-- results:end -->). Columns read a fixture set's latest snapshot or a dataset's latest counts; marks are caveats explained under the table in the README, and a column whose best cell is marked gets no bold.",
+    "about": "The README results block (pii-guard eval report rewrites the block between <!-- results:start --> and <!-- results:end -->). Every column reads a fixture set's latest snapshot from the run records in eval/results/runs/ (LAB-1656: no dataset-record columns, so the README and the landing read one source). Marks are caveats explained under the table in the README; a column whose best cell is marked gets no bold, and a cell from a run missing some of the set's languages is marked § automatically. over_masking_table prints over-masking for every row; per_language prints the first row's leak per language on the headline set. latency names the one pii-guard bench latency record and cell the README quotes.",
     "columns": [
       {
         "title": "Hand-written",
@@ -19,25 +19,37 @@
       },
       {
         "title": "Agent traffic",
-        "dataset": "agent-traffic"
+        "fixture_set": "agent-traffic"
       },
       {
         "title": "Nemotron-PII",
-        "dataset": "nemotron-pii"
+        "fixture_set": "nemotron-pii"
       },
       {
         "title": "CEE-PII",
-        "dataset": "cee-pii"
+        "fixture_set": "cee-pii"
       },
       {
         "title": "Gretel finance",
-        "dataset": "gretel-finance"
+        "fixture_set": "gretel-finance"
+      },
+      {
+        "title": "Gretel finance, corrected labels",
+        "fixture_set": "gretel-finance-corrected"
       },
       {
         "title": "Ai4Privacy",
-        "dataset": "ai4privacy"
+        "fixture_set": "ai4privacy"
       }
     ],
+    "over_masking_table": true,
+    "per_language": true,
+    "latency": {
+      "run": "2026-10-28-ner-concurrency-cpu-fast",
+      "concurrency": 1,
+      "stream": false,
+      "label": "What fast mode adds to each request on CPU (gateway overhead, rules + NER, one request at a time)"
+    },
     "rows": [
       {
         "system": "rules+ner:xlmr-base-v2-hn",

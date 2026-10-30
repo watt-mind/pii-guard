@@ -21,7 +21,7 @@ pii-guard sits between an application and an LLM. It finds personal data in text
 
 ```text
 One rule decides where each model runs: anything that sees real personal data is an open-weights model you can host yourself; hosted models only see fictional or masked data.
-- Muse Spark Open (open weights, on Baseten Model APIs or your own GPUs) is the LLM detector of audit mode, the optional second opinion for quality checks and the benchmark upper bound: 0.9 % Hungarian and 0.0 % English leak. Production traffic runs fast mode (rules + the NER, local, about 18 ms per document, $0, nothing leaves the machine).
+- Muse Spark Open (open weights, on Baseten Model APIs or your own GPUs) is the LLM detector of audit mode, the optional second opinion for quality checks and the benchmark upper bound: 0.9 % Hungarian and 0.0 % English leak. Production traffic runs fast mode (rules + the NER, local, ⟦B3 CPU overhead⟧ added per request on CPU, $0, nothing leaves the machine).
 - Muse Glimmer 30B (open weights, Apache-2.0) was the best zero-shot detector we measured (F1 99.3, 0.0 % leak) but takes 9.4 s per document, so we used it as the teacher: it labelled a 4,964-document fictional corpus, which, with public OpenPII rows and hard negatives, trained an XLM-RoBERTa base model. It is published as watt-mind/pii-guard-ner-xlmr-base v2.0 and runs in-process for fast mode. Two later retrains (v3, v3.1) were scored on a selection set fixed before training; none beat v2.0 on every gate, so v2.0 stays.
 - We also fine-tuned Muse Glimmer itself (LoRA, 3,883 fictional documents) to answer without reasoning: 2.2x faster than zero-shot Glimmer (agent traffic p50 1.03 s vs 2.28 s) but it leaks 1.0 % of values against 0.4 % with the rules in front, so the small NER (0.13 % at 0.02 s) stays the product.
 - Muse Spark 1.3 wrote the synthetic Hungarian and English benchmark and the distillation corpus around fictional identities ($1.05 for 5,004 calls), and is the downstream model in the demo, which only ever sees placeholders.
@@ -39,7 +39,7 @@ One rule decides where each model runs: anything that sees real personal data is
 - We publish exposure, not just detection: Meta's own model recovers 0.2 % of masked values from the masked text, and 39.2 % when handed five candidates (chance 20 %). We say "pseudonymisation, not anonymisation".
 - The gateway masks tool definitions, response schemas and metadata, refuses placeholders pasted back as input, and fails closed on every error.
 - Language packs with a conformance suite, so adding a language is a checklist (German was added this way).
-- Measured against Presidio, LLM Guard and PrivAiTe with one scorer: on the hand-written set fast mode leaks 0.0 % against PrivAiTe 12.7 %, Presidio 24.3 % and LLM Guard 45.1 %; on public test sets 0.7 % vs 4.0 % (Nemotron-PII) and 0.4 % vs 4.4 % (CEE-PII, best other tool). It is behind or level where it is weak: finance text (19.1 % vs Presidio 18.8 %), agent traffic (2.6 % vs PrivAiTe 2.4 %), and Ai4Privacy-style text it has not seen (13.8 % for the same recipe trained without those rows, vs PrivAiTe 9.5 %).
+- Measured against Presidio, LLM Guard and PrivAiTe with one scorer, from committed run records: on agent traffic (tool calls, JSON, logs) fast mode leaks ⟦B3 agent-traffic leak⟧ and over-masks ⟦B3 agent-traffic over-masking⟧, against PrivAiTe ⟦PrivAiTe agent-traffic leak⟧ / ⟦PrivAiTe agent-traffic over-masking⟧; on the hand-written German, English, Hungarian and Polish set it leaks ⟦B3 smoke leak⟧ (⟦B3 smoke leak per language⟧ per language) against ⟦tools smoke range⟧; on public test sets ⟦B3 nemotron leak⟧ vs ⟦best tool nemotron⟧ (Nemotron-PII) and ⟦B3 cee leak⟧ vs ⟦best tool cee⟧ (CEE-PII). With the same rules around it, our NER leaks less than ⟦n⟧ other open PII models on the hand-written set. Where it is weak: finance text on the dataset's own labels, about level with Presidio.
 - Images: portraits, signatures and machine-readable zones on 65 official specimen IDs masked at 90.8 %, 83.8 % and 80.0 % (MRZ with the LLM detector), against 55–57 %, 46–49 % and at most 10 % for Eka PII Redaction; each masked region can carry the text session's placeholder, so a model told "which parties have an ID on file?" got 3 of 3 right with labelled images and 1 of 3 with black boxes.
 ```
 
@@ -56,10 +56,10 @@ One rule decides where each model runs: anything that sees real personal data is
 ## What's next
 
 ```text
-- Fewer false alarms in fast mode: reference and tracking numbers without a cue word are read as IDs (39.4 % over-masking on CEE-PII, 14.0 % on agent traffic).
-- Better finance coverage (19.1 % leak on Gretel finance) and an NER that generalises to unseen Ai4Privacy-style text (13.8 % held out).
+- Fewer false alarms in fast mode: reference and tracking numbers without a cue word are read as IDs (⟦B3 cee over-masking⟧ over-masking on CEE-PII).
+- Better finance coverage (⟦B3 gretel leak⟧ leak on Gretel finance with the dataset's own labels).
 - A reader for security-printed ID cards: OCR returns no word for 108 of 274 specimen text values.
-- Polish next: on the public pl-pii-bench set fast mode leaks 17.5 %, nearly all national ID numbers, which a Polish language pack with checksum validators covers.
+- More EU languages: the Polish language pack (checksum validators for PESEL, NIP, REGON) took pl-pii-bench to ⟦B3 pl-pii-bench leak⟧; the same pack recipe is the path for the next language.
 - Publishing the package to PyPI, so `uvx --from wattmind-pii-guard pii-guard up` is the one-command start.
 - Confirming the hosted endpoint's data-retention terms before recommending it for real data.
 ```

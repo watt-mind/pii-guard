@@ -26,6 +26,20 @@ leak in a column is bold, unless the best cell carries a caveat mark (an in-dist
 result is not a win). The block also says the hand-written set's detection p50 per row, the
 first row's over-masking per column (LAB-1598: it used to be hand-copied prose under the
 table, and went stale) and links the records behind the first row.
+
+LAB-1656 options, each off unless set in the ``readme`` section:
+
+- ``"over_masking_table": true``: an over-masking table for every row and column (lowest in
+  bold) in place of the first row's one-line summary, so a low leak bought by masking
+  everything shows up next to it;
+- ``"per_language": true``: the first row's leak per language on the headline set;
+- ``"latency": {"run": "<run id>", "concurrency": 1, "stream": false, "label": "..."}``: one
+  gateway-overhead figure (p50 and p95) from a ``pii-guard bench latency`` record, so the
+  README states a single, sourced latency number instead of hand-copied ones.
+
+A fixture-set cell whose snapshot is missing some of the set's languages (a tool run on an
+earlier fixture version, say) is marked ``§`` and explained under the table, never silently
+pooled with the complete rows; a marked best cell is not bold.
 """
 
 from __future__ import annotations
@@ -45,6 +59,7 @@ _NOTE = (
     "of docs/benchmarks/config.json; edit those, not this block. -->"
 )
 _MISSING = "—"
+_PARTIAL = "§"
 
 
 def parse_spec(raw: object, where: str) -> dict[str, Any]:
@@ -69,7 +84,49 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
             isinstance(row.get(k), str) for k in ("system", "label")
         ):
             raise RecordError(f"{where}: each readme row needs 'system' and 'label': {row!r}")
-    return {"columns": columns, "rows": rows}
+    spec: dict[str, Any] = {"columns": columns, "rows": rows}
+    for flag in ("over_masking_table", "per_language"):
+        if flag in raw:
+            if not isinstance(raw[flag], bool):
+                raise RecordError(f"{where}: readme '{flag}' must be true or false")
+            spec[flag] = raw[flag]
+    if "latency" in raw:
+        lat = raw["latency"]
+        if (
+            not isinstance(lat, dict)
+            or not isinstance(lat.get("run"), str)
+            or not isinstance(lat.get("label"), str)
+            or not isinstance(lat.get("concurrency", 1), int)
+            or not isinstance(lat.get("stream", False), bool)
+        ):
+            raise RecordError(
+                f"{where}: readme 'latency' needs 'run' and 'label' strings, an integer "
+                f"'concurrency' and a boolean 'stream': {lat!r}"
+            )
+        spec["latency"] = lat
+    return spec
+
+
+def _latency_line(index: Mapping[str, Any], lat: Mapping[str, Any], where: str) -> str:
+    run = next((r for r in index.get("latency") or [] if r["run_id"] == lat["run"]), None)
+    if run is None:
+        raise RecordError(f"{where}: readme latency run {lat['run']!r} is not a latency record")
+    concurrency, stream = lat.get("concurrency", 1), lat.get("stream", False)
+    cell = next(
+        (c for c in run["cells"] if c["concurrency"] == concurrency and c["stream"] == stream),
+        None,
+    )
+    if cell is None:
+        raise RecordError(
+            f"{where}: latency run {lat['run']!r} has no cell at concurrency {concurrency}, "
+            f"stream {stream}"
+        )
+    o = cell["overhead_ms"]
+    return (
+        f"{lat['label']}: p50 {fmt_duration(o['p50'])}, p95 {fmt_duration(o['p95'])} "
+        f"({cell['requests']} requests, {run['hardware']}; "
+        f"[record](eval/results/runs/{run['run_id']}.json))."
+    )
 
 
 def _col_id(col: Mapping[str, Any]) -> str:
@@ -102,8 +159,10 @@ class _Cell:
         docs: int | None,
         links: list[str],
         over: float | None = None,
+        missing: Sequence[str] = (),
     ) -> None:
         self.value, self.docs, self.links, self.over = value, docs, links, over
+        self.missing = list(missing)
 
 
 def _cell(
@@ -118,7 +177,11 @@ def _cell(
             return _Cell(None, None, [])
         links = [f"eval/results/runs/{run_id}.json" for run_id in snap["run_ids"]]
         return _Cell(
-            snap["all"]["leak"], snap["all"]["documents"], links, snap["all"].get("over_masking")
+            snap["all"]["leak"],
+            snap["all"]["documents"],
+            links,
+            snap["all"].get("over_masking"),
+            snap.get("missing_languages") or (),
         )
     c = latest.get((col["dataset"], system))
     if c is None:
@@ -155,25 +218,26 @@ def render_block(
     columns, rows = spec["columns"], spec["rows"]
     latest = _latest_counts(counts)
     grid = [[_cell(index, latest, col, row["system"]) for col in columns] for row in rows]
-    body: list[list[str]] = [[row["label"]] for row in rows]
-    for j, col in enumerate(columns):
-        cid = _col_id(col)
-        shown = [_pct(grid[i][j].value) for i in range(len(rows))]
-        marks = [str(row.get("marks", {}).get(cid, "")) for row in rows]
-        numbers = [float(s[:-2]) for s in shown if s != _MISSING]
-        best = min(numbers) if numbers else None
-        winners = [i for i, s in enumerate(shown) if s != _MISSING and float(s[:-2]) == best]
-        bold = bool(winners) and not any(marks[i] for i in winners)
-        for i, text in enumerate(shown):
-            cell = f"**{text}**" if bold and i in winners else text
-            body[i].append(cell + (f" {marks[i]}" if marks[i] else ""))
-    header = ["Leak"] + [_header(index, col, [g[j] for g in grid]) for j, col in enumerate(columns)]
-    lines = [
-        "| " + " | ".join(_escape(h) for h in header) + " |",
-        "|---|" + "---:|" * len(columns),
-        *("| " + " | ".join(_escape(c) for c in r) + " |" for r in body),
-    ]
-    out = [_NOTE, "", *lines, ""]
+    headers = [_header(index, col, [g[j] for g in grid]) for j, col in enumerate(columns)]
+    out = [_NOTE, "", *_table("Leak", headers, rows, columns, grid, "value"), ""]
+
+    partial = sorted(
+        {
+            (rows[i].get("short", rows[i]["label"]), str(col["title"]), ", ".join(c.missing))
+            for i, r in enumerate(grid)
+            for j, (col, c) in enumerate(zip(columns, r, strict=True))
+            if c.missing and c.value is not None
+        },
+        key=lambda t: (t[1], t[0]),
+    )
+    if partial:
+        out.append(
+            f"{_PARTIAL} Run on fewer languages than the set has, on an earlier version of its "
+            "files, so not comparable with the complete rows: "
+            + "; ".join(f"{who} on {where} (no {langs})" for who, where, langs in partial)
+            + ". Per-language numbers are in [docs/benchmarks.md](docs/benchmarks.md)."
+        )
+        out.append("")
 
     p50 = []
     for row in rows:
@@ -198,11 +262,39 @@ def render_block(
         out.append("")
 
     first = rows[0]
-    overs = [
-        f"{col['title']} {_pct(grid[0][j].over)}"
-        for j, col in enumerate(columns)
-        if grid[0][j].over is not None
-    ]
+    if spec.get("per_language"):
+        headline = index.get("headline_set")
+        snap = _snapshot(index, headline, first["system"]) if headline else None
+        langs = (snap or {}).get("languages") or {}
+        if isinstance(langs, Mapping) and langs:
+            parts = [f"{lang} {_pct(m.get('leak'))}" for lang, m in sorted(langs.items())]
+            out.append(
+                f"Leak per language of the {first.get('short', first['label'])} row on "
+                f"`{headline}`: " + ", ".join(parts) + "."
+            )
+            out.append("")
+
+    if spec.get("latency"):
+        out.append(_latency_line(index, spec["latency"], "docs/benchmarks/config.json"))
+        out.append("")
+
+    if spec.get("over_masking_table"):
+        out.extend(_table("Over-masking", headers, rows, columns, grid, "over"))
+        out.append("")
+        out.append(
+            "Over-masking: share of masked spans that are not personal data; lower is better "
+            "([how it is scored](docs/benchmarks.md#how-to-read-this))."
+        )
+        out.append("")
+    overs = (
+        []
+        if spec.get("over_masking_table")
+        else [
+            f"{col['title']} {_pct(grid[0][j].over)}"
+            for j, col in enumerate(columns)
+            if grid[0][j].over is not None
+        ]
+    )
     if overs:
         out.append(
             f"Over-masking of the {first.get('short', first['label'])} row: "
@@ -227,10 +319,53 @@ def render_block(
         out.append(
             f"Records behind the {first.get('short', first['label'])} row: "
             + ", ".join(refs)
-            + "; every other cell is in the [run log](docs/benchmarks.md#run-log) and "
-            "[eval/datasets/results/](eval/datasets/results/)."
+            + "; every other cell is in the [run log](docs/benchmarks.md#run-log)"
+            + (
+                " and [eval/datasets/results/](eval/datasets/results/)."
+                if any("dataset" in col for col in columns)
+                else "."
+            )
         )
     return "\n".join(out) + "\n"
+
+
+def _table(
+    title: str,
+    headers: Sequence[str],
+    rows: Sequence[Mapping[str, Any]],
+    columns: Sequence[Mapping[str, Any]],
+    grid: Sequence[Sequence[_Cell]],
+    attr: str,
+) -> list[str]:
+    """One markdown table of ``attr`` (``value`` = leak, ``over``); the lowest is bold."""
+    body: list[list[str]] = [[str(row["label"])] for row in rows]
+    for j, col in enumerate(columns):
+        cid = _col_id(col)
+        cells = [grid[i][j] for i in range(len(rows))]
+        shown = [_pct(getattr(c, attr)) for c in cells]
+        marks = []
+        for row, c, text in zip(rows, cells, shown, strict=True):
+            # A caveat mark explains a number: none on an empty cell or on the over-masking table.
+            mark = (
+                [str(row.get("marks", {}).get(cid, ""))]
+                if attr == "value" and text != _MISSING
+                else []
+            )
+            if c.missing and text != _MISSING:
+                mark.append(_PARTIAL)
+            marks.append(" ".join(m for m in mark if m))
+        numbers = [float(s[:-2]) for s in shown if s != _MISSING]
+        best = min(numbers) if numbers else None
+        winners = [i for i, s in enumerate(shown) if s != _MISSING and float(s[:-2]) == best]
+        bold = bool(winners) and not any(marks[i] for i in winners)
+        for i, text in enumerate(shown):
+            cell = f"**{text}**" if bold and i in winners else text
+            body[i].append(cell + (f" {marks[i]}" if marks[i] else ""))
+    return [
+        "| " + " | ".join(_escape(h) for h in [title, *headers]) + " |",
+        "|---|" + "---:|" * len(columns),
+        *("| " + " | ".join(_escape(c) for c in r) + " |" for r in body),
+    ]
 
 
 def splice(doc: str, block: str, where: str) -> str:

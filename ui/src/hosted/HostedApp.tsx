@@ -19,6 +19,7 @@ import { COMPARED, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, PROOF,
 import AgentReplay from "./AgentReplay";
 import { ImageMaskingPreview } from "./ImageMaskingPreview";
 import { LandingBenchmarkChart } from "./LandingBenchmarkChart";
+import { AgentTrafficTable, OpenModelsTable, ProofFacts } from "./LandingProof";
 import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 import { PublicPageContent, type PublicSections } from "./PublicPages";
@@ -348,13 +349,18 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     results: (
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-5">
         <SectionHead id="results-heading" eyebrow="Benchmarks" title="The lowest leak rate on each test set below." lead="Committed runs on fictional and public data. Leak rate measures personal values left unmasked; lower is better. These are specific test sets, so small differences should be treated with care." />
-        <p className="max-w-3xl text-muted">{RUNS.label} committed benchmark runs. {MEASURED}. Detection adds {LATENCY.value} per request (p50) in the published measurement.</p>
+        <p className="max-w-3xl text-muted">{RUNS.label} committed benchmark runs. {MEASURED}. PII Guard adds {LATENCY.value} per request on CPU (p50) in the published measurement.</p>
         <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English, Hungarian and Polish set (62 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
             <DeferredSection anchor="results" className="min-h-[340px]"><ResultsChart /></DeferredSection>
           </Card>
           <LandingBenchmarkChart />
         </div>
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+          <AgentTrafficTable />
+          <OpenModelsTable />
+        </div>
+        <ProofFacts />
         <div className="flex flex-wrap gap-3"><ButtonLink href="#evaluation">Explore the benchmarks</ButtonLink><a className="inline-flex min-h-11 items-center rounded-sm underline underline-offset-4" href="#trust">Read the limits</a></div>
       </section>
     ),
@@ -403,7 +409,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <span className="grid gap-1.5">
               <Point title="Finance text.">{WEAKER.gretel}&nbsp;% leak on Gretel finance, level with Presidio ({WEAKER.gretelPresidio}&nbsp;%).</Point>
               <Point title="Over-masking.">Reference numbers without a cue word can be masked as IDs ({WEAKER.ceeOverMasking}&nbsp;% on CEE-PII).</Point>
-              <Point title="Other EU languages.">Trained on Hungarian, German and English; on EU legal text in 21 languages it leaks {WEAKER.mapaLeak}&nbsp;%.</Point>
+              <Point title="Other EU languages.">Measured on German, English, Hungarian and Polish; other EU languages are less tested, so check the masked request.</Point>
             </span>
           </LimitItem>
           <LimitItem title="Printed text on ID scans">On {IMAGE_LIMITS.ids} official specimen IDs, {IMAGE_LIMITS.all}&nbsp;% of all labeled regions are covered (Presidio Image Redactor: {IMAGE_LIMITS.presidio}&nbsp;%). Printed text alone: {IMAGE_LIMITS.text}&nbsp;%. Faces and ID photos are the strong part; read the masked transcript before you rely on it.</LimitItem>

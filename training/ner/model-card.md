@@ -6,15 +6,15 @@
 
 [Quickstart](#usage) · [Source code](https://github.com/watt-mind/pii-guard) · [Try the demo](https://guard.watt-mind.com) · [Evaluations](https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md) · [Watt Mind](https://huggingface.co/watt-mind)
 
-A text token-classification model that finds personal data in **Hungarian, English and German**: names, addresses, birth dates, contact details, ID and account numbers. Built by [Watt Mind](https://watt-mind.com), it powers the NER detector in [PII Guard](https://github.com/watt-mind/pii-guard)'s fast mode and runs locally on CPU.
+A text token-classification model that finds personal data in **⟦B3 training languages⟧**: names, addresses, birth dates, contact details, ID and account numbers. Built by [Watt Mind](https://watt-mind.com), it powers the NER detector in [PII Guard](https://github.com/watt-mind/pii-guard)'s fast mode and runs locally on CPU.
 
 **This model returns detected text spans.** PII Guard adds rule-based detection, boundary and Hungarian suffix handling, reversible masking and restoration, and the gateway workflows for prompts, tool calls and images. The model alone does not redact text, process images or guarantee that all personal data is found.
 
 | | |
 |---|---|
 | Base model | [`FacebookAI/xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base) (278M parameters) |
-| Languages | Hungarian, English, German |
-| Release | `v2.0` |
+| Languages | ⟦B3 training languages⟧ |
+| Release | ⟦B3 release tag⟧ |
 | Licence | Apache-2.0 (training data attribution below) |
 
 ## Usage
@@ -116,49 +116,49 @@ BIO tags over ten entity types:
 ## Evaluation
 
 Scored by `pii-guard eval`. A value **leaks** if any part of it reaches the LLM unmasked.
-**Over-masking** is the share of masked spans that weren't personal data. All numbers are %.
-The full run records are in the pii-guard repository under `eval/results/`.
+**Over-masking** is the share of masked spans that weren't personal data. All numbers are %,
+from the committed run records in the pii-guard repository (`eval/results/runs/`), the same
+records as its README and [benchmarks page](https://github.com/watt-mind/pii-guard/blob/develop/docs/benchmarks.md).
 
-| Set (documents) | Rules + this model: leak | Over-masking | This model, no rules: leak |
-|---|--:|--:|--:|
-| Hand-written smoke tests, hu/en/de (51) | 0.0 | 1.1 | 3.5 |
-| Agent traffic: tool calls, JSON, logs (990) | 0.2 | 1.7 | 0.3 |
-| Ai4Privacy OpenPII validation (600)\* | 0.4 | 1.3 | 0.4 |
-| NVIDIA Nemotron-PII test, en (300) | 0.7 | 1.4 | 1.1 |
-| CEE PII benchmark test, hu/en (451) | 0.4 | 26.4 | 1.6 |
-| Gretel finance test, en/de (400) | 19.0 | 22.5 | 20.3 |
-| MAPA EUR-Lex court documents (42)† | 8.5 | 55.6 | n/a |
+| Set (documents) | Rules + this model: leak | Over-masking | Run record |
+|---|--:|--:|---|
+| Hand-written smoke tests, de/en/hu/pl (62) | ⟦B3 smoke leak⟧ | ⟦B3 smoke over-masking⟧ | ⟦record⟧ |
+| Agent traffic: tool calls, JSON, logs (990) | ⟦B3 agent-traffic leak⟧ | ⟦B3 agent-traffic over-masking⟧ | ⟦record⟧ |
+| NVIDIA Nemotron-PII test, en (300) | ⟦B3 nemotron leak⟧ | ⟦B3 nemotron over-masking⟧ | ⟦record⟧ |
+| CEE PII benchmark test, en/hu (451) | ⟦B3 cee leak⟧ | ⟦B3 cee over-masking⟧ | ⟦record⟧ |
+| Gretel finance test, de/en (400) | ⟦B3 gretel leak⟧ | ⟦B3 gretel over-masking⟧ | ⟦record⟧ |
+| Gretel finance, corrected labels (400) | ⟦B3 gretel-corrected leak⟧ | ⟦B3 gretel-corrected over-masking⟧ | ⟦record⟧ |
+| Ai4Privacy OpenPII sample, de/en/hu (600)\* | ⟦B3 ai4privacy leak⟧ | ⟦B3 ai4privacy over-masking⟧ | ⟦record⟧ |
+| Polish pl-pii-bench (346), with PII Guard's Polish rules | ⟦B3 pl-pii-bench leak⟧ | ⟦B3 pl-pii-bench over-masking⟧ | ⟦record⟧ |
+| Hungarian inflected names (12) | ⟦B3 inflection leak⟧ | ⟦B3 inflection over-masking⟧ | ⟦record⟧ |
 
-\* In distribution: the model was trained on rows from the same dataset's train split. A
-version trained without any of that data leaked 13.8 % here, which is the fairer figure for
-unseen text in that style.
-† Mixed EU languages, most of them outside the three this model was trained on.
+\* In distribution: ⟦whether B3's training mix includes OpenPII train rows; if so, say no
+evaluated row was trained on and that this is not a fair figure for unseen text⟧.
 
-**Latency:** p50 74 ms and p95 147 ms per ~400-character message on an Apple M1 Max CPU under
-heavy load. The same machine measured 47 / 55 ms under lighter load.
+**Latency:** ⟦B3 CPU overhead⟧ added per request (p50, one request at a time) by PII Guard's
+gateway with this model on CPU, from a `pii-guard bench latency` record (⟦record⟧).
 
 ### Compared with other open models
 
-Measured the same way, with each model in place of this one inside pii-guard's fast mode:
+Measured the same way on the hand-written smoke tests, with each model in place of this one
+inside pii-guard's fast mode (the same rules around each, one commit):
 
-| Leak % | This model | [bardsai/eu-pii-anonimization-multilang](https://huggingface.co/bardsai/eu-pii-anonimization-multilang) | [tabularisai/eu-pii-safeguard](https://huggingface.co/tabularisai/eu-pii-safeguard) | [urchade/gliner_multi-v2.1](https://huggingface.co/urchade/gliner_multi-v2.1) |
-|---|--:|--:|--:|--:|
-| Agent traffic (dev split) | **0.1** | n/a | 8.2 | n/a |
-| Smoke tests | **0.0** | n/a | 5.8 | n/a |
-| Ai4Privacy, pooled | **0.4** | 10.4 | 7.5 | 22.5 |
-
-"n/a" means that model wasn't run on that set. The bardsai and GLiNER figures come from an
-earlier pii-guard version.
+| Model | Leak | F1 | Over-masking |
+|---|--:|--:|--:|
+| **This model** | ⟦B3⟧ | ⟦B3⟧ | ⟦B3⟧ |
+| ⟦each other open model from the same-commit comparison runs⟧ | | | |
 
 ## Limitations
 
-- **Languages.** Only Hungarian, English and German were trained. Other languages work partly
-  through XLM-R's multilingual pretraining, but they leak more. On a Polish benchmark, 17.5 %
-  of values leak, almost all of them Polish national ID numbers.
+- **Languages.** ⟦B3 training languages⟧ were trained. Other languages work partly through
+  XLM-R's multilingual pretraining, but they leak more. On a Polish benchmark the model with
+  PII Guard's Polish rules leaks ⟦B3 pl-pii-bench leak⟧; without the rules, Polish national ID
+  numbers are most of what leaks.
 - **Reference numbers without context** (tracking numbers, order IDs in tool output) are
   sometimes tagged as `BANK_ACCOUNT` or `ID_DOCUMENT`. That causes most of the over-masking on
   the CEE benchmark. pii-guard's number post-processing removes most of these.
-- **Finance documents** with unusual identifier formats leak about 19 %.
+- **Finance documents** with unusual identifier formats leak ⟦B3 gretel leak⟧ on the
+  dataset's own labels (⟦B3 gretel-corrected leak⟧ on corrected labels).
 - **No types for usernames, IP addresses, URLs or secrets.** pii-guard handles these with rules.
 - **Not a standalone anonymiser.** It is designed to run with pii-guard's rules. On its own, it
   reports spans with no checksum validation and no fail-closed behaviour.
@@ -179,32 +179,9 @@ every text was checked. A near-duplicate check (MinHash) of the training data ag
 the evaluation sets found no overlap. It covered about 91 % of the training rows; one of the
 two synthetic corpora could not be rebuilt for the check.
 
-**Why v2.0 and not a newer retrain.** A v2.1 trained longer, with extra hard negatives, fixed
-some over-masking. But it leaked more real ID numbers and e-mail addresses on unseen agent
-traffic (2.4 % vs 1.7 % on the selection set), so v2.0 stays the release. The selection rule is
-always the lowest leak on held-out agent traffic, because a leak is worse than an extra mask.
+**How this release was chosen.** ⟦B3 selection story from eval/results/2026-10-30-lab-1625-ner-v42/README.md: the rule fixed before training, the gates against v2.0 (gates.json), and what B3 traded⟧.
 
-### Next candidate (v3, not published)
-
-LAB-1393 trained a v3 candidate on a wider mix:
-[eval/results/2026-10-28-ner-v3](https://github.com/watt-mind/pii-guard/tree/develop/eval/results/2026-10-28-ner-v3).
-It didn't pass the selection rule, so v2.0 above is still the release. If a later v3.x is
-published, its data and attribution are:
-
-| Part | Train rows | Source | Licence, attribution |
-|---|--:|---|---|
-| Ai4Privacy OpenPII-1M, train split | 30,000 (hu/en/de 5,000; pl/cs/sk/ro/hr/sl 2,500) | [`ai4privacy/pii-masking-openpii-1m`](https://huggingface.co/datasets/ai4privacy/pii-masking-openpii-1m) | CC-BY-4.0, "Ai4Privacy / Ai Suisse SA" |
-| Privy protocol traces | 12,000 | [`piimb/privy`](https://huggingface.co/datasets/piimb/privy) | MIT, Privy (Pixie) |
-| nym-pii multilingual | 13,000 (en/de/pl/cs/ro) | [`Wismut/nym-pii-multilingual-data`](https://huggingface.co/datasets/Wismut/nym-pii-multilingual-data) | MIT, byteowlz / Wismut |
-| Nemotron-PII, train split | 1,500 | [`nvidia/Nemotron-PII`](https://huggingface.co/datasets/nvidia/Nemotron-PII) | CC-BY-4.0, NVIDIA Corporation |
-| Gretel PII masking EN v1, train split | 2,500 | [`gretelai/gretel-pii-masking-en-v1`](https://huggingface.co/datasets/gretelai/gretel-pii-masking-en-v1) | Apache-2.0, Gretel.ai |
-| Synthetic agent traffic, s11 corpus, hard negatives | 12,023 | pii-guard generators | Apache-2.0 |
-
-Every source is pinned to a revision and file hash, and none is gated, CC-BY-SA or
-non-commercial. Labels with no pii-guard NER type are left out of the loss: secrets, URLs and
-IPs, which the rules handle, and the GDPR special categories. `Horizon-Labs/pii-redactor-base`
-(Apache-2.0) took unlabelled English and German PII out of the loss and added no labels. No
-training document is a near-copy of an evaluation text: 0 of 72,664 were dropped.
+⟦Training data table and attribution for B3 (v4.1 data + v4.2 targeted corpus): every source pinned to a revision, licence and attribution; replaces the v2.0 table above and the old "Next candidate (v3)" section⟧
 
 ## Licence and attribution
 
