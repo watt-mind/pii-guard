@@ -177,9 +177,8 @@ def ensure_first_run(
         # its own. Bounded, so a store that keeps failing still surfaces as an error.
         for _ in range(BLOB_ATTEMPTS - 1):
             try:
-                return store._run(operation)
+                return store.run_atomic(operation)
             except ProjectStorageError:
                 continue
-        return store._run(operation)
-    with store._lock:
-        return operation(store)
+        return store.run_atomic(operation)
+    return store.run_atomic(operation)
