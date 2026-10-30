@@ -47,10 +47,28 @@ BODY_READ_SECONDS = 10
 # Tool types a client executes itself; any other type (web search, file search, code
 # interpreter, MCP) runs and bills at the provider, outside the reserved token usage.
 _CLIENT_TOOL_TYPES = frozenset({"function", "custom"})
+# Responses API only: a ``namespace`` groups client tools under one name (Codex's
+# ``multi_agent_v1``, Muse Code's ``muse``, LAB-1658). It is client-side only when every tool
+# it holds is, at any depth; the upstream (api.meta.ai) takes it as is and calls the tools
+# ``<namespace>.<name>``, so nothing is flattened.
+_NAMESPACE_TOOL_TYPE = "namespace"
+# Bounds on the tool walk: namespace nesting below the top-level array, and tool definitions
+# counted across every level. Clients send one level and a few dozen tools; past either
+# bound the request is refused rather than walked.
+MAX_TOOL_NAMESPACE_DEPTH = 4
+MAX_TOOL_DEFINITIONS = 512
 
 
-def _provider_billed_tools(body: dict[str, Any]) -> bool:
-    """Whether a chat or Responses body asks the provider for separately billed tool work."""
+class _ToolWalkLimitError(Exception):
+    """The tool array nests or counts past the walk bounds."""
+
+
+def _provider_billed_tools(body: dict[str, Any], *, namespaces: bool = False) -> bool:
+    """Whether a chat or Responses body asks the provider for separately billed tool work.
+
+    ``namespaces`` (Responses API): accept ``namespace`` tools whose nested tools are all
+    client-side. Raises :class:`_ToolWalkLimitError` past the depth or count bound.
+    """
     if "web_search_options" in body:
         return True
     tools = body.get("tools")
@@ -58,10 +76,30 @@ def _provider_billed_tools(body: dict[str, Any]) -> bool:
         return False
     if not isinstance(tools, list):
         return True
-    return any(
-        not isinstance(tool, dict) or tool.get("type", "function") not in _CLIENT_TOOL_TYPES
-        for tool in tools
-    )
+    seen = [0]
+
+    def provider_side(entries: list[Any], depth: int) -> bool:
+        for tool in entries:
+            seen[0] += 1
+            if seen[0] > MAX_TOOL_DEFINITIONS:
+                raise _ToolWalkLimitError
+            if not isinstance(tool, dict):
+                return True
+            tool_type = tool.get("type", "function")
+            if tool_type in _CLIENT_TOOL_TYPES:
+                continue
+            if not namespaces or tool_type != _NAMESPACE_TOOL_TYPE:
+                return True
+            inner = tool.get("tools")
+            if not isinstance(inner, list):
+                return True
+            if depth >= MAX_TOOL_NAMESPACE_DEPTH:
+                raise _ToolWalkLimitError
+            if provider_side(inner, depth + 1):
+                return True
+        return False
+
+    return provider_side(tools, 0)
 
 
 class HostedRequestError(PiiGuardError):
@@ -384,7 +422,17 @@ class HostedMiddleware:
                 )
                 if sponsored_route and body.get("model") not in self.service.settings.hosted_models:
                     raise HostedRequestError("Model is not allowed for sponsored requests")
-                if sponsored_route and _provider_billed_tools(body):
+                try:
+                    provider_tools = sponsored_route and _provider_billed_tools(
+                        body, namespaces=canonical == "/v1/responses"
+                    )
+                except _ToolWalkLimitError:
+                    raise HostedRequestError(
+                        "Hosted requests allow at most "
+                        f"{MAX_TOOL_DEFINITIONS} tool definitions, nested at most "
+                        f"{MAX_TOOL_NAMESPACE_DEPTH} namespaces deep"
+                    ) from None
+                if provider_tools:
                     # Provider-side tools (Meta web search grounding: USD 2.50 per 1,000
                     # queries, LAB-1372) are billed outside the token usage the reservation
                     # bounds, so the sponsored route never asks for them.
