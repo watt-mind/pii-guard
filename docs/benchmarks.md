@@ -2125,7 +2125,7 @@ Every registered dataset ([datasets.md](datasets.md): licences, splits, label ma
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | pii-guard rules | 990 | 38.8 (38.0-39.7) | 99.8 (99.6-99.9) | 56.3 (55.4-57.2) | 72.0 (71.2-72.7) | 0.0 (0.0-0.0) | 0.9 | 1.8 |
 | pii-guard fast, NER v4.2 candidate B3 (LAB-1625; local checkpoint, not published) | 990 | 0.2 (0.1-0.4) | 93.4 (92.8-93.9) | 98.8 (98.4-99.1) | 96.0 (95.6-96.4) | 0.7 (0.5-1.0) | 49.3 | 92.9 |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 0.3 (0.1-0.5) | 96.1 (95.6-96.7) | 97.9 (97.5-98.3) | 97.0 (96.6-97.4) | 1.4 (1.1-1.7) | 16.7 | 30.4 |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 0.3 (0.1-0.5) | 96.3 (95.8-96.8) | 98.0 (97.6-98.4) | 97.1 (96.7-97.6) | 1.3 (1.1-1.6) | 16.1 | 29.5 |
 | pii-guard audit (rules + NER v2 + LLM) | 30 | 0.0 (0.0-0.0) | 82.0 (77.0-86.8) | 100.0 (100.0-100.0) | 90.1 (87.0-92.9) | 11.2 (7.5-14.9) | 1,938 | 2,603 |
 | Presidio | 990 | 12.4 (11.4-13.4) | 52.1 (50.8-53.4) | 71.8 (70.4-73.1) | 60.4 (59.2-61.5) | 36.8 (35.4-38.3) | 15.4 | 203 |
 | LLM Guard | 990 | 20.2 (18.8-21.6) | 74.7 (73.1-76.3) | 67.6 (66.2-69.0) | 71.0 (69.9-72.1) | 16.9 (15.3-18.6) | 58.9 | 98.3 |
@@ -2137,7 +2137,7 @@ Leak by construction (values in brackets): identifiers whose checksum passes, th
 |---|---:|---:|---:|
 | pii-guard rules | 0.5 (781) | 77.5 (129) | 45.9 (859) |
 | pii-guard fast, NER v4.2 candidate B3 (LAB-1625; local checkpoint, not published) | 0.0 (781) | 0.0 (129) | 0.3 (859) |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 0.1 (781) | 0.8 (129) | 0.5 (859) |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 0.1 (781) | 0.0 (129) | 0.3 (859) |
 | pii-guard audit (rules + NER v2 + LLM) | 0.0 (27) | 0.0 (1) | 0.0 (23) |
 | Presidio | 15.2 (781) | 37.2 (129) | 31.5 (859) |
 | LLM Guard | 27.3 (781) | 41.1 (129) | 26.7 (859) |
@@ -2149,7 +2149,7 @@ Leak by construction (values in brackets): identifiers whose checksum passes, th
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | pii-guard rules | 300 | 37.8 (36.4-39.3) | 99.9 (99.7-100.0) | 57.3 (55.5-59.0) | 72.8 (71.4-74.2) | 0.0 (0.0-0.0) | 0.9 | 1.9 |
 | pii-guard fast, NER v4.2 candidate B3 (LAB-1625; local checkpoint, not published) | 300 | 0.1 (0.0-0.3) | 93.1 (92.1-94.2) | 99.1 (98.5-99.6) | 96.0 (95.3-96.7) | 0.7 (0.4-1.1) | 48.0 | 78.1 |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 0.1 (0.0-0.3) | 96.3 (95.5-97.2) | 98.5 (97.9-99.1) | 97.4 (96.8-98.1) | 1.7 (1.1-2.2) | 16.6 | 30.6 |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 0.1 (0.0-0.3) | 96.4 (95.6-97.3) | 98.5 (97.8-99.1) | 97.4 (96.7-98.1) | 1.5 (1.0-2.1) | 16.1 | 30.1 |
 
 Leak by construction (values in brackets): identifiers whose checksum passes, those altered to fail it, and values with an adversarial perturbation.
 
@@ -2373,8 +2373,8 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 | 2026-10-30 | `2026-10-30-lab-1625-agent-traffic-dev-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1625) | agent-traffic-dev | de, en, hu | recorded | `357175c` | — | — |
 | 2026-10-30 | `2026-10-30-lab-1625-inflection-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1625) | inflection | hu | recorded | `357175c` | — | — |
 | 2026-10-30 | `2026-10-30-lab-1625-smoke-v20` | pii-guard fast, NER v2.0 (selection-only re-score, LAB-1625) | smoke | de, en, hu | recorded | `357175c` | — | — |
-| 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `87ea986` | — | — |
-| 2026-10-30 | `2026-10-30-datasets-agent-traffic-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic | de, en, hu | recorded | `87ea986` | — | — |
+| 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `e2f5480` | — | — |
+| 2026-10-30 | `2026-10-30-datasets-agent-traffic-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic | de, en, hu | recorded | `e2f5480` | — | — |
 | 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-rules` | pii-guard rules | agent-traffic-dev | de, en, hu | recorded | `87ea986` | — | — |
 | 2026-10-30 | `2026-10-30-datasets-agent-traffic-rules` | pii-guard rules | agent-traffic | de, en, hu | recorded | `87ea986` | — | — |
 | 2026-10-30 | `2026-10-30-lab-1589-pl-smoke-fast-wismut-nym` | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | smoke | pl | recorded | `252b680` | — | — |

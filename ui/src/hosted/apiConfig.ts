@@ -72,7 +72,9 @@ const PUBLIC_ORIGIN = "https://guard.watt-mind.com";
 export function hostedSpec(spec: Spec, origin: string, endpointId: string | null): Spec {
   const local = (server: ServerEntry) => /^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(server.url);
   const rewrite = (server: ServerEntry): ServerEntry => {
-    let url = server.url.startsWith(PUBLIC_ORIGIN) ? origin + server.url.slice(PUBLIC_ORIGIN.length) : server.url;
+    // Exact-origin match: a bare prefix test would also accept https://guard.watt-mind.com.evil.example.
+    const onPublic = server.url === PUBLIC_ORIGIN || server.url.startsWith(`${PUBLIC_ORIGIN}/`);
+    let url = onPublic ? origin + server.url.slice(PUBLIC_ORIGIN.length) : server.url;
     if (endpointId && url.includes("{endpoint_id}")) {
       url = url.replace("{endpoint_id}", encodeURIComponent(endpointId));
       return { url, description: "Your endpoint (endpoint key)" };

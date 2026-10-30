@@ -240,17 +240,28 @@ def _check_serialized(
     check.short = max(check.short, short)
 
 
+def _unescaped_quote(serialized: str, pos: int) -> bool:
+    if serialized[pos] != '"':
+        return False
+    backslashes = 0
+    cursor = pos - 1
+    while cursor >= 0 and serialized[cursor] == "\\":
+        backslashes += 1
+        cursor -= 1
+    return backslashes % 2 == 0
+
+
 def _enclosing_json_string(serialized: str, start: int, end: int) -> str:
     """The raw content of the JSON string enclosing ``serialized[start:end]`` (``""``: none
     found nearby). Bounded: the quotes are searched within 1024 characters each way."""
     opening = -1
     for i in range(start - 1, max(start - 1025, -1), -1):
-        if serialized[i] == '"' and (i == 0 or serialized[i - 1] != "\\"):
+        if _unescaped_quote(serialized, i):
             opening = i
             break
     if opening < 0:
         return ""
     for j in range(end, min(end + 1024, len(serialized))):
-        if serialized[j] == '"' and serialized[j - 1] != "\\":
+        if _unescaped_quote(serialized, j):
             return serialized[opening + 1 : j]
     return ""

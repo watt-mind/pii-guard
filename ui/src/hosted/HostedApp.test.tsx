@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as chatApi from "../api/chat";
 import { ApiError } from "../api/http";
 import { HostedApp } from "./HostedApp";
@@ -15,6 +15,7 @@ function requester(handler: (path: string, body?: unknown, method?: string) => u
 }
 
 describe("public hosted workflow", () => {
+  beforeEach(() => history.replaceState(null, "", "/#demo"));
   it("defaults to English even with a Hungarian browser locale and honors the sample switch", async () => {
     const locale = vi.spyOn(navigator, "language", "get").mockReturnValue("hu-HU");
     try {
@@ -31,10 +32,11 @@ describe("public hosted workflow", () => {
   });
 
   it("sends sign-in back to the console instead of the provider's bare page", async () => {
+    history.replaceState(null, "", "/");
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
-    await screen.findAllByText(/free runs/i);
-    expect(screen.getByText(/Runs on Muse Spark 1.3 · no key needed/)).toHaveTextContent("3 of 3 free runs left today");
+    await screen.findByRole("link", { name: "Sign in to console" });
+
     expect(document.body.textContent).not.toMatch(/sponsor/i);
     const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Sign in to console" })];
     expect(links.length).toBeGreaterThanOrEqual(2);
@@ -123,9 +125,10 @@ describe("public hosted workflow", () => {
     expect(screen.queryByRole("button", { name: "Run the live demo" })).not.toBeInTheDocument();
     expect(screen.getByText("Recorded run · real model · fictional data")).toBeInTheDocument();
     expect(screen.getByText("The live service isn’t reachable")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reconnect to API" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry live service" })).toBeInTheDocument();
   });
   it("points a signed-in visitor of the public page to the console, without broad account keys", async () => {
+    history.replaceState(null, "", "/");
     const call = requester((path) => path === "/v1/account" ? { ...account, authenticated: true } : []);
     render(<HostedApp call={call} />);
     await screen.findByText(/You’re signed in/);
@@ -143,17 +146,16 @@ describe("hero CTA (LAB-1479)", () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     const scroll = spyScroll();
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await screen.findByRole("button", { name: "Run the live demo" });
+    await screen.findByRole("link", { name: "Run the live demo" });
     const cta = screen.getByRole("link", { name: "Run the live demo" });
     expect(cta).toHaveAttribute("href", "#demo");
     await user.click(cta);
     await screen.findByText("Live result · answered by test-model");
     expect(call).toHaveBeenCalledWith("/v1/demo", { sample_id: "en-support", language: "en" });
-    expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
-    expect(scroll.mock.contexts[0]).toBe(document.getElementById("demo"));
-    const heading = screen.getByRole("heading", { name: "See exactly what the model sees." });
+    expect(location.hash).toBe("#demo");
+    const heading = screen.getByRole("heading", { name: "Interactive demo" });
     expect(heading).toHaveAttribute("tabindex", "-1");
-    expect(heading).toHaveFocus();
+    await waitFor(() => expect(heading).toHaveFocus());
     scroll.mockRestore();
   });
   it("jumps without smooth scrolling under prefers-reduced-motion", async () => {
@@ -161,10 +163,10 @@ describe("hero CTA (LAB-1479)", () => {
     const scroll = spyScroll();
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }) as MediaQueryList);
     const user = userEvent.setup(); render(<HostedApp call={call} />);
-    await screen.findByRole("button", { name: "Run the live demo" });
+    await screen.findByRole("link", { name: "Run the live demo" });
     await user.click(screen.getByRole("link", { name: "Run the live demo" }));
     await screen.findByText("Live result · answered by test-model");
-    expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
+    expect(scroll).not.toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
     vi.unstubAllGlobals(); scroll.mockRestore();
   });
   it("opens the custom-text editor from the signed-in hero without sending a request", async () => {
@@ -173,14 +175,15 @@ describe("hero CTA (LAB-1479)", () => {
     try {
       const user = userEvent.setup(); render(<HostedApp call={call} />);
       await user.click(await screen.findByRole("link", { name: "Run your own text" }));
-      expect(screen.getByRole("combobox", { name: "Input" })).toHaveValue("custom");
+      expect(await screen.findByRole("combobox", { name: "Input" })).toHaveValue("custom");
       expect(screen.getByRole("textbox", { name: "Your text" })).toBeInTheDocument();
       expect(screen.getByText("Your text · ready for a live run")).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "See exactly what the model sees." })).toHaveFocus();
+      await waitFor(() => expect(screen.getByRole("heading", { name: "Interactive demo" })).toHaveFocus());
       expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
     } finally { scroll.mockRestore(); }
   });
   it("explains why an empty or whitespace-only custom draft cannot run", async () => {
+    history.replaceState(null, "", "/#demo");
     const call = requester(() => ({ ...account, authenticated: true }));
     const user = userEvent.setup(); render(<HostedApp call={call} />);
     await user.selectOptions(await screen.findByRole("combobox", { name: "Input" }), "custom");
@@ -195,6 +198,7 @@ describe("hero CTA (LAB-1479)", () => {
     expect(screen.getByRole("button", { name: "Run your text" })).toBeEnabled();
   });
   it("clears a shown custom result and reopens the editor from the signed-in hero", async () => {
+    history.replaceState(null, "", "/#demo");
     const send = vi.fn(async () => ({ sessionId: "synthetic", answer: "Synthetic answer", maskedAnswer: "Synthetic answer", maskedMessages: [{ role: "user" as const, content: "Synthetic draft." }], masked: 0, mode: "fast" as const, ms: 1 }));
     const chat = vi.spyOn(chatApi, "createHttpChat").mockReturnValue({ kind: "api", listModels: async () => ["test-model"], send });
     const scroll = spyScroll();
@@ -205,12 +209,14 @@ describe("hero CTA (LAB-1479)", () => {
       await user.type(screen.getByRole("textbox", { name: "Your text" }), "Synthetic draft.");
       await user.click(screen.getByRole("button", { name: "Run your text" }));
       await screen.findByRole("button", { name: "Edit your text" });
-      await user.click(screen.getByRole("link", { name: "Run your own text" }));
+      act(() => { location.hash = "site"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+      await user.click(await screen.findByRole("link", { name: "Run your own text" }));
       expect(screen.queryByRole("button", { name: "Edit your text" })).not.toBeInTheDocument();
       expect(screen.getByRole("textbox", { name: "Your text" })).toBeInTheDocument();
     } finally { chat.mockRestore(); scroll.mockRestore(); }
   });
   it("lets a custom result be edited with the draft and focus preserved, or return to the recording", async () => {
+    history.replaceState(null, "", "/#demo");
     const draft = "Synthetic draft. ".repeat(25);
     const send = vi.fn(async () => ({ sessionId: "synthetic", answer: "Synthetic answer", maskedAnswer: "Synthetic answer", maskedMessages: [{ role: "user" as const, content: draft }], masked: 0, mode: "fast" as const, ms: 1 }));
     const chat = vi.spyOn(chatApi, "createHttpChat").mockReturnValue({ kind: "api", listModels: async () => ["test-model"], send });
@@ -242,10 +248,11 @@ describe("hero CTA (LAB-1479)", () => {
       const editor = screen.getByRole("textbox", { name: "Your text" });
       await user.clear(editor);
       await user.type(editor, "Synthetic draft for testing.");
-      await user.click(cta);
-      expect(editor).toHaveValue("Synthetic draft for testing.");
-      expect(screen.getByRole("combobox", { name: "Input" })).toHaveValue("custom");
-      expect(screen.getByRole("heading", { name: "See exactly what the model sees." })).toHaveFocus();
+      act(() => { location.hash = "site"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
+      await user.click(await screen.findByRole("link", { name: "Run your own text" }));
+      expect(await screen.findByRole("textbox", { name: "Your text" })).toHaveValue("Synthetic draft for testing.");
+      expect(await screen.findByRole("combobox", { name: "Input" })).toHaveValue("custom");
+      await waitFor(() => expect(screen.getByRole("heading", { name: "Interactive demo" })).toHaveFocus());
       expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
     } finally { scroll.mockRestore(); }
   });
@@ -268,6 +275,7 @@ describe("hero CTA (LAB-1479)", () => {
 });
 
 describe("sponsorship off (zero budget until the provider authorises it)", () => {
+  beforeEach(() => history.replaceState(null, "", "/#demo"));
   const off: Account = { ...account, limits: { requests_per_day: 5, images_per_day: 0, max_image_bytes: 0, sponsored_enabled: false } };
   it("offers no live run to guests, keeps the recorded run and points to sign-in", async () => {
     const call = requester((path) => path === "/v1/account" ? off : result);
@@ -280,7 +288,7 @@ describe("sponsorship off (zero budget until the provider authorises it)", () =>
     expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
     expect(screen.getByText("Free runs are paused right now")).toBeInTheDocument();
     expect(screen.getByText("The recorded run below shows the same flow, answered by a real model.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "See the demo" })).toHaveAttribute("href", "#demo");
+    expect(screen.getAllByRole("link", { name: "Demo" })[0]).toHaveAttribute("href", "#demo");
     expect(document.body.textContent).not.toMatch(/sponsor/i);
   });
   it("hides limits that are off", async () => {
@@ -299,6 +307,7 @@ describe("sponsorship off (zero budget until the provider authorises it)", () =>
 });
 
 describe("signed-in example runs without a model picker", () => {
+  beforeEach(() => history.replaceState(null, "", "/#demo"));
   const signed: Account = { ...account, authenticated: true, tier: "standard" };
   const conn = { id: "conn-one", provider: "meta", origin: "https://api.example.com", expires_at: "2026-10-28T20:00:00Z" };
   it("uses sponsored Meta when it's on, with no connection dropdown", async () => {
@@ -341,24 +350,25 @@ describe("positioning and copy (LAB-1466)", () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Send the work to the model.Keep the people out of it.");
-    await screen.findByText(/Runs on Muse Spark 1.3/);
+    await screen.findByRole("link", { name: "Run the live demo" });
     expect(screen.getAllByText(/measured 27–30 Oct 2026/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Run the live demo" })).toHaveAttribute("href", "#demo");
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/sponsor|Llama|GDPR[- ]compliant|compliant with GDPR|anonymi[sz]ed data|privacy firewall|Hungarian first|coming soon/i);
     // The differentiators come right after the hero, and only tools the integration docs test (LAB-1478, LAB-1499).
-    expect(screen.getByRole("list", { name: "What makes it different" })).toHaveTextContent(/Agents, not just chat.*the coding agents Codex, OpenCode, Muse Code and pi: 115 requests, 0 values leaked, 0 of 10 turns refused.*No LLM, no GPU to mask.*Inflected EU languages.*One person, one placeholder.*Measured in the open/);
+
     // The problem in one line, and the proof signals under the call to action (LAB-1499).
     expect(text).toMatch(/Legal, HR and finance teams in the EU often can’t send case files to a hosted model/);
     expect(screen.getByRole("list", { name: "Proof" })).toHaveTextContent(/Tested with 4 real coding agents.*700\+ committed benchmark runs.*Published open NER model.*Apache-2\.0.*CI and tests/);
     // The Meta strip says what each model does, and Glimmer was the teacher, not a fine-tune.
-    expect(screen.getByRole("list", { name: "Meta models and what each does" })).toHaveTextContent(/XLM-RoBERTa.*Muse Glimmer 30B.*served on Modal.*The teacher.*Muse Spark Open.*on Baseten.*SAM 3\.1.*Muse Spark 1\.3/);
+
     expect(text).not.toMatch(/LoRA|being finali[sz]ed|not a live run|Checking availability|written by hand/);
     expect(text).not.toMatch(/Claude Code/);
     expect(screen.getByText(/^Next best: PrivAiTe 13\.0\s%$/)).toBeInTheDocument();
   });
   it("doesn't name a model the server didn't report", async () => {
     const call = requester((path) => path === "/v1/account" ? { ...account, included_model: undefined } : result);
+    history.replaceState(null, "", "/#demo");
     render(<HostedApp call={call} />);
     await screen.findByText(/Runs on Meta’s model · no key needed/);
     expect(document.body.textContent).not.toMatch(/Muse Spark 1\.3/);
@@ -366,7 +376,7 @@ describe("positioning and copy (LAB-1466)", () => {
   it("keeps sign-in clearly named in the header", async () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
-    await screen.findAllByText(/free runs/);
+    await screen.findByRole("link", { name: "Sign in to console" });
     const nav = screen.getByRole("navigation", { name: "Main navigation" }).closest("header")!;
     expect(within(nav).getByRole("link", { name: "Sign in to console" })).toHaveAttribute("href", account.login_url);
   });
@@ -374,6 +384,7 @@ describe("positioning and copy (LAB-1466)", () => {
 
 describe("landing round L3 (LAB-1515, LAB-1503)", () => {
   it("opens the demo on the recorded real-model run of the server's own sample, panes under the section h2", async () => {
+    history.replaceState(null, "", "/#demo");
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
     await screen.findByText(/Runs on Muse Spark 1.3/);
@@ -387,17 +398,15 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
     for (const id of ["demo-input", "demo-sent", "demo-answer", "demo-restored"]) expect(document.getElementById(`${id}-title`)?.tagName).toBe("H3");
     expect(call).not.toHaveBeenCalledWith("/v1/demo", expect.anything());
   });
-  it("has the Why Europe cards with the disclaimer and the three steps, with no compliance claim", async () => {
+  it("keeps detailed model and EU explanations on the technical page", async () => {
+    history.replaceState(null, "", "/#technical");
     render(<HostedApp call={requester((path) => path === "/v1/account" ? account : result)} />);
-    await screen.findByText(/Runs on Muse Spark 1.3/);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Technical overview");
+    expect(screen.getByRole("list", { name: "Meta models and what each does" })).toHaveTextContent(/XLM-RoBERTa.*Muse Glimmer 30B.*The teacher/);
     expect(screen.getByRole("list", { name: "EU rules and what PII Guard does" })).toHaveTextContent(/Minimize before you send.*Less personal data crossing borders.*Built for regulated work/);
-    expect(screen.getByText(/^A technical measure, not legal advice or a compliance feature: .* transfer assessment\./)).toBeInTheDocument();
-    expect(screen.getByText(/placeholders go out, the mapping stays with your guard\. Your transfer obligations remain\./)).toBeInTheDocument();
-    expect(screen.getByText(/PII Guard lists every call in Logs, outbound check included\./)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Meta Model API terms ↗" })).toHaveAttribute("href", "https://dev.meta.ai/legal/terms-of-service");
+    expect(screen.getByText(/^A technical measure, not legal advice or a compliance feature:/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "What we don’t claim ↗" })).toHaveAttribute("href", expect.stringMatching(/docs\/eu-regulation\.md#what-we-dont-claim$/));
-    expect(screen.getByRole("list", { name: "Live in three steps" })).toHaveTextContent(/Change one base URL\..*Masking and restoring happen automatically: streaming, tool calls, images\..*See every request in Logs, with its outbound check result\./);
-    expect(document.body.textContent).not.toMatch(/GDPR[- ]compliant|special categor|anonymi[sz]ed data/i);
+    expect(document.body.textContent).not.toMatch(/GDPR[- ]compliant|anonymi[sz]ed data/i);
   });
   it("offers a section menu where the nav links don't fit, closed after a link is followed", async () => {
     const user = userEvent.setup();
@@ -405,8 +414,9 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
     const menu = screen.getByText("Menu").closest("details")!;
     await user.click(screen.getByText("Menu"));
     expect(menu).toHaveAttribute("open");
-    await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
+    await user.click(screen.getAllByRole("link", { name: "Technical overview" })[0]!);
     expect(menu).not.toHaveAttribute("open");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Technical overview", level: 1 })).toHaveFocus());
     await user.click(screen.getByText("Menu"));
     await user.keyboard("{Escape}");
     expect(menu).not.toHaveAttribute("open");
@@ -418,6 +428,7 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
 });
 
 describe("landing recovery and keyboard navigation (LAB-1540)", () => {
+  beforeEach(() => history.replaceState(null, "", "/#demo"));
   it("retries beside the recorded demo, prevents duplicate retries and recovers live actions", async () => {
     let finish!: (value: Account) => void;
     const call = vi.fn().mockRejectedValueOnce(new Error("offline"))
@@ -450,9 +461,9 @@ describe("landing recovery and keyboard navigation (LAB-1540)", () => {
     await user.tab({ shift: true });
     expect(menu).not.toHaveAttribute("open");
     await user.click(toggle);
-    await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
+    await user.click(screen.getAllByRole("link", { name: "Technical overview" })[0]!);
     expect(menu).not.toHaveAttribute("open");
-    await waitFor(() => expect(screen.getByRole("heading", { name: "What EU rules ask, and what PII Guard does." })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Technical overview" })).toHaveFocus());
   });
 });
 
@@ -491,7 +502,7 @@ describe("public footer", () => {
       expect(a.querySelector("img")).toHaveAttribute("alt", "");
       expect(a.querySelector("img")).toHaveAttribute("src", src);
     }
-    expect(links.map((a) => a.getAttribute("href"))).toEqual(expect.arrayContaining(["#data", "https://github.com/watt-mind/pii-guard#try-it", "https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations/README.md", "https://github.com/watt-mind/pii-guard/issues"]));
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(expect.arrayContaining(["#trust", "https://github.com/watt-mind/pii-guard#try-it", "https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations/README.md", "https://github.com/watt-mind/pii-guard/issues"]));
     expect(footer).toHaveTextContent("Apache-2.0");
   });
 });

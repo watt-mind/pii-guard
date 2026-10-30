@@ -47,10 +47,28 @@ BODY_READ_SECONDS = 10
 # Tool types a client executes itself; any other type (web search, file search, code
 # interpreter, MCP) runs and bills at the provider, outside the reserved token usage.
 _CLIENT_TOOL_TYPES = frozenset({"function", "custom"})
+# Responses API only: a ``namespace`` groups client tools under one name (Codex's
+# ``multi_agent_v1``, Muse Code's ``muse``, LAB-1658). It is client-side only when every tool
+# it holds is, at any depth; the upstream (api.meta.ai) takes it as is and calls the tools
+# ``<namespace>.<name>``, so nothing is flattened.
+_NAMESPACE_TOOL_TYPE = "namespace"
+# Bounds on the tool walk: namespace nesting below the top-level array, and tool definitions
+# counted across every level. Clients send one level and a few dozen tools; past either
+# bound the request is refused rather than walked.
+MAX_TOOL_NAMESPACE_DEPTH = 4
+MAX_TOOL_DEFINITIONS = 512
 
 
-def _provider_billed_tools(body: dict[str, Any]) -> bool:
-    """Whether a chat or Responses body asks the provider for separately billed tool work."""
+class _ToolWalkLimitError(Exception):
+    """The tool array nests or counts past the walk bounds."""
+
+
+def _provider_billed_tools(body: dict[str, Any], *, namespaces: bool = False) -> bool:
+    """Whether a chat or Responses body asks the provider for separately billed tool work.
+
+    ``namespaces`` (Responses API): accept ``namespace`` tools whose nested tools are all
+    client-side. Raises :class:`_ToolWalkLimitError` past the depth or count bound.
+    """
     if "web_search_options" in body:
         return True
     tools = body.get("tools")
@@ -58,10 +76,30 @@ def _provider_billed_tools(body: dict[str, Any]) -> bool:
         return False
     if not isinstance(tools, list):
         return True
-    return any(
-        not isinstance(tool, dict) or tool.get("type", "function") not in _CLIENT_TOOL_TYPES
-        for tool in tools
-    )
+    seen = [0]
+
+    def provider_side(entries: list[Any], depth: int) -> bool:
+        for tool in entries:
+            seen[0] += 1
+            if seen[0] > MAX_TOOL_DEFINITIONS:
+                raise _ToolWalkLimitError
+            if not isinstance(tool, dict):
+                return True
+            tool_type = tool.get("type", "function")
+            if tool_type in _CLIENT_TOOL_TYPES:
+                continue
+            if not namespaces or tool_type != _NAMESPACE_TOOL_TYPE:
+                return True
+            inner = tool.get("tools")
+            if not isinstance(inner, list):
+                return True
+            if depth >= MAX_TOOL_NAMESPACE_DEPTH:
+                raise _ToolWalkLimitError
+            if provider_side(inner, depth + 1):
+                return True
+        return False
+
+    return provider_side(tools, 0)
 
 
 class HostedRequestError(PiiGuardError):
@@ -321,7 +359,7 @@ class HostedMiddleware:
                 )
                 async with asyncio.timeout_at(deadline):
                     scope, receive = await endpoint_body(
-                        scope, receive, state, self.service.settings.hosted_max_body_bytes
+                        scope, receive, state, self.service.settings.hosted_endpoint_max_body_bytes
                     )
                 headers = Headers(scope=scope)
             # Text routes stay text-sized; the image route gets its own bounded limit, and
@@ -333,7 +371,13 @@ class HostedMiddleware:
                 and principal.auth_method == "google"
                 and routed is None
             )
-            text_limit = self.service.settings.hosted_max_body_bytes
+            # Endpoint routes carry coding agents' prompts and tool schemas: their own limit
+            # (LAB-1651); the console and guard API keys keep the text limit.
+            text_limit = (
+                self.service.settings.hosted_endpoint_max_body_bytes
+                if routed is not None
+                else self.service.settings.hosted_max_body_bytes
+            )
             if image:
                 body_limit = image_body_limit(self.service.settings)
             elif chat_images:
@@ -378,7 +422,17 @@ class HostedMiddleware:
                 )
                 if sponsored_route and body.get("model") not in self.service.settings.hosted_models:
                     raise HostedRequestError("Model is not allowed for sponsored requests")
-                if sponsored_route and _provider_billed_tools(body):
+                try:
+                    provider_tools = sponsored_route and _provider_billed_tools(
+                        body, namespaces=canonical == "/v1/responses"
+                    )
+                except _ToolWalkLimitError:
+                    raise HostedRequestError(
+                        "Hosted requests allow at most "
+                        f"{MAX_TOOL_DEFINITIONS} tool definitions, nested at most "
+                        f"{MAX_TOOL_NAMESPACE_DEPTH} namespaces deep"
+                    ) from None
+                if provider_tools:
                     # Provider-side tools (Meta web search grounding: USD 2.50 per 1,000
                     # queries, LAB-1372) are billed outside the token usage the reservation
                     # bounds, so the sponsored route never asks for them.
@@ -415,9 +469,14 @@ class HostedMiddleware:
                 output_field = (
                     "max_output_tokens" if canonical == "/v1/responses" else "max_completion_tokens"
                 )
+                # A limit above the hosted cap is clamped to it, not refused (LAB-1651): coding
+                # agents ask for 16k-32k (OpenCode 32000, pi 16384, Muse 32000) and can't be
+                # told otherwise. Every field is only an upper bound on the reply, so the
+                # smallest one wins and the reservation below charges that, never more. A
+                # value that isn't a positive integer is still refused.
                 for key in ("max_tokens", "max_completion_tokens", "max_output_tokens"):
                     value = body.pop(key, maximum)
-                    if type(value) is not int or not 1 <= value <= maximum:
+                    if type(value) is not int or value < 1:
                         raise HostedRequestError("Output token limit is outside hosted limits")
                     maximum = min(maximum, value)
                 body[output_field] = maximum

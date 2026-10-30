@@ -68,6 +68,24 @@ describe("project workspace", () => {
     expect(within(row).getByRole("region", { name: "Connect Synthetic support" })).toBeInTheDocument();
   });
 
+  it("keeps an endpoint's open panels out of its summary line, so they cannot squeeze it (LAB-1652)", async () => {
+    const user = userEvent.setup(); render(<Workspace call={fixture()} />);
+    await screen.findByText("Synthetic support");
+    const edit = screen.getByRole("button", { name: "Edit Synthetic support" });
+    const row = edit.closest("li")!;
+    // The summary and the actions share one no-wrap flex line; the panels are blocks below it.
+    const line = screen.getByRole("heading", { name: "Synthetic support" }).parentElement!.parentElement!;
+    expect(line.parentElement).toBe(row);
+    expect(line).toContainElement(edit);
+    expect(row).not.toHaveClass("flex");
+    await user.click(screen.getByRole("button", { name: "Connect & keys for Synthetic support" }));
+    const panel = within(row).getByRole("region", { name: "Connect Synthetic support" });
+    expect(line).not.toContainElement(panel);
+    await user.click(edit);
+    const form = within(row).getByRole("form", { name: "Edit Synthetic support" });
+    expect(line).not.toContainElement(form);
+  });
+
   it("requires an explicit policy version and never preloads a provider secret", async () => {
     const call = fixture(); const user = userEvent.setup(); render(<Workspace call={call} />);
     await screen.findByText("Synthetic support");

@@ -102,3 +102,21 @@
 @media (max-width: 359px) { .public-nav summary { gap: 4px; padding-inline: 4px; } .public-account { gap: 0; } }
 /* Lean account action, matching the quieter navigation. */
 .public-account > a:not(.public-source-link) { height: 36px; min-height: 36px; border-radius: 6px; }
+
+/* Supporting pages: orientation, usable section links, and a clear next step. */
+.public-page-intro { max-width: 960px; }
+.public-page-contents { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 24px; }
+.public-page-contents > span { width: 100%; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+.public-page-contents a { display: inline-flex; min-height: 44px; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; color: var(--ink); font-size: 13px; white-space: nowrap; }
+.public-page-contents a:hover, .public-page-contents a[aria-current] { background: var(--surface-2); border-color: var(--field); }
+.public-subpage :is(a, summary):focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.public-page-next { padding-top: 24px; border-top: 1px solid var(--line); }
+.public-page-next h2 { font-size: 14px; font-weight: 500; margin-bottom: 16px; }
+.public-page-next > div { display: grid; gap: 12px; }
+.public-page-next a { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 16px; min-width: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); }
+.public-page-next a:hover { border-color: var(--field); }
+.public-page-next a > span:first-child { font-weight: 500; color: var(--ink); }
+.public-page-next a > span:last-child { font-size: 13px; color: var(--muted); }
+@media (min-width: 640px) { .public-page-contents > span { width: auto; margin: 0 8px 0 0; } .public-page-next > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.public-subpage > :not(:last-child) { margin-block-end: 32px; }
+@media (min-width: 640px) { .public-subpage > :not(:last-child) { margin-block-end: 48px; } }

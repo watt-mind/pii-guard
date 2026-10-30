@@ -1902,9 +1902,15 @@ ten-second deadline from taking the slot bounds the whole body read, however it 
 trickled (`504 hosted_timeout`, no quota charged). Endpoint-key lookup, the only wait
 before identity is known, has its own pool of eight and reads no body. `GET
 /v1/traffic/stream` gives its ingress slot back once admitted and holds a
-stream slot instead: two per owner, sixteen in all (`429 hosted_capacity` beyond). Bodies are capped at 32 KiB; hosted
+stream slot instead: two per owner, sixteen in all (`429 hosted_capacity` beyond). Bodies are capped at 32 KiB, and at
+256 KiB on project endpoint routes (`/e/<endpoint>/v1`, `PII_GUARD_HOSTED_ENDPOINT_MAX_BODY_BYTES`,
+at most 512 KiB): coding agents send their system prompt and tool schemas with every request,
+measured on 2026-10-30 at up to 9 KB (pi), 35 KB (OpenCode), 44 KB (Codex) and 135 KB (Muse
+Code) per request (LAB-1651). Hosted
 requests have a 180-second deadline, fast text detection, one completion and at most 8192
-output/reasoning tokens. Sponsored models are an explicit server allowlist, initially
+output/reasoning tokens: a larger `max_tokens`, `max_completion_tokens` or `max_output_tokens`
+is clamped to the cap, not refused (agents ask for 16,384 to 32,000), and a value that is not a
+positive integer is refused. Sponsored models are an explicit server allowlist, initially
 `muse-spark-1.3`; model selection cannot change the sponsored destination.
 
 Reservations are sized from the request before work. The input charge is the upstream
@@ -1921,7 +1927,12 @@ the defaults a guest gets its five demos (about 8,250 reserved tokens and $0.14 
 fresh signed-in user can send a chat close to the 32 KiB body limit. Sponsored requests may not
 ask for provider-side tools (`web_search_options`, or a `tools` entry other than `function` or
 `custom`): Meta bills web search grounding per query, outside the token usage a reservation
-bounds, so they are refused with `403 hosted_request_denied` before any work. Completion, cancellation, invalid provider responses and client retries never refund
+bounds, so they are refused with `403 hosted_request_denied` before any work. On
+`/v1/responses` a `namespace` tool (Codex's `multi_agent_v1`, Muse Code's `muse`) is accepted
+when every tool it holds, at any depth, is a `function` or `custom` tool; it goes upstream as
+is (LAB-1658). A provider-side tool inside a namespace is refused like one at the top level,
+and so is a `tools` array holding more than 512 definitions or nesting namespaces more than 4
+deep. Completion, cancellation, invalid provider responses and client retries never refund
 requests, tokens or money. Concurrency releases only after the response stream and cleanup.
 There are no automatic upstream retries. Monetary units are integer microdollars, and configured
 per-token rates must upper-bound every permitted model and all reasoning charges. The rate

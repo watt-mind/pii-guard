@@ -68,3 +68,12 @@ def test_span_across_cells_is_cut_at_the_delimiter() -> None:
     spans = NerDetector(backend=backend).detect(text, "en")
     assert sorted(s.text for s in spans) == ["Peter Nagy", "Szeged"]
     assert all(";" not in s.text for s in spans)
+
+
+def test_model_view_leaves_all_caps_reference_cells_glued() -> None:
+    # LAB-1648: spacing ",ORD-…" glued the order number to the ID before it, and the model
+    # dropped the ID. Only a capitalised word (a name's start) is a cell boundary to space.
+    row = '"Isla Ellison",islaellison@example.net,020 7946 0650,610456508,ORD-2026-481850,26.82\n'
+    assert model_view(row) == (row, ())
+    assert model_view("x,100000000,SO7466927,1.25") == ("x,100000000,SO7466927,1.25", ())
+    assert model_view("1,O'Brien Kate;J. Smith") == ("1 O'Brien Kate J. Smith", (1, 14))

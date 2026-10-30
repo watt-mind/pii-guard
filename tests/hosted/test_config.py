@@ -95,3 +95,16 @@ def test_hosted_source_tag_is_configurable_and_restricted(monkeypatch) -> None:
         except pydantic.ValidationError:
             continue
         raise AssertionError(f"accepted invalid source tag {bad!r}")
+
+
+def test_endpoint_body_limit_is_separate_and_bounded(monkeypatch) -> None:
+    # LAB-1651: coding agents on /e/ routes need more than the 32 KiB console text limit.
+    defaults = Settings(_env_file=None)
+    assert defaults.hosted_max_body_bytes == 32768
+    assert defaults.hosted_endpoint_max_body_bytes == 262144
+    monkeypatch.setenv("PII_GUARD_HOSTED_ENDPOINT_MAX_BODY_BYTES", "524288")
+    assert Settings(_env_file=None).hosted_endpoint_max_body_bytes == 524288
+    for value in ("524289", "1023"):
+        monkeypatch.setenv("PII_GUARD_HOSTED_ENDPOINT_MAX_BODY_BYTES", value)
+        with pytest.raises(ValueError):
+            Settings(_env_file=None)
