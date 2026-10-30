@@ -95,6 +95,7 @@
         "key": {"type": "string", "minLength": 1, "description": "Stable id of the system; runs with the same key are the same system over time."},
         "label": {"type": "string", "minLength": 1},
         "family": {"enum": ["pii-guard", "comparison"]},
+        "role": {"enum": ["own", "other-model", "tool"], "description": "Whose system it is: pii-guard's own configuration, another organisation's model run through pii-guard's pipeline (family pii-guard), or a comparison tool. Derived from the detectors (pii_guard.eval.record.system_role); older records are backfilled by eval rescore (LAB-1495)."},
         "tool": {"type": "string"},
         "version": {"type": ["string", "null"]},
         "detectors": {"type": "array", "items": {"$ref": "#/$defs/detector"}},

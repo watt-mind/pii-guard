@@ -240,11 +240,18 @@ def _claude(url: str, model: str, key: str | None) -> tuple[str, str]:
 
 
 def _muse_endpoint(url: str, model: str, key: str | None) -> tuple[str, str]:
+    # Muse sends META_API_KEY as the bearer token, for its catalog at the root of the base URL
+    # (/muse-code/models) too: the gateway serves this endpoint's catalog there (LAB-1462).
+    token = f'META_API_KEY="${key}" ' if key else ""
+    code = f"pii-guard connect muse-code --gateway {_q(url)} --no-session-path\n{token}muse"
     note = (
-        "Not for endpoint URLs yet. Muse Code loads its model catalog from the gateway's root "
-        "(/muse-code/models), which an /e/<endpoint>/v1 URL doesn't serve; use another tool."
+        "Muse Code reads its endpoint only from settings.json, so this writes it first "
+        "(endpoint_transport, backup kept, --dry-run to preview). Muse sends META_API_KEY as "
+        "the key"
+        + (f", so this passes ${key}: export it first." if key else ".")
+        + " Its catalog lists only this endpoint's model."
     )
-    return "", note
+    return code, note
 
 
 def _pi_endpoint(url: str, model: str, key: str | None) -> tuple[str, str]:

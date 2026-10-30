@@ -209,12 +209,14 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_DEFAULT_LANGUAGE` | `default_language` | `str` | `hu` |
 | `PII_GUARD_DETECTION_PROFILE` | `detection_profile` | `standard \| local-only` | `standard` |
 | `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...] \| None` (comma-separated registry names) | unset (the gateway fast-mode stack: `rules`, plus `ner` when available) |
+| `PII_GUARD_MAX_TEXT_CHARS` | `max_text_chars` | `int` (>= 1, code points) | `200000` |
 | `PII_GUARD_POLICY_OVERRIDES` | `policy_overrides` | `dict[EntityType, Policy]` (`TYPE=mask\|keep\|block,...`) | none |
 | `PII_GUARD_GATEWAY_KEEP_TYPES` | `gateway_keep_types` | `frozenset[EntityType] \| None` (deprecated) | unset |
 | `PII_GUARD_NER_MODEL` | `ner_model` | `str \| None` (hub id or directory) | unset (detector default; a set model makes a missing `ner` extra stop startup) |
 | `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
 | `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
 | `PII_GUARD_NER_WARMUP_TIMEOUT` | `ner_warmup_timeout` | `float` (> 0, seconds): how long a detecting request waits for the background NER load | `120` |
+| `PII_GUARD_BODY_READ_TIMEOUT` | `body_read_timeout` | `float` (> 0, seconds): whole request-body read deadline on the REST API; past it, 408 `request_timeout` and nothing is processed (raise it for large image bodies on slow links) | `30` |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
@@ -232,6 +234,8 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_LLM_DETECTOR_MAX_TOKENS` | `llm_detector_max_tokens` | `int \| None` (>= 256) | unset (detector default `4096`) |
 | `PII_GUARD_LLM_DETECTOR_TIMEOUT` | `llm_detector_timeout` | `float \| None` (> 0, seconds) | unset (detector default `60`) |
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
+| `PII_GUARD_SAM_API_KEY` | `sam_api_key` | `SecretStr \| None` | unset (falls back to `META_API_KEY`) |
+| `PII_GUARD_SAM_MODEL` | `sam_model` | `str \| None` | unset (SamClient default `sam-3.1`) |
 | `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
@@ -367,6 +371,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | Status | `code` | When |
 |---|---|---|
 | 400 | `unsupported_content` | Gateway: the body holds a key or content part outside the [request allow-list](#gateway-request-fields-implemented) (an unknown field, a remote image URL, an audio part). Nothing is forwarded or stored. A malformed gateway body (not JSON, a wrong value type) is `400 invalid_request`. |
+| 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the Anthropic Messages API, which Claude Code speaks, is not served yet. The message points to the OpenAI-compatible routes (`/v1/chat/completions`, `/v1/responses`) and the console's Connect page; the response has `x-should-retry: false`. Nothing is detected, stored or forwarded; the attempt is one `refused` traffic event (model and `stream` only, never the body). |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
@@ -396,7 +401,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 502 | `upstream_did_not_stream` | `POST /v1/chat/completions` with `stream: true`: the upstream answered without `text/event-stream`. The body is not read or forwarded; retry without `stream` (see [Gateway chat streaming](#gateway-chat-streaming-implemented)). |
 | 503 | `upstream_not_configured` | Gateway: the server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). |
 | 503 | `vault_capacity_exhausted` | A new vault session is needed while every session slot is held by an active request; nothing is masked or sent. Retry once a request finishes. |
-| 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
+| 503 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
 | 503 | `detection_profile_denied` | The selected or cached raw-processing component is not permitted by `PII_GUARD_DETECTION_PROFILE`; nothing is forwarded. |
@@ -555,7 +560,7 @@ Options (JSON fields, or query parameters with a raw upload):
 - `render`: `labels` (default, `PII_GUARD_IMAGE_RENDER`) prints each covered region's vault
   placeholder in its box and returns a masked transcript and a document summary; `opaque`
   fills boxes solid black and returns neither. Without a tenant key the default falls back
-  to `opaque`; an explicit `labels` is then `500 vault_not_configured`.
+  to `opaque`; an explicit `labels` is then `503 vault_not_configured`.
 - `session_id`: the vault session to mask in (`labels` only), shared with `/v1/mask` and the
   gateway, so the same person gets the same placeholder in text and in images. Omitted: a new
   session is created and returned. Unknown or expired: `404 not_found`.
@@ -940,7 +945,9 @@ row links to its session.
   variants after their value, with `variant_of`), then the known values nothing matched yet
   (`placeholder: null`). Each item has `placeholder`, `entity_type`, `origin` (`detected`, or
   `known` for a pre-loaded value), `count` (occurrences masked), `forms` (how many other written
-  forms matched: inflected stems, split surfaces), `hint`, and on a revealed read `original`
+  forms matched: inflected stems, split surfaces), `hint`, `detector` (the detector of the
+  first span that created the entry), `first_seen` and `last_seen` (vault-clock seconds of
+  the first and latest masked occurrence), and on a revealed read `original`
   and `known_forms`. Every revealed read is logged at `WARNING` with the ref and the counts,
   never a value or the session id.
 
@@ -1330,7 +1337,7 @@ doesn't inflate them).
 |---|---|---|---|
 | `SessionNotFoundError` (`PiiGuardError`) | `not_found` | 404 | The session id is unknown, expired or closed. Raised by `Vault.session` and by every `VaultSession` method (and so by `StreamUnmasker`) once the session is gone; the gateway fails the request instead of forwarding unrestored text. |
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
-| `MaskingError` | `vault_not_configured` | 500 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
+| `VaultNotConfiguredError` (`PiiGuardError`) | `vault_not_configured` | 503 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
 | `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
 | `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
@@ -1667,7 +1674,12 @@ describes the oldest enabled endpoint. `state` is `ready`, `needs_key` (sponsore
 sponsorship is unavailable) or `disabled`. `issue_key: true` issues one endpoint key, returned
 raw only in that response, while the endpoint has no active key. `meta_api_key` converts a
 `needs_key` sponsored default endpoint, in place, to an own-key `meta` endpoint on
-`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The
+`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The key is
+checked for shape first (LAB-1463): surrounding whitespace is dropped, and anything that is not
+one token of 20 to 4096 printable ASCII characters without spaces, quotes or `://` is refused
+with `422 invalid_provider_key` before anything is saved, so the endpoint stays `needs_key` and
+never falls back to sponsored inference. The message names the expected shape, never the value.
+This is a format check only; no provider call verifies the key on save. The
 operation is one atomic store update (a single conditional write on the Blob store, re-read and
 retried up to three times after a conflict), so repeat sign-ins and concurrent first requests never create a second
 endpoint. It spends no daily request or token budget and takes no runtime.

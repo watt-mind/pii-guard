@@ -107,11 +107,23 @@ class Settings(BaseSettings):
     hosted_image_timeout: float = Field(default=60, gt=0, le=120)
     hosted_user_images_per_day: int = Field(default=20, ge=1, le=1000)
     hosted_global_images_per_day: int = Field(default=500, ge=1, le=100_000)
+    # Inline images in hosted chat and Responses (LAB-1439): off unless the operator opts in,
+    # and only with hosted_images on. Signed-in Google owners, on their own connection only
+    # (never the sponsored route), through the same local pipeline and one-job pool. Each
+    # image counts once against the daily image count and reserves this many provider input
+    # tokens on top of the text bound: well above what common vision tokenizers charge for
+    # one image at the hosted pixel cap (a few thousand at most).
+    hosted_chat_images: bool = False
+    hosted_chat_max_images: int = Field(default=1, ge=1, le=4)
+    hosted_image_input_tokens: int = Field(default=16_384, ge=1024, le=131_072)
 
     # Detection and policies for the REST API (/v1/analyze, /v1/mask).
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
     # the gateway fast-mode stack, rules + ner when available (pii_guard.detect.stack).
     detectors: Annotated[tuple[str, ...] | None, NoDecode] = None
+    # Upper bound on the analysed text, in code points (LAB-1095). Override per-app via
+    # app.state.max_text_chars (set by create_app from here).
+    max_text_chars: int = Field(default=200_000, ge=1)
     # A processing constraint, independent of the masked downstream LLM destination.
     detection_profile: Literal["standard", "local-only"] = "standard"
     # "TYPE=mask|keep|block,..." on top of the defaults in docs/entities.md.
@@ -141,6 +153,10 @@ class Settings(BaseSettings):
     # Upstream LLM the gateway forwards masked requests to (OpenAI-compatible).
     upstream_base_url: str | None = None
     upstream_api_key: SecretStr | None = None
+    # The configured upstream is the offline mock (LAB-1311): `make demo` sets this when it
+    # starts its mock upstream, so /v1/status and Connect report it as the mock instead of
+    # a real-looking URL. `pii-guard up --mock` marks it through app.state.up_status instead.
+    upstream_mock: bool = False
 
     # Key for deriving pseudonyms (HMAC), hex encoded (openssl rand -hex 32).
     tenant_key: SecretStr | None = None
@@ -176,6 +192,10 @@ class Settings(BaseSettings):
     image_max_pixels: int = Field(default=16_000_000, ge=1)
     image_concurrency: int = Field(default=2, ge=1)
     image_timeout: float = Field(default=120.0, gt=0)
+    # Whole request-body read deadline in seconds for the REST API (LAB-1566, LAB-1581): bytes
+    # alone don't stop a slow-loris client. Past it, 408 request_timeout and nothing is
+    # processed; raise it for large image bodies on slow links.
+    body_read_timeout: float = Field(default=30.0, gt=0)
 
     # Most live vault sessions; one more evicts the least recently used (docs/operations.md).
     vault_max_sessions: int = Field(default=10_000, ge=1)
@@ -206,6 +226,11 @@ class Settings(BaseSettings):
     # vLLM reads this instead of reasoning_effort; unset sends nothing.
     llm_detector_reasoning_strength: str | None = None
     sam_url: str | None = None
+    # SAM 3.1 on the Meta Model API: the key (PII_GUARD_SAM_API_KEY, else META_API_KEY)
+    # and the model (PII_GUARD_SAM_MODEL, default sam-3.1). SamClient resolves
+    # constructor -> these Settings fields -> process env (keeping the META_API_KEY fallback).
+    sam_api_key: SecretStr | None = None
+    sam_model: str | None = None
     # NER detector (fast mode). "transformers": a token-classification checkpoint
     # (PII_GUARD_NER_MODEL); "gliner": a GLiNER checkpoint, default the public zero-shot
     # urchade/gliner_multi-v2.1 (needs the gliner extra). See docs/models.md.

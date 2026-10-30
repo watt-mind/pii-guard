@@ -588,6 +588,11 @@ upload in one step once downloads are allowed for the key.
   `muse-image-1.0`, `muse-voice-transcribe-1.0` and `sam-3.1` (plus `-contributor` variants).
   **SAM 3.1** is served on the same API through `POST /v1/responses` (not exercised here).
 - Do not use the `-contributor` model variants: their tier allows the provider to use traffic.
+  **One exception: the corpus generator** (`pii-guard eval generate`, `PII_GUARD_CORPUS_MODEL`)
+  defaults to `muse-spark-1.3-contributor`, because everything it sends is fictional: seeded
+  identities from `pii_guard.eval.identities`, never real or masked text. The detector, the
+  gateway and anything else that can see user data stay on non-contributor or open-weights
+  models.
 
 **Privacy rule for the hosted API.** Hosted Meta API models only ever see **fictional or
 masked** data: tests, fixtures and the corpus generator send synthetic text only. Real data is
@@ -597,6 +602,16 @@ recorded test fixtures in `tests/detect/fixtures/` are responses to fictional te
 
 Tests mock HTTP with recorded responses; `uv run pytest -m live` runs the live checks against
 the Meta Model API (with `META_API_KEY` set) and Baseten (with `BASETEN_API_KEY` set).
+
+### SAM 3.1 response format
+
+SAM 3.1 is served on the Meta Model API through `POST /v1/responses` (one request per
+concept prompt, `"store": false`). The observed output format is documented in the
+`pii_guard.visual.sam` module docstring (the source of truth): a single `output_text` token
+string (`<0f>` frame marker, `<|box;...|>` pixel boxes, `<|mask;...;data=H,W,~base85|>` bitmaps;
+empty text means nothing was found, no confidence scores, one noun phrase per request).
+Configure it with `PII_GUARD_SAM_URL` (default `https://api.meta.ai/v1`), `PII_GUARD_SAM_API_KEY`
+(else `META_API_KEY`) and `PII_GUARD_SAM_MODEL` (default `sam-3.1`).
 
 ## Local segmentation
 

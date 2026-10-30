@@ -459,7 +459,7 @@ def test_api_without_vault_falls_back_to_opaque_unless_labels_is_asked() -> None
         default = post_card(http)
         explicit = post_card(http, render="labels")
     assert default.status_code == 200 and default.json()["render"] == "opaque"
-    assert explicit.status_code == 500  # like every vault endpoint without a key
+    assert explicit.status_code == 503  # like every vault endpoint without a key
     assert explicit.json()["error"]["code"] == "vault_not_configured"
 
 

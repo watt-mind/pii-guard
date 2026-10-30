@@ -324,6 +324,19 @@ class EntryOut(BaseModel):
     variant_of: str | None = Field(
         description="The placeholder this one is a casing or layout variant of, if any."
     )
+    detector: str | None = Field(
+        default=None,
+        description="The detector of the first span that created the entry (`null` when unknown).",
+    )
+    first_seen: float | None = Field(
+        default=None,
+        description="Vault-clock seconds of the first masked occurrence (`null` before the "
+        "entry's first occurrence).",
+    )
+    last_seen: float | None = Field(
+        default=None,
+        description="Vault-clock seconds of the latest masked occurrence.",
+    )
     hint: str = Field(
         description="A redacted hint of the value: first letter and length of each word, the "
         "last two digits of a number. Never the value.",
@@ -444,6 +457,9 @@ def _entry(item: EntryView, reveal: bool) -> dict[str, Any]:
         "count": item.count,
         "forms": len(item.forms),
         "variant_of": item.variant_of,
+        "detector": item.detector,
+        "first_seen": item.first_seen,
+        "last_seen": item.last_seen,
         "hint": hint(item.original, item.entity_type),
     }
     if reveal:
@@ -460,6 +476,9 @@ def _pending(item: KnownView, reveal: bool) -> dict[str, Any]:
         "count": 0,
         "forms": 0,
         "variant_of": None,
+        "detector": None,
+        "first_seen": None,
+        "last_seen": None,
         "hint": hint(item.value, item.entity_type),
     }
     if reveal:

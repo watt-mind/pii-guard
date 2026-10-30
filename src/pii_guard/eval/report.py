@@ -4,7 +4,8 @@ Layout (``schema_version`` 1)::
 
     {"schema_version": 1,
      "meta": {"commit", "dirty", "dirty_paths", "pii_guard_version", "generated_at", "detectors",
-              "skipped_detectors", "languages", "fixtures": [{"path", "sha256", "documents"}]},
+              "skipped_detectors", "languages", "fixtures": [{"path", "sha256", "documents"}],
+              "usage": {...}},  # only when a detector meters requests (the LLM detector)
      "overall": <block>,
      "languages": {"hu": <block>, "en": <block>}}
 
@@ -16,7 +17,7 @@ from __future__ import annotations
 
 import subprocess
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ __all__ = [
     "build_scorecard",
     "git_commit",
     "git_dirty_paths",
+    "price_usage",
     "render_markdown",
 ]
 
@@ -100,8 +102,15 @@ def build_scorecard(
     fixture_paths: Sequence[str | Path] = (),
     languages: Sequence[str] | None = None,
     commit: tuple[str, bool] | None = None,
+    usage: Mapping[str, Mapping[str, int]] | None = None,
+    price: Mapping[str, float | None] | None = None,
 ) -> dict[str, Any]:
-    """The JSON scorecard: metadata, an overall block and one block per language."""
+    """The JSON scorecard: metadata, an overall block and one block per language.
+
+    ``usage`` is :meth:`pii_guard.eval.scorer.DetectorAnalyzer.usage`; when it names a
+    detector, ``meta.usage`` is added, priced with ``price`` (USD per 1M tokens: ``input``,
+    ``cached``, ``output``) when that has an input or output rate.
+    """
     if commit is None:
         commit_hash, dirty = git_commit()
         dirty_paths = git_dirty_paths() if dirty else []
@@ -114,7 +123,7 @@ def build_scorecard(
     for path in fixture_paths:
         path = Path(path)
         fixtures.append({"path": str(path), "sha256": file_sha256(path)})
-    return {
+    card: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "meta": {
             "commit": commit_hash,
@@ -129,6 +138,58 @@ def build_scorecard(
         },
         "overall": summarize(results),
         "languages": {lang: summarize(by_language[lang]) for lang in sorted(by_language)},
+    }
+    if usage:
+        card["meta"]["usage"] = usage_block(usage, messages=len(results), price=price)
+    return card
+
+
+def usage_block(
+    usage: Mapping[str, Mapping[str, int]],
+    *,
+    messages: int,
+    price: Mapping[str, float | None] | None = None,
+) -> dict[str, Any]:
+    """``meta.usage``: per-detector counters, their total, the refusal rate and the cost."""
+    detectors = {name: dict(counters) for name, counters in usage.items()}
+    total: dict[str, int] = {}
+    for counters in detectors.values():
+        for key, value in counters.items():
+            total[key] = total.get(key, 0) + value
+    requests = total.get("requests", 0)
+    block: dict[str, Any] = {
+        "messages": messages,
+        "detectors": detectors,
+        "total": total,
+        "refusal_rate": total.get("refusals", 0) / requests if requests else None,
+    }
+    if price and (price.get("input") is not None or price.get("output") is not None):
+        block["cost"] = price_usage(total, messages=messages, price=price)
+    return block
+
+
+def price_usage(
+    total: Mapping[str, int], *, messages: int, price: Mapping[str, float | None]
+) -> dict[str, Any]:
+    """Dollar cost of ``total`` token counts at ``price`` (USD per 1M tokens).
+
+    A missing ``cached`` rate falls back to the ``input`` rate; a missing rate is 0.
+    """
+    rate_in = float(price.get("input") or 0.0)
+    cached_rate = price.get("cached")
+    rate_cached = rate_in if cached_rate is None else float(cached_rate)
+    rate_out = float(price.get("output") or 0.0)
+    prompt = total.get("prompt_tokens", 0)
+    cached = min(total.get("cached_tokens", 0), prompt)
+    usd = (
+        (prompt - cached) * rate_in
+        + cached * rate_cached
+        + total.get("completion_tokens", 0) * rate_out
+    ) / 1_000_000
+    return {
+        "usd": usd,
+        "usd_per_1k_messages": usd / messages * 1000 if messages else None,
+        "prices_per_1m_tokens": {"input": rate_in, "cached": rate_cached, "output": rate_out},
     }
 
 
@@ -207,6 +268,26 @@ def _type_rows(block: dict[str, Any]) -> list[str]:
     return rows
 
 
+def _usage_line(block: Mapping[str, Any]) -> str:
+    total = block["total"]
+    parts = [
+        f"{total.get('requests', 0)} requests",
+        f"{total.get('prompt_tokens', 0)} prompt tokens ({total.get('cached_tokens', 0)} cached)",
+        f"{total.get('completion_tokens', 0)} completion tokens "
+        f"({total.get('reasoning_tokens', 0)} reasoning)",
+        f"{total.get('invalid_outputs', 0)} invalid outputs",
+        f"{total.get('refusals', 0)} refusals ({fmt_pct(block.get('refusal_rate'), sign=True)})",
+    ]
+    cost = block.get("cost")
+    if cost:
+        per_1k = cost["usd_per_1k_messages"]
+        parts.append(
+            f"${cost['usd']:.4f} total, "
+            + (f"${per_1k:.4f} per 1k messages" if per_1k is not None else "n/a per 1k messages")
+        )
+    return f"- LLM usage over {block['messages']} messages: " + ", ".join(parts)
+
+
 def render_markdown(scorecard: dict[str, Any]) -> str:
     """The scorecard as Markdown: a summary per language and overall, then per entity type."""
     meta = scorecard["meta"]
@@ -223,6 +304,8 @@ def render_markdown(scorecard: dict[str, Any]) -> str:
         lines.append(f"- fixtures: `{fixture['path']}` sha256 `{fixture['sha256'][:16]}`")
     if meta["languages"]:
         lines.append(f"- language filter: {', '.join(meta['languages'])}")
+    if meta.get("usage"):
+        lines.append(_usage_line(meta["usage"]))
     lines += [
         "",
         "All ratios in %. P/R/F1 are span-level micro averages; macro F1 is over entity types "

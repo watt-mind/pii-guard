@@ -18,93 +18,96 @@
 <text x="134" y="260.3" font-size="20" fill="#4A4A52" text-anchor="end">50%</text>
 <line x1="150" y1="170" x2="1180" y2="170" stroke="#E3E3E8" stroke-width="2"/>
 <text x="134" y="177" font-size="20" fill="#4A4A52" text-anchor="end">60%</text>
-<text x="169.1" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
-<text x="169.1" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">0ba3c1a</text>
-<text x="207.2" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
-<text x="207.2" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">62b64fc</text>
-<text x="245.4" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="245.4" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">c759b54</text>
-<text x="283.5" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="283.5" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">c611f99</text>
-<text x="321.7" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="321.7" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">5dd3c23</text>
-<text x="359.8" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="359.8" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">9fad0fa</text>
-<text x="398" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="398" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">8944f96</text>
-<text x="436.1" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="436.1" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">9ca003f</text>
-<text x="474.3" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="474.3" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">9d133c0</text>
-<text x="512.4" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="512.4" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">3d9eb8b</text>
-<text x="550.6" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="550.6" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">dd35916</text>
-<text x="588.7" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="588.7" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">7337ffa</text>
-<text x="626.9" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="626.9" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">484b7f1</text>
-<text x="665" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="665" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">910a6a2</text>
-<text x="703.1" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="703.1" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">752ff9a</text>
-<text x="741.3" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
-<text x="741.3" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">477196a</text>
-<text x="779.4" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
-<text x="779.4" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">51e9e02</text>
-<text x="817.6" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
-<text x="817.6" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">36a78e3</text>
-<text x="855.7" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
-<text x="855.7" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">ac0603d</text>
-<text x="893.9" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
-<text x="893.9" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">97ee284</text>
-<text x="932" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
-<text x="932" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">72026a5</text>
-<text x="970.2" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
-<text x="970.2" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">f93a2e1</text>
-<text x="1008.3" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
-<text x="1008.3" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">753c016</text>
-<text x="1046.5" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
-<text x="1046.5" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">540d4d6</text>
-<text x="1084.6" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
-<text x="1084.6" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">10c53ad</text>
-<text x="1122.8" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
-<text x="1122.8" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">6d02b8d</text>
-<text x="1160.9" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-30</text>
-<text x="1160.9" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">62799b5</text>
+<text x="168.4" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
+<text x="168.4" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">0ba3c1a</text>
+<text x="205.2" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-26</text>
+<text x="205.2" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">62b64fc</text>
+<text x="242" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="242" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">c759b54</text>
+<text x="278.8" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="278.8" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">c611f99</text>
+<text x="315.5" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="315.5" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">5dd3c23</text>
+<text x="352.3" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="352.3" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">9fad0fa</text>
+<text x="389.1" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="389.1" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">8944f96</text>
+<text x="425.9" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="425.9" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">9ca003f</text>
+<text x="462.7" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="462.7" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">9d133c0</text>
+<text x="499.5" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="499.5" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">3d9eb8b</text>
+<text x="536.2" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="536.2" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">dd35916</text>
+<text x="573" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="573" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">7337ffa</text>
+<text x="609.8" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="609.8" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">484b7f1</text>
+<text x="646.6" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="646.6" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">910a6a2</text>
+<text x="683.4" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="683.4" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">752ff9a</text>
+<text x="720.2" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-27</text>
+<text x="720.2" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">477196a</text>
+<text x="757" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
+<text x="757" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">51e9e02</text>
+<text x="793.8" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
+<text x="793.8" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">36a78e3</text>
+<text x="830.5" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
+<text x="830.5" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">ac0603d</text>
+<text x="867.3" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
+<text x="867.3" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">97ee284</text>
+<text x="904.1" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
+<text x="904.1" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">72026a5</text>
+<text x="940.9" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
+<text x="940.9" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">f93a2e1</text>
+<text x="977.7" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-28</text>
+<text x="977.7" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">753c016</text>
+<text x="1014.5" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
+<text x="1014.5" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">540d4d6</text>
+<text x="1051.2" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
+<text x="1051.2" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">10c53ad</text>
+<text x="1088" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
+<text x="1088" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">6d02b8d</text>
+<text x="1124.8" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-29</text>
+<text x="1124.8" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">f7b384f</text>
+<text x="1161.6" y="704" font-size="20" fill="#4A4A52" text-anchor="middle">2026-10-30</text>
+<text x="1161.6" y="730" font-size="20" fill="#4A4A52" text-anchor="middle">62799b5</text>
 <line x1="150" y1="670" x2="1180" y2="670" stroke="#8A8A93" stroke-width="2"/>
-<path d="M358,323.2H396.1V323.2H434.3V323.2H472.4V323.2H510.6V323.2H548.7V323.2H586.9V323.2H625V670H663.1V670H701.3V670H739.4V670H777.6V670H815.7V670H853.9V670H892V670H930.2V670H968.3V670H1006.5V670H1044.6V670H1082.8V670H1120.9V670H1200.9" fill="none" stroke="#1B1B1F" stroke-width="3" stroke-dasharray="10 7"/>
-<path d="M169.1,243.5L207.2,243.5L283.5,243.5L398,323.2L436.1,323.2L474.3,323.2L512.4,323.2L550.6,323.2L588.7,323.2L626.9,323.2L703.1,323.2L1160.9,328" fill="none" stroke="#0072B2" stroke-width="4"/>
-<circle cx="169.1" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="207.2" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="283.5" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
-<circle cx="398" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="436.1" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="474.3" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="512.4" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="550.6" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="588.7" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="626.9" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="703.1" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1160.9" cy="328" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
-<path d="M665,670L741.3,670L779.4,670L817.6,670L855.7,670L893.9,670L932,670L970.2,670L1008.3,670L1046.5,670L1084.6,670L1122.8,670L1160.9,670" fill="none" stroke="#009E73" stroke-width="4"/>
-<circle cx="665" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="741.3" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="779.4" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="817.6" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="855.7" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="893.9" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="932" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="970.2" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1008.3" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1046.5" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1084.6" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1122.8" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<circle cx="1160.9" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
-<path d="M321.7,663.8L359.8,663.8" fill="none" stroke="#D55E00" stroke-width="4"/>
-<circle cx="321.7" cy="663.8" r="11" fill="#FFFFFF" stroke="#D55E00" stroke-width="4"/>
-<circle cx="359.8" cy="663.8" r="11" fill="#FFFFFF" stroke="#D55E00" stroke-width="4"/>
-<circle cx="245.4" cy="670" r="11" fill="#FFFFFF" stroke="#CC79A7" stroke-width="4"/>
+<path d="M349.1,323.2H385.9V323.2H422.7V323.2H459.5V323.2H496.2V323.2H533V323.2H569.8V323.2H606.6V670H643.4V670H680.2V670H717V670H753.8V670H790.5V670H827.3V670H864.1V670H900.9V670H937.7V670H974.5V670H1011.2V670H1048V670H1084.8V670H1121.6V670H1201.6" fill="none" stroke="#1B1B1F" stroke-width="3" stroke-dasharray="10 7"/>
+<path d="M168.4,243.5L205.2,243.5L278.8,243.5L389.1,323.2L425.9,323.2L462.7,323.2L499.5,323.2L536.2,323.2L573,323.2L609.8,323.2L683.4,323.2L1124.8,323.2L1161.6,328" fill="none" stroke="#0072B2" stroke-width="4"/>
+<circle cx="168.4" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
+<circle cx="205.2" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
+<circle cx="278.8" cy="243.5" r="11" fill="#FFFFFF" stroke="#0072B2" stroke-width="4"/>
+<circle cx="389.1" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="425.9" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="462.7" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="499.5" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="536.2" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="573" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="609.8" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="683.4" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1124.8" cy="323.2" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1161.6" cy="328" r="11" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
+<path d="M646.6,670L720.2,670L757,670L793.8,670L830.5,670L867.3,670L904.1,670L940.9,670L977.7,670L1014.5,670L1051.2,670L1088,670L1161.6,670" fill="none" stroke="#009E73" stroke-width="4"/>
+<circle cx="646.6" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="720.2" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="757" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="793.8" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="830.5" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="867.3" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="904.1" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="940.9" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="977.7" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1014.5" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1051.2" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1088" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="1161.6" cy="670" r="11" fill="#009E73" stroke="#FFFFFF" stroke-width="3"/>
+<path d="M315.5,663.8L352.3,663.8" fill="none" stroke="#D55E00" stroke-width="4"/>
+<circle cx="315.5" cy="663.8" r="11" fill="#FFFFFF" stroke="#D55E00" stroke-width="4"/>
+<circle cx="352.3" cy="663.8" r="11" fill="#FFFFFF" stroke="#D55E00" stroke-width="4"/>
+<circle cx="242" cy="670" r="11" fill="#FFFFFF" stroke="#CC79A7" stroke-width="4"/>
 <circle cx="1230" cy="180" r="10" fill="#0072B2" stroke="#FFFFFF" stroke-width="3"/>
 <text x="1250" y="187" font-size="20" fill="#1B1B1F" font-weight="600">rules (default)</text>
 <text x="1250" y="213" font-size="19" fill="#4A4A52">latest 41.0% leak</text>
@@ -122,5 +125,5 @@
 <text x="56" y="780" font-size="20" fill="#4A4A52">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), de + en + hu pooled (micro-averaged); one configuration at one commit merged.</text>
 <text x="56" y="810" font-size="20" fill="#4A4A52">Hollow: run on an earlier fixture file or on fewer languages (other documents), not comparable with filled points or the best line.</text>
 <text x="56" y="840" font-size="20" fill="#4A4A52">The default pipeline (rules only) finds no names by design; names come from the NER and LLM stages.</text>
-<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-26 to 2026-10-30 · 27 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#4A4A52">Runs 2026-10-26 to 2026-10-30 · 28 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>

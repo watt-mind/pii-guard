@@ -38,6 +38,42 @@ where.
 The corpus is split into **train** (for fine-tuning the LLM detector), **dev** and **test**.
 The test split is never used for training or prompt tuning.
 
+### Generating the corpus
+
+`pii-guard eval generate` (also `python -m pii_guard.eval.generate`) plans each document
+deterministically from `(seed, language, index)`, asks the model to write it, locates the
+values and writes labeled JSONL:
+
+```bash
+# Print the first prompt without calling a model
+uv run pii-guard eval generate --language hu --n 1 --seed 42 --dry-run
+# 200 Hungarian documents, split 70/15/15 into eval/generated/{train,dev,test}
+uv run pii-guard eval generate --language hu --n 200 --seed 42 --out eval/generated/
+# A single file, two templates only, with run statistics
+uv run pii-guard eval generate --language en --n 10 --seed 1 --kinds invoice,letter \
+  --out eval/fixtures/en-synth.jsonl --stats eval/generated/en-stats.json
+```
+
+- **Endpoint.** Any OpenAI-compatible Chat Completions endpoint. `PII_GUARD_CORPUS_URL`
+  (default the Meta Model API), `PII_GUARD_CORPUS_API_KEY` (falls back to `META_API_KEY`) and
+  `PII_GUARD_CORPUS_MODEL` (default `muse-spark-1.3-contributor`, allowed only because the
+  data is fictional: see [models.md](models.md)); `--base-url`, `--api-key-env` and `--model`
+  override them.
+- **Reproducible.** Raw model output is cached under `eval/generated/cache` by a hash of the
+  request, so a rerun with the same seed rebuilds the corpus byte for byte without a model
+  call (`--no-cache` skips the cache). Other flags: `--start`, `--split`, `--workers`,
+  `--reasoning-effort`, `--temperature`, `--max-tokens`.
+- **Consistent documents.** People in one document never share a full name, surname or
+  given name (mothers included), so a name part used alone points at one person. When a
+  template has a property and a land registry office or court, the office sits in the
+  property's own town.
+- **Discards** (a value the model left out, an identifier it invented, empty or truncated
+  output) are counted by reason in the statistics and never hand-fixed.
+- `GENERATOR_VERSION` (in the run metadata as `pii_guard.eval.generate/<n>`) changes whenever
+  the same seed would plan different documents. The committed `*-synth-sample.jsonl`
+  fixtures stay at the version that wrote them: they are a pinned benchmark that the run
+  records and the tables below refer to, so they are regenerated only on purpose.
+
 ## Metrics
 
 | Metric | Definition |
@@ -175,10 +211,16 @@ Every run worth keeping becomes one **run record**: `eval/results/runs/<YYYY-MM-
 specified by the JSON Schema `eval/results/schema/run.schema.json` (`schema_version` 1) and
 validated in the tests. A record says:
 
-- **what ran**: the system (`family` `pii-guard` or comparison, `tool`, `version`), each
+- **what ran**: the system (`family` `pii-guard` or comparison, `role`, `tool`, `version`), each
   detector with its `model`, `model_ref`, `revision`, `settings` (reasoning strength, mode,
   thresholds) and `serving`, and a derived `system.key` such as `rules+ner:xlmr-base-ft-s7` or
   `rules+llm:muse-glimmer@reasoning_strength=low` that groups runs of the same configuration;
+  `role` is `own` (a PII Guard configuration), `other-model` (another organisation's model run
+  through PII Guard's pipeline, alone or in place of its NER: bardsai, tabularisai,
+  Horizon-Labs, Wismut, Davlan, GLiNER zero-shot) or `tool` (a comparison tool). It is derived
+  from the detectors' models (`pii_guard.eval.record.system_role`), so a "best PII Guard
+  configuration" never picks someone else's model; `python -m pii_guard.eval.rescore`
+  backfills it on older records;
 - **on what**: each fixture file with its SHA-256, language, fixture set (`smoke`,
   `synth-sample` …), `origin` (`hand-written`, `generated` with the generator model, or
   `specimens`) and document count;
@@ -490,8 +532,13 @@ under another label (a tax number caught as `PHONE_NUMBER`, say).
 ### Reading the numbers
 
 - The **Muse-generated** fixtures (`*-synth-sample.jsonl`) were written by the same model
-  family PII Guard's LLM detector uses, which flatters Muse-based detection. The hand-written
-  smoke sets don't have that bias.
+  family PII Guard's LLM detector uses, which flatters Muse-based detection (`rules,llm`).
+  The hand-written smoke sets and the public Ai4Privacy rows don't have that bias. A
+  non-Muse writer was considered (LAB-1105) and not adopted for now: the generator already
+  takes any OpenAI-compatible endpoint (`--base-url`, `--model`), but the production path is
+  the encoder NER, which this bias doesn't flatter, and the project runs on free credits
+  only. Read `rules,llm` scores on the synth samples as an upper bound; to check the bias,
+  regenerate with another writer and compare.
 - The fixture sets are small (51 smoke, 30 synthetic documents): differences of a few
   points are noise.
 - `pii-guard rules` is the rules-only pass, with no name detection; names come from the NER

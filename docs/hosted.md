@@ -197,6 +197,9 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_MAX_IMAGE_BYTES`, `PII_GUARD_HOSTED_IMAGE_MAX_PIXELS` | Defaults 4 MiB decoded and 8 MP, checked before OCR |
 | `PII_GUARD_HOSTED_IMAGE_TIMEOUT` | Default 60 s per image; one image job per replica, a busy replica answers `429` |
 | `PII_GUARD_HOSTED_USER_IMAGES_PER_DAY`, `PII_GUARD_HOSTED_GLOBAL_IMAGES_PER_DAY` | Defaults 20 and 500, reserved before work, never refunded |
+| `PII_GUARD_HOSTED_CHAT_IMAGES` | Default `false`. With hosted images on, a signed-in Google owner's direct chat or Responses call on their own connection may carry inline images; the sponsored route, guard API keys and endpoint paths stay text-only |
+| `PII_GUARD_HOSTED_CHAT_MAX_IMAGES` | Default 1 (at most 4) inline images per chat request; the chat body limit grows by that many base64 images, and a body without one keeps the text limit |
+| `PII_GUARD_HOSTED_IMAGE_INPUT_TOKENS` | Default 16,384 provider input tokens reserved per chat image, plus 32 KiB for its masked transcript; the image bytes are never charged as text tokens |
 | `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
 | `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |
@@ -279,7 +282,13 @@ Before `enable`, point the public `guard` CNAME at `<appName>.<environmentDomain
 resolution (no proxy during certificate validation), and create TXT `asuid.guard` from the app's
 `properties.customDomainVerificationId` after staging. These are public domain-verification
 records, not credentials. Run `deploy/azure/deploy.sh bind-domain` as the operator to add the hostname and request/bind
-a platform-managed certificate using CNAME validation. App release preserves that binding and
+a platform-managed certificate using CNAME validation. `bind-domain` is re-runnable: it
+skips `hostname add` when the hostname is already in
+`properties.configuration.ingress.customDomains`, then binds, so a re-run after a
+successful bind is a no-op success. Managed-cert issuance needs public reachability from
+DigiCert DCV IPs: if the first `bind-domain` ran while ingress was still internal, the
+certificate stays Pending until ingress goes external; re-run `bind-domain` once it is
+public to complete the binding. App release preserves that binding and
 runs the canonical HTTPS smoke during `enable`. Certificate issuance may take time; a failed
 enablement attempts to restore internal ingress. Verify DNS propagation,
 certificate subject/expiry and the HTTPS callback before retrying. Keep the canonical origin and

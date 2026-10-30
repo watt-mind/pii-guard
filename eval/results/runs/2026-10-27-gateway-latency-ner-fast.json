@@ -22,6 +22,7 @@
     "key": "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled",
     "label": "pii-guard gateway, fast mode (rules + ner pii-guard-ner-xlmr-large-distilled)",
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": "0.1.0",
     "detectors": [

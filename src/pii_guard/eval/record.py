@@ -46,9 +46,11 @@ __all__ = [
     "merge_extra",
     "rate_errors",
     "system_key",
+    "system_role",
     "text_metrics",
     "validate",
     "visual_metrics",
+    "with_role",
     "write_records",
 ]
 
@@ -238,6 +240,54 @@ def system_key(system: Mapping[str, Any]) -> str:
     return "+".join(parts) or "none"
 
 
+#: Roles a system can have (``system.role``): pii-guard's own configuration, someone else's
+#: model run through pii-guard's pipeline, or a comparison tool (LAB-1495).
+ROLES = ("own", "other-model", "tool")
+
+#: NER models of other organisations, by the ``model`` name run records give them (short
+#: names and Hugging Face ids). pii-guard's own checkpoints and fine-tunes are not here.
+OTHER_MODELS = frozenset(
+    {
+        "bardsai-v1-fallback",
+        "bardsai-v3",
+        "bardsai/eu-pii-anonimization-multilang",
+        "eu-pii-anonimization-multilang",
+        "eu-pii-safeguard",
+        "horizon-base",
+        "horizon-small",
+        "wismut-nym",
+        "xlm-roberta-base-ner-hrl",
+        "xlmr-ner-hrl",
+        "gliner-multi-v2.1",
+    }
+)
+
+
+def system_role(system: Mapping[str, Any]) -> str:
+    """``tool`` for a comparison tool; ``other-model`` when every NER detector of a pii-guard
+    system runs another organisation's model (:data:`OTHER_MODELS`), alone or in place of
+    pii-guard's NER; ``own`` otherwise (rules, pii-guard's NER, the LLM detector, or
+    pii-guard's NER in union with another model).
+    """
+    if system.get("family") == "comparison":
+        return "tool"
+    ner = [d for d in system.get("detectors", []) if str(d.get("name", "")).startswith("ner")]
+    if ner and all(d.get("model") in OTHER_MODELS for d in ner):
+        return "other-model"
+    return "own"
+
+
+def with_role(system: dict[str, Any], role: str | None = None) -> dict[str, Any]:
+    """``system`` with ``role`` (computed when not given) placed right after ``family``."""
+    role = role or system_role(system)
+    items = [(k, v) for k, v in system.items() if k != "role"]
+    at = next((i + 1 for i, (k, _) in enumerate(items) if k == "family"), len(items))
+    items.insert(at, ("role", role))
+    system.clear()
+    system.update(items)
+    return system
+
+
 def _default_label(system: Mapping[str, Any]) -> str:
     if system.get("family") == "comparison":
         return str(system["tool"])
@@ -383,6 +433,8 @@ def merge_extra(record: dict[str, Any], extra: Mapping[str, Any] | None) -> dict
         system["key"] = system_extra.get("key") or system_key(system)
     if "label" in system_extra or not explicit_label:
         system["label"] = system_extra.get("label") or _default_label(system)
+    if "role" in system or "role" in system_extra:
+        with_role(system, system_extra.get("role"))
     if notes_extra:
         record["notes"] = [*record["notes"], *notes_extra]
     return record
@@ -418,6 +470,7 @@ def _base_record(
 ) -> dict[str, Any]:
     system.setdefault("key", system_key(system))
     system.setdefault("label", _default_label(system))
+    with_role(system, system.get("role"))
     sets = sorted({f["set"] for f in fixtures}) or ["unknown"]
     return {
         "schema_version": RECORD_SCHEMA_VERSION,

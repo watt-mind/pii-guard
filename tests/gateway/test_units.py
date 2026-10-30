@@ -452,6 +452,21 @@ def test_chat_gutter_multiline_mask_never_restores_original_text() -> None:
     assert "Jane" not in message["content"] and "Placeholder" not in message["content"]
 
 
+def test_cache_hit_preserves_forced_by_and_masked_type() -> None:
+    """LAB-1248: the span cache stores ``forced_by`` (the fail-closed override), and a hit
+    restores both it and the masked type. Types only: the cache still holds no values."""
+    cache = DetectionCache(2)
+    text = "Teszt Elek írt a Kft.-ről"
+    span = Span(0, 10, EntityType.PERSON, "Teszt Elek", 0.9, "llm", forced_by="llm")
+    key = cache.key("s1", "hu", "audit", text)
+    cache.put(key, [span])
+    assert "Teszt" not in repr(cache._data)
+    (hit,) = cache.get(key, text) or []
+    assert hit.entity_type is EntityType.PERSON
+    assert hit.forced_by == "llm"
+    assert hit == span
+
+
 @pytest.mark.parametrize(
     "text",
     [
