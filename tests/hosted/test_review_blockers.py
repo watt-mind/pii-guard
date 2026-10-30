@@ -29,7 +29,7 @@ from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT, check_upstream_pay
 from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.egress import EgressPolicyError, _check_addresses
 from pii_guard.hosted.identity import ApiKeyStore, IdentityError, Principal
-from pii_guard.hosted.middleware import MAX_TOOL_DEFINITIONS, MAX_TOOL_NAMESPACE_DEPTH
+from pii_guard.hosted.middleware import MAX_TOOL_DEFINITIONS
 from pii_guard.hosted.quotas import (
     DEFAULT_INPUT_MICRODOLLARS_PER_TOKEN,
     DEFAULT_OUTPUT_MICRODOLLARS_PER_TOKEN,
@@ -651,7 +651,6 @@ def test_sponsored_namespace_tool_text_is_still_masked(make_client: Any) -> None
         [_namespace("muse", [{"type": "file_search", "vector_store_ids": ["vs_synthetic"]}])],
         [_namespace("muse", [{"type": "code_interpreter", "container": {"type": "auto"}}])],
         [_namespace("muse", [{"type": "computer_use_preview"}])],
-        [_namespace("outer", [_namespace("inner", [{"type": "mcp", "server_label": "x"}])])],
         [_namespace("muse", [_function("read_file"), "web_search"])],
         [_namespace("muse", "web_search")],
         [{"type": "namespace", "name": "muse"}],
@@ -700,8 +699,6 @@ def _nested(depth: int) -> list[Any]:
 @pytest.mark.parametrize(
     ("tools", "allowed"),
     [
-        (_nested(MAX_TOOL_NAMESPACE_DEPTH), True),
-        (_nested(MAX_TOOL_NAMESPACE_DEPTH + 1), False),
         # Bare definitions keep the body under the hosted size limit.
         ([_namespace("m", [{"type": "function", "name": "t"}] * (MAX_TOOL_DEFINITIONS - 1))], True),
         ([_namespace("m", [{"type": "function", "name": "t"}] * MAX_TOOL_DEFINITIONS)], False),
@@ -716,13 +713,170 @@ def test_sponsored_tool_walk_is_bounded(make_client: Any, tools: list[Any], allo
         headers=auth(),
     )
     if allowed:
-        # Past the hosted check; the gateway's own walk may still refuse deep nesting (400).
-        assert response.status_code != 403, response.text
+        assert response.status_code == 200, response.text
         return
     assert response.status_code == 403, response.text
     assert "tool definitions" in response.json()["error"]["message"]
     assert calls == []
     assert client.app.state.hosted.quotas._spent_today == 0
+
+
+# --- LAB-1659: tool_choice, nested namespaces and malformed tool types --------------------
+
+
+def _sponsored_body(path: str, **extra: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {"model": "muse-spark-1.3", **extra}
+    if path == "/v1/responses":
+        body["input"] = "Hello"
+    else:
+        body["messages"] = [{"role": "user", "content": "Hello"}]
+    return body
+
+
+def _assert_refused_before_admission(
+    client: Any, calls: list[Any], response: httpx.Response, message: str
+) -> None:
+    assert response.status_code == 403, response.text
+    error = response.json()["error"]
+    assert error["code"] == "hosted_request_denied"
+    assert error["message"] == message
+    assert calls == []
+    assert client.app.state.hosted.quotas._spent_today == 0
+
+
+_PROVIDER_TOOLS = "Provider-side tools are not allowed for sponsored requests"
+
+
+@pytest.mark.parametrize("path", ["/v1/responses", "/v1/chat/completions"])
+@pytest.mark.parametrize(
+    "tool_choice",
+    [
+        {"type": "web_search_preview"},
+        {"type": "mcp", "server_label": "x"},
+        {"type": "file_search"},
+        {"type": "allowed_tools", "mode": "auto", "tools": [{"type": "mcp", "server_label": "x"}]},
+        {"type": "allowed_tools", "mode": "auto", "tools": [{"type": "web_search"}]},
+        {"type": "allowed_tools", "mode": "auto", "tools": ["web_search"]},
+        {"type": "allowed_tools", "mode": "auto", "tools": [{"type": ["function"]}]},
+        {"type": "allowed_tools", "mode": "auto"},
+        {"type": ["function"]},
+        {"name": "lookup"},
+        "web_search",
+        ["auto"],
+        7,
+        None,
+    ],
+)
+def test_sponsored_requests_refuse_provider_tool_choice(
+    make_client: Any, path: str, tool_choice: Any
+) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return echo(request)
+
+    client = make_client(handler)
+    response = client.post(
+        path, json=_sponsored_body(path, tool_choice=tool_choice), headers=auth()
+    )
+    _assert_refused_before_admission(client, calls, response, _PROVIDER_TOOLS)
+
+
+@pytest.mark.parametrize(
+    "tool_choice",
+    [
+        "auto",
+        "none",
+        "required",
+        {"type": "function", "name": "lookup"},
+        {"type": "custom", "name": "lookup"},
+        {
+            "type": "allowed_tools",
+            "mode": "auto",
+            "tools": [{"type": "function", "name": "lookup"}, {"type": "custom", "name": "x"}],
+        },
+    ],
+)
+def test_sponsored_responses_accept_client_tool_choice(make_client: Any, tool_choice: Any) -> None:
+    seen: list[dict[str, Any]] = []
+    client = make_client(_responses_upstream(seen))
+    body = _sponsored_body(
+        "/v1/responses", tools=[_function("lookup")], tool_choice=tool_choice, store=False
+    )
+    response = client.post("/v1/responses", json=body, headers=auth())
+    assert response.status_code == 200, response.text
+    assert seen[0]["tool_choice"] == tool_choice
+
+
+@pytest.mark.parametrize(
+    "tool_choice", ["auto", "required", {"type": "function", "function": {"name": "lookup"}}]
+)
+def test_sponsored_chat_completions_accept_client_tool_choice(
+    make_client: Any, tool_choice: Any
+) -> None:
+    client = make_client()
+    tools = [{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}]
+    body = _sponsored_body("/v1/chat/completions", tools=tools, tool_choice=tool_choice)
+    response = client.post("/v1/chat/completions", json=body, headers=auth())
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize(
+    "tools",
+    [
+        _nested(2),
+        _nested(4),
+        _nested(5),
+        [_namespace("outer", [_namespace("inner", [{"type": "mcp", "server_label": "x"}])])],
+        [_namespace("outer", [_function("read_file"), _namespace("inner", [])])],
+    ],
+)
+def test_sponsored_responses_refuse_nested_namespaces(make_client: Any, tools: list[Any]) -> None:
+    calls: list[dict[str, Any]] = []
+    client = make_client(_responses_upstream(calls))
+    response = client.post(
+        "/v1/responses", json=_sponsored_body("/v1/responses", tools=tools), headers=auth()
+    )
+    _assert_refused_before_admission(
+        client,
+        calls,
+        response,
+        "Namespace tools cannot hold other namespaces in sponsored requests",
+    )
+
+
+def test_sponsored_responses_accept_one_namespace_level(make_client: Any) -> None:
+    seen: list[dict[str, Any]] = []
+    client = make_client(_responses_upstream(seen))
+    body = _sponsored_body("/v1/responses", tools=_nested(1), store=False)
+    response = client.post("/v1/responses", json=body, headers=auth())
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize("path", ["/v1/responses", "/v1/chat/completions"])
+@pytest.mark.parametrize(
+    "tools",
+    [
+        [{"type": ["function"], "name": "lookup"}],
+        [{"type": {"name": "function"}, "name": "lookup"}],
+        [{"type": 1, "name": "lookup"}],
+        [{"type": None, "name": "lookup"}],
+        [_namespace("muse", [{"type": ["function"], "name": "lookup"}])],
+    ],
+)
+def test_sponsored_requests_refuse_non_string_tool_types(
+    make_client: Any, path: str, tools: list[Any]
+) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return echo(request)
+
+    client = make_client(handler)
+    response = client.post(path, json=_sponsored_body(path, tools=tools), headers=auth())
+    _assert_refused_before_admission(client, calls, response, _PROVIDER_TOOLS)
 
 
 def test_sponsored_requests_keep_client_side_function_tools(make_client: Any) -> None:
