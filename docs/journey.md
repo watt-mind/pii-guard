@@ -15,43 +15,30 @@ latency or cost of a recommended configuration) adds its milestone as a new file
 number it: it gets the next number when it is folded into this page after the merge, so two
 pull requests that each add a milestone don't conflict (LAB-1269).
 
-## Where we are (2026-10-28)
+## Where we are (2026-10-30, NER v4.2 pinned)
 
-**pii-guard cuts the share of personal data that reaches the model from about 40 % to under
-1 %, in Hungarian and English, with no refusals.** On the hand-written smoke sets, rules alone
-leak 39.6 % (Hungarian) and 46.7 % (English) of labeled values (41.6 % over all 51 documents,
-German included). Rules plus Muse Spark Open on Baseten leak 0.9 % and 0.0 %, at a median
-1.2–1.8 s and about $2–2.50 per 1,000 messages. The default fast mode, with no LLM call (rules
-plus pii-guard's own NER, v2, trained on data distilled from Muse Glimmer), leaks 0.0 % in both
-languages at tens of milliseconds per message. On a public benchmark (Ai4Privacy OpenPII, 600
-documents, milestone 24) strict mode leaks 3.9 %. Fast mode leaked 38.0 % there, and 27.6 %
-after the cue-word and detection fixes (milestones 28–31). With NER v2 (milestone 37), fast
-mode leaks 0.4 %, a result measured in-distribution. A v2 model that never saw an Ai4Privacy
-row leaks 13.8 %, and on other held-out sets the published model leaks 0.0–2.6 % (19.1 % on
-finance text) and over-masks up to 39 % ([benchmarks.md](benchmarks.md#results-per-dataset),
-[model card](../training/ner/model-card.md#evaluation)).
+**pii-guard cuts the share of personal data that reaches the model from about 40 % (rules
+alone) to 0.0 % on the hand-written set, in all four languages, with no LLM call.**
+The default fast mode is rules plus pii-guard's own NER, `v4.2` (XLM-RoBERTa base,
+published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base);
+[model card](../training/ner/model-card.md)). The NER takes 43 ms per ~400-character message on CPU (p50, the model alone;
+[measurement](../eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json)).
 
-| Language | Mode | Best configuration | Leak | F1 (overlap) | p50 latency | $ / 1k msgs | Source |
-|---|---|---|---:|---:|---:|---:|---|
-| Hungarian | strict | rules + Muse Spark Open (Baseten, `low`) | **0.9 %** | 98.4 | 1.8 s | 2.42 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md), `hu-smoke` (31 docs) |
-| English | strict | rules + Muse Spark Open (Baseten, `low`) | **0.0 %** | 97.1 | 1.2 s | 1.99 | same, `en-smoke` (10 docs) |
-| Hungarian | fast | rules + NER v2 base + hard negatives (milestone 37) | **0.0 %** | 93.3 | 18 ms (MPS), 44 ms (CPU) | no API call | [2026-10-27-ner-v2](../eval/results/2026-10-27-ner-v2/README.md), `hu-smoke` (31 docs) |
-| English | fast | same | **0.0 %** | 94.2 | 14 ms (MPS) | no API call | same, `en-smoke` (10 docs) |
-| either | none | rules only (baseline) | 39.6 % / 46.7 % | 72.3 / 64.0 | < 1 ms | no API call | [benchmarks.md](benchmarks.md#smoke), `smoke` (51 docs), run 2026-10-27 |
+Every figure below is generated from the committed run records; the full tables are the
+README's [results block](../README.md#results) and [benchmarks.md](benchmarks.md#results-by-fixture-set).
 
-The fast-mode MPS figures are per document, taken from the scorecards. The CPU figure is for
-NER only, from `training/ner/bench_latency.py`. Both were measured on an M1 Max under unrelated
-load. The previous fast default, the distilled large NER of milestone 14, leaked 0.9 % / 0.0 %
-on these sets, at a CPU p95 of 147 ms. The v2 weights are published as
-[`hdkiller/pii-guard-ner-xlmr-base`](https://huggingface.co/hdkiller/pii-guard-ner-xlmr-base)
-(release `v2.0`, LAB-1306; [model card](../training/ner/model-card.md)). Fast mode downloads
-and hash-checks them on first use, so nothing needs training
-([models.md](models.md#ner-v2-wider-labels-openpii-train-split-hard-negatives)).
+| Set | Fast mode: leak | Over-masking | Best other tool: leak / over-masking | Source |
+|---|---:|---:|---:|---|
+| Hand-written, de + en + hu + pl (62 docs) | 0.0 % | 1.3 % | PrivAiTe 13.0 % / 25.7 % | [smoke](benchmarks.md#smoke) |
+| Agent traffic, de + en + hu (990 docs) | 0.2 % | 0.7 % | PrivAiTe 2.4 % / 35.2 % | [agent-traffic](benchmarks.md#agent-traffic) |
+| Nemotron-PII (300) | 0.6 % | 1.5 % | PrivAiTe 4.0 % / 5.6 % | [nemotron-pii](benchmarks.md#nemotron-pii) |
+| CEE-PII (451) | 0.8 % (v2.0: 0.4 %) | 7.3 % | PrivAiTe 4.4 % / 59.2 % | [cee-pii](benchmarks.md#cee-pii) |
+| Gretel finance (400), dataset labels / corrected | 19.1 % / 2.4 % | 24.4 % / 24.4 % | Presidio 18.8 % / 75.4 %; corrected: PrivAiTe 13.2 % / 46.6 % | [gretel-finance](benchmarks.md#gretel-finance) |
+| pl-pii-bench (346), with the Polish pack | 4.2 % (v2.0: 3.5 %) | 10.8 % | — | [pl-pii-bench](benchmarks.md#pl-pii-bench) |
 
-Leak = share of labeled values that still appear, in any surface form, in the text the
-model would receive ([evaluation.md](evaluation.md#leak-rate-in-practice)). The smoke sets
-are small (31 + 10 + 10 documents): one leaked value is about 1 point on Hungarian and 3 on
-English.
+Audit mode (rules + NER + Muse Spark Open on Baseten) stays the opt-in upper bound and
+teacher; its runs are dated 2026-10-27 on the earlier 51-document hand-written set. The
+milestones below keep the numbers of their own day.
 
 ### Leak rate over time
 

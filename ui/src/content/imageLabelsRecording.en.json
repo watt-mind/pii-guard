@@ -1,6 +1,6 @@
 {
   "recorded": "2026-10-30",
-  "note": "scripts/record_image_labels.py: POST /v1/mask/image with render=labels on ui/public/samples/id-card-en.png (fictional specimen), configured like the hosted preview (segmenter local/YuNet, Tesseract, rules; signatures and stamps kept), in the session that masked the message. Value-free: placeholders only, no image.",
+  "note": "scripts/record_image_labels.py: POST /v1/mask/image with render=labels on ui/public/samples/id-card-en.png (fictional specimen), configured with the legacy local preview policy (segmenter local/YuNet, Tesseract, rules; signatures and stamps kept), in the session that masked the message. Value-free: placeholders only, no image.",
   "message": {
     "masked": "[[PERSON_f31df7]] is the seller. Is her ID card attached, and is it still valid?"
   },

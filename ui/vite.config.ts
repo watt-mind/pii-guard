@@ -70,6 +70,7 @@ function benchmarksIndex(): Plugin {
     const runs = join(REPO_ROOT, "eval", "results", "runs");
     for (const name of readdirSync(runs)) if (name.endsWith(".json")) ctx.addWatchFile(join(runs, name));
     ctx.addWatchFile(join(REPO_ROOT, "docs", "benchmarks", "config.json"));
+    ctx.addWatchFile(join(REPO_ROOT, "docs", "benchmarks", "colours.json"));
     cached ??= build().trim();
     return cached;
   };

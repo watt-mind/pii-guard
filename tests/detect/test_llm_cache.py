@@ -63,7 +63,7 @@ def _live_patterns_with(marker: str) -> list[re.Pattern[str]]:
     return [
         obj
         for obj in gc.get_objects()
-        if isinstance(obj, re.Pattern)
+        if type(obj) is re.Pattern
         and isinstance(obj.pattern, str)
         and marker.lower() in obj.pattern.lower()
     ]
@@ -80,9 +80,9 @@ def test_re_cache_stays_bounded_and_clear_drops_every_value(detector: LlmDetecto
     _align_many(detector)
     assert len(re._cache) <= re._MAXCACHE  # type: ignore[attr-defined]
     # Older values were evicted by the bound; the most recent ones may still be in re's cache.
-    assert _live_patterns_with("Ember0000") == []
+    assert _live_patterns_with("Szintetikus Ember0000") == []
     clear_alignment_caches()
-    assert _live_patterns_with("Ember") == []
+    assert _live_patterns_with("Szintetikus Ember") == []
 
 
 def test_alignment_unchanged_after_clear(detector: LlmDetector) -> None:

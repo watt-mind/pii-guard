@@ -249,8 +249,10 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
     const toolSets = new Set(INDEX.snapshots.filter((s) => INDEX.systems[s.system]?.family === "comparison").map((s) => s.fixture_set));
     const expected = Object.keys(INDEX.fixture_sets).filter((k) => fastSets.has(k) && toolSets.has(k) && INDEX.fixture_sets[k]!.origin !== "generated");
     const table = within(section).getByRole("table");
-    const names = within(table).getAllByRole("rowheader").map((h) => within(h).getByRole("button").getAttribute("title"));
-    expect(names.sort()).toEqual([...expected].sort());
+    await waitFor(() => {
+      const names = within(table).getAllByRole("rowheader").map((h) => within(h).getByRole("button").getAttribute("title"));
+      expect(names.sort()).toEqual([...expected].sort());
+    });
     // Numbers come from the index: fast mode's pooled leak on a public set.
     const other = expected.find((k) => k !== INDEX.headline_set)!;
     const row = within(table).getAllByRole("row").find((r) => within(r).queryByRole("button", { name: new RegExp(other) }))!;
@@ -262,9 +264,9 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
   it("names the production system briefly and marks it in the chart", async () => {
     const { panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });
-    expect(rowNames(resultsTable(panel))).toContain("rules + NER v2.0");
+    expect(rowNames(resultsTable(panel))).toContain("rules + NER v4.2");
     const chart = within(panel).getByRole("region", { name: "Leak rate vs latency" });
-    const legend = within(chart).getAllByRole("listitem").find((li) => /^rules \+ NER v2\.0/.test(li.textContent ?? ""));
+    const legend = within(chart).getAllByRole("listitem").find((li) => /^rules \+ NER v4\.2/.test(li.textContent ?? ""));
     expect(legend).toHaveTextContent(/fast mode/);
     expect(within(chart).getByText(/p50 to p95/)).toBeInTheDocument();
   });

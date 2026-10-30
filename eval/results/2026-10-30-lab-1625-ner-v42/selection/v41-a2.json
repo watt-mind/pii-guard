@@ -1,0 +1,98 @@
+{
+  "candidate": "v41-a2",
+  "model": "models/ner/pii-guard-ner-xlmr-base-v41-a2",
+  "all": {
+    "documents": 685,
+    "values": 1868,
+    "leaked": 3,
+    "leak": 0.16,
+    "masked": 2143,
+    "over_masked": 216,
+    "over": 10.08,
+    "leaked_by_type": {
+      "PERSON": 3
+    },
+    "over_masked_by_type": {
+      "PERSON": 5,
+      "PHONE": 10,
+      "DATE_OF_BIRTH": 130,
+      "NATIONAL_ID_HU_TAX": 8,
+      "NATIONAL_ID_HU_TAJ": 9,
+      "ID_DOCUMENT": 46,
+      "BANK_ACCOUNT": 8
+    }
+  },
+  "wall_s": 37.0,
+  "slices": {
+    "base": {
+      "documents": 135,
+      "values": 507,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 536,
+      "over_masked": 0,
+      "over": 0,
+      "leaked_by_type": {},
+      "over_masked_by_type": {}
+    },
+    "de-genitive": {
+      "documents": 200,
+      "values": 690,
+      "leaked": 2,
+      "leak": 0.29,
+      "masked": 693,
+      "over_masked": 5,
+      "over": 0.72,
+      "leaked_by_type": {
+        "PERSON": 2
+      },
+      "over_masked_by_type": {
+        "PERSON": 5
+      }
+    },
+    "hu-surname-given": {
+      "documents": 80,
+      "values": 139,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 172,
+      "over_masked": 0,
+      "over": 0,
+      "leaked_by_type": {},
+      "over_masked_by_type": {}
+    },
+    "dates": {
+      "documents": 180,
+      "values": 399,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 531,
+      "over_masked": 132,
+      "over": 24.86,
+      "leaked_by_type": {},
+      "over_masked_by_type": {
+        "DATE_OF_BIRTH": 130,
+        "BANK_ACCOUNT": 2
+      }
+    },
+    "numbers": {
+      "documents": 90,
+      "values": 133,
+      "leaked": 1,
+      "leak": 0.75,
+      "masked": 211,
+      "over_masked": 79,
+      "over": 37.44,
+      "leaked_by_type": {
+        "PERSON": 1
+      },
+      "over_masked_by_type": {
+        "PHONE": 10,
+        "NATIONAL_ID_HU_TAX": 8,
+        "NATIONAL_ID_HU_TAJ": 9,
+        "ID_DOCUMENT": 46,
+        "BANK_ACCOUNT": 6
+      }
+    }
+  }
+}

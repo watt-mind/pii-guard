@@ -112,8 +112,10 @@ spend. This is a secondary abuse signal, without an external CAPTCHA or bot-proo
 
 ## Modes
 
-- **`fast`** is the default and the production path: rules + the in-process NER, local, about
-  36 ms of detection, $0, and nothing leaves the machine. It needs no model key.
+- **`fast`** is the default and the production path: rules + the in-process NER, local, on
+  CPU, $0, and nothing leaves the machine. It needs no model key. What it adds per request is
+  measured, not estimated: see [gateway latency](benchmarks.md#gateway-latency) (the README
+  quotes one cell of it).
 - **`audit`** adds an LLM detector (Muse Spark Open on Baseten by default) to every message: a
   second opinion for sampled or offline quality checks, generating labels and teacher data for
   the NER, and the benchmark upper bound. It is not meant for production traffic: each

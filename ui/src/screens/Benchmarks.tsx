@@ -51,7 +51,7 @@ function stripTickets(text: string): string {
  * production system spells out the Hugging Face id and wraps in every table header and chart
  * label. The full label stays in tooltips and the run log (LAB-1531).
  */
-const DISPLAY_LABEL: Record<string, string> = { [FAST_MODE_SYSTEM]: "rules + NER v2.0" };
+const DISPLAY_LABEL: Record<string, string> = { [FAST_MODE_SYSTEM]: "rules + NER v4.2" };
 
 /** "rules + X in place of PII Guard NER": the "rules +" already says it, and the label wraps. */
 const shortLabel = (text: string) => stripTickets(text).replace(/ in place of PII Guard NER\b/, "");
@@ -499,7 +499,7 @@ function SystemChip({ id, info, on, onToggle }: { id: string; info: SystemInfo |
 function FastModeTag() {
   return (
     <span
-      title="Rules + the published on-device NER v2.0: the gateway's fast mode, its production path. Without a NER checkpoint, fast mode runs the rules alone."
+      title="Rules + the published on-device NER v4.2: the gateway's fast mode, its production path. Without a NER checkpoint, fast mode runs the rules alone."
       className="rounded-sm bg-guard-soft px-1 font-mono text-2xs whitespace-nowrap text-guard-ink ring-1 ring-guard/40"
     >
       fast mode
@@ -658,7 +658,7 @@ function Headline({ index, set, lang }: { index: BenchmarkIndex; set: string; la
         The best open-source tool, {h.theirs.label}, lets {pct(h.theirs)} through.
       </p>
       <p className="mt-1 max-w-4xl text-xs text-pretty text-muted">
-        {h.fastMode ? "Fast mode is the production path: rules + the published on-device NER v2.0. " : "Fast mode wasn’t run on this set. "}
+        {h.fastMode ? "Fast mode is the production path: rules + the published on-device NER v4.2. " : "Fast mode wasn’t run on this set. "}
         {set === index.headline_set && kind === "hand-written" && "This is our own hand-written regression set; the public test sets are in the table below. "}
         F1 {formatPct(h.ours.f1)} against {formatPct(h.theirs.f1)}; over-masking (masked text that wasn’t personal data) {formatPct(h.ours.over_masking)} against {formatPct(h.theirs.over_masking)}.{" "}
         {h.otherModel && (

@@ -58,20 +58,27 @@ would run, without downloading).
    If it is set and can't load, startup stops (fail closed, ADR 0006).
 2. **The published PII Guard checkpoint**, the default:
    [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
-   (`PII_GUARD_NER_PUBLISHED_MODEL`), release `v2.0` at revision
-   `95f612a9ad65cc5ade5b9248bd152020541e7097`, `model.safetensors` SHA-256
-   `4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9`, both pinned in
-   `pii_guard.detect.ner_resolve.PUBLISHED` (LAB-1306). It is NER v2 base + hard negatives
-   (LAB-1150), Apache-2.0, trained in part on Ai4Privacy OpenPII-1M (CC-BY-4.0, "Ai4Privacy /
-   Ai Suisse SA"); see [NER v2.1](#ner-v21-and-the-published-checkpoint) and its
+   (`PII_GUARD_NER_PUBLISHED_MODEL`), release `v4.2` at revision
+   `33ef18fed56abd06e8caeb4ad0268633d5346ed5`, `model.safetensors` SHA-256
+   `40e8406cc7d5be7d809d43948a46b5b5059734f044ba87f5a5a8009f041ef05d`, both pinned in
+   `pii_guard.detect.ner_resolve.PUBLISHED` (LAB-1625). It is v2.0 fine-tuned on 24 EU
+   languages (candidate B3, [results](../eval/results/2026-10-30-lab-1625-ner-v42/README.md)),
+   Apache-2.0, trained in part on Ai4Privacy OpenPII-1M (CC-BY-4.0, "Ai4Privacy / Ai Suisse
+   SA"), kiji (Apache-2.0), nym and E3 (MIT) and pii-anon (CC0-1.0); see its
    [model card](../training/ner/model-card.md). A checkpoint is never loaded unpinned: another
    repo needs `repo@revision`. It downloads like the fallback below (1.1 GB, first run only,
-   into `~/.cache/pii-guard/models/ner/watt-mind--pii-guard-ner-xlmr-base-95f612a9ad65/`).
+   into `~/.cache/pii-guard/models/ner/watt-mind--pii-guard-ner-xlmr-base-33ef18fed56a/`).
+   **Rollback to v2.0:** set `PII_GUARD_NER_PUBLISHED_MODEL` to
+   `watt-mind/pii-guard-ner-xlmr-base@95f612a9ad65cc5ade5b9248bd152020541e7097` (tag `v2.0`,
+   NER v2 base + hard negatives, LAB-1150 / LAB-1306); its weights are still checked
+   (SHA-256 `4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9`,
+   `ner_resolve.PREVIOUS_PUBLISHED`). See also
+   [NER v2.1](#ner-v21-and-the-published-checkpoint).
    The repo moved from `hdkiller/` to the `watt-mind` organization (LAB-1402) with its
-   history, so the revision is unchanged: a checked download under the old directory name,
-   `hdkiller--pii-guard-ner-xlmr-base-95f612a9ad65/`, is reused (offline and under `cached`
-   too), and `PII_GUARD_NER_PUBLISHED_MODEL` set to the old `hdkiller` id still names this
-   checkpoint.
+   history, so revisions are unchanged: a checked download under the old directory name
+   (`hdkiller--pii-guard-ner-xlmr-base-<revision>/`) is reused (offline and under `cached`
+   too), and `PII_GUARD_NER_PUBLISHED_MODEL` set to the old `hdkiller` id still names the
+   same checkpoint.
 3. **The public fallback**, a **stop-gap** used only when step 2 is turned off or replaced by
    an unpinned repo:
    [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)
@@ -329,10 +336,10 @@ config, `training_meta.json` without local values, the model card as `README.md`
 It uses the local Hugging Face login, tags the upload commit, and prints the revision and
 SHA-256 that `ner_resolve.PUBLISHED` pins. Modal spend: $2.92 of free credits.
 
-### NER v3, v3.1, v3.2 and v3.3: v2.0 stays
+### NER v3, v3.1, v3.2 and v3.3: v2.0 stayed
 
-Four later rounds tried to replace v2.0. Each used a selection rule fixed in advance, and v2.0
-is still the published model.
+Four rounds after v2.0 tried to replace it. Each used a selection rule fixed in advance, and none
+replaced it.
 
 - **v3** (LAB-1393) and **v3.1** (LAB-1410) retrained on wider mixes. Each traded one
   domain's leaks for another's, and every candidate failed the smoke leak gate
@@ -349,8 +356,27 @@ is still the published model.
   It also tried dev-calibrated thresholds on v2.0 (`training/ner/thresholds_v33.py`).
   - Every candidate failed a gate: smoke leak, smoke over-masking or inflection.
   - The fine-tunes over-masked less agent text but leaked more, and lost MAPA
-    ([v3.3 results](../eval/results/2026-10-29-ner-v33/README.md)). v2.0 is frozen as the
-    published model.
+    ([v3.3 results](../eval/results/2026-10-29-ner-v33/README.md)). v2.0 stayed the
+    published model through v3.3.
+
+### NER v4, v4.1 and v4.2: v4.2 is published
+
+- **v4** (LAB-1535) added the EU phase-1 data to v2.0. It failed the v4 gates; candidate A cut
+  the MAPA leak but lost elsewhere ([v4 results](../eval/results/2026-10-29-lab-1535-ner-v4/README.md)).
+- **v4.1** (LAB-1547) kept loose addresses out of the loss. The address and Hungarian fixes
+  worked, but birth-date over-masking on agent traffic took their place
+  ([v4.1 results](../eval/results/2026-10-30-lab-1547-ner-v41/README.md)).
+- **v4.2** (LAB-1625) added a selection split built around v4.1's failures, taught implausible
+  third-party birth-date labels as `O` and added targeted fictional data (German genitive names,
+  Hungarian surname plus inflected given name, birth dates next to other dates, reference
+  numbers). Candidate B3 (the targeted data twice) is the first since v2.0 to pass every gate
+  against v2.0: smoke leak 0.00 % and over-masking 1.09 % (v2.0 1.08 %), inflection leak
+  2.0 → 0.0 %, EU total leak 0.95 → 0.32 %, agent-traffic-dev over-masking 1.66 → 0.66 % at the
+  same leak, CPU p95 0.94× v2.0. The owner published it as `v4.2` (revision `33ef18fe`).
+  It is not better everywhere: with the rules it leaks more than v2.0 on CEE-PII (0.79 %
+  against 0.40 %) and Polish pl-pii-bench (4.24 % against 3.52 %), and on TAB court text,
+  scored locally only (5.1 % against 4.0 %); none of these is a gate
+  ([v4.2 results](../eval/results/2026-10-30-lab-1625-ner-v42/README.md)).
 
 ### NER v2.0 in every MAPA language
 

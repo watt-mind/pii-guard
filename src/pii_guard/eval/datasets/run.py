@@ -104,15 +104,19 @@ def _ner_detector() -> dict[str, Any]:
     ident = ner_identity()
     weights = ident.get("safetensors_sha256") or {}
     published = ner_resolve.PUBLISHED
-    # The published v2.0: fast mode's default choice, or a local copy of the same weights.
+    # The published release: fast mode's default choice, or a local copy of the same weights.
+    # Its model name carries the release (v2.0 records keep their old name, xlmr-base-v2-hn).
     if (
         weights.get("model.safetensors") == published.weights_sha256
         or ner_resolve.resolve().source == "published"
     ):
         return {
             "name": "ner",
-            "model": "xlmr-base-v2-hn",
-            "model_ref": f"{published.repo_id} v2.0, revision {published.revision[:12]}",
+            "model": f"xlmr-base-{ner_resolve.PUBLISHED_RELEASE}",
+            "model_ref": (
+                f"{published.repo_id} {ner_resolve.PUBLISHED_RELEASE}, "
+                f"revision {published.revision[:12]}"
+            ),
             "revision": f"sha256:{published.weights_sha256}",
             "settings": {},
             "serving": "local PyTorch",
@@ -148,8 +152,8 @@ def _llm_detector(analyzer: Any) -> dict[str, Any]:
 
 _LABELS = {
     "rules": "pii-guard rules",
-    # The published v2.0 (LAB-1150's checkpoint): the label its other records carry.
-    "fast": "pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)",
+    # The published release; v2.0 records carry "NER v2.0 (published ..., LAB-1306)".
+    "fast": "pii-guard fast, NER v4.2 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1625)",
     "audit": "pii-guard audit (rules + NER v2 + LLM)",
 }
 

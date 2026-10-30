@@ -1,0 +1,32 @@
+{
+  "pl-smoke": {
+    "documents": 11,
+    "leak": 0.0,
+    "over_masking": 0.022222,
+    "f1": 0.989691
+  },
+  "pl-pii-bench": {
+    "documents": 346,
+    "leak": 0.133333,
+    "over_masking": 0.095341,
+    "f1": 0.866969
+  },
+  "gretel-finance-corrected": {
+    "documents": 400,
+    "leak": 0.03856,
+    "over_masking": 0.244928,
+    "f1": 0.79946
+  },
+  "tab-echr": {
+    "documents": 40,
+    "leak": 0.051282,
+    "over_masking": 0.011186,
+    "f1": 0.65511
+  },
+  "mapa-eur-lex": {
+    "documents": 42,
+    "leak": 0.085135,
+    "over_masking": 0.44688,
+    "f1": 0.589285
+  }
+}

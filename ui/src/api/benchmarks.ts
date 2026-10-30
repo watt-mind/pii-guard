@@ -425,11 +425,11 @@ export function coverageTag(index: BenchmarkIndex, s: Snapshot): string | null {
 }
 
 /**
- * The system the gateway's fast mode runs: rules + the published on-device NER v2.0
- * (`watt-mind/pii-guard-ner-xlmr-base`), the production path. The index's own `default` flag still
+ * The system the gateway's fast mode runs: rules + the published on-device NER v4.2
+ * (`watt-mind/pii-guard-ner-xlmr-base`, LAB-1625; its run records keep candidate B3's key, same weights), the production path. The index's own `default` flag still
  * marks the rules-only baseline, which is what fast mode falls back to without a NER checkpoint.
  */
-export const FAST_MODE_SYSTEM = "rules+ner:xlmr-base-v2-hn";
+export const FAST_MODE_SYSTEM = "rules+ner:pii-guard-ner-xlmr-base-v42-b3";
 
 /**
  * One spelling in labels: the index has both "ner" and "NER", and the run records name the

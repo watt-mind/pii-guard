@@ -1,14 +1,18 @@
-"""Record the landing's labels-mode image showcase (LAB-1484).
+"""Record the legacy local/YuNet labels-mode evidence (LAB-1484).
 
-The landing (``ui/src/hosted/ImageShowcase.tsx``) shows what the default ``render="labels"``
-does to two fictional specimen ID cards, ``ui/public/samples/id-card-en.png``
+The landing now uses build_image_illustrations.py for explicitly annotated visual
+geometry. These recordings remain separate historical evidence, not the current hosted
+signature-masking configuration. This script intentionally preserves its legacy policy.
+
+This legacy evidence records ``render="labels"`` on two fictional specimen ID cards,
+``ui/public/samples/id-card-en.png``
 (``eval/fixtures/visual/images/en-id_card-front.png``, the default since LAB-1509) and
 ``ui/public/samples/id-card.png`` (``hu-id_card-front.png``): each text value covered by a box with
 its vault placeholder printed in it, the face and ID photo covered, and the masked transcript
 and document summary that go to the model with the image. This script makes that recording
-with the real API, configured like the hosted preview (ADR 0014): the on-device ``local``
-segmenter (YuNet), the built-in Tesseract OCR, the ``rules`` detector, signatures and stamps
-kept.
+with the real API, configured with the legacy local preview policy (ADR 0014):
+the on-device ``local`` segmenter (YuNet), the built-in Tesseract OCR, the ``rules``
+detector, signatures and stamps kept.
 
 One vault session, as an application would use it: the party is pre-loaded as a known value,
 the user's message is masked (``/v1/mask``), then the image (``/v1/mask/image``), so the
@@ -245,8 +249,9 @@ def record(sample: Sample, ask_model: bool = True) -> dict[str, Any]:
         "recorded": dt.date.today().isoformat(),
         "note": (
             "scripts/record_image_labels.py: POST /v1/mask/image with render=labels on "
-            f"ui/public/samples/{sample.image.name} (fictional specimen), configured like the "
-            "hosted preview (segmenter local/YuNet, Tesseract, rules; signatures and stamps "
+            f"ui/public/samples/{sample.image.name} (fictional specimen), configured with the "
+            "legacy local preview policy (segmenter local/YuNet, Tesseract, rules; "
+            "signatures and stamps "
             "kept), in the session that masked the message. Value-free: placeholders only, "
             "no image."
         ),

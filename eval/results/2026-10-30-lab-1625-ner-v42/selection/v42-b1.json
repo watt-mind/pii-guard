@@ -1,0 +1,89 @@
+{
+  "candidate": "v42-b1",
+  "model": "models/ner/pii-guard-ner-xlmr-base-v42-b1",
+  "all": {
+    "documents": 685,
+    "values": 1868,
+    "leaked": 0,
+    "leak": 0,
+    "masked": 1964,
+    "over_masked": 36,
+    "over": 1.83,
+    "leaked_by_type": {},
+    "over_masked_by_type": {
+      "PERSON": 2,
+      "PHONE": 3,
+      "DATE_OF_BIRTH": 3,
+      "NATIONAL_ID_HU_TAX": 9,
+      "NATIONAL_ID_HU_TAJ": 4,
+      "ID_DOCUMENT": 15
+    }
+  },
+  "wall_s": 37.8,
+  "slices": {
+    "base": {
+      "documents": 135,
+      "values": 507,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 536,
+      "over_masked": 2,
+      "over": 0.37,
+      "leaked_by_type": {},
+      "over_masked_by_type": {
+        "PERSON": 2
+      }
+    },
+    "de-genitive": {
+      "documents": 200,
+      "values": 690,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 690,
+      "over_masked": 0,
+      "over": 0,
+      "leaked_by_type": {},
+      "over_masked_by_type": {}
+    },
+    "hu-surname-given": {
+      "documents": 80,
+      "values": 139,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 172,
+      "over_masked": 0,
+      "over": 0,
+      "leaked_by_type": {},
+      "over_masked_by_type": {}
+    },
+    "dates": {
+      "documents": 180,
+      "values": 399,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 402,
+      "over_masked": 3,
+      "over": 0.75,
+      "leaked_by_type": {},
+      "over_masked_by_type": {
+        "DATE_OF_BIRTH": 3
+      }
+    },
+    "numbers": {
+      "documents": 90,
+      "values": 133,
+      "leaked": 0,
+      "leak": 0,
+      "masked": 164,
+      "over_masked": 31,
+      "over": 18.9,
+      "leaked_by_type": {},
+      "over_masked_by_type": {
+        "PHONE": 3,
+        "NATIONAL_ID_HU_TAX": 9,
+        "NATIONAL_ID_HU_TAJ": 4,
+        "ID_DOCUMENT": 15
+      }
+    }
+  }
+}
