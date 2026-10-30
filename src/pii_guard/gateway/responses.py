@@ -27,11 +27,10 @@ Nothing here logs or raises with request text, values, masked bodies or keys.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from contextlib import suppress
 from typing import Any, cast
 
@@ -42,7 +41,7 @@ from starlette.responses import Response
 from pii_guard.gateway.meter import record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
 from pii_guard.gateway.placeholder_note import add_responses_note
-from pii_guard.gateway.request import InvalidChatRequestError
+from pii_guard.gateway.request import CollectedTexts, InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
 from pii_guard.gateway.responses_restore import (
     DONE,
@@ -51,7 +50,6 @@ from pii_guard.gateway.responses_restore import (
     restore_response,
     sse_message,
 )
-from pii_guard.gateway.restore import restore_text
 from pii_guard.gateway.service import (
     REQUEST_ID_HEADER,
     Gateway,
@@ -65,10 +63,11 @@ from pii_guard.gateway.service import (
     _upstream_error,
     check_upstream_payload,
 )
+from pii_guard.gateway.stream import stream_sse_events, timed_sse_lines
 from pii_guard.gateway.tool_names import tool_names, without_tool_names
 from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import RequestTimer
-from pii_guard.types import PayloadTooLargeError, PiiGuardError
+from pii_guard.types import PiiGuardError
 from pii_guard.vault import UnmaskOutputTooLargeError
 
 __all__ = [
@@ -155,6 +154,18 @@ def _masked_output(answer: Mapping[str, Any]) -> list[dict[str, object]]:
     return out
 
 
+def _responses_stream_error(exc: Exception) -> Iterable[bytes]:
+    error = {
+        "type": "error",
+        "code": "stream_failed",
+        "message": "the response stream failed",
+        "param": None,
+    }
+    if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
+        error.update(code=exc.code, message=exc.message)
+    return (sse_message(json.dumps(error), "error"),)
+
+
 class ResponsesGateway:
     """``/v1/responses`` on top of the app's :class:`Gateway` (its detectors, cache, vault)."""
 
@@ -165,7 +176,7 @@ class ResponsesGateway:
         return f"ResponsesGateway({self.gateway!r})"
 
     def _upstream_url(self) -> str:
-        self.gateway._upstream_url()  # UpstreamNotConfiguredError without a base URL
+        self.gateway.upstream_url()  # UpstreamNotConfiguredError without a base URL
         return responses_url(cast(str, self.gateway.settings.upstream_base_url))
 
     async def responses(
@@ -181,7 +192,7 @@ class ResponsesGateway:
         timer = RequestTimer(received_at)
         trace = CallTrace(self.gateway.observability, timer, body, request_id=request_id)
         try:
-            response, stats = await self.gateway._with_session_lease(
+            response, stats = await self.gateway.with_session_lease(
                 self._responses(
                     body,
                     headers,
@@ -202,52 +213,27 @@ class ResponsesGateway:
             trace.finish()
         return response, stats
 
-    async def _responses(
+    async def _mask(
         self,
-        body: object,
+        body: dict[str, Any],
+        collected: CollectedTexts,
         headers: Mapping[str, str],
         *,
-        max_text_chars: int | None,
+        detector: Any,
+        language: str,
+        path_session: str | None,
         timer: RequestTimer,
         trace: CallTrace,
-        path_session: str | None = None,
-    ) -> tuple[Response, RequestStats]:
+        stats: RequestStats,
+    ) -> tuple[Any, bytes, float]:
         gw = self.gateway
-        url = self._upstream_url()
-        mode = gw._mode(headers)
-        language = gw._language(headers)
-        trace.mode, trace.language = mode.value, language
-        echo = gw._echo(headers)
-        stats = _Stats(mode=mode, mode_alias=gw._mode_alias(headers))
-        trace.stats = stats
-        collected = collect_response_texts(body)
-        body = cast(dict[str, Any], body)
-        stream = bool(body.get("stream"))
-        if echo and stream:
-            raise InvalidChatRequestError(
-                "X-PII-Guard-Echo is supported on non-streamed /v1/responses calls only"
-            )
-        if max_text_chars is not None and any(
-            len(s.text) > max_text_chars for s in collected.slots
-        ):
-            raise PayloadTooLargeError(f"a text is longer than {max_text_chars} characters")
-        if len(collected.images) > gw.config.max_images:
-            raise PayloadTooLargeError(
-                f"a request may carry at most {gw.config.max_images} inline images"
-            )
-        if any(len(img.data) > gw.config.max_image_bytes for img in collected.images):
-            raise PayloadTooLargeError(
-                f"an inline image is larger than {gw.config.max_image_bytes} bytes"
-            )
-        detector = gw.detectors[mode]
-        session, created = gw._session(headers, body, path_session, stats, trace)
-        stats.stream = stream
+        session, created = gw.session(headers, body, path_session, stats, trace)
         stats.texts = len(collected.slots)
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
         try:
             with timer.span("detect"):
-                spans = await gw._detect_all(collected.slots, detector, session, language, stats)
+                spans = await gw.detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
                 spans = without_tool_names(
                     [slot.text for slot in collected.slots],
@@ -262,58 +248,41 @@ class ResponsesGateway:
             generation = session.generation
             before = _counts_of(session)
             with timer.span("mask"):
-                masked = gw._mask(collected.slots, spans, session, language)
+                masked = gw.mask(collected.slots, spans, session, language)
             _count_masked(stats, before, session)
             if collected.images:
                 with timer.span("image"):
-                    await gw._mask_images(collected.images, detector, language, stats, session)
+                    await gw.mask_images(collected.images, detector, language, stats, session)
             before = _counts_of(session)
             with timer.span("mask"):
                 remask = bool(collected.images)
-                gw._write(
+                gw.write(
                     collected.slots, masked, session, language, remask, generation, names, issued
                 )
                 collected.finalize()
             _count_masked(stats, before, session)
             with timer.span("mask"):
-                gw._recheck(body, collect_response_texts, session, language, stats, names, issued)
+                gw.recheck(body, collect_response_texts, session, language, stats, names, issued)
             forwarding = time.perf_counter()
-            payload = gw._forwarded(body, session, stats, add_responses_note)
+            payload = gw.forwarded(body, session, stats, add_responses_note)
             check_upstream_payload(payload, stats.image_payload_bytes)
         except BaseException:
             stats.log("blocked")
-            gw._release_session(session, created, masked=False)
+            gw.release_session(session, created, masked=False)
             raise
-        gw._release_session(session, created, masked=True)
-        if trace.payloads:
-            trace.masked_request = payload
-        masked_input = _masked_input(body) if echo else None
-        client = gw.upstream_client()  # shared with /v1/chat/completions (LAB-1176)
-        upstream_headers = gw._upstream_headers(headers)
-        if stream:
-            upstream_headers["Accept"] = "text/event-stream"
-        request = client.build_request(
-            "POST", url, content=payload, headers=upstream_headers, timeout=gw.upstream_timeout()
-        )
-        started = time.perf_counter()
-        timer.add("forward", started - forwarding)
-        timer.upstream_sent = started
-        try:
-            response = await client.send(request, stream=True)
-            await gw.bound_upstream_response(response)
-        except httpx.HTTPError as exc:
-            timer.add("upstream", time.perf_counter() - started)
-            stats.log("upstream_unreachable")
-            raise UpstreamError(f"upstream request failed ({type(exc).__name__})") from None
-        except UpstreamError:
-            timer.add("upstream", time.perf_counter() - started)
-            stats.log("upstream_unreachable")
-            raise
-        timer.add("upstream_ttfb", time.perf_counter() - started)
-        timer.add("upstream", time.perf_counter() - started)
+        gw.release_session(session, created, masked=True)
+        return session, payload, forwarding
 
-        stats.upstream_status = response.status_code
-        out_headers = stats.headers(session.session_id)
+    async def _check_upstream(
+        self,
+        response: httpx.Response,
+        *,
+        started: float,
+        stream: bool,
+        timer: RequestTimer,
+        stats: RequestStats,
+        out_headers: dict[str, str],
+    ) -> JSONResponse | None:
         if response.status_code >= 400:
             try:
                 raw = await _read_limited(response)
@@ -331,7 +300,7 @@ class ResponsesGateway:
                     f"{response.status_code}); use /v1/chat/completions with this upstream"
                 )
             stats.log("upstream_error")
-            return _upstream_error(response.status_code, raw, out_headers), stats
+            return _upstream_error(response.status_code, raw, out_headers)
 
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
         if stream and not is_sse:
@@ -344,6 +313,73 @@ class ResponsesGateway:
                 "upstream did not return an event stream; retry without stream",
                 code="upstream_did_not_stream",
             ) from None
+        return None
+
+    async def _responses(
+        self,
+        body: object,
+        headers: Mapping[str, str],
+        *,
+        max_text_chars: int | None,
+        timer: RequestTimer,
+        trace: CallTrace,
+        path_session: str | None = None,
+    ) -> tuple[Response, RequestStats]:
+        gw = self.gateway
+        url = self._upstream_url()
+        mode = gw.mode(headers)
+        language = gw.language(headers)
+        trace.mode, trace.language = mode.value, language
+        echo = gw.echo(headers)
+        stats = _Stats(mode=mode, mode_alias=gw.mode_alias(headers))
+        trace.stats = stats
+        collected = collect_response_texts(body)
+        body = cast(dict[str, Any], body)
+        stream = bool(body.get("stream"))
+        if echo and stream:
+            raise InvalidChatRequestError(
+                "X-PII-Guard-Echo is supported on non-streamed /v1/responses calls only"
+            )
+        gw.validate_limits(collected, max_text_chars, text_label="a text")
+        detector = gw.detectors[mode]
+        stats.stream = stream
+        session, payload, forwarding = await self._mask(
+            body,
+            collected,
+            headers,
+            detector=detector,
+            language=language,
+            path_session=path_session,
+            timer=timer,
+            trace=trace,
+            stats=stats,
+        )
+        if trace.payloads:
+            trace.masked_request = payload
+        masked_input = _masked_input(body) if echo else None
+        upstream_headers = gw.upstream_headers(headers)
+        if stream:
+            upstream_headers["Accept"] = "text/event-stream"
+        response, started = await gw.send_upstream(
+            url,
+            payload,
+            upstream_headers,
+            timer=timer,
+            stats=stats,
+            forwarding_started=forwarding,
+        )
+        stats.upstream_status = response.status_code
+        out_headers = stats.headers(session.session_id)
+        err_response = await self._check_upstream(
+            response,
+            started=started,
+            stream=stream,
+            timer=timer,
+            stats=stats,
+            out_headers=out_headers,
+        )
+        if err_response is not None:
+            return err_response, stats
         if not stream:
             return await self._whole(
                 response,
@@ -398,7 +434,7 @@ class ResponsesGateway:
         self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         report = restore_response(session, answer)
         stats.unresolved = len(report.unresolved)
-        self.gateway._seed_cache(session, language, detector, report.restored_spans, stats)
+        self.gateway.seed_cache(session, language, detector, report.restored_spans, stats)
         out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
         if echo:
             answer["pii_guard"] = {"masked_input": masked_input, "masked_output": masked_output}
@@ -429,28 +465,10 @@ class ResponsesGateway:
             session, on_ids=lambda ids: issued.add(session.session_id, ids)
         )
         trace.streaming = True
-
-        async def timed_lines() -> AsyncIterator[str]:
-            # Whole-stream deadline (LAB-1566), like the chat stream's timed lines.
-            lines = response.aiter_lines().__aiter__()
-            deadline = time.perf_counter() + self.gateway.config.upstream_stream_timeout
-            while True:
-                waiting = time.perf_counter()
-                remaining = deadline - waiting
-                if remaining <= 0:
-                    raise TimeoutError("upstream stream deadline exceeded")
-                try:
-                    line = await asyncio.wait_for(lines.__anext__(), remaining)
-                except StopAsyncIteration:
-                    timer.add("upstream", time.perf_counter() - waiting)
-                    return
-                timer.add("upstream", time.perf_counter() - waiting)
-                if line.startswith("data:"):
-                    timer.mark_first_data()
-                yield line
+        timeout = self.gateway.config.upstream_stream_timeout
 
         async def produce() -> AsyncGenerator[bytes, None]:
-            async for event, data in iter_sse_events(timed_lines()):
+            async for event, data in iter_sse_events(timed_sse_lines(response, timer, timeout)):
                 unmasking = time.perf_counter()
                 outs = restorer.process(event, data)
                 timer.add("unmask", time.perf_counter() - unmasking)
@@ -462,60 +480,22 @@ class ResponsesGateway:
             for name, out in restorer.finish():
                 yield sse_message(out, name)
 
-        async def events() -> AsyncIterator[bytes]:
-            outcome = "ok"
-            source = produce()
-            try:
-                try:
-                    async for chunk in source:
-                        sending = time.perf_counter()
-                        try:
-                            yield chunk
-                        finally:
-                            timer.add("client", time.perf_counter() - sending)
-                except Exception as exc:
-                    outcome = f"stream_error:{type(exc).__name__}"
-                    error = {
-                        "type": "error",
-                        "code": "stream_failed",
-                        "message": "the response stream failed",
-                        "param": None,
-                    }
-                    if isinstance(exc, UnmaskOutputTooLargeError):  # LAB-1350
-                        error.update(code=exc.code, message=exc.message)
-                    yield sse_message(json.dumps(error), "error")
-            except (GeneratorExit, asyncio.CancelledError):
-                if outcome == "ok":
-                    outcome = "client_disconnected"
-                raise
-            finally:
-                await source.aclose()
-                await response.aclose()
-                stats.upstream_ms = timer.stages["upstream"] * 1000
-                stats.unresolved = len(restorer.unresolved)
-                if outcome == "ok":
-                    with suppress(PiiGuardError):
-                        restored = {}
-                        for index, masked in restorer.masked_content().items():
-                            text, spans, _ = restore_text(session, masked)
-                            restored[index] = (text, spans)
-                        self.gateway._seed_cache(session, language, detector, restored, stats)
-                        if trace.full:
-                            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
-                stats.log(outcome)
-                if trace.payloads:
-                    trace.stream_masked = restorer.masked_content()
-                    trace.stream_chunks = restorer.chunks
-                if outcome == "ok":
-                    trace.finish()
-                elif outcome == "client_disconnected":
-                    trace.finish(outcome=outcome, error={"code": outcome})
-                else:
-                    trace.finish(outcome="stream_error", error={"code": "stream_failed"})
-
+        events = stream_sse_events(
+            produce(),
+            response=response,
+            timer=timer,
+            trace=trace,
+            stats=stats,
+            restorer=restorer,
+            session=session,
+            seed_cache=lambda restored: self.gateway.seed_cache(
+                session, language, detector, restored, stats
+            ),
+            on_error=_responses_stream_error,
+        )
         out_headers["Cache-Control"] = "no-cache"
         return (
-            StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
+            StreamingResponse(events, media_type="text/event-stream", headers=out_headers),
             stats,
         )
 

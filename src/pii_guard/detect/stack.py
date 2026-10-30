@@ -49,6 +49,7 @@ __all__ = [
     "build_detectors",
     "check_spans",
     "default_detector_names",
+    "ner_available",
     "ner_choice",
     "ner_in_stack",
     "rest_detector_names",
@@ -107,6 +108,11 @@ def _ner_available() -> bool:
     except DetectionError:
         return False
     return True
+
+
+def ner_available() -> bool:
+    """Whether the ``ner`` detector resolves (delegates to :func:`_ner_available`)."""
+    return _ner_available()
 
 
 def ner_choice(settings: Settings) -> ner_resolve.NerChoice:

@@ -196,7 +196,7 @@ def gateway_policies(settings: Settings, config: GatewayConfig) -> PolicySet:
 
 def _ner_available() -> bool:
     """Kept for callers of the old name; the decision lives in :mod:`pii_guard.detect.stack`."""
-    return stack._ner_available()
+    return stack.ner_available()
 
 
 def build_mode_detectors(
@@ -280,9 +280,10 @@ def build_mode_detectors(
     return detectors
 
 
-def detector_timings(results: Iterable[dict[str, float]]) -> dict[str, float]:
-    total: dict[str, float] = {}
-    for timings in results:
+def detector_timings(per_text: Iterable[dict[str, float]]) -> dict[str, float]:
+    """Sum per-detector wall times across a request's uncached texts."""
+    totals: dict[str, float] = {}
+    for timings in per_text:
         for name, ms in timings.items():
-            total[name] = total.get(name, 0.0) + ms
-    return total
+            totals[name] = totals.get(name, 0.0) + ms
+    return totals
