@@ -220,3 +220,29 @@ def test_latency_line_quotes_one_cell_of_one_latency_record() -> None:
         render_block(index, [], parse_spec({**SPEC, "latency": {**lat, "run": "x"}}, "c"))
     with pytest.raises(RecordError, match="no cell"):
         render_block(index, [], parse_spec({**SPEC, "latency": {**lat, "concurrency": 4}}, "c"))
+
+
+def test_model_latency_line_quotes_one_model_of_a_measurement() -> None:
+    data = {
+        "machine": "Test CPU",
+        "torch_threads": 8,
+        "messages": 122,
+        "mean_chars": 382.5,
+        "results": {
+            "v20": {"p50_ms": 42.3, "p95_ms": 48.8},
+            "new": {"p50_ms": 42.8, "p95_ms": 49.6},
+        },
+    }
+    ml = {"file": "eval/results/x/latency.json", "model": "new", "label": "NER per message"}
+    spec = parse_spec({**SPEC, "model_latency": ml}, "config")
+    spec["model_latency"]["data"] = data
+    block = render_block(_index(), [], spec)
+    assert (
+        "NER per message: p50 43 ms, p95 50 ms (122 messages of about 382 characters, Test CPU, "
+        "8 threads; [measurement](eval/results/x/latency.json))." in block
+    )
+    spec["model_latency"]["model"] = "missing"
+    with pytest.raises(RecordError, match="has no result"):
+        render_block(_index(), [], spec)
+    with pytest.raises(RecordError, match="model_latency"):
+        parse_spec({**SPEC, "model_latency": {"file": "x"}}, "config")

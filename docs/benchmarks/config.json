@@ -3,7 +3,7 @@
   "headline_set": "smoke",
   "featured": [
     "rules",
-    "rules+ner:xlmr-base-v2-hn",
+    "rules+ner:pii-guard-ner-xlmr-base-v42-b3",
     "rules+llm:muse-spark-open@reasoning_effort=low",
     "rules+llm:muse-glimmer@reasoning_strength=low",
     "presidio",
@@ -11,7 +11,7 @@
     "privaite"
   ],
   "readme": {
-    "about": "The README results block (pii-guard eval report rewrites the block between <!-- results:start --> and <!-- results:end -->). Every column reads a fixture set's latest snapshot from the run records in eval/results/runs/ (LAB-1656: no dataset-record columns, so the README and the landing read one source). Marks are caveats explained under the table in the README; a column whose best cell is marked gets no bold, and a cell from a run missing some of the set's languages is marked § automatically. over_masking_table prints over-masking for every row; per_language prints the first row's leak per language on the headline set. latency names the one pii-guard bench latency record and cell the README quotes.",
+    "about": "The README results block (pii-guard eval report rewrites the block between <!-- results:start --> and <!-- results:end -->). Every column reads a fixture set's latest snapshot from the run records in eval/results/runs/ (LAB-1656: no dataset-record columns, so the README and the landing read one source). Marks are caveats explained under the table in the README; a column whose best cell is marked gets no bold, and a cell from a run missing some of the set's languages is marked § automatically. over_masking_table prints over-masking for every row; per_language prints the first row's leak per language on the headline set. model_latency names the one model-latency measurement the README quotes (LAB-1625's gateway-latency records were taken under heavy load and are too noisy to quote).",
     "columns": [
       {
         "title": "Hand-written",
@@ -44,15 +44,9 @@
     ],
     "over_masking_table": true,
     "per_language": true,
-    "latency": {
-      "run": "2026-10-28-ner-concurrency-cpu-fast",
-      "concurrency": 1,
-      "stream": false,
-      "label": "What fast mode adds to each request on CPU (gateway overhead, rules + NER, one request at a time)"
-    },
     "rows": [
       {
-        "system": "rules+ner:xlmr-base-v2-hn",
+        "system": "rules+ner:pii-guard-ner-xlmr-base-v42-b3",
         "label": "**PII Guard fast** (rules + NER, on-device, $0)",
         "short": "fast",
         "marks": {
@@ -82,6 +76,11 @@
         "label": "PII Guard rules only (no name detection)",
         "p50": false
       }
-    ]
+    ],
+    "model_latency": {
+      "file": "eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json",
+      "model": "v42-b3",
+      "label": "What the NER model (v4.2) takes per message on CPU (the model's own detection time, not the whole gateway; measured alternating with v2.0 in one process on a shared machine)"
+    }
   }
 }

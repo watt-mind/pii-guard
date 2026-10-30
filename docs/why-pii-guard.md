@@ -10,8 +10,8 @@ link goes to that write-up and says so. All data behind these numbers is fiction
 **in progress** / **planned** = tracked on the named ticket, not merged; **blocked** = tracked
 on the named ticket, waiting on something outside the code.
 
-As of 2026-10-28, `develop` at `5581013`. Fast mode below means the published NER `v2.0`
-(`NER v2 base + hard negatives` in the reports). Leak figures are copied from the generated
+As of 2026-10-30. Fast mode below means the published NER `v4.2` (LAB-1625; `NER v4.2
+(published, LAB-1625)` in the reports, which keep the run records' candidate name `v42-b3`). Leak figures are copied from the generated
 [benchmarks.md](benchmarks.md): the hand-written set from [results by fixture
 set](benchmarks.md#smoke), the public and agent-traffic test splits from [results per
 dataset](benchmarks.md#results-per-dataset). When a number changes, update it here, in the
@@ -23,8 +23,8 @@ README's "Why PII Guard" section, in [submission.md](submission.md) and in
 | 1 | [Reversible placeholders, consistent for a whole session](#1-reversible-placeholders-consistent-for-a-whole-session) | 100 % round trip on the hand-written set; placeholder consistency 96.5 % of entities, but only one entity there repeats (n = 1) | shipped |
 | 2 | [Grammar-aware: Hungarian inflection in and out](#2-grammar-aware-hungarian-inflection-in-and-out) | inflected-name leak 18/30 → 0/30 | shipped |
 | 3 | [Built on Meta's models end to end](#3-built-on-metas-models-end-to-end) | 6 Meta models, each with a job and a reason | shipped; Glimmer LoRA blocked |
-| 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | fast (production default): ⟦B3 smoke leak⟧ leak on the hand-written set, ⟦B3 CPU overhead⟧ added per request on CPU, $0, nothing leaves the machine; audit (optional, measured 2026-10-27 on the earlier 51-document set): 0.6 % at 1.9 s, about $2–3 per 1k messages | shipped |
-| 5 | [Head-to-head with Presidio, LLM Guard and PrivAiTe](#5-head-to-head-with-presidio-llm-guard-and-privaite) | hand-written set: fast ⟦B3 smoke leak⟧ leak vs ⟦tools smoke range⟧; agent traffic: ⟦B3 agent-traffic leak / over-masking⟧ vs PrivAiTe ⟦PrivAiTe agent-traffic leak / over-masking⟧; ahead on Nemotron-PII and CEE-PII; about level with Presidio on finance text (upstream labels) | shipped |
+| 4 | [Two modes with published leak, latency and cost](#4-two-modes-with-published-leak-latency-and-cost) | fast (production default): 0.0 % leak on the hand-written set, 43 ms of NER time per message on CPU, $0, nothing leaves the machine; audit (optional, measured 2026-10-27 on the earlier 51-document set): 0.6 % at 1.9 s, about $2–3 per 1k messages | shipped |
+| 5 | [Head-to-head with Presidio, LLM Guard and PrivAiTe](#5-head-to-head-with-presidio-llm-guard-and-privaite) | agent traffic: fast over-masks 0.7 % and leaks 0.2 %, PrivAiTe 35.2 % and 2.4 %; hand-written set: fast 0.0 % leak vs 13.0–46.3 % for the other tools; ahead on Nemotron-PII and CEE-PII; about level with Presidio on finance text (upstream labels) | shipped |
 | 6 | [The LLM can only point, never write; red-teamed](#6-the-llm-can-only-point-never-write-red-teamed) | prompt-injection leak 3.4 % → 0.0 % (two runs), no partial leaks left | shipped |
 | 7 | [Honest about re-identification](#7-honest-about-re-identification) | exposure 1.4 % from masked text; 39.9 % with a 5-name candidate list | shipped |
 | 8 | [A drop-in gateway that fails closed](#8-a-drop-in-gateway-that-fails-closed) | masks tools, metadata and response schemas; rejects pasted placeholders | shipped |
@@ -94,7 +94,7 @@ masked data** ([models.md](models.md)).
 |---|---|---|---|---|
 | Audit-mode detector (second opinion) | **Muse Spark Open** (open weights) on Baseten Model APIs, or your own GPUs | Open weights, so the detector can move inside your boundary; Muse Spark quality at 1.2–1.8 s p50 | [2026-10-27-baseten](../eval/results/2026-10-27-baseten/README.md) | shipped |
 | Teacher for the fast-mode NER | **Muse Glimmer 30B** (open weights, Apache-2.0), vLLM on one H100 | Best zero-shot quality we measured (F1 99.3, leak 0.0 % on the 38 Hungarian and English smoke documents of that run), too slow for the request path (9.4 s p50), so we distilled it | [run record](../eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [models.md](models.md#distilled-from-muse-glimmer) | shipped |
-| Fast-mode NER student | **XLM-RoBERTa** base (FacebookAI, MIT), fine-tuned on Glimmer's labels, public OpenPII train rows and hard negatives; published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v2.0` | Multilingual encoder, in-process on CPU, ⟦B3 CPU overhead⟧ added per request ([gateway latency](benchmarks.md#gateway-latency)) | [model card](../training/ner/model-card.md), [selection](../eval/results/2026-10-27-ner-v21/README.md), [benchmarks.md](benchmarks.md#smoke) | shipped (published, downloaded and hash-checked on first use) |
+| Fast-mode NER student | **XLM-RoBERTa** base (FacebookAI, MIT), fine-tuned on Glimmer's labels, public OpenPII train rows and hard negatives; published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2` | Multilingual encoder, in-process on CPU, 43 ms per ~400-character message (p50, the model alone, [measurement](../eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json)) | [model card](../training/ner/model-card.md), [selection](../eval/results/2026-10-30-lab-1625-ner-v42/README.md), [benchmarks.md](benchmarks.md#smoke) | shipped (published, downloaded and hash-checked on first use) |
 | Glimmer as a fine-tuned detector | **Muse Glimmer** LoRA on Fireworks | An answer-only detector that is fast enough for the request path | LAB-1109 | blocked |
 | Synthetic benchmark and distillation corpus | **Muse Spark 1.3**, contributor tier | Writes realistic Hungarian and English documents around fictional identities; $1.05 for the 5,004-call distillation corpus | [models.md](models.md#distilled-from-muse-glimmer) | shipped |
 | Red-team attacker | **Muse Spark Open**, and **Muse Spark 1.3** for comparison | Meta's own model tries to undo the masking | [2026-10-27-redteam](../eval/results/2026-10-27-redteam/README.md) | shipped |
@@ -119,32 +119,37 @@ published, including the cost per 1,000 messages.
 
 | Mode | Set | Leak | F1 (overlap) | p50 latency | $ / 1k messages | Source |
 |---|---|---:|---:|---:|---:|---|
-| fast (rules + NER ⟦release⟧) | hand-written, de + en + hu + pl (62 docs) | **⟦B3 smoke leak⟧** | ⟦B3 smoke F1⟧ | ⟦B3 smoke p50⟧ | no API call | [benchmarks.md](benchmarks.md#smoke) |
-| fast, per language | de / en / hu / pl | ⟦B3 smoke leak per language⟧ | ⟦B3 smoke F1 per language⟧ | | no API call | [benchmarks.md, by language](benchmarks.md#smoke) |
+| fast (rules + NER v4.2) | hand-written, de + en + hu + pl (62 docs) | **0.0 %** | 95.9 | 37 ms* | no API call | [benchmarks.md](benchmarks.md#smoke) |
+| fast, per language | de / en / hu / pl | 0.0 / 0.0 / 0.0 / 0.0 % | 100.0 / 97.1 / 93.0 / 99.0 | | no API call | [benchmarks.md, by language](benchmarks.md#smoke) |
 | audit (rules + NER + Muse Spark Open, Baseten) | hand-written, de + en + hu (51 docs, earlier version of the set, 2026-10-27) | 0.6 % | 98.2 | 1.9 s* | 2.03–2.95 | [comparison](../eval/results/2026-10-27-comparison/README.md) |
 | audit, earlier configuration (rules + Muse Spark Open, no NER) | hu-smoke (31 docs) | 0.9 % | 98.4 | 1.8 s | 2.42 | [hu-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-hu-smoke.json) |
 | same | en-smoke (10 docs) | 0.0 % | 97.1 | 1.2 s | 1.99 | [en-smoke run record](../eval/results/runs/2026-10-27-baseten-spark-open-en-smoke.json) |
-| rules only (floor) | hand-written, de + en + hu + pl (62 docs) | ⟦rules smoke leak⟧ | ⟦rules smoke F1⟧ | ⟦rules smoke p50⟧ | no API call | [benchmarks.md](benchmarks.md#smoke) |
+| rules only (floor) | hand-written, de + en + hu + pl (62 docs) | 40.7 % | 70.2 | 0.46 ms* | no API call | [benchmarks.md](benchmarks.md#smoke) |
 
 Fast mode on test sets it was not trained on (leak, from the run records in
 [benchmarks.md](benchmarks.md#results-by-fixture-set), the same source as the README):
-Nemotron-PII ⟦B3 nemotron leak⟧, CEE-PII ⟦B3 cee leak⟧, agent traffic ⟦B3 agent-traffic leak⟧,
-finance text ⟦B3 gretel leak⟧ (⟦B3 gretel-corrected leak⟧ on the corrected labels). Audit mode
+Nemotron-PII 0.6 %, CEE-PII 0.8 % (v2.0: 0.4 %), agent traffic 0.2 %,
+finance text 19.1 % (2.4 % on the corrected labels). Audit mode
 was run on 10–30 documents per set, too few to compare.
 
 - **Caveats:** the hand-written set is small (31 Hungarian, 11 Polish, 10 English and 10
   German documents; one leaked value is about 1 point on Hungarian and 2–3 on the others).
   `*` marks a latency averaged over several runs, measured where each run record says. The
-  one latency figure to quote is the gateway overhead on CPU, ⟦B3 CPU overhead⟧ p50 at one
-  request at a time ([gateway latency](benchmarks.md#gateway-latency)). Fast mode over-masks
-  reference numbers without a cue word: ⟦B3 cee over-masking⟧ of masked spans on CEE-PII,
-  against ⟦B3 agent-traffic over-masking⟧ on agent traffic
+  one latency figure to quote is the NER's own time on CPU: 43 ms p50 and 50 ms p95 per
+  ~400-character message, alternating with v2.0 in one process on a shared machine
+  ([measurement](../eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json)). It is
+  the model alone, not the whole gateway; the gateway runs from LAB-1625 were taken under heavy
+  load and are not quoted. Fast mode over-masks
+  reference numbers without a cue word: 7.3 % of masked spans on CEE-PII,
+  against 0.7 % on agent traffic
   ([model card, limitations](../training/ner/model-card.md#limitations)). The
-  ⟦B3 smoke leak⟧ on the hand-written set is not the whole picture: finance text leaks
-  ⟦B3 gretel leak⟧ on the dataset's own labels. Fast mode downloads
+  0.0 % on the hand-written set is not the whole picture: finance text leaks
+  19.1 % on the dataset's own labels. v4.2 also leaks a little more than v2.0 on two public
+  sets: CEE-PII 0.8 % against 0.4 %, and Polish pl-pii-bench 4.2 % against 3.5 %
+  ([model card](../training/ner/model-card.md#evaluation)). Fast mode downloads
   the published NER on first use and checks its hash; without one it is rules only
   ([models.md](models.md#which-ner-model-fast-mode-runs)).
-- **Status:** shipped (LAB-1128, LAB-1150, LAB-1186, LAB-1192, LAB-1306). The committed
+- **Status:** shipped (LAB-1128, LAB-1150, LAB-1186, LAB-1192, LAB-1306; NER v4.2 pinned by LAB-1625). The committed
   Hungarian fast-mode scorecard and the fresh comparison landed with LAB-1148.
 
 ## 5. Head-to-head with Presidio, LLM Guard and PrivAiTe
@@ -156,16 +161,16 @@ The full tables, generated from the run records, are the README's
 [results block](../README.md#results) (leak and over-masking for every tool on every set) and
 [benchmarks.md](benchmarks.md#results-by-fixture-set). The short version:
 
-- **Agent traffic** (tool calls, JSON, logs; ⟦B3 agent-traffic docs⟧ documents): fast mode leaks
-  ⟦B3 agent-traffic leak⟧ and over-masks ⟦B3 agent-traffic over-masking⟧, against PrivAiTe's
-  ⟦PrivAiTe agent-traffic leak⟧ and ⟦PrivAiTe agent-traffic over-masking⟧
+- **Agent traffic** (tool calls, JSON, logs; 990 documents): fast mode over-masks 0.7 % and
+  leaks 0.2 %, against PrivAiTe's 35.2 % and 2.4 % (Presidio 33.4 % and 16.6 %, LLM Guard
+  16.9 % and 20.2 %)
   (the same 990 documents, all three languages).
-- **Hand-written set** (de + en + hu + pl, 62 documents): ⟦B3 smoke leak⟧ against
-  ⟦tools smoke range⟧, and ⟦B3 smoke leak per language⟧ in each language.
-- **Public test sets:** ⟦B3 nemotron leak⟧ vs ⟦best tool nemotron⟧ on Nemotron-PII and
-  ⟦B3 cee leak⟧ vs ⟦best tool cee⟧ on CEE-PII (the lowest of the other tools).
-- **Hard cases:** on CEE-PII, ⟦B3 valid-number leak⟧ of checksum-valid numbers and
-  ⟦B3 invalid-number leak⟧ of mistyped ones leak (the "Number validity" table).
+- **Hand-written set** (de + en + hu + pl, 62 documents): 0.0 % against 13.0–46.3 % for the
+  other tools, and 0.0 % in each language.
+- **Public test sets:** 0.6 % vs 4.0 % (PrivAiTe) on Nemotron-PII and 0.8 % vs 4.4 %
+  (PrivAiTe) on CEE-PII (the lowest of the other tools).
+- **Hard cases:** on CEE-PII, 0.0 % of checksum-valid numbers and 0.0 % of mistyped ones
+  leak (the "Number validity" table).
 
 † Ai4Privacy is in-distribution for the NER (it trained on other rows of the same dataset's
 train split), so it is never counted as a win; a version trained without those rows leaked
@@ -179,9 +184,9 @@ leak less.
   [eval/results/2026-10-26-baselines/comparison.md](../eval/results/2026-10-26-baselines/comparison.md);
   the fresh one: [eval/results/2026-10-27-comparison/README.md](../eval/results/2026-10-27-comparison/README.md).
 - **Where PII Guard is not ahead:** on finance text with the dataset's own labels it is about
-  level with Presidio (⟦B3 gretel leak⟧ vs ⟦Presidio gretel leak⟧); on the corrected labels it
-  leaks ⟦B3 gretel-corrected leak⟧ against Presidio's ⟦Presidio gretel-corrected leak⟧
-  ([why the labels were corrected](datasets.md)). It over-masks ⟦B3 cee over-masking⟧ on
+  level with Presidio (19.1 % vs 18.8 %); on the corrected labels it
+  leaks 2.4 % against Presidio's 14.8 %
+  ([why the labels were corrected](datasets.md)). It over-masks 7.3 % on
   CEE-PII, where reference numbers without a cue word come out as IDs; the other tools
   over-mask more on most sets (README over-masking table).
 - **Caveats:** the hand-written set is small, and the comparison runs on it because the
@@ -369,8 +374,8 @@ hand-written ones because the generated ones flatter a Muse-based detector.
   ([models.md](models.md#baseten-model-apis-the-audit-mode-detector)).
 - English names on Muse-generated English text: 2.5 % leak on `en-synth-sample` (LAB-1138,
   triage).
-- Fast mode on unfamiliar text: ⟦B3 gretel leak⟧ leak on finance text (dataset labels) and
-  ⟦B3 cee over-masking⟧ over-masking on CEE-PII
+- Fast mode on unfamiliar text: 19.1 % leak on finance text (dataset labels) and
+  7.3 % over-masking on CEE-PII
   ([model card](../training/ner/model-card.md#limitations)).
 - A reader for security-printed ID cards: Tesseract returns no word for 108 of 274 specimen
   text values (LAB-1125, [section 9](#9-images-faces-signatures-machine-readable-zones)).

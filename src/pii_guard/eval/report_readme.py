@@ -35,7 +35,11 @@ LAB-1656 options, each off unless set in the ``readme`` section:
 - ``"per_language": true``: the first row's leak per language on the headline set;
 - ``"latency": {"run": "<run id>", "concurrency": 1, "stream": false, "label": "..."}``: one
   gateway-overhead figure (p50 and p95) from a ``pii-guard bench latency`` record, so the
-  README states a single, sourced latency number instead of hand-copied ones.
+  README states a single, sourced latency number instead of hand-copied ones;
+- ``"model_latency": {"file": "<repo path>", "model": "<name>", "label": "..."}``: the same,
+  from a model-latency measurement (``training/ner/eval_v3.py latency`` JSON: the NER
+  detector's own time per message, no gateway or rules) when no clean gateway record exists.
+  ``pii-guard eval report`` reads the file and passes it in as ``data``.
 
 A fixture-set cell whose snapshot is missing some of the set's languages (a tool run on an
 earlier fixture version, say) is marked ``§`` and explained under the table, never silently
@@ -104,7 +108,31 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
                 f"'concurrency' and a boolean 'stream': {lat!r}"
             )
         spec["latency"] = lat
+    if "model_latency" in raw:
+        ml = raw["model_latency"]
+        if not isinstance(ml, dict) or not all(
+            isinstance(ml.get(k), str) for k in ("file", "model", "label")
+        ):
+            raise RecordError(
+                f"{where}: readme 'model_latency' needs 'file', 'model' and 'label' strings: {ml!r}"
+            )
+        spec["model_latency"] = dict(ml)
     return spec
+
+
+def _model_latency_line(ml: Mapping[str, Any], where: str) -> str:
+    data = ml.get("data")
+    if not isinstance(data, Mapping):
+        raise RecordError(f"{where}: model_latency {ml['file']!r} was not read")
+    result = data.get("results", {}).get(ml["model"])
+    if not isinstance(result, Mapping):
+        raise RecordError(f"{where}: model_latency {ml['file']!r} has no result {ml['model']!r}")
+    return (
+        f"{ml['label']}: p50 {fmt_duration(result['p50_ms'])}, "
+        f"p95 {fmt_duration(result['p95_ms'])} ({data['messages']} messages of about "
+        f"{round(data['mean_chars'])} characters, {data['machine']}, "
+        f"{data['torch_threads']} threads; [measurement]({ml['file']}))."
+    )
 
 
 def _latency_line(index: Mapping[str, Any], lat: Mapping[str, Any], where: str) -> str:
@@ -276,6 +304,9 @@ def render_block(
 
     if spec.get("latency"):
         out.append(_latency_line(index, spec["latency"], "docs/benchmarks/config.json"))
+        out.append("")
+    if spec.get("model_latency"):
+        out.append(_model_latency_line(spec["model_latency"], "docs/benchmarks/config.json"))
         out.append("")
 
     if spec.get("over_masking_table"):

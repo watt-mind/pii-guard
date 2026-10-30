@@ -46,7 +46,7 @@ function tableWith(set: string, column: string): { header: string[]; rows: strin
 }
 
 // The fast-mode row label in the report: the run records' system.label of FAST_MODE_SYSTEM (changes with the NER pin).
-const OURS = "pii-guard fast, NER v2.0 (published";
+const OURS = "pii-guard fast, NER v4.2 (published";
 const SYSTEMS: Record<string, string> = { "PII Guard": OURS, PrivAiTe: "PrivAiTe", Presidio: "Presidio", "LLM Guard": "LLM Guard" };
 const SET_IDS = ["smoke", "cee-pii", "nemotron-pii"];
 // Result table columns: System, Docs, Precision, Recall, F1, Leak, Partial leak, Over-masking, Round trip, Detect p50
@@ -112,6 +112,8 @@ describe("landing numbers match their sources (LAB-1499)", () => {
     expect(cells(section("gretel-finance"), OURS)[LEAK]).toBe(`${WEAKER.gretel}%`);
     expect(cells(section("gretel-finance"), "Presidio")[LEAK]).toBe(`${WEAKER.gretelPresidio}%`);
     expect(cells(section("cee-pii"), OURS)[OVER]).toBe(`${WEAKER.ceeOverMasking}%`);
+    const v20 = "pii-guard fast, NER v2.0 (selection-only re-score, LAB-1625)";
+    expect([cells(section("cee-pii"), OURS)[LEAK], cells(section("cee-pii"), v20)[LEAK], cells(section("pl-pii-bench"), v20)[LEAK]]).toEqual([`${WEAKER.cee}%`, `${WEAKER.ceeV20}%`, `${WEAKER.polishV20}%`]);
     // MAPA is report-only: no MAPA figure on the landing (LAB-1656).
     expect(Object.keys(WEAKER).some((k) => k.toLowerCase().includes("mapa"))).toBe(false);
   });
@@ -129,9 +131,11 @@ describe("landing numbers match their sources (LAB-1499)", () => {
     expect(presidio.split("|").slice(1, -1).map((cell) => cell.trim())[8]).toBe(`${IMAGE_LIMITS.presidio}%`);
   });
 
-  it("gateway latency on CPU, one request at a time", () => {
-    const row = report.split("\n").find((line) => line.includes("`2026-10-28-ner-concurrency-cpu-fast`") && /\| 1 \| no \|/.test(line))!;
-    expect(row).toContain(`| ${LATENCY.value.replace("~", "")} |`);
+  it("NER latency on CPU: the README's measurement, rounded as the README rounds it", () => {
+    const m = JSON.parse(readFileSync(join(ROOT, "eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json"), "utf8")).results["v42-b3"];
+    expect([LATENCY.value, LATENCY.p95]).toEqual([`${Math.round(m.p50_ms)} ms`, `${Math.round(m.p95_ms)} ms`]);
+    const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+    expect(readme).toContain(`p50 ${LATENCY.value}, p95 ${LATENCY.p95}`);
   });
 
   it("real coding agents: requests, leaks and refusals", () => {

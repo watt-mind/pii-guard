@@ -15,25 +15,26 @@ latency or cost of a recommended configuration) adds its milestone as a new file
 number it: it gets the next number when it is folded into this page after the merge, so two
 pull requests that each add a milestone don't conflict (LAB-1269).
 
-## Where we are (⟦date of the B3 pin⟧)
+## Where we are (2026-10-30, NER v4.2 pinned)
 
 **pii-guard cuts the share of personal data that reaches the model from about 40 % (rules
-alone) to ⟦B3 smoke leak⟧ on the hand-written set, in all four languages, with no LLM call.**
-The default fast mode is rules plus pii-guard's own NER, ⟦B3 release tag⟧ (XLM-RoBERTa base,
+alone) to 0.0 % on the hand-written set, in all four languages, with no LLM call.**
+The default fast mode is rules plus pii-guard's own NER, `v4.2` (XLM-RoBERTa base,
 published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base);
-[model card](../training/ner/model-card.md)). It adds ⟦B3 CPU overhead⟧ per request on CPU.
+[model card](../training/ner/model-card.md)). The NER takes 43 ms per ~400-character message on CPU (p50, the model alone;
+[measurement](../eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json)).
 
 Every figure below is generated from the committed run records; the full tables are the
 README's [results block](../README.md#results) and [benchmarks.md](benchmarks.md#results-by-fixture-set).
 
 | Set | Fast mode: leak | Over-masking | Best other tool: leak / over-masking | Source |
 |---|---:|---:|---:|---|
-| Hand-written, de + en + hu + pl (62 docs) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [smoke](benchmarks.md#smoke) |
-| Agent traffic, de + en + hu (990 docs) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [agent-traffic](benchmarks.md#agent-traffic) |
-| Nemotron-PII (300) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [nemotron-pii](benchmarks.md#nemotron-pii) |
-| CEE-PII (451) | ⟦B3⟧ | ⟦B3⟧ | ⟦PrivAiTe⟧ | [cee-pii](benchmarks.md#cee-pii) |
-| Gretel finance (400), dataset labels / corrected | ⟦B3⟧ | ⟦B3⟧ | ⟦Presidio⟧ | [gretel-finance](benchmarks.md#gretel-finance) |
-| pl-pii-bench (346), with the Polish pack | ⟦B3⟧ | ⟦B3⟧ | — | [pl-pii-bench](benchmarks.md#pl-pii-bench) |
+| Hand-written, de + en + hu + pl (62 docs) | 0.0 % | 1.3 % | PrivAiTe 13.0 % / 25.7 % | [smoke](benchmarks.md#smoke) |
+| Agent traffic, de + en + hu (990 docs) | 0.2 % | 0.7 % | PrivAiTe 2.4 % / 35.2 % | [agent-traffic](benchmarks.md#agent-traffic) |
+| Nemotron-PII (300) | 0.6 % | 1.5 % | PrivAiTe 4.0 % / 5.6 % | [nemotron-pii](benchmarks.md#nemotron-pii) |
+| CEE-PII (451) | 0.8 % (v2.0: 0.4 %) | 7.3 % | PrivAiTe 4.4 % / 59.2 % | [cee-pii](benchmarks.md#cee-pii) |
+| Gretel finance (400), dataset labels / corrected | 19.1 % / 2.4 % | 24.4 % / 24.4 % | Presidio 18.8 % / 75.4 %; corrected: PrivAiTe 13.2 % / 46.6 % | [gretel-finance](benchmarks.md#gretel-finance) |
+| pl-pii-bench (346), with the Polish pack | 4.2 % (v2.0: 3.5 %) | 10.8 % | — | [pl-pii-bench](benchmarks.md#pl-pii-bench) |
 
 Audit mode (rules + NER + Muse Spark Open on Baseten) stays the opt-in upper bound and
 teacher; its runs are dated 2026-10-27 on the earlier 51-document hand-written set. The

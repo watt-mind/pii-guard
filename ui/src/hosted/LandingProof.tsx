@@ -73,7 +73,7 @@ export function OpenModelsTable() {
   return (
     <figure className="rounded-xl border border-line bg-surface p-4 sm:p-6">
       <h3 className="text-base font-medium text-ink">Our NER against other open PII models</h3>
-      <p className="mt-1 mb-4 text-xs text-muted">Hand-written German, English, Hungarian and Polish set. Each model runs inside PII Guard with the same rules, so only the model differs.</p>
+      <p className="mt-1 mb-4 text-xs text-muted">Hand-written German, English, Hungarian and Polish set. Each model runs inside PII Guard with the same rules, so only the model differs. The other models were scored on an earlier commit; v2.0’s leak, F1 and over-masking were the same on both.</p>
       <Table label="Open model comparison, scrolls sideways" caption="Leak, F1 and over-masking of open PII models with the same rules">
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
@@ -126,7 +126,7 @@ export function ProofFacts() {
       <Fact title="Hungarian inflection">
         Names change with every case, and the ending stays outside the placeholder. On {INFLECTION.docs} hand-written documents full of inflected names, {INFLECTION.leak}&nbsp;% of values leaked, against {INFLECTION.rulesLeak}&nbsp;% with rules alone.
       </Fact>
-      <Fact title="On a CPU, no GPU">{LATENCY.value} added per request ({LATENCY.hint}).</Fact>
+      <Fact title="On a CPU, no GPU">The NER takes {LATENCY.value} per message ({LATENCY.hint}).</Fact>
       {/* Five facts on a three-column grid: the last one closes the row. */}
       <Fact title="Polish, through its language pack" wide>
         {POLISH.leak}&nbsp;% leaked on the public pl-pii-bench set ({POLISH.docs} documents), against {POLISH.rulesLeak}&nbsp;% with rules alone.

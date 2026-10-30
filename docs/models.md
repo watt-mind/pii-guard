@@ -359,15 +359,24 @@ replaced it.
     ([v3.3 results](../eval/results/2026-10-29-ner-v33/README.md)). v2.0 stayed the
     published model through v3.3.
 
-### NER v4, v4.1 and v4.2: ⟦outcome of the pin decision⟧
+### NER v4, v4.1 and v4.2: v4.2 is published
 
 - **v4** (LAB-1535) added the EU phase-1 data to v2.0. It failed the v4 gates; candidate A cut
   the MAPA leak but lost elsewhere ([v4 results](../eval/results/2026-10-29-lab-1535-ner-v4/README.md)).
 - **v4.1** (LAB-1547) kept loose addresses out of the loss. The address and Hungarian fixes
   worked, but birth-date over-masking on agent traffic took their place
   ([v4.1 results](../eval/results/2026-10-30-lab-1547-ner-v41/README.md)).
-- **v4.2** (LAB-1625) ⟦what B3 changed, its gates against v2.0, and why it is (or is not) the
-  published model; link eval/results/2026-10-30-lab-1625-ner-v42/README.md once merged⟧.
+- **v4.2** (LAB-1625) added a selection split built around v4.1's failures, taught implausible
+  third-party birth-date labels as `O` and added targeted fictional data (German genitive names,
+  Hungarian surname plus inflected given name, birth dates next to other dates, reference
+  numbers). Candidate B3 (the targeted data twice) is the first since v2.0 to pass every gate
+  against v2.0: smoke leak 0.00 % and over-masking 1.09 % (v2.0 1.08 %), inflection leak
+  2.0 → 0.0 %, EU total leak 0.95 → 0.32 %, agent-traffic-dev over-masking 1.66 → 0.66 % at the
+  same leak, CPU p95 0.94× v2.0. The owner published it as `v4.2` (revision `33ef18fe`).
+  It is not better everywhere: with the rules it leaks more than v2.0 on CEE-PII (0.79 %
+  against 0.40 %) and Polish pl-pii-bench (4.24 % against 3.52 %), and on TAB court text,
+  scored locally only (5.1 % against 4.0 %); none of these is a gate
+  ([v4.2 results](../eval/results/2026-10-30-lab-1625-ner-v42/README.md)).
 
 ### NER v2.0 in every MAPA language
 
