@@ -44,9 +44,12 @@ for that language with nothing in the logs.
 
 **Overrides keep working.** `register_rule_pack`, `register_inflection` and
 `register_language_forms` still exist and take precedence over the pack's part, so existing
-callers and tests are unaffected. `pii_guard.detect.rules.hu`/`.en` are aliases of the packs'
-rule modules (the same module objects) and `HungarianSuffixMatcher`, `EnglishPossessiveMatcher`
-and `HungarianForms` stay importable from their old modules, for one release.
+callers and tests are unaffected. The pre-pack import paths (`pii_guard.detect.rules.hu`/`.en`
+as aliases of the packs' rule modules, `HungarianSuffixMatcher` and `EnglishPossessiveMatcher`
+from `pii_guard.vault.inflection`, `pii_guard.eval.HungarianForms` and
+`pii_guard.detect.llm.LANGUAGES`) were kept for one release and removed in LAB-1145; import
+from `pii_guard.languages.<code>.rules`, `pii_guard.languages.<code>.inflection`, and use
+`language_forms()` / `language_profile()` instead.
 
 **Conformance is a library**, `pii_guard.languages.conformance`, used by the pytest suite in
 `tests/languages/` (parametrized over every registered pack), by `pii-guard lang check`, and by

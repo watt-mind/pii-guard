@@ -179,15 +179,17 @@ _CARD_CONTEXT = (
 )  # fmt: skip
 
 # Printed in groups of 4 ("4111 1111 1111 1111", Amex "3782 822463 10005") with one consistent
-# separator, or compact. Never part of a longer number.
+# separator, or compact. Never part of a longer number. A comma on either side separates CSV
+# fields, not thousands: only a comma before 1-3 trailing digits blocks, as for other numbers
+# (LAB-1367), so a card in a CSV field ("name,4111111111111111,x") is found (LAB-1381).
 _CARD_RE = re.compile(
-    r"(?<![\w\-./,])(?<!\d )"
+    r"(?<![\w\-./])(?:(?<!\d,)|(?=\d{4}))(?<!\d )"
     r"(?:"
     r"(?P<grouped>\d{4}(?P<sep>[ -])\d{4}(?:(?P=sep)\d{4}){1,2}(?:(?P=sep)\d{1,3})?)"
     r"|(?P<amex>3[47]\d{2}(?P<asep>[ -])\d{6}(?P=asep)\d{5})"
     r"|(?P<compact>\d{12,19})"
     r")"
-    r"(?![\w\-./,]\w)(?! \d)"
+    r"(?!\d)(?![-./]\d)(?!,\d{1,3}(?!\d))" + NOT_IN_WORD_AFTER + r"(?! \d)"
 )
 
 

@@ -22,7 +22,8 @@ The rules:
   (``Teszt\\u200bElek`` reads ``Teszt Elek``). Anywhere else they are dropped like the other
   invisible characters, so one inside a word (``Te\\u200bszt``) still reads ``Teszt``. A
   separator between two words of the same case (``teszt\\u200belek``) cannot be told from one
-  inside a word and is dropped; the vault searches both readings
+  inside a word and is dropped here; the pipeline runs detection over a second, spaced view
+  as well (:func:`spaced_view`), and the vault searches both readings
   (:func:`~pii_guard.vault.fold.fold_views`). The non-joiner and joiner are never read as a
   space: they shape text in Arabic, Persian and Indic scripts.
 - **Combining marks** are composed (NFC) with the character before them, so a decomposed
@@ -77,6 +78,7 @@ __all__ = [
     "ZERO_WIDTH_SEPARATORS",
     "NormalizedText",
     "normalize_for_detection",
+    "spaced_view",
 ]
 
 #: Characters with no visible glyph that can be put inside a value to break matching.
@@ -529,6 +531,40 @@ def _one_for_one_fold(text: str) -> tuple[dict[int, str], bool] | None:
 def normalize_for_detection(text: str) -> NormalizedText:
     """Clean ``text`` for detection with an exact offset map back; see the module docstring."""
     return _normalize(text, fast=True)
+
+
+def spaced_view(text: str) -> str | None:
+    """``text`` with same-case zero-width separators read as spaces, or ``None`` when absent.
+
+    A zero-width separator (U+200B, U+2060, a mid-text U+FEFF) between two letters of the same
+    case is a word boundary the normal form drops (``teszt\\u200belek`` reads ``tesztelek``),
+    so a first sighting written that way never reaches a detector as two words. The spaced
+    view is the same length (one character stands for one), so spans over it map back onto
+    ``text`` offset for offset, covering the separator (LAB-1252). Detection runs over both
+    views only when such a separator is present; clean texts take no second pass.
+    """
+    if "\u200b" not in text and "\u2060" not in text and "\ufeff" not in text:
+        return None
+    out: list[str] | None = None
+    for k, char in enumerate(text):
+        if (
+            char in ZERO_WIDTH_SEPARATORS
+            and 0 < k < len(text) - 1
+            and _same_case(text[k - 1], text[k + 1])
+        ):
+            if out is None:
+                out = list(text)
+            out[k] = " "
+    return "".join(out) if out is not None else None
+
+
+def _same_case(before: str, after: str) -> bool:
+    """Both letters, and both lower case or both upper case (caseless letters never match)."""
+    return (
+        before.isalpha()
+        and after.isalpha()
+        and ((before.islower() and after.islower()) or (before.isupper() and after.isupper()))
+    )
 
 
 def _normalize_reference(text: str) -> NormalizedText:

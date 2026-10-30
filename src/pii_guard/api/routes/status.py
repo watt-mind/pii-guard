@@ -101,7 +101,9 @@ def _static_status(request: Request) -> dict[str, Any]:
     model, audit_reason = _audit(settings)
     policies = gateway_policies(settings, config)
     up = getattr(state, "up_status", None)
-    mock = bool(getattr(up, "mock", False))
+    # `up --mock` marks it through up_status; `make demo` through the settings (LAB-1311):
+    # under `serve` there is no up_status, but the upstream is the separate mock process.
+    mock = bool(getattr(up, "mock", False) or settings.upstream_mock)
     origin = None if mock else upstream_origin(settings.upstream_base_url)
     gaps = _image_gaps(settings)
     return {

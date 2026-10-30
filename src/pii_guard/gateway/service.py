@@ -138,10 +138,13 @@ UPSTREAM_PAYLOAD_LIMIT: ContextVar[int | None] = ContextVar(
 )
 
 
-def check_upstream_payload(payload: bytes) -> None:
-    """Refuse a masked payload larger than the bound its admission was charged for."""
+def check_upstream_payload(payload: bytes, image_bytes: int = 0) -> None:
+    """Refuse a masked payload larger than the bound its admission was charged for.
+
+    ``image_bytes`` (the masked images' data URLs the gateway wrote) is left out: hosted
+    admission charges each image a fixed provider price instead of its bytes (LAB-1439)."""
     limit = UPSTREAM_PAYLOAD_LIMIT.get()
-    if limit is not None and len(payload) > limit:
+    if limit is not None and len(payload) - max(0, image_bytes) > limit:
         raise PayloadTooLargeError("the masked request is larger than its admitted size bound")
 
 
@@ -170,6 +173,9 @@ class RequestStats:
     seeded: int = 0
     spans: Counter[str] = field(default_factory=Counter)
     masked: Counter[str] = field(default_factory=Counter)
+    #: Spans whose masked type a detector forced over a keep-type rule (LAB-1248, LAB-1228):
+    #: counts by entity type only, never values.
+    forced: Counter[str] = field(default_factory=Counter)
     detect_ms: float = 0.0
     detector_ms: dict[str, float] = field(default_factory=dict)
     upstream_status: int | None = None
@@ -181,6 +187,8 @@ class RequestStats:
     image_kept: Counter[str] = field(default_factory=Counter)
     image_ocr: bool | None = None
     image_ms: float = 0.0
+    #: Characters of the masked image data URLs written into the body (not rendered).
+    image_payload_bytes: int = 0
     session_source: SessionSource | None = None
     #: The placeholder note went upstream with the request (LAB-1471).
     note: bool = False
@@ -220,6 +228,7 @@ class RequestStats:
             "cache_hits": self.cache_hits,
             "cache_misses": self.cache_misses,
             "masked": _counts(self.masked),
+            "forced": _counts(self.forced),
             "detect_ms": f"{self.detect_ms:.0f}",
         }
         if self.outbound is not None:
@@ -758,6 +767,7 @@ class Gateway:
             stats.detector_ms[KNOWN_DETECTOR] = stats.detector_ms.get(KNOWN_DETECTOR, 0) + elapsed
         for spans in out:
             stats.spans.update(s.entity_type.value for s in spans)
+            stats.forced.update(s.entity_type.value for s in spans if s.forced_by)
         return out
 
     @staticmethod
@@ -922,7 +932,9 @@ class Gateway:
             stats.image_masked.update({t.value: n for t, n in outcome.counts(Policy.MASK).items()})
             stats.image_kept.update({t.value: n for t, n in outcome.counts(Policy.KEEP).items()})
         for number, (slot, outcome) in enumerate(zip(images, outcomes, strict=True), start=1):
-            slot.write("data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii"))
+            url = "data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii")
+            slot.write(url)
+            stats.image_payload_bytes += len(url)
             if outcome.summary is not None:
                 slot.annotate(image_annotation(number, outcome))
 
@@ -936,11 +948,13 @@ class Gateway:
         max_text_chars: int | None = None,
         received_at: float | None = None,
         path_session: str | None = None,
+        request_id: str | None = None,
     ) -> tuple[Response, RequestStats]:
         """Mask, forward, restore. ``received_at`` (``perf_counter``) starts the timer;
-        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL."""
+        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL. ``request_id``
+        is the id the route assigned up front (LAB-1179); generated here when absent."""
         timer = RequestTimer(received_at)
-        trace = CallTrace(self.observability, timer, body)
+        trace = CallTrace(self.observability, timer, body, request_id=request_id)
         try:
             response, stats = await self._with_session_lease(
                 self._chat_completions(
@@ -1042,7 +1056,7 @@ class Gateway:
         forwarding = time.perf_counter()
         payload = self._forwarded(body, session, stats, add_chat_note)
         try:
-            check_upstream_payload(payload)
+            check_upstream_payload(payload, stats.image_payload_bytes)
         except PayloadTooLargeError:
             stats.log("blocked")
             raise

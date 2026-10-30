@@ -107,6 +107,15 @@ class Settings(BaseSettings):
     hosted_image_timeout: float = Field(default=60, gt=0, le=120)
     hosted_user_images_per_day: int = Field(default=20, ge=1, le=1000)
     hosted_global_images_per_day: int = Field(default=500, ge=1, le=100_000)
+    # Inline images in hosted chat and Responses (LAB-1439): off unless the operator opts in,
+    # and only with hosted_images on. Signed-in Google owners, on their own connection only
+    # (never the sponsored route), through the same local pipeline and one-job pool. Each
+    # image counts once against the daily image count and reserves this many provider input
+    # tokens on top of the text bound: well above what common vision tokenizers charge for
+    # one image at the hosted pixel cap (a few thousand at most).
+    hosted_chat_images: bool = False
+    hosted_chat_max_images: int = Field(default=1, ge=1, le=4)
+    hosted_image_input_tokens: int = Field(default=16_384, ge=1024, le=131_072)
 
     # Detection and policies for the REST API (/v1/analyze, /v1/mask).
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
@@ -141,6 +150,10 @@ class Settings(BaseSettings):
     # Upstream LLM the gateway forwards masked requests to (OpenAI-compatible).
     upstream_base_url: str | None = None
     upstream_api_key: SecretStr | None = None
+    # The configured upstream is the offline mock (LAB-1311): `make demo` sets this when it
+    # starts its mock upstream, so /v1/status and Connect report it as the mock instead of
+    # a real-looking URL. `pii-guard up --mock` marks it through app.state.up_status instead.
+    upstream_mock: bool = False
 
     # Key for deriving pseudonyms (HMAC), hex encoded (openssl rand -hex 32).
     tenant_key: SecretStr | None = None

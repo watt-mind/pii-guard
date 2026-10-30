@@ -128,6 +128,9 @@ def _fields(pack: LanguagePack) -> dict[str, object]:
         # Unknown numbering plans after a phone cue.
         ("Telefon: 0729 11192898", "hu", "0729 11192898", E.PHONE),
         ("hívja a 0136.42246 9041 számot", "hu", "0136.42246 9041", E.PHONE),
+        # Hungarian national formats without a prefix, next to a phone cue (LAB-1094).
+        ("Hívjon a 30/123-4567 számon", "hu", "30/123-4567", E.PHONE),
+        ("Telefon: 30 123 4567", "hu", "30 123 4567", E.PHONE),
         ("Handy: 0158.609.792.0528", "de", "0158.609.792.0528", E.PHONE),
         ("Tel. (95)-7613 3737", "hu", "(95)-7613 3737", E.PHONE),
         ("call us at 0198.08.725 3693", "en", "0198.08.725 3693", E.PHONE),
@@ -168,6 +171,18 @@ def test_a_validated_hit_keeps_its_span_and_score(cued: RuleDetector, plain: Rul
 
 def test_cued_scores_are_below_every_validated_rule() -> None:
     assert CUED_SCORE < 0.7  # the lowest validated score (bare ID card numbers)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "30/123-4567",  # no cue at all: left to the LLM (LAB-1094)
+        "A szám 30/123-4567 volt.",
+        "Rendelés 30/123-4567 szám",  # a reference cue: a reference, not a phone
+    ],
+)
+def test_an_uncued_prefix_less_phone_is_not_masked(cued: RuleDetector, text: str) -> None:
+    assert [s for s in cued.detect(text, "hu") if s.entity_type is E.PHONE] == []
 
 
 @pytest.mark.parametrize(

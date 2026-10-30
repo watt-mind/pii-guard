@@ -165,3 +165,17 @@ def test_local_capabilities_follow_the_log_and_inspector_settings(
     assert body["capabilities"]["logs"] is True
     assert body["capabilities"]["vault"] is False
     assert set(body["capabilities"]) == CAPABILITIES
+
+
+def test_status_reports_the_demo_mock_upstream() -> None:
+    """LAB-1311: under `make demo` the API is plain `serve` (no up_status), but the upstream
+    is the separate mock process: PII_GUARD_UPSTREAM_MOCK marks it as the mock."""
+    app = create_app(
+        Settings(
+            tenant_key=TEST_TENANT_KEY,
+            upstream_base_url="http://127.0.0.1:8790/v1",
+            upstream_mock=True,
+        )
+    )
+    body = TestClient(app, base_url="http://localhost:8787").get("/v1/status").json()
+    assert body["upstream"] == {"configured": True, "mock": True, "origin": None}
