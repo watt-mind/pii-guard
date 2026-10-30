@@ -152,8 +152,8 @@ class HostedMiddleware:
                             scope = route_to_endpoint(scope, owner)
                             path = scope["path"]
                             routed = endpoint_path(path)
-                            if routed is None:
-                                raise HostedRequestError("Endpoint route is unavailable")
+                        if routed is None:
+                            raise HostedRequestError("Endpoint route is unavailable")
                         endpoint_snapshot = await anyio.to_thread.run_sync(
                             self.service.projects.store.resolve_key, auth, routed[0]
                         )

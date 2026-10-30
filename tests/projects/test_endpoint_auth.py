@@ -368,3 +368,64 @@ def test_endpoint_snippet_offers_muse_code():
         in (muse["code"])
     )
     assert 'META_API_KEY="$PII_GUARD_ENDPOINT_KEY" muse' in muse["code"]
+
+
+def test_revoked_endpoint_key_on_the_root_muse_catalog_is_403(gateway):
+    client, resource, key, sent = gateway
+    base = f"/v1/projects/{resource['project_id']}/endpoints/{resource['id']}/keys"
+    assert client.get("/muse-code/models", headers={"Authorization": "Bearer " + key}).is_success
+    for item in client.get(base, headers=OWNER).json()["keys"]:
+        assert client.delete(f"{base}/{item['id']}", headers=OWNER).status_code == 204
+    result = client.get("/muse-code/models", headers={"Authorization": "Bearer " + key})
+    assert result.status_code == 403, result.text
+    assert key not in result.text
+    assert not sent
+
+
+def test_endpoint_key_with_the_api_token_header_on_the_root_catalog_matches_the_endpoint(
+    gateway,
+):
+    client, resource, key, sent = gateway
+    headers = {"Authorization": "Bearer " + key, **OWNER}
+    root = client.get("/muse-code/models", headers=headers)
+    routed = client.get(f"/e/{resource['id']}/muse-code/models", headers=headers)
+    assert root.status_code == routed.status_code == 403, (root.text, routed.text)
+    assert key not in root.text
+    assert API_TOKEN not in root.text
+    assert not sent
+
+
+@pytest.mark.parametrize("path", ["//muse-code/models", "/muse-code/models/"])
+def test_endpoint_key_on_a_near_miss_muse_catalog_path_is_refused(gateway, path):
+    client, _, key, sent = gateway
+    result = client.get(path, headers={"Authorization": "Bearer " + key})
+    assert result.status_code in (401, 403, 404), result.text
+    assert "synthetic-pinned" not in result.text
+    assert not sent
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/v1/models"),
+        ("POST", "/v1/chat/completions"),
+        ("POST", "/v1/responses"),
+        ("GET", "/v1/projects"),
+        ("GET", "/v1/sessions"),
+    ],
+)
+def test_api_token_mode_endpoint_key_reaches_only_the_muse_catalog_at_root(gateway, method, path):
+    # With PII_GUARD_API_TOKEN set, a pg_ep_ key is not the token: at the root it opens only
+    # /muse-code/models (LAB-1462), never another route.
+    client, _, key, sent = gateway
+    body = {"model": "synthetic-pinned", "messages": [{"role": "user", "content": EMAIL}]}
+    result = client.request(
+        method,
+        path,
+        headers={"Authorization": "Bearer " + key},
+        json=body if method == "POST" else None,
+    )
+    assert result.status_code in (401, 403), result.text
+    assert key not in result.text
+    assert not sent
+    assert client.get("/muse-code/models", headers={"Authorization": "Bearer " + key}).is_success
