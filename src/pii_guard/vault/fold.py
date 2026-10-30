@@ -16,7 +16,9 @@ A zero-width separator between two letters of the same case is ambiguous: ``tesz
 may be two words run together or one word with an invisible character put in to break
 matching (``Te\\u200bszt``). The detection fold drops it; :func:`fold_views` also gives the
 reading with every such separator as a space, and the vault searches both, so neither way of
-writing a value hides an occurrence.
+writing a value hides an occurrence. Between a lower-case and an upper-case letter the detection
+fold reads it as a space (``Teszt\\u200bElek``), so :func:`fold_views` also gives the reading
+with every separator dropped (``AbCdEf\\u200bGh12``).
 """
 
 from __future__ import annotations
@@ -30,7 +32,9 @@ from pii_guard.detect.normalize import (
     normalize_for_detection,
 )
 
-__all__ = ["FoldedText", "fold_text", "fold_value", "fold_views", "spaced"]
+__all__ = ["FoldedText", "dropped", "fold_text", "fold_value", "fold_views", "spaced"]
+
+_SOFT_HYPHEN = "\u00ad"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,22 +68,37 @@ def fold_text(text: str) -> FoldedText:
 
 
 def fold_views(text: str) -> tuple[FoldedText, ...]:
-    """The folded views occurrences are searched in: :func:`fold_text`'s, and one more if needed.
+    """The folded views occurrences are searched in: :func:`fold_text`'s, and more if needed.
 
-    The second view reads every zero-width separator between two letters (invisible
-    characters and combining marks aside) as a space: ``teszt\\u200belek`` as ``teszt elek``.
-    It is given only when ``text`` has such a separator; both views map back to ``text``.
+    A second view reads every zero-width separator between two letters (invisible characters
+    and combining marks aside) as a space: ``teszt\\u200belek`` as ``teszt elek``. A third
+    drops every one of them: the detection fold reads a separator between a lower-case and an
+    upper-case letter as a space (``Teszt\\u200bElek``), which would hide a value written with
+    one inside it (``AbCdEf\\u200bGh12``, LAB-1363). Each is given only when ``text`` has such
+    a separator and the view differs from the others; all of them map back to ``text``.
     """
     primary = fold_text(text)
     if text.isascii() or not any(c in ZERO_WIDTH_SEPARATORS for c in text):
         return (primary,)
-    reading = spaced(text)
-    if reading == text:
-        return (primary,)
-    alternative = _fold(text, reading)
-    if alternative.text == primary.text:
-        return (primary,)
-    return primary, alternative
+    views = [primary]
+    for reading in (spaced(text), dropped(text)):
+        if reading == text:
+            continue
+        view = _fold(text, reading)
+        if all(view.text != other.text for other in views):
+            views.append(view)
+    return tuple(views)
+
+
+def dropped(text: str) -> str:
+    """``text`` with every zero-width separator dropped, never read as a space.
+
+    Each is replaced one for one by a soft hyphen, which the detection fold always drops, so
+    offsets into the result are offsets into ``text``.
+    """
+    if not any(c in ZERO_WIDTH_SEPARATORS for c in text):
+        return text
+    return "".join(_SOFT_HYPHEN if c in ZERO_WIDTH_SEPARATORS else c for c in text)
 
 
 def spaced(text: str) -> str:

@@ -6,17 +6,30 @@
   names inside company names (:mod:`.companies`: ``Tóth és Társa Bt.``, ``... e.v.``);
 - inflection (:mod:`.inflection`): case suffixes and the stem changes they cause;
 - LLM prompt notes (``prompt.md``) and every Hungarian-specific entity type;
-- eval surface forms (:mod:`.forms`) and the lexicons in ``pii_guard/lang/data/hu``.
+- eval surface forms (:mod:`.forms`) and the lexicons in ``pii_guard/lang/data/hu``;
+- the synthetic corpus: ``HungarianIdentities`` and ``eval/templates/hu.toml``.
 """
 
 from __future__ import annotations
 
 from importlib.resources import files
+from typing import TYPE_CHECKING
 
 from pii_guard.languages import LanguagePack, LexiconSpec
 from pii_guard.types import EntityType
 
+if TYPE_CHECKING:
+    import random
+
+    from pii_guard.eval.identities import IdentityGenerator
+
 __all__ = ["pack"]
+
+
+def _identities(rng: random.Random) -> IdentityGenerator:
+    from pii_guard.eval.identities import HungarianIdentities
+
+    return HungarianIdentities(rng)
 
 
 def pack() -> LanguagePack:
@@ -63,4 +76,6 @@ def pack() -> LanguagePack:
         captions=files(__name__).joinpath("captions.tsv"),
         cues=files(__name__).joinpath("cues.tsv"),
         brands=files(__name__).joinpath("brands.tsv"),
+        identity_generator=_identities,
+        corpus_templates=files("pii_guard.eval").joinpath("templates", "hu.toml"),
     )

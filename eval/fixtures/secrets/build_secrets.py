@@ -18,10 +18,10 @@ padding plus a truncated value), brackets inside a quoted password, two tokens t
 only in letter case (each needs its own placeholder to round-trip), and ``{...}`` template
 fields after a password key as a hard negative.
 
-Known miss, not in the JSONL: a *literal* quoted password that contains a ``{word}`` group
-(``password="Fake{0000}pw"``) is read as a format field and left unmasked, the same as
-``"{password}"``. The suite's leak limit is 0.0 (``eval/gates.json``), so the case is
-documented here and tracked as a follow-up (LAB-1383) rather than added as a failing document.
+LAB-1383: a *literal* quoted password that contains a ``{word}`` group
+(``password="Fake{0000}pw"``, ``"pre{fix}0000x"``) is a password, not a format field; only a
+real template (the whole value is one field, a field names a secret, two or more fields, a
+``{}`` / ``{0}`` positional or a ``%(x)s`` field) stays unmasked (``neg-template-fields``).
 
 Regenerate after editing (a test fails if the committed file is stale)::
 
@@ -205,6 +205,18 @@ def documents() -> list[Document]:
             f'MYSQL_PWD="{s("[Fake]0pw0000")}"\n',
         ),
         (
+            "brace-literal-password",
+            "code",
+            "# literal passwords that happen to contain a {word} group (LAB-1383)\n"
+            f'password="{s("Fake{0000}pw")}"\n'
+            f"db_password = '{s('pre{fix}0000x')}'\n"
+            f'"passphrase": "{s("Synth9-{bakery}-pass")}"\n'
+            f"MYSQL_PWD=`{s('{fake}0pw0000')}`\n"
+            # Not "...{0000}": a value ending in "}" would close the {{SECRET|...}} markup early;
+            # tests/detect/test_secrets.py covers that shape.
+            f'ADMIN_PASSWORD: "{s("fake0pw{0000}0x")}"\n',
+        ),
+        (
             "case-differing-tokens",
             "chat",
             "We rotated the CI token, the old and the new one look almost the same:\n"
@@ -220,6 +232,15 @@ def documents() -> list[Document]:
             'password = "{password}"\n'
             'password = f"{db_password}"\n'
             "passwd = '%(passwd)s'\n"
+            'password = "pw-{db_password}"\n'
+            'password = "{0}"\n'
+            'password = "Synth{0}pass"\n'
+            'password = "pw{}"\n'
+            'password = "{prefix}-{suffix}"\n'
+            'password = "{cfg.db.password}"\n'
+            'admin_password = "{creds[pw]}"\n'
+            'password = "{{ db_password }}"\n'
+            'password = "${DB_PASSWORD}"\n'
             "password = creds[0]\n"
             "pwd = cfg[password]\n"
             "pwd: /home/bakery/app\n",

@@ -1450,8 +1450,6 @@ As of 2026-10-28, `develop` at `5581013`.
   the 274 specimen text values (milestone 22). MRZ zones, captioned values, the comparison
   with other image tools and placeholder-labelled images are shipped (milestones 18, 22, 26
   and 27).
-- **English names** still missed on Muse-generated English (2.5–5.0 % leak across runs,
-  LAB-1138, triage).
 - **Re-identification from residual context** (39.2 % re-identified with a five-name candidate list,
   chance 20 %; LAB-1152, triage).
 - **Polish.** Fast mode leaks 17.5 % on the public pl-pii-bench set, nearly all national ID

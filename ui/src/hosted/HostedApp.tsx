@@ -24,6 +24,8 @@ import { useCurrentSection } from "./useCurrentSection";
 import { consoleSectionOf } from "./consoleLink";
 import { DeferredSection } from "./DeferredSection";
 import { PublicEvaluation } from "./PublicEvaluation";
+import { ApiReference } from "./ApiReference";
+import { isApiHash } from "./apiConfig";
 import { SignedOutConsole } from "./SignedOut";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -69,6 +71,7 @@ const NAV: readonly { href: string; label: string; wide?: boolean }[] = [
   { href: "#results", label: "Results" },
   { href: "#how", label: "How it works" },
   { href: "#data", label: "Your data", wide: true },
+  { href: "#api", label: "API", wide: true },
 ];
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
 const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
@@ -82,6 +85,8 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
   // Signed in earlier on this page, so an anonymous account now means the session ended.
   const [wasSignedIn, setWasSignedIn] = useState(false);
   if (account?.authenticated && !wasSignedIn) setWasSignedIn(true);
+  // The API reference is static and the same for everyone, signed in or not (LAB-1586).
+  if (isApiHash(hash)) return <ApiReference consoleHref={account?.authenticated && renderConsole ? "#overview" : account?.login_url || LOGIN} />;
   if (renderConsole && account?.authenticated && !SITE_HASHES.has(hash)) return renderConsole({ account, error, refresh, call });
   // A console deep link without a session: say what the screen is and how to get there (LAB-1519).
   const section = renderConsole && account && !account.authenticated ? consoleSectionOf(hash) : null;
@@ -461,6 +466,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <a className="text-ink hover:underline" href={SOURCE}>Source code</a>
           <a className="text-ink hover:underline" href={SELF_HOST}>Self-host</a>
           <a className="text-ink hover:underline" href={`${DOCS}/integrations/README.md`}>Integrate</a>
+          <a className="text-ink hover:underline" href="#api">API reference</a>
           <a className="text-ink hover:underline" href="#data">Your data</a>
           <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks</a>
           {PRIVACY_NOTICE_URL && <a className="text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}

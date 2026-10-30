@@ -229,6 +229,15 @@ def test_language_selects_notes_and_entity_types() -> None:
         assert "PERSON" in content
 
 
+def test_english_notes_ask_for_a_surname_after_a_title() -> None:
+    # LAB-1138: a surname after a title ("Ms Doe") was missed when the full name was already listed,
+    # or never appeared, because the notes only said to drop the title.
+    system, _ = llm.build_messages("text", "en")
+    content = system["content"]
+    assert '"Mr Smith"' in content
+    assert "on its own" in content
+
+
 @pytest.mark.parametrize("language", ["fi", "cs-CZ", "", "xx"])  # "de" and "pl" have packs now
 def test_unknown_language_falls_back(language: str) -> None:
     system, _ = llm.build_messages("Text", language)

@@ -7,12 +7,19 @@ log is on; originals (the client's request, the restored answer) only at level `
 
 The event never holds request headers (so no ``Authorization`` or upstream key), and the
 session only as its :meth:`~pii_guard.observability.traffic.TrafficLog.session_ref`.
+
+``model`` goes upstream verbatim and is checked like an identifier (LAB-1563), so the event
+keeps it only once that check has passed: the outbound re-check ran and found nothing. A
+refused, blocked or failed call gets :data:`MODEL_WITHHELD` instead, in ``model`` and in the
+``full`` original alike (LAB-1358). The upstream's reported model is kept only when the request
+model was and it is model-id shaped.
 """
 
 from __future__ import annotations
 
 import copy
 import json
+import re
 import secrets
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -25,7 +32,31 @@ from pii_guard.types import PiiGuardError
 if TYPE_CHECKING:
     from pii_guard.gateway.service import RequestStats
 
-__all__ = ["CallTrace", "new_request_id"]
+__all__ = ["MODEL_WITHHELD", "CallTrace", "new_request_id"]
+
+#: Stands in for a model name the gateway has not checked (or that is not model-id shaped).
+MODEL_WITHHELD = "[withheld]"
+#: Model ids as providers write them (``org/name:tag``, ``name@version``); no spaces.
+_MODEL_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}")
+
+
+def _contains_email(value: str) -> bool:
+    """True when an e-mail address hides in an otherwise id-shaped string.
+
+    Linear scan rather than a regex, so a hostile model name cannot make it backtrack.
+    """
+    for at, char in enumerate(value):
+        if char != "@" or at == 0 or value[at - 1] in "@/: \t\r\n":
+            continue
+        domain = value[at + 1 :].split("@", 1)[0]
+        for dot in range(1, len(domain) - 2):
+            if (
+                domain[dot] == "."
+                and domain[dot + 1 : dot + 3].isascii()
+                and domain[dot + 1 : dot + 3].isalpha()
+            ):
+                return True
+    return False
 
 
 def new_request_id() -> str:
@@ -39,6 +70,14 @@ def _json(raw: bytes | None) -> Any:
         return json.loads(raw)
     except ValueError:
         return f"[not JSON, {len(raw)} bytes]"
+
+
+def _model_id(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    if _MODEL_ID_RE.fullmatch(value) and not _contains_email(value):
+        return value
+    return MODEL_WITHHELD
 
 
 class CallTrace:
@@ -118,6 +157,15 @@ class CallTrace:
         if outcome == "ok" and stats is not None and (stats.upstream_status or 0) >= 400:
             outcome = "upstream_error"
             error = {"code": "upstream_error", "status": stats.upstream_status}
+        # The model passed its identifier check only if the outbound re-check ran clean.
+        outbound = getattr(stats, "outbound", None)
+        model_checked = outbound is not None and not outbound.hits
+        if not isinstance(self.model, str):
+            model = None
+        elif model_checked:
+            model = _model_id(self.model)
+        else:
+            model = MODEL_WITHHELD
         detectors = sorted((stats.detector_ms if stats else {}).keys())
         if stats is not None and stats.images:
             detectors.append("visual")
@@ -133,7 +181,7 @@ class CallTrace:
             "mode": self.mode,
             "language": self.language,
             "stream": self.stream,
-            "model": self.model if isinstance(self.model, str) else None,
+            "model": model,
             "session_ref": (
                 obs.traffic.session_ref(self.session_id) if self.session_id is not None else None
             ),
@@ -160,9 +208,16 @@ class CallTrace:
             "response": None,
         }
         upstream_answer = _json(self.upstream_body) if self.upstream_body is not None else None
+        answer = self.answer
         if isinstance(upstream_answer, dict):
-            model = upstream_answer.get("model")
-            event["upstream"]["model"] = model if isinstance(model, str) else None
+            reported = _model_id(upstream_answer.get("model"))
+            if reported is not None and not model_checked:
+                reported = MODEL_WITHHELD
+            event["upstream"]["model"] = reported
+            if reported is not None and reported != upstream_answer.get("model"):
+                upstream_answer = {**upstream_answer, "model": reported}
+                if isinstance(answer, dict) and "model" in answer:
+                    answer = {**answer, "model": reported}
             self.usage = upstream_answer.get("usage", self.usage)
         if isinstance(self.usage, dict):
             event["usage"] = {
@@ -179,9 +234,12 @@ class CallTrace:
                 response["masked"] = {"content": _by_choice(self.stream_masked)}
                 response["chunks"] = self.stream_chunks
             if self.full:
-                request["original"] = self.original
-                if self.answer is not None:
-                    response["unmasked"] = self.answer
+                original = self.original
+                if isinstance(original, dict) and model is not None and model != self.model:
+                    original = {**original, "model": model}
+                request["original"] = original
+                if answer is not None:
+                    response["unmasked"] = answer
                 elif self.stream_restored is not None:
                     response["unmasked"] = {"content": _by_choice(self.stream_restored)}
             event["request"] = obs.scrub(request)

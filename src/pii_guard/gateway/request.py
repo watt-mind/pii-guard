@@ -154,14 +154,33 @@ class TextSlot:
 
 #: A line-number gutter, as Muse Code's ``read_file`` prints file lines (``12|Jane ...``),
 #: after the line's leading spaces/tabs (stripped first: no backtracking over them).
-_GUTTER_RE = re.compile(r"\d{1,7}\|")
+_GUTTER_RE = re.compile(r"(\d{1,7})\|")
 
 
-def _gutter(line: str) -> str:
-    """The line's gutter (indentation, number and ``|``), or ``""``."""
+def _gutter(line: str) -> tuple[str, int] | None:
+    """The line's gutter candidate (indentation, number and ``|``) and its number, or ``None``."""
     indent = len(line) - len(line.lstrip(" \t"))
     match = _GUTTER_RE.match(line, indent)
-    return line[: match.end()] if match else ""
+    return (line[: match.end()], int(match.group(1))) if match else None
+
+
+def _gutters(lines: list[str]) -> dict[int, str]:
+    """The line-number gutters of ``lines``, by line index (LAB-1583).
+
+    A ``12|`` prefix is a gutter only inside a run of at least two adjacent lines whose
+    numbers go up by exactly one (``11|``, ``12|``), as ``read_file`` and ``cat -n`` print
+    them. A lone ``1234567|...`` (a pipe-delimited table row with an id) or rows with
+    unrelated numbers stay visible to the detectors and to the outbound re-check: hiding a
+    number that is not a line number would forward it unchecked.
+    """
+    found = {i: g for i, line in enumerate(lines) if (g := _gutter(line))}
+    out: dict[int, str] = {}
+    for i, (gutter, number) in found.items():
+        before = found.get(i - 1)
+        after = found.get(i + 1)
+        if (before and before[1] + 1 == number) or (after and number + 1 == after[1]):
+            out[i] = gutter
+    return out
 
 
 def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
@@ -171,11 +190,12 @@ def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
     in tool outputs and again in the conversation its reminder observers get as a message.
     Glued to the first word, the gutter makes a name detector see ``12|Jane`` as one token and
     mask only the surname. The detectors get each gutter as spaces of the same length (offsets
-    don't move); the masked text gets the gutters back.
+    don't move); the masked text gets the gutters back. Only numbered runs count as gutters
+    (:func:`_gutters`).
     """
     text: str = holder[key]
     lines = text.split("\n")
-    gutters = {i: g for i, line in enumerate(lines) if (g := _gutter(line))}
+    gutters = _gutters(lines)
     if not gutters:
         return TextSlot(text, _setter(holder, key), kind)
     hidden = "\n".join(

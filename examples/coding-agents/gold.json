@@ -18,12 +18,9 @@
   ],
   "ner": [
     "Jane Placeholder",
-    "John Sample"
+    "John Sample",
+    "Teszt Elek",
+    "Max Mustermann"
   ],
-  "known_gaps": {
-    "csv_names": [
-      "Teszt Elek",
-      "Max Mustermann"
-    ]
-  }
+  "known_gaps": {}
 }

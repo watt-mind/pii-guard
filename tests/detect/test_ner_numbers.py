@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from pii_guard.detect.ner import NerDetector, RawEntity
+from pii_guard.detect.ner import NerDetector, RawEntity, model_view
 from pii_guard.detect.ner_numbers import check_numbers, cue_before, number_verdict
 from pii_guard.types import EntityType, Span
 
@@ -18,7 +18,11 @@ E = EntityType
 
 
 class TagBackend:
-    """Tags every occurrence of each ``(value, label)`` pair."""
+    """Tags every occurrence of each ``(value, label)`` pair.
+
+    The model sees glued cell delimiters as spaces (LAB-1258), so values are looked up as the
+    model sees them.
+    """
 
     def __init__(self, tags: list[tuple[str, str]]) -> None:
         self.tags = tags
@@ -26,6 +30,7 @@ class TagBackend:
     def predict(self, text: str) -> list[RawEntity]:
         out = []
         for value, label in self.tags:
+            value = model_view(value)[0]
             start = text.find(value)
             while start >= 0:
                 out.append(RawEntity(label, start, start + len(value), 0.9))
