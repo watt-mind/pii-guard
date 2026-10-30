@@ -20,6 +20,8 @@ dependencies = [
     "cryptography>=46.0.0",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
+    # Meta's official SAM 3.1 output parser (LAB-1665); SAM License, pure Python, no deps.
+    "meta-sam-parser==0.1.0",
     "pillow>=13.0.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",

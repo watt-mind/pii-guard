@@ -17,6 +17,8 @@
 | Synthetic corpus generation | **Muse** (Wonder for documents, Spark for variations) | Meta Model API | **no**: fictional data only |
 | The downstream model in the demo | **Muse Spark** | Meta Model API | **no**: only masked data |
 
+SAM 3.1 output is decoded with Meta's official `meta_sam_parser`.
+
 The rule behind this table: **anything that sees real personal data is an open-weights model
 you can host yourself.** Hosted Meta models only ever see fictional data or masked data.
 
