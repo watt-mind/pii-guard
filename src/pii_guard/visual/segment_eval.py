@@ -61,7 +61,7 @@ import sys
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -175,8 +175,9 @@ class YolosSignatures:  # pragma: no cover - needs torch + transformers and the 
             out, threshold=self.score, target_sizes=[(image.height, image.width)]
         )[0]
         return [
-            (*(float(v) for v in b.tolist()), float(s))
+            (float(vals[0]), float(vals[1]), float(vals[2]), float(vals[3]), float(s))
             for b, s in zip(res["boxes"], res["scores"], strict=True)
+            for vals in (b.tolist(),)
         ]
 
     def segment(
@@ -423,15 +424,15 @@ def score_image(
             out[kind].leaks += cov < LEAK_COVERAGE
             out[kind].leaks_strict += cov < 0.999
     for region in covered:
-        kind = _GROUP.get(region.entity_type)
-        if kind is None:
+        group = _GROUP.get(region.entity_type)
+        if group is None:
             continue
-        out[kind].predicted += 1
-        targets = [box for k, box in expected if k == kind]
+        out[group].predicted += 1
+        targets = [box for k, box in expected if k == group]
         if any(
             iou(box, region.box) >= 0.5 or _inside_share(region.box, box) >= 0.8 for box in targets
         ):
-            out[kind].predicted_ok += 1
+            out[group].predicted_ok += 1
     return out
 
 
@@ -623,7 +624,7 @@ def to_record(
     (record,) = build_records(
         card,
         slug=slug,
-        day=date.today().isoformat(),
+        day=datetime.now(UTC).date().isoformat(),
         hardware=hardware,
         notes=_notes(card),
         extra={

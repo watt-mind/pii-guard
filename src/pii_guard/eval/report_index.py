@@ -417,8 +417,8 @@ def pool_validity(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
     ``matches_headline`` holds when every re-run reproduced its record's counts, and
     ``rerun_headline`` otherwise sums what the breakdowns add up to.
     """
-    vals = [b.get("validity") for b in blocks]
-    if not vals or any(not v for v in vals):
+    vals: list[Mapping[str, Any]] = [v for b in blocks if (v := b.get("validity"))]
+    if not vals or len(vals) != len(blocks):
         return None
     out: dict[str, Any] = {k: _sum_counts([v[k] for v in vals]) for k in _VALIDITY_PARTS}
     per_type: dict[str, Any] = {}
@@ -768,7 +768,7 @@ def build_index(
             if f["generator"]:
                 entry["generators"].add(f["generator"])
     for rec in text:  # sets whose files aren't committed: take document counts from metrics
-        current = versions[rec["fixture_set"]]
+        current_set = versions[rec["fixture_set"]]
         entry = fixture_sets.setdefault(
             rec["fixture_set"],
             {
@@ -780,7 +780,7 @@ def build_index(
             },
         )
         for lang, block in rec["metrics"]["languages"].items():
-            if fixture_shas(rec)[lang] == current[lang]:
+            if fixture_shas(rec)[lang] == current_set[lang]:
                 entry["documents"].setdefault(lang, block["documents"])
     fixture_sets = {
         name: {

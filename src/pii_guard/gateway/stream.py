@@ -67,7 +67,7 @@ class StreamTooLargeError(RuntimeError):
 async def timed_sse_lines(
     response: httpx.Response,
     timer: RequestTimer,
-    timeout: float,
+    timeout: float,  # noqa: ASYNC109 - a per-stream deadline, not a call timeout
 ) -> AsyncIterator[str]:
     """The upstream's lines; time spent waiting on them counts as upstream time.
 

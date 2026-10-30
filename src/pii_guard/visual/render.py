@@ -87,7 +87,7 @@ def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
 
 def _measure(draw: ImageDraw.ImageDraw, text: str, size: int) -> tuple[int, int]:
     left, top, right, bottom = draw.textbbox((0, 0), text, font=_font(size))
-    return right - left, bottom - top
+    return int(right - left), int(bottom - top)
 
 
 def _variants(label: str) -> list[list[str]]:

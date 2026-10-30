@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import hmac
-import os
 import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
@@ -163,7 +163,7 @@ class HostedService:
             or (settings.detectors and any(d not in {"rules", "ner"} for d in settings.detectors))
             or (
                 settings.hosted_sponsored_kill_switch_path is not None
-                and not os.path.isabs(settings.hosted_sponsored_kill_switch_path)
+                and not Path(settings.hosted_sponsored_kill_switch_path).is_absolute()
             )
         ):
             raise ValueError(
@@ -588,7 +588,7 @@ class HostedService:
         if path is None or self.quotas.sponsored_killed:
             return self.quotas.sponsored_killed
         try:
-            os.stat(path)
+            Path(path).stat()
         except FileNotFoundError:
             return False
         except OSError:
