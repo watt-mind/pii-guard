@@ -167,6 +167,18 @@ class TestSoftwareNames:
         text = "Claude sent the invoice yesterday."
         assert kept(text, hit(text, "Claude", E.PERSON)) == ["Claude"]
 
+    def test_short_harness_name_completed_to_a_product(self) -> None:
+        # LAB-1485: "pi" is a surname on its own, so only the software context unmasks it.
+        text = "Read the pi coding agent docs, then run pi-coding-agent."
+        spans = (hit(text, "pi", E.PERSON), hit(text, "pi-coding-agent", E.PERSON))
+        assert kept(text, *spans) == []
+
+    def test_short_harness_name_alone_is_kept(self) -> None:
+        # Bare "pi" (as in "pi's documentation") cannot be told from the surname Pi:
+        # the over-mask is accepted, as for a bare "Claude".
+        text = "pi's documentation: run pi --help"
+        assert kept(text, hit(text, "pi", E.PERSON)) == ["pi"]
+
     def test_lexicon_name_listed_with_software_is_kept(self) -> None:
         text = "Ask Anna or Codex for a review."
         assert kept(text, hit(text, "Anna", E.PERSON), hit(text, "Codex", E.PERSON)) == ["Anna"]
@@ -387,6 +399,36 @@ class TestBareNumbersAsAddress:
         text = "The vault holds up to 4096 keyed digests at 12 Sample Road."
         assert kept(text, hit(text, "12 Sample Road", E.ADDRESS)) == ["12 Sample Road"]
 
+    def test_bare_address_number_without_a_street_is_kept(self) -> None:
+        """LAB-1599: a missing street or city is no reason to drop a number (Ai4Privacy shapes,
+        fictional values). Only a positive non-address sign drops one."""
+        for text, value in (
+            ("Meet near building number 800, where the parade starts.", "800"),
+            ("   • Street: Sample Road\n   • Building No.: 607\n   • City: Exampleton", "607"),
+            ("the zip code for the area is 92004.", "92004"),
+            ("Please send your 123023 to ensure proper mailing.", "123023"),
+            ("Mintaköz 34 in Graz (1040) erfasst.", "1040"),
+            ("a gig-dolgozók a 6000 környékeken élnek", "6000"),
+            ("Mahamat, a Minta utca 94 szám alatt, a 1126 területen", "1126"),
+            ("Meet at Bypass Road #542 for the track.", "542"),
+            ("shipped to County Road 260 #1963", "1963"),
+        ):
+            assert kept(text, hit(text, value, E.ADDRESS)) == [value], text
+
+    def test_labelled_non_address_numbers_go(self) -> None:
+        for text, value in (
+            ("Fixed in PR #295 and issue 4471.", "295"),
+            ("Fixed in PR #295 and issue 4471.", "4471"),
+            ("Upgrade to version 2026 first.", "2026"),
+            ('{"pid": 81215, "timeout": 3000}', "81215"),
+            ("hrsz.: 0123", "0123"),
+        ):
+            assert kept(text, hit(text, value, E.ADDRESS)) == [], text
+
+    def test_weak_sign_next_to_an_address_keeps_it(self) -> None:
+        text = "The office listens to callers at Musterstraße 12, 10115 Berlin."
+        assert kept(text, hit(text, "10115", E.ADDRESS)) == ["10115"]
+
     def test_sweep_leaves_a_bare_port_alone(self) -> None:
         text = "Ports 18790 and 18787."
         s = text.index("18787")
@@ -428,3 +470,40 @@ class TestEponyms:
     def test_full_name_hit_is_kept(self) -> None:
         text = "Peter Luhn test results are ready."
         assert kept(text, hit(text, "Peter Luhn", E.PERSON)) == ["Peter Luhn"]
+
+
+class TestFamilyFirmWords:
+    """LAB-1220: ``Fia`` / ``Társa`` in ``Balogh és Fia Kkt.`` names a relation, not a person."""
+
+    def test_family_word_before_a_legal_form_is_not_a_person(self) -> None:
+        for text, value in (
+            ("Vállalkozó: Balogh és Fia Kkt., képviseli az ügyvezető.", "Fia"),
+            ("A Szabó és Fiai Kkt. ajánlata a legkedvezőbb.", "Fiai"),
+            ("A Szabó és Fiai Kkt.-val szerződtünk.", "Fiai"),
+            ("Bérlő: Pintér Zoltán és Társa Bt. fizet.", "Társa"),
+            ("A Simon & Társa Bt.-vel megyünk tovább.", "Társa"),
+            ("A NÉMETH ÉS FIA KFT. képviselője.", "FIA"),
+            ("A Kiss és Lánya Építő Kft. nyerte.", "Lánya"),
+        ):
+            assert kept(text, hit(text, value, E.PERSON)) == [], text
+            assert sweep_vetoed(
+                text, text.index(value), text.index(value) + len(value), E.PERSON, "hu"
+            )
+
+    def test_the_member_name_is_kept(self) -> None:
+        text = "Vállalkozó: Balogh és Fia Kkt."
+        spans = (hit(text, "Balogh", E.PERSON), hit(text, "Fia", E.PERSON))
+        assert kept(text, *spans) == ["Balogh"]
+
+    def test_without_the_firm_shape_it_is_kept(self) -> None:
+        for text, value in (
+            ("Fia Kkt. ügyvezetője.", "Fia"),  # no connector before it
+            ("Balogh és Fia elutazott.", "Fia"),  # no legal form after it
+            ("Kovács és Fia Anna Kft.", "Fia Anna"),  # a longer hit is a name
+            ("Kovács és Fiala Kft.", "Fiala"),  # a surname, not the family word
+        ):
+            assert kept(text, hit(text, value, E.PERSON)) == [value], text
+
+    def test_other_types_are_untouched(self) -> None:
+        text = "A Balogh és Fia Kkt. ajánlata."
+        assert kept(text, hit(text, "Fia", E.ORGANIZATION)) == ["Fia"]

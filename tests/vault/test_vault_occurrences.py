@@ -173,7 +173,7 @@ def test_suffix_pattern_and_splits_for_a_doubled_final_consonant() -> None:
     # Single consonants still double (Elek -> Elekkel) and restore is unchanged.
     assert ("Elek", "kel") in [(x.lemma, x.suffix) for x in hu.splits("Elekkel", P)]
     assert hu.restore("Varga Bernadett", "vel", P) == "Varga Bernadettel"
-    assert hu.restore("Kiss", "val", P) == "Kissal"
+    assert hu.restore("Kiss", "val", P) == "Kissel"  # re-harmonized (LAB-1152)
 
 
 def test_a_confirmed_doubled_lemma_is_chosen_for_the_inflected_span() -> None:

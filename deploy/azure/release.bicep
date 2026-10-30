@@ -141,9 +141,12 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_TRAFFIC_LOG', value: 'off' }
           { name: 'PII_GUARD_METRICS', value: 'false' }
         ]
+        // Readiness admits the replica while the bundled NER model still loads (LAB-1548):
+        // scale-to-zero cold starts serve the landing page at once, detecting requests wait or
+        // get 503 detector_loading. Full /readyz (model loaded) stays the deploy smoke gate.
         probes: [
           { type: 'Startup', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 60, timeoutSeconds: 5 }
-          { type: 'Readiness', httpGet: { path: '/readyz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5 }
+          { type: 'Readiness', httpGet: { path: '/readyz/serving', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5 }
           { type: 'Liveness', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 30, failureThreshold: 3, timeoutSeconds: 5 }
         ]
       }]

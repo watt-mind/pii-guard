@@ -48,37 +48,43 @@ export function ApiReference({ consoleHref }: { consoleHref: string }) {
             <Logo />
             PII Guard
           </a>
-          <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
+          <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-3 sm:gap-5">
             <a className="hidden text-muted hover:text-ink sm:inline" href="#demo">Demo</a>
             <a className="hidden text-muted hover:text-ink sm:inline" href="#evaluation">Evaluation</a>
-            <span aria-current="page" className="hidden text-ink underline decoration-guard decoration-2 underline-offset-[6px] sm:inline">API</span>
+            <a href="#api" aria-current="page" className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap text-ink underline decoration-accent decoration-2 underline-offset-[6px] pointer-coarse:min-h-11">API</a>
             <ButtonLink href={consoleHref}>Console</ButtonLink>
           </nav>
         </div>
         <div aria-hidden="true" className="header-hairline" />
       </header>
       <main id="main" tabIndex={-1} className="focus:outline-none">
-        <div className="mx-auto max-w-[1280px] px-4 pt-6 sm:px-6 sm:pt-8 lg:px-10">
-          <h1 className="text-xl font-medium tracking-tight sm:text-2xl">API reference</h1>
-          <p className="mt-2 max-w-[68ch] text-muted">
+        <section aria-labelledby="api-title" className="mx-auto max-w-[1280px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p className="inline-flex items-center gap-2 font-mono text-xs text-muted">Developer docs · Read-only reference</p>
+            <ThemeToggle theme={theme} onTheme={setTheme} />
+          </div>
+          <h1 id="api-title" className="mt-4 text-3xl font-medium tracking-tight sm:text-4xl">API reference</h1>
+          <p className="mt-3 max-w-[68ch] leading-relaxed text-muted">
             The OpenAI-compatible gateway and the masking routes. Point an OpenAI SDK at the guard&apos;s <code className="font-mono text-ink">/v1</code> base URL; the provider only sees placeholders.
             This page is read-only and sends no requests.
           </p>
-          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-            <a className="underline underline-offset-4 hover:text-ink" href={GUIDE}>Guide: quickstart, keys, sessions ↗</a>
-            <a className="underline underline-offset-4 hover:text-ink" href={CONTRACTS}>Full contract ↗</a>
-            <a className="underline underline-offset-4 hover:text-ink" href={specUrl} download="pii-guard-openapi.json">openapi.json</a>
-          </p>
+          <nav aria-label="API resources" className="mt-5 flex flex-wrap gap-2">
+            <ButtonLink size="sm" href={GUIDE}>Guide: quickstart, keys, sessions ↗</ButtonLink>
+            <ButtonLink size="sm" href={CONTRACTS}>Full contract ↗</ButtonLink>
+            <ButtonLink size="sm" href={specUrl} download="pii-guard-openapi.json">openapi.json</ButtonLink>
+          </nav>
+        </section>
+        <div className="api-reference-frame mx-auto max-w-[1280px] border-t border-line">
+          {ScalarReference ? (
+            <Suspense fallback={<p role="status" className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">Loading the reference…</p>}>
+              <ScalarReference specUrl={specUrl} dark={dark} />
+            </Suspense>
+          ) : (
+            <p className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">
+              The rendered reference is on the hosted site: <a className="underline underline-offset-4 hover:text-ink" href={HOSTED_REFERENCE}>guard.watt-mind.com/#api ↗</a>
+            </p>
+          )}
         </div>
-        {ScalarReference ? (
-          <Suspense fallback={<p role="status" className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">Loading the reference…</p>}>
-            <ScalarReference specUrl={specUrl} dark={dark} />
-          </Suspense>
-        ) : (
-          <p className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">
-            The rendered reference is on the hosted site: <a className="underline underline-offset-4 hover:text-ink" href={HOSTED_REFERENCE}>guard.watt-mind.com/#api ↗</a>
-          </p>
-        )}
       </main>
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-10">

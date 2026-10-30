@@ -6,6 +6,7 @@ client's default session. Fictional values only (ADR 0005).
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -470,3 +471,142 @@ def test_recreated_session_id_starts_with_clean_cache_and_issued_ids() -> None:
     assert second.headers["x-pii-guard-cache-misses"] == "0"  # served from cache
     assert int(third.headers["x-pii-guard-cache-misses"]) > 0  # clean incarnation: a miss
     assert "call_synthetic_old" not in gateway.issued_ids.of("clean-box")
+
+
+# --- LAB-1580: owner on the session, incarnations in shared caches, /v1/unmask -------------
+
+
+def test_binding_flood_cannot_evict_a_live_sessions_owner() -> None:
+    # The old per-vault index forgot its oldest of 16384 bindings; a flood of distinct
+    # bindings then let a second identity claim the victim's session. The owner now lives
+    # on the session itself.
+    vault = Vault(KEY_A, max_sessions=20000)
+    victim, _, _ = resolve_session(vault, BEARER_1, {}, "victim-box")
+    for number in range(16385):
+        resolve_session(vault, BEARER_2, {}, f"flood-{number}")
+    assert vault.session("victim-box") is victim  # still live
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, BEARER_2, {}, "victim-box")
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, {"X-PII-Guard-Session": "victim-box", **BEARER_2}, {}, None)
+    assert resolve_session(vault, BEARER_1, {}, "victim-box")[0] is victim
+
+
+def test_recreated_session_starts_unowned() -> None:
+    vault = Vault(KEY_A)
+    first, _, _ = resolve_session(vault, BEARER_1, {}, "reborn-box")
+    vault.drop("reborn-box")
+    second, created, _ = resolve_session(vault, BEARER_2, {}, "reborn-box")
+    assert created and second is not first
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, BEARER_1, {}, "reborn-box")
+
+
+def test_owner_bound_during_an_image_fork_commit_survives(monkeypatch: pytest.MonkeyPatch) -> None:
+    # ``check_and_bind`` does not take the session lock, so it can land while ``commit``
+    # replays a fork's journal on its staged copy. The commit must not copy the owner the
+    # session had when it started back over the new binding.
+    from pii_guard.vault.vault import VaultSession
+
+    vault = Vault(KEY_A)
+    session, _, _ = resolve_session(vault, {}, {}, "fork-box")
+    assert session.owner == "anonymous"
+    fork = session.fork()
+    fork.mask("Teszt Elek írt.", [])
+    replay = VaultSession.mask_with_report
+
+    def bind_mid_commit(self: VaultSession, *args: Any, **kwargs: Any) -> Any:
+        if self is not session and self is not fork:  # the staged copy inside commit()
+            sessions.check_and_bind(session, client_identity(BEARER_1))
+        return replay(self, *args, **kwargs)
+
+    monkeypatch.setattr(VaultSession, "mask_with_report", bind_mid_commit)
+    incarnation = session.incarnation
+    session.commit(fork)
+
+    assert session.owner == client_identity(BEARER_1)
+    assert session.incarnation == incarnation
+    with pytest.raises(SessionNotFoundError):
+        resolve_session(vault, BEARER_2, {}, "fork-box")
+
+
+def _shared_gateway(vault: Vault, cache: Any, upstream: MockUpstream) -> Any:
+    """A per-request gateway on a shared vault and cache, as the hosted and project runtimes
+    build them (``hosted/runtime.py``, ``projects/runtime.py``)."""
+    from pii_guard.gateway import Gateway, GatewayConfig, Mode, build_mode_detectors
+
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY, upstream_base_url=UPSTREAM_URL, upstream_api_key=UPSTREAM_KEY
+    )
+    config = GatewayConfig(mode=Mode.AUDIT)
+    return Gateway(
+        settings=settings,
+        vault=vault,
+        config=config,
+        detectors=build_mode_detectors(settings, config, llm_detector=FakeLlm()),
+        cache=cache,
+        transport=upstream.transport(),
+    )
+
+
+def test_recreated_session_starts_clean_with_per_request_gateways() -> None:
+    asyncio.run(_recreated_with_per_request_gateways())
+
+
+async def _recreated_with_per_request_gateways() -> None:
+    from pii_guard.gateway.cache import DetectionCache
+
+    vault, cache, upstream = Vault(KEY_A), DetectionCache(), MockUpstream()
+
+    async def turn() -> Any:
+        gateway = _shared_gateway(vault, cache, upstream)
+        body = {"model": "m", "messages": conversation_turn_one()}  # masked in place
+        try:
+            response, _ = await gateway.chat_completions(body, BEARER_1, path_session="shared-box")
+        finally:
+            await gateway.aclose()
+        return response
+
+    first, second = await turn(), await turn()
+    assert first.status_code == second.status_code == 200
+    assert second.headers["x-pii-guard-cache-misses"] == "0"  # the cache is shared
+    vault.drop("shared-box")
+    third = await turn()  # a new gateway, which never saw the old incarnation
+    assert third.status_code == 200
+    assert int(third.headers["x-pii-guard-cache-misses"]) > 0
+
+
+def test_unmask_honors_the_gateway_binding() -> None:
+    upstream = MockUpstream()
+    with TestClient(make_app(upstream)) as http:
+        bound = chat(http, "/s/unmask-box/v1/chat/completions", **BEARER_1)
+        assert bound.status_code == 200
+        masked = upstream.bodies[-1]["messages"][-1]["content"]
+        assert PLACEHOLDER_RE.search(masked)
+        body = {"session_id": "unmask-box", "text": masked}
+        own = http.post("/v1/unmask", json=body, headers=BEARER_1)
+        other = http.post("/v1/unmask", json=body, headers=BEARER_2)
+        bare = http.post("/v1/unmask", json=body)
+        assert own.status_code == 200
+        assert not PLACEHOLDER_RE.search(own.json()["text"])
+        assert other.status_code == bare.status_code == 404
+        assert other.json()["error"]["code"] == bare.json()["error"]["code"] == "not_found"
+        # Unmasking never binds: the owner keeps the gateway session.
+        assert chat(http, "/s/unmask-box/v1/chat/completions", **BEARER_1).status_code == 200
+
+
+def test_unmask_of_unbound_and_anonymous_sessions_is_unchanged() -> None:
+    upstream = MockUpstream()
+    with TestClient(make_app(upstream)) as http:
+        mask = http.post("/v1/mask", json={"text": "Írj Teszt Eleknek: teszt.elek@example.com"})
+        assert mask.status_code == 200, mask.text
+        unbound = {"session_id": mask.json()["session_id"], "text": mask.json()["masked_text"]}
+        for headers in ({}, BEARER_1, BEARER_2):
+            assert http.post("/v1/unmask", json=unbound, headers=headers).status_code == 200
+        assert chat(http, "/s/anon-box/v1/chat/completions").status_code == 200
+        masked = upstream.bodies[-1]["messages"][-1]["content"]
+        anon = {"session_id": "anon-box", "text": masked}
+        for headers in ({}, BEARER_1):
+            assert http.post("/v1/unmask", json=anon, headers=headers).status_code == 200
+        # Still anonymous-owned (unmask didn't bind BEARER_1): an anonymous turn works.
+        assert chat(http, "/s/anon-box/v1/chat/completions").status_code == 200

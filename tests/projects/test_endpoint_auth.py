@@ -306,3 +306,126 @@ def test_raw_latin1_padded_endpoint_key_passes_to_project_middleware():
     status, seen = anyio.run(_through_middleware, "/e/synthetic/v1/chat/completions", raw)
     assert status == 200  # admission is ProjectMiddleware's call, not a 401 here
     assert seen == raw
+
+
+# --- LAB-1462: the Muse Code catalog for an endpoint key ---------------------------------------
+
+
+def _catalog_ids(result: httpx.Response) -> list[str]:
+    assert result.status_code == 200, result.text
+    return [m["id"] for m in result.json()["data"]]
+
+
+@pytest.mark.parametrize("routed", [False, True], ids=["root", "endpoint-path"])
+def test_endpoint_key_reads_its_endpoint_muse_catalog(gateway, routed):
+    # Muse reads the catalog at the root of its base URL (/muse-code/models), so an endpoint
+    # base URL (/e/<id>/v1) sends the endpoint key there: it lists only the pinned model.
+    client, resource, key, sent = gateway
+    path = f"/e/{resource['id']}/muse-code/models" if routed else "/muse-code/models"
+    result = client.get(path, headers={"Authorization": "Bearer " + key})
+    assert _catalog_ids(result) == ["synthetic-pinned"]
+    assert "muse-code" in result.json()["data"][0]["metadata"]
+    assert not sent
+
+
+def test_fake_endpoint_key_on_the_root_muse_catalog_is_403(gateway):
+    client, _, _, sent = gateway
+    result = client.get("/muse-code/models", headers={"Authorization": "Bearer pg_ep_fake"})
+    assert result.status_code == 403, result.text
+    assert not sent
+
+
+def test_endpoint_key_reaches_no_other_root_route(gateway):
+    client, _, key, sent = gateway
+    result = client.get("/v1/models", headers={"Authorization": "Bearer " + key})
+    assert result.status_code in (401, 403), result.text
+    assert not sent
+
+
+def test_connect_muse_code_catalog_check_works_through_the_endpoint_url(gateway):
+    # What `pii-guard connect muse-code --check` (and Muse) read for an endpoint base URL.
+    from pii_guard.integrations import muse_code
+
+    client, resource, key, _ = gateway
+    base = "http://127.0.0.1:8787" + resource["base_path"]  # the loopback host it allows
+    assert muse_code.fetch_catalog(base, token=key, client=client) == ["synthetic-pinned"]
+
+
+def test_endpoint_snippet_offers_muse_code():
+    from pii_guard.integrations import snippets
+
+    built = snippets.build_endpoint(
+        gateway_url="https://guard.example/e/ep-synthetic/v1",
+        endpoint="ep-synthetic",
+        name="Synthetic endpoint",
+        model="synthetic-pinned",
+        preset=None,
+    )
+    muse = next(t for t in built["tools"] if t["id"] == "muse-code")
+    assert muse["supported"] is True
+    assert (
+        "pii-guard connect muse-code --gateway https://guard.example/e/ep-synthetic/v1"
+        in (muse["code"])
+    )
+    assert 'META_API_KEY="$PII_GUARD_ENDPOINT_KEY" muse' in muse["code"]
+
+
+def test_revoked_endpoint_key_on_the_root_muse_catalog_is_403(gateway):
+    client, resource, key, sent = gateway
+    base = f"/v1/projects/{resource['project_id']}/endpoints/{resource['id']}/keys"
+    assert client.get("/muse-code/models", headers={"Authorization": "Bearer " + key}).is_success
+    for item in client.get(base, headers=OWNER).json()["keys"]:
+        assert client.delete(f"{base}/{item['id']}", headers=OWNER).status_code == 204
+    result = client.get("/muse-code/models", headers={"Authorization": "Bearer " + key})
+    assert result.status_code == 403, result.text
+    assert key not in result.text
+    assert not sent
+
+
+def test_endpoint_key_with_the_api_token_header_on_the_root_catalog_matches_the_endpoint(
+    gateway,
+):
+    client, resource, key, sent = gateway
+    headers = {"Authorization": "Bearer " + key, **OWNER}
+    root = client.get("/muse-code/models", headers=headers)
+    routed = client.get(f"/e/{resource['id']}/muse-code/models", headers=headers)
+    assert root.status_code == routed.status_code == 403, (root.text, routed.text)
+    assert key not in root.text
+    assert API_TOKEN not in root.text
+    assert not sent
+
+
+@pytest.mark.parametrize("path", ["//muse-code/models", "/muse-code/models/"])
+def test_endpoint_key_on_a_near_miss_muse_catalog_path_is_refused(gateway, path):
+    client, _, key, sent = gateway
+    result = client.get(path, headers={"Authorization": "Bearer " + key})
+    assert result.status_code in (401, 403, 404), result.text
+    assert "synthetic-pinned" not in result.text
+    assert not sent
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/v1/models"),
+        ("POST", "/v1/chat/completions"),
+        ("POST", "/v1/responses"),
+        ("GET", "/v1/projects"),
+        ("GET", "/v1/sessions"),
+    ],
+)
+def test_api_token_mode_endpoint_key_reaches_only_the_muse_catalog_at_root(gateway, method, path):
+    # With PII_GUARD_API_TOKEN set, a pg_ep_ key is not the token: at the root it opens only
+    # /muse-code/models (LAB-1462), never another route.
+    client, _, key, sent = gateway
+    body = {"model": "synthetic-pinned", "messages": [{"role": "user", "content": EMAIL}]}
+    result = client.request(
+        method,
+        path,
+        headers={"Authorization": "Bearer " + key},
+        json=body if method == "POST" else None,
+    )
+    assert result.status_code in (401, 403), result.text
+    assert key not in result.text
+    assert not sent
+    assert client.get("/muse-code/models", headers={"Authorization": "Bearer " + key}).is_success

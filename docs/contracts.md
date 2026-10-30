@@ -215,6 +215,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
 | `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
 | `PII_GUARD_NER_WARMUP_TIMEOUT` | `ner_warmup_timeout` | `float` (> 0, seconds): how long a detecting request waits for the background NER load | `120` |
+| `PII_GUARD_BODY_READ_TIMEOUT` | `body_read_timeout` | `float` (> 0, seconds): whole request-body read deadline on the REST API; past it, 408 `request_timeout` and nothing is processed (raise it for large image bodies on slow links) | `30` |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
@@ -367,6 +368,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | Status | `code` | When |
 |---|---|---|
 | 400 | `unsupported_content` | Gateway: the body holds a key or content part outside the [request allow-list](#gateway-request-fields-implemented) (an unknown field, a remote image URL, an audio part). Nothing is forwarded or stored. A malformed gateway body (not JSON, a wrong value type) is `400 invalid_request`. |
+| 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the Anthropic Messages API, which Claude Code speaks, is not served yet. The message points to the OpenAI-compatible routes (`/v1/chat/completions`, `/v1/responses`) and the console's Connect page; the response has `x-should-retry: false`. Nothing is detected, stored or forwarded; the attempt is one `refused` traffic event (model and `stream` only, never the body). |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
@@ -531,6 +533,13 @@ mapping (invented or mangled by the model). They are left in `text` as is. Unkno
 expired `session_id` → 404 `not_found`. Restoring more than
 `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (default 1 000 000) →
 413 `unmask_output_too_large`, with no text (LAB-1350).
+
+Owner rule (LAB-1580): a session that a gateway request bound to a credential (its
+`Authorization` value) unmasks only for that same value. Any other `Authorization` value, or
+none, gets 404 `not_found`, as if the session did not exist. Sessions no gateway request has
+presented, and anonymous-owned ones, unmask for every caller. Unmask only checks the owner: it
+never binds a session. In hosted mode `Authorization` is stripped before routing, so isolation
+there is the per-owner vault.
 
 ### `POST /v1/mask/image`
 
@@ -1028,6 +1037,9 @@ Treatments:
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
   Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
   (`maximum`, `minLength`, ...), are checked the same way.
+  The traffic log keeps a checked `model` only after the check passed (the outbound re-check
+  ran clean): a refused, blocked or failed call records `"[withheld]"` in the event's `model`,
+  and in the `full` original (LAB-1358).
 
 **Chat line-number gutters.** Message content, text/refusal content parts and the string
 fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter handling:
@@ -1657,7 +1669,12 @@ describes the oldest enabled endpoint. `state` is `ready`, `needs_key` (sponsore
 sponsorship is unavailable) or `disabled`. `issue_key: true` issues one endpoint key, returned
 raw only in that response, while the endpoint has no active key. `meta_api_key` converts a
 `needs_key` sponsored default endpoint, in place, to an own-key `meta` endpoint on
-`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The
+`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The key is
+checked for shape first (LAB-1463): surrounding whitespace is dropped, and anything that is not
+one token of 20 to 4096 printable ASCII characters without spaces, quotes or `://` is refused
+with `422 invalid_provider_key` before anything is saved, so the endpoint stays `needs_key` and
+never falls back to sponsored inference. The message names the expected shape, never the value.
+This is a format check only; no provider call verifies the key on save. The
 operation is one atomic store update (a single conditional write on the Blob store, re-read and
 retried up to three times after a conflict), so repeat sign-ins and concurrent first requests never create a second
 endpoint. It spends no daily request or token budget and takes no runtime.

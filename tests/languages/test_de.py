@@ -97,6 +97,15 @@ def test_identifiers(detector: RuleDetector) -> None:
     assert _found(detector, f"RVNR {SV_NUMBER}") == [("ID_DOCUMENT", SV_NUMBER)]
 
 
+def test_checksum_validated_ids_carry_the_validated_subtype(detector: RuleDetector) -> None:
+    # LAB-1380: the resolver treats these as authoritative, so they win an exact-range
+    # type conflict against a higher-score NER span.
+    spans = detector.detect(f"Steuer-ID: {STEUER_ID}", "de")
+    assert [(s.entity_type, s.subtype) for s in spans] == [(E.ID_DOCUMENT, "validated")]
+    spans = detector.detect(f"RVNR {SV_NUMBER}", "de")
+    assert [(s.entity_type, s.subtype) for s in spans] == [(E.ID_DOCUMENT, "validated")]
+
+
 def test_scopes(detector: RuleDetector) -> None:
     # A labelled Steuer-ID and a Sozialversicherungsnummer are found in any language ...
     assert _found(detector, f"Steuer-ID {STEUER_ID}", "en") == [("ID_DOCUMENT", STEUER_ID)]
