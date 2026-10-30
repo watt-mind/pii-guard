@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
 from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
-from pii_guard.vault.fold import FoldedText, fold_value, fold_views, spaced
+from pii_guard.vault.fold import FoldedText, dropped, fold_value, fold_views, spaced
 from pii_guard.vault.inflection import (
     InflectionMatcher,
     Split,
@@ -363,7 +363,9 @@ class _Entry:
             if self.exact is None:
                 self.exact = frozenset(_exact(v) for v in (self.original, *self.surfaces))
             allowed = self.exact
-        return _exact(written) in allowed or _exact(spaced(written)) in allowed
+        return any(
+            _exact(reading) in allowed for reading in (written, spaced(written), dropped(written))
+        )
 
     def remember(self, suffix: str, stem: str) -> None:
         if suffix:

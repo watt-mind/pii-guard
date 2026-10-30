@@ -62,20 +62,26 @@ about the words of a language, and drops a hit only when that shape rules person
    - in a path, a name-like hit in the package segment right after ``node_modules/`` (or in its
      ``@scope`` segment and the package after it) goes: those are npm package names.
 
-7. **Bare numbers as addresses (LAB-1477).** An ``ADDRESS`` hit with digits and no letter
-   (``4096`` in ``up to 4096 keyed digests``, a port, ``"ticket": 4471``, the digits of a SKU)
-   goes when nothing address-like stands next to it. It is kept when:
+7. **Bare numbers as addresses (LAB-1477, narrowed by LAB-1599).** An ``ADDRESS`` hit with
+   digits and no letter goes only when something positive says it is not an address. A missing
+   street or city never decides: a bare house number, building number or postcode
+   (``building number 800``, ``the zip code for the area is 92004``, ``a 1126 területen``) is
+   kept, because a leak costs more than an over-mask. It goes when:
 
-   - a word written as a name touches it (only spaces, ``,`` ``.`` ``-`` ``/`` or a line break
-     between, and no sentence end before a word after it): a settlement or a street
-     (``1051 Budapest``, ``Budapest, 1051``, ``Musterstraße 12``, ``H-6720 Szeged``);
-   - one of the two words before it, or the word after it, on its line is an address word
-     (:data:`_ADDRESS_WORDS`: a street type, ``zip``, ``PLZ``, ``irányítószám``, ``lakcím``):
-     ``Minta utca 12. 3/5.``, ``"zip": 1051``;
-   - another ``ADDRESS`` hit touches it (the model split one address in two).
+   - the word right before it labels a non-address number (:data:`_NON_ADDRESS_LABELS`: a
+     port word, ``ticket``, ``issue``, ``PR``, ``version``, ``build``, ``pid``, ``sku``,
+     ``priority``, ``timeout``, ``minutes``; ``--port 8787``, ``"ticket": 4471``,
+     ``sku: GT-81215``), or ``hrsz``/``helyrajzi`` names it a parcel (the parcel rule masks it);
+   - it is assigned (``VAULT_MAX_KEYS=8192``, ``PORT=8787``); a ``#`` alone is not a sign
+     (``Bypass Road #542``), ``PR #295`` is;
+   - a weaker sign stands near it and nothing address-like does: a port word (``port``,
+     ``Ports``, ``localhost``, ``listens``) on its line within 100 characters, ``up to`` right
+     before it (``up to 4096 keyed digests``), or the shape of an amount (``7869.62``).
+     Address-like means a word written as a name touching it (``1051 Budapest``,
+     ``Musterstraße 12``, ``H-6720 Szeged``), an address word (:data:`_ADDRESS_WORDS`) among
+     the two words before it or the word after it, or another ``ADDRESS`` hit touching it.
 
-   A port word right before it (``port``, ``--port``, ``Ports``) drops it whatever follows. A
-   four-digit number has the shape of a Hungarian postcode, so the shape alone never decides.
+   A four-digit number has the shape of a Hungarian postcode, so the shape alone never decides.
 
 8. **Eponyms (LAB-1477).** A one-word ``PERSON`` hit that is followed by the noun of a method
    (:data:`_METHOD_WORDS`: ``Luhn test``, ``Luhn check``, ``Dijkstra's algorithm``,
@@ -233,12 +239,26 @@ _ADDRESS_SUFFIXES = ("strasse", "weg", "allee", "platz", "gasse")
 _PORT_WORD_RE = re.compile(
     r"^(?:ports?|port(?:on|ot|ra|ja|szam\w*|nummer\w*|e|en|s)|listen|listens|listening)$"
 )
+# LAB-1599: the word right before a number that labels it as something other than an address,
+# folded. Only a positive sign like this drops a bare-number ADDRESS hit; a missing street or
+# city does not. "number", "no", "szam" and "line" are not here: they label house numbers too.
+_NON_ADDRESS_LABELS: tuple[str, ...] = (
+    "ticket*", "issue*", "pr", "pull", "version*", "ver", "build", "pid", "sku", "priority",
+    "timeout", "minute*", "second*", "ms", "hrsz", "helyrajzi*",
+)  # fmt: skip
+_PORT_HOST_RE = re.compile(r"^(?:localhost|listen\w*)$")
+_UP_TO_RE = re.compile(r"(?:\bup to|\bbis zu|\blegfeljebb)[ \t\u00a0]$", re.IGNORECASE)
+_CODE_LETTERS_RE = re.compile(r"^[A-Z]{1,4}$")
+_AMOUNT_RE = re.compile(r"^\d{1,9}\.\d{2}$")
 # What may stand between a number and a word that makes it an address: spaces, a comma, a
 # full stop, a hyphen (``H-1051``), a slash or a line break; at most three characters.
 _ADDRESS_GAP_RE = re.compile(r"^[ \t\u00a0,.\-\u2013/\r\n]{1,3}$")
 _LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
 # A full stop and a space after the number end its sentence: the next word is not its city.
 _SENTENCE_END_RE = re.compile(r"\.\s")
+# Between a label and its number: spaces, a quote, a full stop, a colon, an equals sign, a dash
+# or a "#" (``PR #295``). A "#" alone says nothing: ``Bypass Road #542`` is a house number.
+_LABEL_GAP_RE = re.compile(r"^[ \t\u00a0\"'.:=#\-]{1,4}$")
 # The noun of a method after an eponym, folded. English forms are listed whole (``tested``
 # is a verb); Hungarian and German forms take suffixes (``algoritmussal``, ``Prüfsummen``).
 _METHOD_WORDS: tuple[str, ...] = (
@@ -528,28 +548,28 @@ def _address_word(word: str) -> bool:
     return _listed(word, _ADDRESS_WORDS) or _fold(word).endswith(_ADDRESS_SUFFIXES)
 
 
-def _bare_number_address(text: str, start: int, end: int, addresses: Sequence[Span] = ()) -> bool:
-    """A letterless ``ADDRESS`` hit with nothing address-like next to it (module rule 7)."""
-    value = text[start:end]
-    if not any(ch.isdigit() for ch in value) or any(ch.isalpha() for ch in value):
-        return False
+def _port_word(word: str) -> bool:
+    folded = _fold(word).lstrip("-")
+    return bool(_PORT_WORD_RE.match(folded) or _PORT_HOST_RE.match(folded))
+
+
+def _address_context(text: str, start: int, end: int, addresses: Sequence[Span]) -> bool:
+    """Something address-like touches the number: a name, an address word, an address hit."""
     line_start = text.rfind("\n", 0, start) + 1
     line_end = text.find("\n", end)
     line_end = len(text) if line_end < 0 else line_end
     before = list(_LETTER_WORD_RE.finditer(text, max(line_start, start - 30), start))
     after = list(_LETTER_WORD_RE.finditer(text, end, min(line_end, end + 30)))
-    if before and _PORT_WORD_RE.match(_fold(before[-1].group()).lstrip("-")):
-        return True
     for other in addresses:
         if (other.start, other.end) == (start, end):
             continue
         if other.start < end and start < other.end:
-            return False  # overlapping: one address
+            return True  # overlapping: one address
         gap = text[other.end : start] if other.end <= start else text[end : other.start]
         if not gap or _ADDRESS_GAP_RE.match(gap):
-            return False  # touching: the model split one address in two
+            return True  # touching: the model split one address in two
     if any(_address_word(m.group()) for m in [*before[-2:], *after[:1]]):
-        return False
+        return True
     # A word written as a name touching the number (a line break may stand between).
     near = list(_LETTER_WORD_RE.finditer(text, max(0, start - 40), start))
     if (
@@ -557,14 +577,68 @@ def _bare_number_address(text: str, start: int, end: int, addresses: Sequence[Sp
         and _ADDRESS_GAP_RE.match(text[near[-1].end() : start])
         and _name_shaped(near[-1].group())
     ):
-        return False
+        return True
     nxt = _LETTER_WORD_RE.search(text, end, min(len(text), end + 40))
-    return not (
+    return (
         nxt is not None
-        and _ADDRESS_GAP_RE.match(text[end : nxt.start()])
+        and _ADDRESS_GAP_RE.match(text[end : nxt.start()]) is not None
         and not _SENTENCE_END_RE.search(text[end : nxt.start()])
         and _name_shaped(nxt.group())
     )
+
+
+def _labelled_non_address(text: str, start: int, end: int) -> bool:
+    """The number is labelled, assigned or numbered as something other than an address."""
+    if (
+        start >= 2
+        and text[start - 1] == "="
+        and (text[start - 2].isalnum() or text[start - 2] == "_")
+    ):
+        return True  # VAULT_MAX_KEYS=8192, PORT=8787
+    line_start = text.rfind("\n", 0, start) + 1
+    before = list(_LETTER_WORD_RE.finditer(text, max(line_start, start - 30), start))
+    anchor = start
+    if (
+        before
+        and _CODE_LETTERS_RE.match(before[-1].group())
+        and text[before[-1].end() : start] == "-"
+    ):
+        anchor = before.pop().start()  # the letters of a code (GT-81215): read the label before
+    if before:
+        last = before[-1]
+        if _LABEL_GAP_RE.match(text[last.end() : anchor]) and (
+            _PORT_WORD_RE.match(_fold(last.group()).lstrip("-"))
+            or _listed(last.group(), _NON_ADDRESS_LABELS)
+        ):
+            return True
+    nxt = _LETTER_WORD_RE.search(text, end, min(len(text), end + 8))
+    return (
+        nxt is not None
+        and _ADDRESS_GAP_RE.match(text[end : nxt.start()]) is not None
+        and _listed(nxt.group(), ("hrsz", "helyrajzi*"))
+    )
+
+
+def _bare_number_address(text: str, start: int, end: int, addresses: Sequence[Span] = ()) -> bool:
+    """A letterless ``ADDRESS`` hit with a positive non-address sign (module rule 7)."""
+    value = text[start:end]
+    if not any(ch.isdigit() for ch in value) or any(ch.isalpha() for ch in value):
+        return False
+    if _labelled_non_address(text, start, end):
+        return True
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    line_end = len(text) if line_end < 0 else line_end
+    window = [
+        *_LETTER_WORD_RE.finditer(text, max(line_start, start - 100), start),
+        *_LETTER_WORD_RE.finditer(text, end, min(line_end, end + 100)),
+    ]
+    weak = (
+        any(_port_word(m.group()) for m in window)
+        or _UP_TO_RE.search(text, max(0, start - 12), start) is not None
+        or _AMOUNT_RE.match(value.strip()) is not None
+    )
+    return weak and not _address_context(text, start, end, addresses)
 
 
 def _eponym(text: str, start: int, end: int, persons: Sequence[Span]) -> bool:

@@ -11,7 +11,9 @@ from the ranges Ofcom sets aside for drama, and checksummed identifiers are vali
 issued to nobody.
 
 Language-independent pieces (IBANs, e-mail addresses, number grouping) are shared; each
-language adds its names, address format, phone formats and national identifiers::
+language adds its names, address format, phone formats and national identifiers. A language
+contributes its generator through its pack (``LanguagePack.identity_generator``, ADR 0010):
+Hungarian and English are defined here, German in ``pii_guard.languages.de.identities``::
 
     rng = random.Random("42/hu/7")
     ids = identity_generator("hu", rng)
@@ -27,7 +29,7 @@ from __future__ import annotations
 import datetime as dt
 import random
 import unicodedata
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 
 from pii_guard.detect.checksums import (
@@ -38,6 +40,7 @@ from pii_guard.detect.checksums import (
     taj_check_digit,
 )
 from pii_guard.lang import lexicon, postcode_index
+from pii_guard.languages import get_pack, packs, primary_language
 from pii_guard.types import EntityType
 
 __all__ = [
@@ -97,6 +100,8 @@ FIELD_TYPES: dict[str, EntityType] = {
     "email": EntityType.EMAIL,
     "phone": EntityType.PHONE,
     "tax_id": EntityType.NATIONAL_ID_HU_TAX,
+    # German Steuer-ID: the taxonomy has no German type (as for SSNs and NINOs)
+    "steuer_id": EntityType.ID_DOCUMENT,
     "taj": EntityType.NATIONAL_ID_HU_TAJ,
     "id_document": EntityType.ID_DOCUMENT,
     "bank_account": EntityType.BANK_ACCOUNT,
@@ -155,6 +160,7 @@ class Person(_Record):
     mother_name: str | None = None
     tax_id: str | None = None
     taj: str | None = None
+    steuer_id: str | None = None
 
     def _optional(self) -> list[Value]:
         return [
@@ -748,15 +754,43 @@ class EnglishIdentities(IdentityGenerator):
         )
 
 
-LANGUAGES: dict[str, type[IdentityGenerator]] = {
-    "hu": HungarianIdentities,
-    "en": EnglishIdentities,
-}
+class _PackGenerators(Mapping[str, Callable[[random.Random], IdentityGenerator]]):
+    """``code -> generator factory`` for every language pack with an ``identity_generator``
+    (a live view of :mod:`pii_guard.languages`, like :data:`pii_guard.detect.llm.LANGUAGES`)."""
+
+    def _factories(self) -> dict[str, Callable[[random.Random], IdentityGenerator]]:
+        return {
+            code: pack.identity_generator
+            for code, pack in packs().items()
+            if pack.identity_generator is not None
+        }
+
+    def __getitem__(self, code: str) -> Callable[[random.Random], IdentityGenerator]:
+        pack = get_pack(code)
+        if pack is None or pack.identity_generator is None or primary_language(code) != code:
+            raise KeyError(code)
+        return pack.identity_generator
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._factories())
+
+    def __len__(self) -> int:
+        return len(self._factories())
+
+
+#: The languages with a synthetic corpus generator, from the language packs (ADR 0010).
+LANGUAGES: Mapping[str, Callable[[random.Random], IdentityGenerator]] = _PackGenerators()
 
 
 def identity_generator(language: str, rng: random.Random) -> IdentityGenerator:
-    """The generator for ``language`` (``"hu"``, ``"en"``; ``"en-GB"`` -> ``"en"``)."""
-    code = language.split("-", 1)[0].lower()
-    if code not in LANGUAGES:
+    """The generator of ``language``'s pack (``"hu"``, ``"en"``, ``"de"``; ``"en-GB"``: ``en``)."""
+    pack = get_pack(language)
+    if pack is None or pack.identity_generator is None:
         raise ValueError(f"no identity generator for language {language!r}")
-    return LANGUAGES[code](rng)
+    generator = pack.identity_generator(rng)
+    if not isinstance(generator, IdentityGenerator):
+        raise TypeError(
+            f"language pack {pack.code!r}: identity_generator returned a "
+            f"{type(generator).__name__}, not an IdentityGenerator"
+        )
+    return generator

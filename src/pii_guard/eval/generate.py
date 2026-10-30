@@ -2,9 +2,11 @@
 
 For every document index the generator, deterministically from ``(seed, language, index)``:
 
-1. picks a document template (``templates/<language>.toml``: sale contract, lease, power of
+1. picks a document template from the language pack's ``corpus_templates`` (ADR 0010;
+   ``templates/<language>.toml`` for Hungarian and English: sale contract, lease, power of
    attorney, land registry extract, court notice, invoice, letter, informal e-mail, chat);
-2. draws fictional identities for its parties (:mod:`pii_guard.eval.identities`: names and
+2. draws fictional identities for its parties (the pack's ``identity_generator``, see
+   :mod:`pii_guard.eval.identities`: names and
    places sampled from the language pack's lexicons, :mod:`pii_guard.lang`) and a few
    **hard negatives**, ordinary phrases that look like personal data but aren't (a surname
    that is a common word, used as the word; a town outside an address; "Eladó lakás"), which
@@ -75,6 +77,7 @@ from pii_guard.eval.fixtures import Document, FixtureError, GoldSpan, parse_docu
 from pii_guard.eval.forms import find_surface_forms
 from pii_guard.eval.identities import Value, identity_generator
 from pii_guard.lang import LexiconUnavailable, available_kinds, lexicon, lexicon_digest
+from pii_guard.languages import get_pack, on_change
 from pii_guard.types import EntityType
 
 __all__ = [
@@ -238,14 +241,27 @@ def _template_text(name: str) -> str:
     return files("pii_guard.eval").joinpath("templates", name).read_text(encoding="utf-8")
 
 
+def _corpus_templates(language: str) -> str:
+    """The TOML text of ``language``'s pack's ``corpus_templates`` (ADR 0010)."""
+    pack = get_pack(language)
+    if pack is None or pack.corpus_templates is None or pack.identity_generator is None:
+        raise GenerationError(
+            f"no document templates for language {language!r}: its language pack has no "
+            "corpus_templates and identity_generator (the language is measured on its smoke "
+            "set only)"
+        )
+    try:
+        return pack.corpus_templates.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise GenerationError(
+            f"document templates for {language!r} are unreadable: {type(exc).__name__}"
+        ) from exc
+
+
 @cache
 def load_language(language: str) -> LanguagePack:
-    """Parse ``templates/<language>.toml`` (``"en-GB"`` -> ``en.toml``)."""
-    code = language.split("-", 1)[0].lower()
-    try:
-        raw = tomllib.loads(_template_text(f"{code}.toml"))
-    except FileNotFoundError:
-        raise GenerationError(f"no document templates for language {language!r}") from None
+    """Parse the document templates of ``language``'s pack (``"en-GB"`` -> the ``en`` pack)."""
+    raw = tomllib.loads(_corpus_templates(language))
     kinds = tuple(
         DocumentTemplate(
             id=k["id"],
@@ -279,6 +295,9 @@ def load_language(language: str) -> LanguagePack:
         kinds=kinds,
         hard_negatives=_hard_negatives(raw.get("hard_negatives")),
     )
+
+
+on_change(load_language.cache_clear)
 
 
 def _hard_negatives(raw: Mapping[str, Any] | None) -> HardNegatives | None:
@@ -862,7 +881,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Generate a labelled synthetic corpus with a Meta Muse model "
         "(fictional identities only).",
     )
-    parser.add_argument("--language", default="hu", help="hu or en (default: hu)")
+    parser.add_argument(
+        "--language", default="hu", help="a language pack with a corpus: hu, en or de (default: hu)"
+    )
     parser.add_argument("--n", type=int, default=20, help="documents to plan (default: 20)")
     parser.add_argument("--seed", type=int, default=42, help="corpus seed (default: 42)")
     parser.add_argument("--start", type=int, default=0, help="first document index")
