@@ -59,6 +59,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
+from pii_guard.detect.normalize import normalize_for_detection
 from pii_guard.detect.pipeline import DetectionPipeline
 from pii_guard.eval.fixtures import Document, GoldSpan, ignore_regions
 from pii_guard.eval.forms import find_surface_forms, language_forms, surface_pattern
@@ -66,7 +67,7 @@ from pii_guard.eval.stats import percentile
 from pii_guard.policy import DEFAULT_POLICIES, PolicySet
 from pii_guard.registry import create_detector
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, Detector, EntityType, Span
-from pii_guard.vault import PLACEHOLDER_RE, Vault, normalize_value
+from pii_guard.vault import CASE_SENSITIVE_TYPES, PLACEHOLDER_RE, Vault, normalize_value
 from pii_guard.vault.inflection import inflection_for, splits
 
 __all__ = [
@@ -315,6 +316,29 @@ def _digits_left(span: GoldSpan, replacements: Sequence[tuple[int, int, str]]) -
     return any(_digits_at_edge(span.text, covered, i, j) for i, j in _gaps(span.text, covered))
 
 
+_WHITESPACE_RUN = re.compile(r"\s+")
+
+
+def _value_key(entity_type: EntityType, value: str) -> str:
+    """The key a gold value is grouped by, as the vault keys it (LAB-1350, LAB-1382).
+
+    :func:`normalize_value` (case-folded) for most types. :data:`CASE_SENSITIVE_TYPES`
+    (``SECRET``) keep their case: ``AbC1`` and ``aBc1`` are two credentials with two
+    placeholders, so they are two values here too. Only the detection fold (invisible
+    characters, Unicode form, spaces and dashes) and whitespace runs are normalized.
+    """
+    if entity_type in CASE_SENSITIVE_TYPES:
+        return _WHITESPACE_RUN.sub(" ", normalize_for_detection(value).text).strip()
+    return normalize_value(value)
+
+
+def _same_value(entity_type: EntityType, value: str, written: str) -> bool:
+    """Whether ``written`` (a case-insensitive surface match) is ``value`` for its type."""
+    if entity_type not in CASE_SENSITIVE_TYPES:
+        return True
+    return _value_key(entity_type, written) == _value_key(entity_type, value)
+
+
 def leak_report(
     doc: Document,
     masked_text: str,
@@ -334,7 +358,7 @@ def leak_report(
     groups: dict[tuple[EntityType, str], list[GoldSpan]] = defaultdict(list)
     for span in doc.spans:
         if policy.get(span.entity_type, "mask") == "mask":
-            groups[(span.entity_type, normalize_value(span.text))].append(span)
+            groups[(span.entity_type, _value_key(span.entity_type, span.text))].append(span)
 
     # Tokens that also occur outside every gold span don't prove anything when they survive.
     outside = list(doc.text)
@@ -345,7 +369,10 @@ def leak_report(
     report: list[ValueLeak] = []
     for (entity_type, _), spans in groups.items():
         value = spans[0].text
-        leaked = bool(find_surface_forms(clean, value, entity_type, doc.language))
+        leaked = any(
+            _same_value(entity_type, value, clean[a:b])
+            for a, b in find_surface_forms(clean, value, entity_type, doc.language)
+        )
         partial = False
         if not leaked:
             for token in _identifying_tokens(value, entity_type, forms.stopwords):
@@ -385,9 +412,13 @@ def _gold_entities(doc: Document, policy: Mapping[EntityType, str]) -> list[list
     candidates = [s for s in doc.spans if policy.get(s.entity_type, "mask") == "mask"]
     for span in sorted(candidates, key=lambda s: (len(s.text), s.start)):
         for head, members in groups:
-            if head.entity_type is span.entity_type and (
-                normalize_value(head.text) == normalize_value(span.text)
-                or surface_pattern(head.text, head.entity_type, doc.language).fullmatch(span.text)
+            if head.entity_type is not span.entity_type:
+                continue
+            if _value_key(head.entity_type, head.text) == _value_key(
+                span.entity_type, span.text
+            ) or (
+                _same_value(head.entity_type, head.text, span.text)
+                and surface_pattern(head.text, head.entity_type, doc.language).fullmatch(span.text)
             ):
                 members.append(span)
                 break

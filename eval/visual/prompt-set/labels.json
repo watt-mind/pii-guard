@@ -1,0 +1,368 @@
+{
+  "version": 1,
+  "description": "Exact regions of the prompt-study set, keyed by image SHA-256.",
+  "box_format": "[x1, y1, x2, y2] as fractions of the image width and height",
+  "method": "Ink bounding box of each pasted signature or stamp (+3 px); pasted photo box.",
+  "specimens": {
+    "570da151366546df26bc145f9ea8c3d7764755f2ab1635243f895003bb0aa05d": {
+      "id": "scribble-01",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6471,
+            0.603,
+            0.7357
+          ]
+        }
+      ]
+    },
+    "521b93cdc9931203911af8fda01a068cfac0fe323954d074aa8e163c2c6c4497": {
+      "id": "scribble-02",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6729,
+            0.559,
+            0.7943
+          ]
+        }
+      ]
+    },
+    "c0ef551e0820a391348af6236161dbd966e53ce218c3c4b8f317f9bb6d2ce107": {
+      "id": "scribble-03",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6871,
+            0.499,
+            0.7914
+          ]
+        }
+      ]
+    },
+    "b49ffe4bf5e0eb38ad2c7dc5f2ba8f88a5cea1cb7ef8ff77fee58d6bed7dd8a2": {
+      "id": "scribble-04",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6814,
+            0.545,
+            0.7671
+          ]
+        }
+      ]
+    },
+    "72c3425af69121afc15ca7af6dc7ed4815a38a9fef699068755679b8bebb44fa": {
+      "id": "script-01",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6929,
+            0.466,
+            0.7657
+          ]
+        }
+      ]
+    },
+    "a106730914f0a4f4eaa40b58f68f7683a3e974b40bbbf97b778c15b7f5fa39c5": {
+      "id": "script-02",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6514,
+            0.563,
+            0.7743
+          ]
+        }
+      ]
+    },
+    "d1092bb664bdeafebf8bba7f7ccbffc954994ec9fe00731c9f29ead020f8b0e8": {
+      "id": "script-03",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6586,
+            0.478,
+            0.76
+          ]
+        }
+      ]
+    },
+    "6398fec6742c4ed94f1c60c0fa14e59ce7b17a3664ca97e20a4cf2c4279680a9": {
+      "id": "script-04",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6957,
+            0.502,
+            0.7929
+          ]
+        }
+      ]
+    },
+    "02ba50f60a7167a5ad7ed5d3b6211594e065ed5a38418398b2137dc2b54b69fe": {
+      "id": "scanned-01",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6571,
+            0.561,
+            0.7957
+          ]
+        }
+      ]
+    },
+    "853299fdbd390bfbff686e86014a8d9660645eb2761956c160fc9556b80f0bdb": {
+      "id": "scanned-02",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6986,
+            0.473,
+            0.7929
+          ]
+        }
+      ]
+    },
+    "3c2a8b12f7f7de87305f5b1a78abfd5294885348474f3cfcdabc4141406f2530": {
+      "id": "scanned-03",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6986,
+            0.572,
+            0.81
+          ]
+        }
+      ]
+    },
+    "0be849472f484b0539d0919c8deedf713ee244f69c10383e694c521c50da06f9": {
+      "id": "scanned-04",
+      "regions": [
+        {
+          "type": "signature",
+          "entity": "SIGNATURE",
+          "box": [
+            0.197,
+            0.6657,
+            0.575,
+            0.7871
+          ]
+        }
+      ]
+    },
+    "8e5f7f15f52277e4b2d0cebea11eb733696f5b788d6a4c97026cd401bc49399b": {
+      "id": "id-photo-01",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "ID_PHOTO",
+          "box": [
+            0.0395,
+            0.1724,
+            0.165,
+            0.431
+          ]
+        }
+      ]
+    },
+    "82b1027cb03bf7790ffc2fa68f51a2e64d4c1d166326b8476fd107e02087950b": {
+      "id": "id-photo-02",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "ID_PHOTO",
+          "box": [
+            0.0395,
+            0.1724,
+            0.2668,
+            0.6426
+          ]
+        }
+      ]
+    },
+    "1ae8ce59cab9368404e6849748fff54ae146e2ce08853546b1a6d0b9e44b0543": {
+      "id": "id-photo-03",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "ID_PHOTO",
+          "box": [
+            0.0395,
+            0.1724,
+            0.2668,
+            0.6426
+          ]
+        }
+      ]
+    },
+    "72d600ad2ac55958a46a3b8cd1cc3f6c7a180a7a045e44b0ca1fbffd45ec6f0e": {
+      "id": "id-photo-04",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "ID_PHOTO",
+          "box": [
+            0.0395,
+            0.1724,
+            0.165,
+            0.431
+          ]
+        }
+      ]
+    },
+    "1cee2d10603189d4de87378f16be7158e64c63427ca6af56f5e540aabf5e9c68": {
+      "id": "id-photo-05",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "ID_PHOTO",
+          "box": [
+            0.0395,
+            0.1724,
+            0.2668,
+            0.6426
+          ]
+        }
+      ]
+    },
+    "e96687dbded2ff3f615d9c1ceaf8b6d3c798cb536817f5f8c8b2da5ea475d66a": {
+      "id": "id-photo-06",
+      "regions": [
+        {
+          "type": "portrait",
+          "entity": "ID_PHOTO",
+          "box": [
+            0.0395,
+            0.1724,
+            0.2668,
+            0.6426
+          ]
+        }
+      ]
+    },
+    "7a17c82ae4aa577f2199336d90274c85559eb59a05ee911e818460f9adba868b": {
+      "id": "stamp-01",
+      "regions": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.439,
+            0.2771,
+            0.616,
+            0.53
+          ]
+        }
+      ]
+    },
+    "a54899b49a8e239f8a8a1be2e36bbc47b0adbbf55b1fda851de80a29ba1d44c2": {
+      "id": "stamp-02",
+      "regions": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.607,
+            0.6,
+            0.891,
+            0.8229
+          ]
+        }
+      ]
+    },
+    "96d7585c9168f1460ba5ccca9e7510e6fb1df4689b55385b28d3c79f2b85f4c7": {
+      "id": "stamp-03",
+      "regions": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.67,
+            0.6386,
+            0.851,
+            0.8971
+          ]
+        }
+      ]
+    },
+    "dbbf10236b6241adc2fc9d6d988bdde9366e54f9ca9c20787420394f7d6bf2b2": {
+      "id": "stamp-04",
+      "regions": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.457,
+            0.2957,
+            0.787,
+            0.5814
+          ]
+        }
+      ]
+    },
+    "f3ed97066ece908e1237dae8d185df00bbf3801df4ea83b4c1150e44468dc581": {
+      "id": "stamp-05",
+      "regions": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.6,
+            0.6414,
+            0.786,
+            0.9071
+          ]
+        }
+      ]
+    },
+    "e5f2d76c8ce406be2f2d63b5158c113e2bfa5dea121d660e97607179a4809bbd": {
+      "id": "stamp-06",
+      "regions": [
+        {
+          "type": "stamp",
+          "entity": "STAMP",
+          "box": [
+            0.589,
+            0.6543,
+            0.901,
+            0.8671
+          ]
+        }
+      ]
+    }
+  }
+}

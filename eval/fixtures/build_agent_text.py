@@ -168,12 +168,19 @@ LUHN_PROSE = (
     "run the Luhn check again after the edit. Keep the Levenshtein distance under 3."
 )
 
+# LAB-1258: a delimited file with no personal data, cells glued by the delimiter.
+INVENTORY_CSV = (
+    "$ cat inventory.csv\nsku,qty,status,warehouse\nGT-81215,3,active,north\n"
+    "GT-81216,0,backorder,south\nGT-81217,12,discontinued,north"
+)
+
 
 def _negatives(prompt: str, edit: str) -> list[str]:
     return [
         SYSTEM_OPENCODE, prompt, edit, SKILLS_MUSE, SKILLS_XML, LS_OUTPUT, TOOL_SUMMARY, CODE,
         CODEX_CACHE_KEY, CODEX_TURN_METADATA, CODEX_CLIENT_METADATA, OPENCODE_BASH,
         OPENCODE_DEBUG, PI_INSTALL_PATH, OPERATIONS_DOC, TICKET_TOOL_RESULT, LUHN_PROSE,
+        INVENTORY_CSV,
     ]  # fmt: skip
 
 
@@ -244,9 +251,18 @@ def _positives(lang: str) -> list[str]:
         f"Ship ticket 4471 to {A('Musterstraße 12, 10115 Berlin')} for {P(de_name)}; the proxy "
         f"on port 18787 logs it. Card holder for the Luhn test card: {P(hu_name)}."
     )
+    # LAB-1258: an id column before the name, so the name's first word is glued to a comma
+    # (examples/coding-agents/mini-repo/customers.csv), and a read_file line-number gutter.
+    csv_with_ids = (
+        "Tool result (read_file customers.csv):\n1|id,name,email,phone,status\n"
+        f"2|2,{P('Teszt Elek')},{E('teszt.elek@example.com')},{PH('+36 30 123 4567')},active\n"
+        f"3|3,{P('Max Mustermann')},{E('max.mustermann@example.de')},{PH('+49 30 12345678')},"
+        "inactive"
+    )
     return [
         prompts[lang], cat_json, csv_fence, export_path, edit_with_value, metadata_values,
         uuid_prose, command_with_name, path_with_name, address_record, shipping_note,
+        csv_with_ids,
     ]  # fmt: skip
 
 

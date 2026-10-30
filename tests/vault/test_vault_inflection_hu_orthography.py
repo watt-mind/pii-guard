@@ -64,11 +64,11 @@ def test_old_digraph_forms_are_masked_and_round_trip(
     [
         ("Kiss Tóth", "val", "Kiss Tóthtal"),
         ("Kiss Tóth", "al", "Kiss Tóthtal"),
-        ("Kiss Tóth", "vel", "Kiss Tóthtel"),
+        ("Kiss Tóth", "vel", "Kiss Tóthtal"),  # re-harmonized (LAB-1152)
         ("Kiss Tóth", "vá", "Kiss Tóthtá"),
         ("Kiss Tóth", "nak", "Kiss Tóthnak"),
         ("Gipsz Kovácz", "val", "Gipsz Kováczcal"),
-        ("Gipsz Kovácz", "vel", "Gipsz Kováczcel"),
+        ("Gipsz Kovácz", "vel", "Gipsz Kováczcal"),  # re-harmonized
         ("Kovács", "val", "Kováccsal"),
         ("Elek", "vel", "Elekkel"),
         ("Próba Zsuzsanna", "ának", "Próba Zsuzsannának"),

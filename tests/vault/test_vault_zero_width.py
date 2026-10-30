@@ -8,7 +8,7 @@ fictional (ADR 0005).
 from __future__ import annotations
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from vault_helpers import TEST_KEY, span_of
 
@@ -114,6 +114,9 @@ def _cased(word: str, how: str) -> str:
 
 
 @settings(max_examples=200, deadline=None)
+# LAB-1307: "Aaából" reads as the lengthened stem "Aaá" + "-ból", so the value itself masks as
+# "[[PERSON_…]]ból"; the separated occurrence must split the same way, not more or less.
+@example(words=["aa", "aaából"], how="lower", seps=[ZWSP, ZWSP], replace=False)
 @given(
     words=st.lists(_WORD, min_size=2, max_size=3),
     how=st.sampled_from(["lower", "upper", "title"]),
@@ -130,11 +133,20 @@ def test_separator_between_words_never_hides_an_occurrence(
     text = f"{value} írt. Később {written} is."
     s = session()
     masked = s.mask(text, [span_of(text, value, P)], language="hu")
-    tail = masked[masked.index("Később") :]
-    assert "[[PERSON_" in tail
+    head, tail = masked.split(" írt. ")
     assert not any(sep in tail for sep in SEPARATORS)
-    # Nothing of the occurrence is left beside the placeholder.
-    assert PLACEHOLDER_RE.sub(" ", tail).split() == ["Később", "is."]
+    assert tail.startswith("Később ") and tail.endswith(" is.")
+    occurrence = tail[len("Később ") : -len(" is.")]
+    # The occurrence is masked exactly like the value's own span. Intended (LAB-1307): when the
+    # value itself splits as lemma + Hungarian suffix (``Aaából`` -> ``Aaá`` + ``ból``), the
+    # placeholder covers the stem and that suffix stays outside it, in both places, so unmask
+    # re-inflects it. Nothing else of the occurrence is left beside the placeholder.
+    first, second = PLACEHOLDER_RE.match(head), PLACEHOLDER_RE.match(occurrence)
+    assert first is not None and second is not None
+    assert first.group(0) == second.group(0)
+    suffix = head[first.end() :]
+    assert occurrence[second.end() :].casefold() == suffix.casefold()
+    assert value.casefold().endswith(suffix.casefold()) and not any(c.isspace() for c in suffix)
 
 
 # --- a separator at a lower -> upper split inside a confirmed value (LAB-1363) ---------------
