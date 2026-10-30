@@ -1,4 +1,22 @@
+import type { HTMLAttributes } from "react";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type EntityType } from "../api/types";
+
+export type ActivateHandler = (key: string | null, anchor?: HTMLElement | null) => void;
+
+/** Hover, focus, and Escape dismissal props for an interactive entity mark or placeholder chip. */
+export function activationHandlers(key: string, onActivate?: ActivateHandler): HTMLAttributes<HTMLElement> {
+  if (!onActivate) return {};
+  return {
+    tabIndex: 0,
+    onMouseEnter: (e) => onActivate(key, e.currentTarget),
+    onMouseLeave: () => onActivate(null),
+    onFocus: (e) => onActivate(key, e.currentTarget),
+    onBlur: () => onActivate(null),
+    onKeyDown: (e) => {
+      if (e.key === "Escape") onActivate(null);
+    },
+  };
+}
 
 /** docs/contracts.md, "Placeholder format". */
 export const PLACEHOLDER_SOURCE = String.raw`\[\[([A-Z][A-Z0-9_]*)_([0-9a-f]{4,})\]\]`;
@@ -88,6 +106,25 @@ export type RestoredSegment =
   | { kind: "restored"; text: string; placeholder: string; entityType: EntityType | null }
   | { kind: "unresolved"; text: string; entityType: EntityType | null };
 
+function matchesExpectedHint(unmasked: string, cursor: number, hint: string | undefined, next: Token | undefined): hint is string {
+  if (!hint || !unmasked.startsWith(hint, cursor)) return false;
+  if (next === undefined) return cursor + hint.length === unmasked.length;
+  return next.kind === "text" ? unmasked.startsWith(next.text, cursor + hint.length) : true;
+}
+
+function resolvePlaceholderEnd(
+  unmasked: string,
+  cursor: number,
+  hint: string | undefined,
+  next: Token | undefined,
+): number | null {
+  if (matchesExpectedHint(unmasked, cursor, hint, next)) return cursor + hint.length;
+  if (next === undefined) return unmasked.length;
+  if (next.kind !== "text") return null; // Two placeholders back to back can't be told apart; give up on highlighting.
+  const end = unmasked.indexOf(next.text, cursor);
+  return end < 0 ? null : end;
+}
+
 /**
  * `expected(placeholder, cursor)` may return the value a placeholder is known
  * to stand for (from the analysed input); it settles ambiguous alignments such
@@ -117,29 +154,8 @@ export function alignRestored(
       cursor += token.text.length;
       continue;
     }
-    const next = tokens[i + 1];
-    const hint = expected?.(token.text, cursor);
-    let end: number;
-    if (
-      hint !== undefined &&
-      hint.length > 0 &&
-      unmasked.startsWith(hint, cursor) &&
-      (next === undefined
-        ? cursor + hint.length === unmasked.length
-        : next.kind === "text"
-          ? unmasked.startsWith(next.text, cursor + hint.length)
-          : true)
-    ) {
-      end = cursor + hint.length;
-    } else if (next === undefined) {
-      end = unmasked.length;
-    } else if (next.kind === "text") {
-      end = unmasked.indexOf(next.text, cursor);
-      if (end < 0) return null;
-    } else {
-      // Two placeholders back to back can't be told apart; give up on highlighting.
-      return null;
-    }
+    const end = resolvePlaceholderEnd(unmasked, cursor, expected?.(token.text, cursor), tokens[i + 1]);
+    if (end === null) return null;
     segments.push({
       kind: "restored",
       text: unmasked.slice(cursor, end),
@@ -149,6 +165,15 @@ export function alignRestored(
     cursor = end;
   }
   return cursor === unmasked.length ? segments : null;
+}
+
+function resolveLooseAnchor(unmasked: string, cursor: number, text: string): { end: number; remainingText: string } | null {
+  // The suffix glued to the value (its leading letters) may have been re-inflected.
+  const suffix = /^\p{L}{0,6}/u.exec(text)?.[0].length ?? 0;
+  const anchorFrom = suffix < text.length ? suffix : 0;
+  const remainingText = text.slice(anchorFrom);
+  const end = unmasked.indexOf(remainingText, cursor);
+  return end < 0 ? null : { end, remainingText };
 }
 
 /**
@@ -165,30 +190,22 @@ export function alignLoose(masked: string, unmasked: string): RestoredSegment[] 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]!;
     if (token.kind === "text") {
-      if (unmasked.startsWith(token.text, cursor)) {
-        segments.push({ kind: "text", text: token.text });
-        cursor += token.text.length;
-        continue;
-      }
-      return null;
+      if (!unmasked.startsWith(token.text, cursor)) return null;
+      segments.push({ kind: "text", text: token.text });
+      cursor += token.text.length;
+      continue;
     }
     // Swallow any directly following placeholders into this value (they can't be told apart).
     let j = i + 1;
     while (tokens[j]?.kind === "placeholder") j++;
     const next = tokens[j];
-    let end: number;
-    if (next === undefined) {
-      end = unmasked.length;
-    } else {
-      const text = next.text;
-      // The suffix glued to the value (its leading letters) may have been re-inflected.
-      const suffix = /^\p{L}{0,6}/u.exec(text)?.[0].length ?? 0;
-      const anchorFrom = suffix < text.length ? suffix : 0;
-      const at = unmasked.indexOf(text.slice(anchorFrom), cursor);
-      if (at < 0) return null;
-      end = at;
+    let end = unmasked.length;
+    if (next !== undefined) {
+      const anchored = resolveLooseAnchor(unmasked, cursor, next.text);
+      if (!anchored) return null;
+      end = anchored.end;
       // The changed head of the next run belongs to this value's suffix.
-      tokens[j] = { kind: "text", text: text.slice(anchorFrom) };
+      tokens[j] = { kind: "text", text: anchored.remainingText };
     }
     segments.push({ kind: "restored", text: unmasked.slice(cursor, end), placeholder: token.text, entityType: token.entityType });
     cursor = end;

@@ -65,6 +65,100 @@ export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureInterv
 
 type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 
+function entityOptionLabel(ty: EntityType | string): string {
+  const meta = metaFor(ty);
+  return meta.label === "Unknown type" ? ty : meta.label;
+}
+
+function matchesLogFilters(e: TrafficEvent, filters: Filters): boolean {
+  if (filters.mode !== "all" && e.mode !== filters.mode) return false;
+  if (filters.type !== "all" && (maskedCounts(e)[filters.type] ?? 0) === 0 && (e.entities?.detected[filters.type] ?? 0) === 0) return false;
+  return !filters.problems || e.outcome !== "ok";
+}
+
+function LogControlsBar({
+  t,
+  demoTraffic,
+  sendDemo,
+  cleared,
+  onClear,
+  modes,
+  types,
+  filters,
+  onFilters,
+}: {
+  t: TrafficHandle;
+  demoTraffic: boolean;
+  sendDemo: typeof sendDemoTraffic;
+  cleared: number;
+  onClear: () => void;
+  modes: string[];
+  types: EntityType[];
+  filters: Filters;
+  onFilters: (f: Filters) => void;
+}) {
+  return (
+    <section aria-label="Controls" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={t.paused ? "primary" : "secondary"}
+          onClick={() => t.setPaused(!t.paused)}
+          aria-pressed={t.paused}
+          disabled={t.replayDone && !t.paused}
+          title={t.replayDone && !t.paused ? "The recorded replay has finished" : undefined}
+        >
+          {t.paused ? (
+            <>
+              <PlayIcon /> Resume{t.held ? ` (${t.held} new)` : ""}
+            </>
+          ) : (
+            <>
+              <PauseIcon /> Pause
+            </>
+          )}
+        </Button>
+        <Button
+          onClick={onClear}
+          disabled={!t.events.length && !t.held}
+          title="Clears this page only; the server keeps its log"
+        >
+          Clear view
+        </Button>
+        {t.source === "api" && t.status.state === "live" && demoTraffic && <DemoButton key={cleared} send={sendDemo} />}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <label className="flex items-center gap-2 text-muted">
+          Mode
+          <span className="w-32">
+            <Select value={filters.mode} onChange={(e) => onFilters({ ...filters, mode: e.target.value })}>
+              <option value="all">All</option>
+              {modes.map((m) => (
+                <option key={m} value={m}>
+                  {m.charAt(0).toUpperCase() + m.slice(1)}
+                </option>
+              ))}
+            </Select>
+          </span>
+        </label>
+        <label className="flex items-center gap-2 text-muted">
+          Entity
+          <span className="w-44">
+            <Select value={filters.type} onChange={(e) => onFilters({ ...filters, type: e.target.value as Filters["type"] })}>
+              <option value="all">All types</option>
+              {types.map((ty) => (
+                <option key={ty} value={ty}>
+                  {entityOptionLabel(ty)}
+                </option>
+              ))}
+            </Select>
+          </span>
+        </label>
+        <Checkbox label="Blocked or failed only" checked={filters.problems} onChange={(e) => onFilters({ ...filters, problems: e.target.checked })} />
+      </div>
+    </section>
+  );
+}
+
 /**
  * "Open session in <endpoint>" re-scopes the console, which remounts it (LAB-1619): the call
  * to reopen, and to put focus back on, once the endpoint's log has it.
@@ -87,16 +181,7 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
   const endpointSelected = useSelectedEndpoint() !== null;
   const lastTime = t.events.length ? Date.parse(t.events[t.events.length - 1]!.time) : 0;
 
-  const filtered = useMemo(
-    () =>
-      t.events.filter(
-        (e) =>
-          (filters.mode === "all" || e.mode === filters.mode) &&
-          (filters.type === "all" || (maskedCounts(e)[filters.type] ?? 0) > 0 || (e.entities?.detected[filters.type] ?? 0) > 0) &&
-          (!filters.problems || e.outcome !== "ok"),
-      ),
-    [t.events, filters],
-  );
+  const filtered = useMemo(() => t.events.filter((e) => matchesLogFilters(e, filters)), [t.events, filters]);
   // Backend restarts noticed while these calls arrived: the divider renders above the
   // first call of each new run (LAB-1366). A filtered-out first call hides its divider too.
   const breaksById = useMemo(() => new Map(t.runBreaks.map((b) => [b.beforeId, b])), [t.runBreaks]);
@@ -158,71 +243,21 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
 
       <SourceBanner source={t.source} status={t.status} apiStatus={t.apiStatus} forced={forceFixture} paused={t.paused} onFixture={t.showFixture} onRetry={t.retryApi} replayDone={t.replayDone} onReplay={t.replay} />
 
-      <section aria-label="Controls" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant={t.paused ? "primary" : "secondary"}
-            onClick={() => t.setPaused(!t.paused)}
-            aria-pressed={t.paused}
-            disabled={t.replayDone && !t.paused}
-            title={t.replayDone && !t.paused ? "The recorded replay has finished" : undefined}
-          >
-            {t.paused ? (
-              <>
-                <PlayIcon /> Resume{t.held ? ` (${t.held} new)` : ""}
-              </>
-            ) : (
-              <>
-                <PauseIcon /> Pause
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={() => {
-              t.clear();
-              setSelectedId(null);
-              setCleared((n) => n + 1);
-            }}
-            disabled={!t.events.length && !t.held}
-            title="Clears this page only; the server keeps its log"
-          >
-            Clear view
-          </Button>
-          {t.source === "api" && t.status.state === "live" && demoTraffic && <DemoButton key={cleared} send={sendDemo} />}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <label className="flex items-center gap-2 text-muted">
-            Mode
-            <span className="w-32">
-              <Select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })}>
-                <option value="all">All</option>
-                {modes.map((m) => (
-                  <option key={m} value={m}>
-                    {m.charAt(0).toUpperCase() + m.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            </span>
-          </label>
-          <label className="flex items-center gap-2 text-muted">
-            Entity
-            <span className="w-44">
-              <Select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value as Filters["type"] })}>
-                <option value="all">All types</option>
-                {types.map((ty) => {
-                  const meta = metaFor(ty);
-                  return (
-                    <option key={ty} value={ty}>
-                      {meta.label === "Unknown type" ? ty : meta.label}
-                    </option>
-                  );
-                })}
-              </Select>
-            </span>
-          </label>
-          <Checkbox label="Blocked or failed only" checked={filters.problems} onChange={(e) => setFilters({ ...filters, problems: e.target.checked })} />
-        </div>
-      </section>
+      <LogControlsBar
+        t={t}
+        demoTraffic={demoTraffic}
+        sendDemo={sendDemo}
+        cleared={cleared}
+        onClear={() => {
+          t.clear();
+          setSelectedId(null);
+          setCleared((n) => n + 1);
+        }}
+        modes={modes}
+        types={types}
+        filters={filters}
+        onFilters={setFilters}
+      />
 
       <dl className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-x-8" aria-label="Summary of the calls shown">
         <Metric label={filtered.length === t.events.length ? "Calls" : `Calls (of ${t.events.length}, filtered)`} value={filtered.length} />
