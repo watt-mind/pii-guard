@@ -305,7 +305,7 @@ class HostedMiddleware:
                 headers = Headers(scope=scope)
             # Text routes stay text-sized; the image route gets its own bounded limit, and
             # so does a signed-in owner's direct chat while the operator offers chat images
-            # (LAB-1439). A chat body without an image part is held to the text limit below.
+            # (LAB-1439). The non-image bytes of a chat body are held to the text limit below.
             chat_images = (
                 chat_images_enabled(self.service.settings)
                 and canonical in {"/v1/chat/completions", "/v1/responses"}
@@ -364,7 +364,11 @@ class HostedMiddleware:
                 inline_images, image_bytes = (
                     count_chat_images(canonical, body) if chat_images else (0, 0)
                 )
-                if not inline_images and len(raw) > text_limit:
+                # The text limit holds with or without images: only the inline images' own
+                # base64 (the encoded length of their decoded bytes, never more than their
+                # data URLs take in ``raw``) is left out, so ``len(raw) - image_bytes`` is an
+                # upper bound on everything else in the body.
+                if len(raw) - image_bytes > text_limit:
                     raise HostedRequestError("Hosted request body is too large")
                 if inline_images:
                     # Images go to the owner's own provider only: the sponsored allowance

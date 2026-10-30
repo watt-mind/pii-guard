@@ -29,7 +29,7 @@ from pii_guard.config import Settings
 from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT, check_upstream_payload
 from pii_guard.hosted.images import IMAGE_ANNOTATION_BYTES, chat_body_limit, chat_image_charge
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits, upstream_payload_bound
-from pii_guard.types import EntityType, PayloadTooLargeError
+from pii_guard.types import DetectionError, EntityType, PayloadTooLargeError
 from pii_guard.visual import OcrWord
 from pii_guard.visual.ocr import TesseractOcr
 from pii_guard.visual.regions import Box, Region
@@ -301,6 +301,82 @@ def test_text_only_body_keeps_the_text_limit(hosted: Hosted) -> None:
     assert response.status_code == 403
     assert "too large" in response.json()["error"]["message"]
     assert not seen
+
+
+def test_tiny_image_does_not_lift_the_text_limit(hosted: Hosted) -> None:
+    client, seen, calls = hosted
+    headers = connect(client)
+    limit = client.app.state.hosted.settings.hosted_max_body_bytes
+    pixel = io.BytesIO()
+    Image.new("RGB", (1, 1)).save(pixel, format="PNG")
+    body = chat_body(data_url(pixel.getvalue()), text="x" * (limit + 10))
+    assert len(json.dumps(body)) < chat_body_limit(client.app.state.hosted.settings)
+    response = client.post("/v1/chat/completions", json=body, headers=headers)
+    assert response.status_code == 403
+    assert "too large" in response.json()["error"]["message"]
+    assert calls.ocr == 0 and not seen
+    assert all(u.images == 0 for u in client.app.state.hosted.quotas._users.values())
+
+
+def test_ocr_unavailable_refuses_before_forwarding(hosted: Hosted) -> None:
+    client, seen, calls = hosted
+    headers = connect(client)
+    client.app.state.ocr_engine = None
+    response = client.post("/v1/chat/completions", json=chat_body(data_url()), headers=headers)
+    assert response.status_code == 503, response.text
+    assert response.json()["error"]["code"] == "ocr_unavailable"
+    assert calls.ocr == 0 and not seen
+
+
+@pytest.mark.parametrize(
+    ("segmenter", "code"),
+    [("missing", "detection_failed"), ("not-local", "detection_profile_denied")],
+)
+def test_missing_segmenter_refuses_before_forwarding(
+    hosted: Hosted, monkeypatch: pytest.MonkeyPatch, segmenter: str, code: str
+) -> None:
+    client, seen, calls = hosted
+    headers = connect(client)
+    if segmenter == "missing":
+        # No segmenter on the app, and the on-device one cannot be built (no face model).
+        client.app.state.sam_client = None
+
+        def unbuildable(*args: Any, **kwargs: Any) -> Any:
+            raise DetectionError("the on-device face model is not installed")
+
+        monkeypatch.setattr("pii_guard.hosted.images.build_segmenter", unbuildable)
+    else:
+        client.app.state.sam_client = object()
+    response = client.post("/v1/chat/completions", json=chat_body(data_url()), headers=headers)
+    assert response.status_code == 503, response.text
+    assert response.json()["error"]["code"] == code
+    assert calls.ocr == 0 and not seen
+
+
+def test_image_pipeline_timeout_refuses_before_forwarding(monkeypatch: pytest.MonkeyPatch) -> None:
+    for client, seen, calls in _client(monkeypatch, hosted_image_timeout=0.2):
+        headers = connect(client)
+        release = threading.Event()
+        ocr = client.app.state.ocr_engine
+
+        def stuck(
+            image: Image.Image, calls: Calls = calls, release: threading.Event = release
+        ) -> list[OcrWord]:
+            calls.ocr += 1
+            release.wait(10)
+            return list(WORDS)
+
+        ocr.words = stuck  # type: ignore[method-assign]
+        try:
+            response = client.post(
+                "/v1/chat/completions", json=chat_body(data_url()), headers=headers
+            )
+        finally:
+            release.set()
+        assert response.status_code == 503, response.text
+        assert response.json()["error"]["code"] == "detection_failed"
+        assert "timed out" in response.json()["error"]["message"]
+        assert calls.ocr == 1 and not seen
 
 
 def test_body_beyond_the_image_limit_refused(hosted: Hosted) -> None:
