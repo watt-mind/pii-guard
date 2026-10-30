@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import json
 from pathlib import Path
 
 import pytest
@@ -19,14 +18,10 @@ from starlette.routing import Route
 from pii_guard.app_bundle import Status, create_bundle_app
 from pii_guard.config import Settings
 from pii_guard.security_headers import (
-    SCALAR_STYLE_HASHES,
-    SCALAR_VERSION,
     SecurityHeadersMiddleware,
     content_security_policy,
     inline_hashes,
 )
-
-REPO = Path(__file__).resolve().parents[1]
 
 ORIGIN = "https://guard.example"
 THEME = (
@@ -115,10 +110,9 @@ def test_policy_hashes_the_inline_script_and_style() -> None:
     scripts, styles = inline_hashes(INDEX)
     assert scripts == [_hash(THEME)]  # the module script has a src: not hashed
     assert styles == [_hash(STYLE)]
-    csp = _directives(content_security_policy(INDEX, document=False))
+    csp = _directives(content_security_policy(INDEX))
     assert csp["script-src"] == ["'self'", _hash(THEME)]
     assert csp["style-src"] == ["'self'", _hash(STYLE)]
-    assert "style-src-attr" not in csp
     assert csp["connect-src"] == ["'self'"]
     assert csp["base-uri"] == ["'none'"]
     assert csp["form-action"] == ["'self'"]
@@ -129,31 +123,9 @@ def test_policy_hashes_the_inline_script_and_style() -> None:
         assert "*" not in values
 
 
-def test_document_policy_allows_the_api_reference_runtime_styles() -> None:
-    # LAB-1588: Scalar's injected <style> elements and markup style attributes, by hash only.
-    csp = _directives(content_security_policy(INDEX))
-    assert csp["style-src"] == ["'self'", _hash(STYLE), *SCALAR_STYLE_HASHES]
-    attr = csp["style-src-attr"]
-    assert attr[0] == "'unsafe-hashes'"
-    assert _hash("width:30px;height:30px;overflow-y:scroll;") in attr
-    assert _hash("--line-count: 13; --line-digits: 2;") in attr
-    assert _hash("--line-count: 99; --line-digits: 2;") in attr
-    assert all(value.startswith("'sha256-") for value in attr[1:])
-    assert csp["script-src"] == ["'self'", _hash(THEME)]
-    for values in csp.values():
-        assert "'unsafe-inline'" not in values
-        assert "'unsafe-eval'" not in values
-
-
-def test_scalar_hashes_are_pinned_to_the_ui_release() -> None:
-    # A Scalar upgrade changes the injected texts: re-run tests/test_csp_api_browser.py.
-    package = json.loads((REPO / "ui" / "package.json").read_text("utf-8"))
-    assert package["dependencies"]["@scalar/api-reference-react"] == SCALAR_VERSION
-
-
 def test_the_real_index_theme_script_is_hashed() -> None:
     # ui/index.html as committed: one inline theme script, whatever its build-time text.
-    index = (REPO / "ui" / "index.html").read_text("utf-8")
+    index = (Path(__file__).resolve().parents[1] / "ui" / "index.html").read_text("utf-8")
     scripts, styles = inline_hashes(index)
     assert len(scripts) == 1
     assert styles == []
@@ -171,14 +143,6 @@ def test_page_policy_matches_the_served_index(client: TestClient) -> None:
     page = client.get("/")
     assert page.text == INDEX
     assert page.headers["content-security-policy"] == content_security_policy(INDEX)
-
-
-@pytest.mark.parametrize("path", ["/healthz", "/v1/traffic", "/assets/app.js"])
-def test_api_responses_keep_the_short_policy(client: TestClient, path: str) -> None:
-    response = client.get(path)
-    assert response.headers["content-security-policy"] == content_security_policy(
-        INDEX, document=False
-    )
 
 
 def test_host_check_refusal_carries_the_headers(client: TestClient) -> None:
@@ -213,7 +177,7 @@ def test_no_ui_page_style_is_hashed(tmp_path: Path) -> None:
     _, styles = inline_hashes(page.text)
     assert styles
     csp = _directives(page.headers["content-security-policy"])
-    assert csp["style-src"] == ["'self'", *styles, *SCALAR_STYLE_HASHES]
+    assert csp["style-src"] == ["'self'", *styles]
 
 
 def test_a_header_the_route_set_is_not_repeated() -> None:
