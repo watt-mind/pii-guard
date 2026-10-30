@@ -15,118 +15,166 @@
 <text x="780" y="752" font-size="20" fill="#B8B8C0" text-anchor="middle">1.0 s</text>
 <line x1="900" y1="190" x2="900" y2="720" stroke="#33333A" stroke-width="2"/>
 <text x="900" y="752" font-size="20" fill="#B8B8C0" text-anchor="middle">10.0 s</text>
-<text x="406" y="206.5" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=1</text>
-<rect x="420" y="193.8" width="86.4" height="11.4" fill="#0072B2"/>
-<line x1="526.8" y1="189.8" x2="526.8" y2="209.1" stroke="#F2F2F5" stroke-width="4"/>
-<text x="538.8" y="206.5" font-size="18" fill="#B8B8C0">5.2 ms / 7.8 ms</text>
-<text x="406" y="225.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=1, stream</text>
-<rect x="420" y="212.7" width="97.7" height="11.4" fill="#0072B2"/>
-<line x1="528.7" y1="208.7" x2="528.7" y2="228.1" stroke="#F2F2F5" stroke-width="4"/>
-<text x="540.7" y="225.4" font-size="18" fill="#B8B8C0">6.5 ms / 8.1 ms</text>
-<text x="406" y="244.3" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=8</text>
-<rect x="420" y="231.6" width="126.1" height="11.4" fill="#0072B2"/>
-<line x1="588.8" y1="227.6" x2="588.8" y2="247" stroke="#F2F2F5" stroke-width="4"/>
-<text x="600.8" y="244.3" font-size="18" fill="#B8B8C0">11 ms / 26 ms</text>
-<text x="406" y="263.2" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=8, stream</text>
-<rect x="420" y="250.6" width="129.4" height="11.4" fill="#0072B2"/>
-<line x1="591.2" y1="246.6" x2="591.2" y2="265.9" stroke="#F2F2F5" stroke-width="4"/>
-<text x="603.2" y="263.2" font-size="18" fill="#B8B8C0">12 ms / 27 ms</text>
-<text x="406" y="282.2" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1</text>
-<rect x="420" y="269.5" width="186.2" height="11.4" fill="#009E73"/>
-<line x1="618.1" y1="265.5" x2="618.1" y2="284.9" stroke="#F2F2F5" stroke-width="4"/>
-<text x="630.1" y="282.2" font-size="18" fill="#B8B8C0">36 ms / 45 ms</text>
-<text x="406" y="301.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1, stream</text>
-<rect x="420" y="288.4" width="190.8" height="11.4" fill="#009E73"/>
-<line x1="620.7" y1="284.4" x2="620.7" y2="303.8" stroke="#F2F2F5" stroke-width="4"/>
-<text x="632.7" y="301.1" font-size="18" fill="#B8B8C0">39 ms / 47 ms</text>
-<text x="406" y="320" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8</text>
-<rect x="420" y="307.4" width="266.3" height="11.4" fill="#009E73"/>
-<line x1="691.3" y1="303.4" x2="691.3" y2="322.7" stroke="#F2F2F5" stroke-width="4"/>
-<text x="703.3" y="320" font-size="18" fill="#B8B8C0">166 ms / 182 ms</text>
-<text x="406" y="339" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8, stream</text>
-<rect x="420" y="326.3" width="268.7" height="11.4" fill="#009E73"/>
-<line x1="691.5" y1="322.3" x2="691.5" y2="341.6" stroke="#F2F2F5" stroke-width="4"/>
-<text x="703.5" y="339" font-size="18" fill="#B8B8C0">173 ms / 183 ms</text>
-<text x="406" y="357.9" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=1</text>
-<rect x="420" y="345.2" width="370.6" height="11.4" fill="#D55E00"/>
-<line x1="810.4" y1="341.2" x2="810.4" y2="360.6" stroke="#F2F2F5" stroke-width="4"/>
-<text x="822.4" y="357.9" font-size="18" fill="#B8B8C0">1.2 s / 1.8 s</text>
-<text x="406" y="376.8" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=1, stream</text>
-<rect x="420" y="364.1" width="374.4" height="11.4" fill="#D55E00"/>
-<line x1="803.8" y1="360.1" x2="803.8" y2="379.5" stroke="#F2F2F5" stroke-width="4"/>
-<text x="815.8" y="376.8" font-size="18" fill="#B8B8C0">1.3 s / 1.6 s</text>
-<text x="406" y="395.8" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=8</text>
-<rect x="420" y="383.1" width="393.4" height="11.4" fill="#D55E00"/>
-<line x1="826.4" y1="379.1" x2="826.4" y2="398.4" stroke="#F2F2F5" stroke-width="4"/>
-<text x="838.4" y="395.8" font-size="18" fill="#B8B8C0">1.9 s / 2.4 s</text>
-<text x="406" y="414.7" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=8, stream</text>
-<rect x="420" y="402" width="401.6" height="11.4" fill="#D55E00"/>
-<line x1="837.7" y1="398" x2="837.7" y2="417.4" stroke="#F2F2F5" stroke-width="4"/>
-<text x="849.7" y="414.7" font-size="18" fill="#B8B8C0">2.2 s / 3.0 s</text>
-<text x="406" y="433.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1</text>
-<rect x="420" y="420.9" width="167.7" height="11.4" fill="#CC79A7"/>
-<line x1="595.7" y1="416.9" x2="595.7" y2="436.3" stroke="#F2F2F5" stroke-width="4"/>
-<text x="607.7" y="433.6" font-size="18" fill="#B8B8C0">25 ms / 29 ms</text>
-<text x="406" y="452.5" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1, stream</text>
-<rect x="420" y="439.9" width="168.9" height="11.4" fill="#CC79A7"/>
-<line x1="594.9" y1="435.9" x2="594.9" y2="455.2" stroke="#F2F2F5" stroke-width="4"/>
-<text x="606.9" y="452.5" font-size="18" fill="#B8B8C0">26 ms / 29 ms</text>
-<text x="406" y="471.5" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8</text>
-<rect x="420" y="458.8" width="223.5" height="11.4" fill="#CC79A7"/>
-<line x1="654.7" y1="454.8" x2="654.7" y2="474.1" stroke="#F2F2F5" stroke-width="4"/>
-<text x="666.7" y="471.5" font-size="18" fill="#B8B8C0">73 ms / 90 ms</text>
-<text x="406" y="490.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8, stream</text>
-<rect x="420" y="477.7" width="227.4" height="11.4" fill="#CC79A7"/>
-<line x1="665.9" y1="473.7" x2="665.9" y2="493.1" stroke="#F2F2F5" stroke-width="4"/>
-<text x="677.9" y="490.4" font-size="18" fill="#B8B8C0">79 ms / 112 ms</text>
-<text x="406" y="509.3" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1</text>
-<rect x="420" y="496.6" width="183.5" height="11.4" fill="#999933"/>
-<line x1="611.7" y1="492.6" x2="611.7" y2="512" stroke="#F2F2F5" stroke-width="4"/>
-<text x="623.7" y="509.3" font-size="18" fill="#B8B8C0">34 ms / 40 ms</text>
-<text x="406" y="528.2" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1, stream</text>
-<rect x="420" y="515.6" width="186.2" height="11.4" fill="#999933"/>
-<line x1="614.1" y1="511.6" x2="614.1" y2="530.9" stroke="#F2F2F5" stroke-width="4"/>
-<text x="626.1" y="528.2" font-size="18" fill="#B8B8C0">36 ms / 41 ms</text>
-<text x="406" y="547.2" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4</text>
-<rect x="420" y="534.5" width="222.6" height="11.4" fill="#999933"/>
-<line x1="651.2" y1="530.5" x2="651.2" y2="549.9" stroke="#F2F2F5" stroke-width="4"/>
-<text x="663.2" y="547.2" font-size="18" fill="#B8B8C0">72 ms / 84 ms</text>
-<text x="406" y="566.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4, stream</text>
-<rect x="420" y="553.4" width="225.7" height="11.4" fill="#999933"/>
-<line x1="654.5" y1="549.4" x2="654.5" y2="568.8" stroke="#F2F2F5" stroke-width="4"/>
-<text x="666.5" y="566.1" font-size="18" fill="#B8B8C0">76 ms / 90 ms</text>
-<text x="406" y="585" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8</text>
-<rect x="420" y="572.4" width="258.9" height="11.4" fill="#999933"/>
-<line x1="690.1" y1="568.4" x2="690.1" y2="587.7" stroke="#F2F2F5" stroke-width="4"/>
-<text x="702.1" y="585" font-size="18" fill="#B8B8C0">144 ms / 178 ms</text>
-<text x="406" y="604" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8, stream</text>
-<rect x="420" y="591.3" width="264.3" height="11.4" fill="#999933"/>
-<line x1="695.2" y1="587.3" x2="695.2" y2="606.6" stroke="#F2F2F5" stroke-width="4"/>
-<text x="707.2" y="604" font-size="18" fill="#B8B8C0">159 ms / 196 ms</text>
-<text x="406" y="622.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=1</text>
-<rect x="420" y="610.2" width="159" height="11.4" fill="#0072B2"/>
-<line x1="592.4" y1="606.2" x2="592.4" y2="625.6" stroke="#F2F2F5" stroke-width="4"/>
-<text x="604.4" y="622.9" font-size="18" fill="#B8B8C0">21 ms / 27 ms</text>
-<text x="406" y="641.8" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=1, stream</text>
-<rect x="420" y="629.1" width="161.5" height="11.4" fill="#0072B2"/>
-<line x1="611.4" y1="625.1" x2="611.4" y2="644.5" stroke="#F2F2F5" stroke-width="4"/>
-<text x="623.4" y="641.8" font-size="18" fill="#B8B8C0">22 ms / 39 ms</text>
-<text x="406" y="660.7" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=4</text>
-<rect x="420" y="648.1" width="148.3" height="11.4" fill="#0072B2"/>
-<line x1="610.4" y1="644.1" x2="610.4" y2="663.4" stroke="#F2F2F5" stroke-width="4"/>
-<text x="622.4" y="660.7" font-size="18" fill="#B8B8C0">17 ms / 39 ms</text>
-<text x="406" y="679.7" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=4, stream</text>
-<rect x="420" y="667" width="153" height="11.4" fill="#0072B2"/>
-<line x1="604.1" y1="663" x2="604.1" y2="682.4" stroke="#F2F2F5" stroke-width="4"/>
-<text x="616.1" y="679.7" font-size="18" fill="#B8B8C0">19 ms / 34 ms</text>
-<text x="406" y="698.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=8</text>
-<rect x="420" y="685.9" width="187.1" height="11.4" fill="#0072B2"/>
-<line x1="629.6" y1="681.9" x2="629.6" y2="701.3" stroke="#F2F2F5" stroke-width="4"/>
-<text x="641.6" y="698.6" font-size="18" fill="#B8B8C0">36 ms / 56 ms</text>
-<text x="406" y="717.5" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=8, stream</text>
-<rect x="420" y="704.9" width="198.5" height="11.4" fill="#0072B2"/>
-<line x1="641.9" y1="700.9" x2="641.9" y2="720.2" stroke="#F2F2F5" stroke-width="4"/>
-<text x="653.9" y="717.5" font-size="18" fill="#B8B8C0">45 ms / 71 ms</text>
+<text x="406" y="203.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=1</text>
+<rect x="420" y="192.7" width="86.4" height="7.9" fill="#0072B2"/>
+<line x1="526.8" y1="188.7" x2="526.8" y2="204.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="538.8" y="203.6" font-size="18" fill="#B8B8C0">5.2 ms / 7.8 ms</text>
+<text x="406" y="216.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=1, stream</text>
+<rect x="420" y="205.9" width="97.7" height="7.9" fill="#0072B2"/>
+<line x1="528.7" y1="201.9" x2="528.7" y2="217.8" stroke="#F2F2F5" stroke-width="4"/>
+<text x="540.7" y="216.9" font-size="18" fill="#B8B8C0">6.5 ms / 8.1 ms</text>
+<text x="406" y="230.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=8</text>
+<rect x="420" y="219.2" width="126.1" height="7.9" fill="#0072B2"/>
+<line x1="588.8" y1="215.2" x2="588.8" y2="231.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="600.8" y="230.1" font-size="18" fill="#B8B8C0">11 ms / 26 ms</text>
+<text x="406" y="243.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules, c=8, stream</text>
+<rect x="420" y="232.4" width="129.4" height="7.9" fill="#0072B2"/>
+<line x1="591.2" y1="228.4" x2="591.2" y2="244.3" stroke="#F2F2F5" stroke-width="4"/>
+<text x="603.2" y="243.4" font-size="18" fill="#B8B8C0">12 ms / 27 ms</text>
+<text x="406" y="256.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1</text>
+<rect x="420" y="245.7" width="186.2" height="7.9" fill="#009E73"/>
+<line x1="618.1" y1="241.7" x2="618.1" y2="257.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="630.1" y="256.6" font-size="18" fill="#B8B8C0">36 ms / 45 ms</text>
+<text x="406" y="269.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1, stream</text>
+<rect x="420" y="258.9" width="190.8" height="7.9" fill="#009E73"/>
+<line x1="620.7" y1="254.9" x2="620.7" y2="270.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="632.7" y="269.9" font-size="18" fill="#B8B8C0">39 ms / 47 ms</text>
+<text x="406" y="283.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8</text>
+<rect x="420" y="272.1" width="266.3" height="7.9" fill="#009E73"/>
+<line x1="691.3" y1="268.1" x2="691.3" y2="284.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="703.3" y="283.1" font-size="18" fill="#B8B8C0">166 ms / 182 ms</text>
+<text x="406" y="296.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8, stream</text>
+<rect x="420" y="285.4" width="268.7" height="7.9" fill="#009E73"/>
+<line x1="691.5" y1="281.4" x2="691.5" y2="297.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="703.5" y="296.4" font-size="18" fill="#B8B8C0">173 ms / 183 ms</text>
+<text x="406" y="309.6" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=1</text>
+<rect x="420" y="298.6" width="370.6" height="7.9" fill="#D55E00"/>
+<line x1="810.4" y1="294.6" x2="810.4" y2="310.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="822.4" y="309.6" font-size="18" fill="#B8B8C0">1.2 s / 1.8 s</text>
+<text x="406" y="322.9" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=1, stream</text>
+<rect x="420" y="311.9" width="374.4" height="7.9" fill="#D55E00"/>
+<line x1="803.8" y1="307.9" x2="803.8" y2="323.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="815.8" y="322.9" font-size="18" fill="#B8B8C0">1.3 s / 1.6 s</text>
+<text x="406" y="336.1" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=8</text>
+<rect x="420" y="325.1" width="393.4" height="7.9" fill="#D55E00"/>
+<line x1="826.4" y1="321.1" x2="826.4" y2="337.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="838.4" y="336.1" font-size="18" fill="#B8B8C0">1.9 s / 2.4 s</text>
+<text x="406" y="349.4" font-size="19" fill="#F2F2F5" text-anchor="end">audit: rules + llm, c=8, stream</text>
+<rect x="420" y="338.4" width="401.6" height="7.9" fill="#D55E00"/>
+<line x1="837.7" y1="334.4" x2="837.7" y2="350.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="849.7" y="349.4" font-size="18" fill="#B8B8C0">2.2 s / 3.0 s</text>
+<text x="406" y="362.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1</text>
+<rect x="420" y="351.6" width="167.7" height="7.9" fill="#CC79A7"/>
+<line x1="595.7" y1="347.6" x2="595.7" y2="363.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="607.7" y="362.6" font-size="18" fill="#B8B8C0">25 ms / 29 ms</text>
+<text x="406" y="375.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=1, stream</text>
+<rect x="420" y="364.9" width="168.9" height="7.9" fill="#CC79A7"/>
+<line x1="594.9" y1="360.9" x2="594.9" y2="376.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="606.9" y="375.9" font-size="18" fill="#B8B8C0">26 ms / 29 ms</text>
+<text x="406" y="389.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8</text>
+<rect x="420" y="378.1" width="223.5" height="7.9" fill="#CC79A7"/>
+<line x1="654.7" y1="374.1" x2="654.7" y2="390.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="666.7" y="389.1" font-size="18" fill="#B8B8C0">73 ms / 90 ms</text>
+<text x="406" y="402.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner, c=8, stream</text>
+<rect x="420" y="391.4" width="227.4" height="7.9" fill="#CC79A7"/>
+<line x1="665.9" y1="387.4" x2="665.9" y2="403.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="677.9" y="402.4" font-size="18" fill="#B8B8C0">79 ms / 112 ms</text>
+<text x="406" y="415.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1</text>
+<rect x="420" y="404.6" width="183.5" height="7.9" fill="#999933"/>
+<line x1="611.7" y1="400.6" x2="611.7" y2="416.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="623.7" y="415.6" font-size="18" fill="#B8B8C0">34 ms / 40 ms</text>
+<text x="406" y="428.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1, stream</text>
+<rect x="420" y="417.9" width="186.2" height="7.9" fill="#999933"/>
+<line x1="614.1" y1="413.9" x2="614.1" y2="429.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="626.1" y="428.9" font-size="18" fill="#B8B8C0">36 ms / 41 ms</text>
+<text x="406" y="442.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4</text>
+<rect x="420" y="431.1" width="222.6" height="7.9" fill="#999933"/>
+<line x1="651.2" y1="427.1" x2="651.2" y2="443.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="663.2" y="442.1" font-size="18" fill="#B8B8C0">72 ms / 84 ms</text>
+<text x="406" y="455.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4, stream</text>
+<rect x="420" y="444.4" width="225.7" height="7.9" fill="#999933"/>
+<line x1="654.5" y1="440.4" x2="654.5" y2="456.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="666.5" y="455.4" font-size="18" fill="#B8B8C0">76 ms / 90 ms</text>
+<text x="406" y="468.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8</text>
+<rect x="420" y="457.6" width="258.9" height="7.9" fill="#999933"/>
+<line x1="690.1" y1="453.6" x2="690.1" y2="469.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="702.1" y="468.6" font-size="18" fill="#B8B8C0">144 ms / 178 ms</text>
+<text x="406" y="481.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8, stream</text>
+<rect x="420" y="470.9" width="264.3" height="7.9" fill="#999933"/>
+<line x1="695.2" y1="466.9" x2="695.2" y2="482.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="707.2" y="481.9" font-size="18" fill="#B8B8C0">159 ms / 196 ms</text>
+<text x="406" y="495.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=1</text>
+<rect x="420" y="484.1" width="159" height="7.9" fill="#0072B2"/>
+<line x1="592.4" y1="480.1" x2="592.4" y2="496.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="604.4" y="495.1" font-size="18" fill="#B8B8C0">21 ms / 27 ms</text>
+<text x="406" y="508.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=1, stream</text>
+<rect x="420" y="497.4" width="161.5" height="7.9" fill="#0072B2"/>
+<line x1="611.4" y1="493.4" x2="611.4" y2="509.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="623.4" y="508.4" font-size="18" fill="#B8B8C0">22 ms / 39 ms</text>
+<text x="406" y="521.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=4</text>
+<rect x="420" y="510.6" width="148.3" height="7.9" fill="#0072B2"/>
+<line x1="610.4" y1="506.6" x2="610.4" y2="522.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="622.4" y="521.6" font-size="18" fill="#B8B8C0">17 ms / 39 ms</text>
+<text x="406" y="534.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=4, stream</text>
+<rect x="420" y="523.9" width="153" height="7.9" fill="#0072B2"/>
+<line x1="604.1" y1="519.9" x2="604.1" y2="535.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="616.1" y="534.9" font-size="18" fill="#B8B8C0">19 ms / 34 ms</text>
+<text x="406" y="548.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=8</text>
+<rect x="420" y="537.1" width="187.1" height="7.9" fill="#0072B2"/>
+<line x1="629.6" y1="533.1" x2="629.6" y2="549.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="641.6" y="548.1" font-size="18" fill="#B8B8C0">36 ms / 56 ms</text>
+<text x="406" y="561.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (mps), c=8, stream</text>
+<rect x="420" y="550.4" width="198.5" height="7.9" fill="#0072B2"/>
+<line x1="641.9" y1="546.4" x2="641.9" y2="562.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="653.9" y="561.4" font-size="18" fill="#B8B8C0">45 ms / 71 ms</text>
+<text x="406" y="574.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1</text>
+<rect x="420" y="563.6" width="222.2" height="7.9" fill="#999933"/>
+<line x1="674.8" y1="559.6" x2="674.8" y2="575.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="686.8" y="574.6" font-size="18" fill="#B8B8C0">71 ms / 133 ms</text>
+<text x="406" y="587.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1, stream</text>
+<rect x="420" y="576.9" width="207.2" height="7.9" fill="#999933"/>
+<line x1="652.1" y1="572.9" x2="652.1" y2="588.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="664.1" y="587.9" font-size="18" fill="#B8B8C0">53 ms / 86 ms</text>
+<text x="406" y="601.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4</text>
+<rect x="420" y="590.1" width="253.2" height="7.9" fill="#999933"/>
+<line x1="698.8" y1="586.1" x2="698.8" y2="602.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="710.8" y="601.1" font-size="18" fill="#B8B8C0">129 ms / 211 ms</text>
+<text x="406" y="614.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4, stream</text>
+<rect x="420" y="603.4" width="264.1" height="7.9" fill="#999933"/>
+<line x1="736.4" y1="599.4" x2="736.4" y2="615.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="748.4" y="614.4" font-size="18" fill="#B8B8C0">159 ms / 433 ms</text>
+<text x="406" y="627.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8</text>
+<rect x="420" y="616.6" width="283.9" height="7.9" fill="#999933"/>
+<line x1="728" y1="612.6" x2="728" y2="628.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="740" y="627.6" font-size="18" fill="#B8B8C0">232 ms / 369 ms</text>
+<text x="406" y="640.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8, stream</text>
+<rect x="420" y="629.9" width="300.3" height="7.9" fill="#999933"/>
+<line x1="769.1" y1="625.9" x2="769.1" y2="641.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="781.1" y="640.9" font-size="18" fill="#B8B8C0">318 ms / 811 ms</text>
+<text x="406" y="654.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1</text>
+<rect x="420" y="643.1" width="208.6" height="7.9" fill="#009E73"/>
+<line x1="702.6" y1="639.1" x2="702.6" y2="655.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="714.6" y="654.1" font-size="18" fill="#B8B8C0">55 ms / 227 ms</text>
+<text x="406" y="667.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=1, stream</text>
+<rect x="420" y="656.4" width="203.3" height="7.9" fill="#009E73"/>
+<line x1="642.1" y1="652.4" x2="642.1" y2="668.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="654.1" y="667.4" font-size="18" fill="#B8B8C0">49 ms / 71 ms</text>
+<text x="406" y="680.6" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4</text>
+<rect x="420" y="669.6" width="238.8" height="7.9" fill="#009E73"/>
+<line x1="682.9" y1="665.6" x2="682.9" y2="681.6" stroke="#F2F2F5" stroke-width="4"/>
+<text x="694.9" y="680.6" font-size="18" fill="#B8B8C0">98 ms / 155 ms</text>
+<text x="406" y="693.9" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=4, stream</text>
+<rect x="420" y="682.9" width="238.3" height="7.9" fill="#009E73"/>
+<line x1="684.5" y1="678.9" x2="684.5" y2="694.9" stroke="#F2F2F5" stroke-width="4"/>
+<text x="696.5" y="693.9" font-size="18" fill="#B8B8C0">97 ms / 160 ms</text>
+<text x="406" y="707.1" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8</text>
+<rect x="420" y="696.1" width="274.6" height="7.9" fill="#009E73"/>
+<line x1="708.5" y1="692.1" x2="708.5" y2="708.1" stroke="#F2F2F5" stroke-width="4"/>
+<text x="720.5" y="707.1" font-size="18" fill="#B8B8C0">194 ms / 253 ms</text>
+<text x="406" y="720.4" font-size="19" fill="#F2F2F5" text-anchor="end">fast: rules + ner (cpu), c=8, stream</text>
+<rect x="420" y="709.4" width="283.2" height="7.9" fill="#009E73"/>
+<line x1="714.7" y1="705.4" x2="714.7" y2="721.4" stroke="#F2F2F5" stroke-width="4"/>
+<text x="726.7" y="720.4" font-size="18" fill="#B8B8C0">229 ms / 286 ms</text>
 <line x1="420" y1="720" x2="900" y2="720" stroke="#8A8A93" stroke-width="2"/>
 <text x="1060" y="165" font-size="24" fill="#F2F2F5" font-weight="700">Where it goes (p50, c=1, not streamed)</text>
 <text x="1060" y="210" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules</text>
@@ -137,63 +185,79 @@
 <text x="1322.5" y="250" font-size="18" fill="#F2F2F5" text-anchor="middle">4.4 ms</text>
 <rect x="1523.6" y="222" width="10.5" height="40" fill="#F0E442"/>
 <rect x="1534.1" y="222" width="9.9" height="40" fill="#BBBBBB"/>
-<text x="1060" y="311" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner</text>
-<rect x="1060" y="323" width="1.5" height="40" fill="#56B4E9"/>
-<rect x="1061.5" y="323" width="415" height="40" fill="#0072B2"/>
-<text x="1269" y="351" font-size="18" fill="#111318" text-anchor="middle">31 ms</text>
-<rect x="1476.5" y="323" width="2.3" height="40" fill="#009E73"/>
-<rect x="1478.8" y="323" width="60" height="40" fill="#E69F00"/>
-<rect x="1538.8" y="323" width="1.7" height="40" fill="#F0E442"/>
-<rect x="1540.5" y="323" width="3.5" height="40" fill="#BBBBBB"/>
-<text x="1060" y="412" font-size="20" fill="#F2F2F5" font-weight="600">audit: rules + llm</text>
-<rect x="1060" y="424" width="0" height="40" fill="#56B4E9"/>
-<rect x="1060" y="424" width="481.9" height="40" fill="#0072B2"/>
-<text x="1301" y="452" font-size="18" fill="#111318" text-anchor="middle">1.2 s</text>
-<rect x="1541.9" y="424" width="0.1" height="40" fill="#009E73"/>
-<rect x="1542" y="424" width="1.8" height="40" fill="#E69F00"/>
-<rect x="1543.9" y="424" width="0.1" height="40" fill="#F0E442"/>
-<rect x="1543.9" y="424" width="0.1" height="40" fill="#BBBBBB"/>
-<text x="1060" y="513" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner</text>
-<rect x="1060" y="525" width="2.1" height="40" fill="#56B4E9"/>
-<rect x="1062.1" y="525" width="371.5" height="40" fill="#0072B2"/>
-<text x="1247.9" y="553" font-size="18" fill="#111318" text-anchor="middle">19 ms</text>
-<rect x="1433.6" y="525" width="5.3" height="40" fill="#009E73"/>
-<rect x="1438.9" y="525" width="100" height="40" fill="#E69F00"/>
-<text x="1488.9" y="553" font-size="18" fill="#F2F2F5" text-anchor="middle">5.2 ms</text>
-<rect x="1538.8" y="525" width="2.7" height="40" fill="#F0E442"/>
-<rect x="1541.5" y="525" width="2.5" height="40" fill="#BBBBBB"/>
-<text x="1060" y="614" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner (cpu)</text>
-<rect x="1060" y="626" width="1.5" height="40" fill="#56B4E9"/>
-<rect x="1061.5" y="626" width="473.1" height="40" fill="#0072B2"/>
-<text x="1298.1" y="654" font-size="18" fill="#111318" text-anchor="middle">33 ms</text>
-<rect x="1534.6" y="626" width="4.6" height="40" fill="#009E73"/>
-<rect x="1539.3" y="626" width="1.5" height="40" fill="#E69F00"/>
-<rect x="1540.8" y="626" width="1.9" height="40" fill="#F0E442"/>
-<rect x="1542.7" y="626" width="1.3" height="40" fill="#BBBBBB"/>
-<text x="1060" y="715" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner (mps)</text>
-<rect x="1060" y="727" width="2.4" height="40" fill="#56B4E9"/>
-<rect x="1062.4" y="727" width="467.9" height="40" fill="#0072B2"/>
-<text x="1296.4" y="755" font-size="18" fill="#111318" text-anchor="middle">20 ms</text>
-<rect x="1530.3" y="727" width="7.8" height="40" fill="#009E73"/>
-<rect x="1538.1" y="727" width="2.7" height="40" fill="#E69F00"/>
-<rect x="1540.9" y="727" width="3.1" height="40" fill="#F0E442"/>
-<rect x="1060" y="798" width="20" height="20" fill="#56B4E9"/>
-<text x="1088" y="816" font-size="19" fill="#F2F2F5">parse</text>
-<rect x="1153.5" y="798" width="20" height="20" fill="#0072B2"/>
-<text x="1181.5" y="816" font-size="19" fill="#F2F2F5">detect</text>
-<rect x="1252.7" y="798" width="20" height="20" fill="#CC79A7"/>
-<text x="1280.7" y="816" font-size="19" fill="#F2F2F5">image</text>
-<rect x="1351.9" y="798" width="20" height="20" fill="#009E73"/>
-<text x="1379.9" y="816" font-size="19" fill="#F2F2F5">mask</text>
-<rect x="1060" y="832" width="20" height="20" fill="#E69F00"/>
-<text x="1088" y="850" font-size="19" fill="#F2F2F5">forward</text>
-<rect x="1170.6" y="832" width="20" height="20" fill="#D55E00"/>
-<text x="1198.6" y="850" font-size="19" fill="#F2F2F5">unmask</text>
-<rect x="1285" y="832" width="20" height="20" fill="#F0E442"/>
-<text x="1313" y="850" font-size="19" fill="#F2F2F5">response</text>
-<rect x="1409.8" y="832" width="20" height="20" fill="#BBBBBB"/>
-<text x="1437.8" y="850" font-size="19" fill="#F2F2F5">other</text>
+<text x="1060" y="286" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner</text>
+<rect x="1060" y="298" width="1.5" height="40" fill="#56B4E9"/>
+<rect x="1061.5" y="298" width="415" height="40" fill="#0072B2"/>
+<text x="1269" y="326" font-size="18" fill="#111318" text-anchor="middle">31 ms</text>
+<rect x="1476.5" y="298" width="2.3" height="40" fill="#009E73"/>
+<rect x="1478.8" y="298" width="60" height="40" fill="#E69F00"/>
+<rect x="1538.8" y="298" width="1.7" height="40" fill="#F0E442"/>
+<rect x="1540.5" y="298" width="3.5" height="40" fill="#BBBBBB"/>
+<text x="1060" y="362" font-size="20" fill="#F2F2F5" font-weight="600">audit: rules + llm</text>
+<rect x="1060" y="374" width="0" height="40" fill="#56B4E9"/>
+<rect x="1060" y="374" width="481.9" height="40" fill="#0072B2"/>
+<text x="1301" y="402" font-size="18" fill="#111318" text-anchor="middle">1.2 s</text>
+<rect x="1541.9" y="374" width="0.1" height="40" fill="#009E73"/>
+<rect x="1542" y="374" width="1.8" height="40" fill="#E69F00"/>
+<rect x="1543.9" y="374" width="0.1" height="40" fill="#F0E442"/>
+<rect x="1543.9" y="374" width="0.1" height="40" fill="#BBBBBB"/>
+<text x="1060" y="438" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner</text>
+<rect x="1060" y="450" width="2.1" height="40" fill="#56B4E9"/>
+<rect x="1062.1" y="450" width="371.5" height="40" fill="#0072B2"/>
+<text x="1247.9" y="478" font-size="18" fill="#111318" text-anchor="middle">19 ms</text>
+<rect x="1433.6" y="450" width="5.3" height="40" fill="#009E73"/>
+<rect x="1438.9" y="450" width="100" height="40" fill="#E69F00"/>
+<text x="1488.9" y="478" font-size="18" fill="#F2F2F5" text-anchor="middle">5.2 ms</text>
+<rect x="1538.8" y="450" width="2.7" height="40" fill="#F0E442"/>
+<rect x="1541.5" y="450" width="2.5" height="40" fill="#BBBBBB"/>
+<text x="1060" y="514" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner (cpu)</text>
+<rect x="1060" y="526" width="1.5" height="40" fill="#56B4E9"/>
+<rect x="1061.5" y="526" width="473.1" height="40" fill="#0072B2"/>
+<text x="1298.1" y="554" font-size="18" fill="#111318" text-anchor="middle">33 ms</text>
+<rect x="1534.6" y="526" width="4.6" height="40" fill="#009E73"/>
+<rect x="1539.3" y="526" width="1.5" height="40" fill="#E69F00"/>
+<rect x="1540.8" y="526" width="1.9" height="40" fill="#F0E442"/>
+<rect x="1542.7" y="526" width="1.3" height="40" fill="#BBBBBB"/>
+<text x="1060" y="590" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner (mps)</text>
+<rect x="1060" y="602" width="2.4" height="40" fill="#56B4E9"/>
+<rect x="1062.4" y="602" width="467.9" height="40" fill="#0072B2"/>
+<text x="1296.4" y="630" font-size="18" fill="#111318" text-anchor="middle">20 ms</text>
+<rect x="1530.3" y="602" width="7.8" height="40" fill="#009E73"/>
+<rect x="1538.1" y="602" width="2.7" height="40" fill="#E69F00"/>
+<rect x="1540.9" y="602" width="3.1" height="40" fill="#F0E442"/>
+<text x="1060" y="666" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner (cpu)</text>
+<rect x="1060" y="678" width="1.3" height="40" fill="#56B4E9"/>
+<rect x="1061.3" y="678" width="473" height="40" fill="#0072B2"/>
+<text x="1297.8" y="706" font-size="18" fill="#111318" text-anchor="middle">69 ms</text>
+<rect x="1534.3" y="678" width="4.3" height="40" fill="#009E73"/>
+<rect x="1538.6" y="678" width="1" height="40" fill="#E69F00"/>
+<rect x="1539.6" y="678" width="1.2" height="40" fill="#F0E442"/>
+<rect x="1540.8" y="678" width="3.2" height="40" fill="#BBBBBB"/>
+<text x="1060" y="742" font-size="20" fill="#F2F2F5" font-weight="600">fast: rules + ner (cpu)</text>
+<rect x="1060" y="754" width="1.5" height="40" fill="#56B4E9"/>
+<rect x="1061.5" y="754" width="472.1" height="40" fill="#0072B2"/>
+<text x="1297.6" y="782" font-size="18" fill="#111318" text-anchor="middle">53 ms</text>
+<rect x="1533.7" y="754" width="4.5" height="40" fill="#009E73"/>
+<rect x="1538.2" y="754" width="1.1" height="40" fill="#E69F00"/>
+<rect x="1539.2" y="754" width="1.4" height="40" fill="#F0E442"/>
+<rect x="1540.6" y="754" width="3.4" height="40" fill="#BBBBBB"/>
+<rect x="1060" y="800" width="20" height="20" fill="#56B4E9"/>
+<text x="1088" y="818" font-size="19" fill="#F2F2F5">parse</text>
+<rect x="1153.5" y="800" width="20" height="20" fill="#0072B2"/>
+<text x="1181.5" y="818" font-size="19" fill="#F2F2F5">detect</text>
+<rect x="1252.7" y="800" width="20" height="20" fill="#CC79A7"/>
+<text x="1280.7" y="818" font-size="19" fill="#F2F2F5">image</text>
+<rect x="1351.9" y="800" width="20" height="20" fill="#009E73"/>
+<text x="1379.9" y="818" font-size="19" fill="#F2F2F5">mask</text>
+<rect x="1060" y="834" width="20" height="20" fill="#E69F00"/>
+<text x="1088" y="852" font-size="19" fill="#F2F2F5">forward</text>
+<rect x="1170.6" y="834" width="20" height="20" fill="#D55E00"/>
+<text x="1198.6" y="852" font-size="19" fill="#F2F2F5">unmask</text>
+<rect x="1285" y="834" width="20" height="20" fill="#F0E442"/>
+<text x="1313" y="852" font-size="19" fill="#F2F2F5">response</text>
+<rect x="1409.8" y="834" width="20" height="20" fill="#BBBBBB"/>
+<text x="1437.8" y="852" font-size="19" fill="#F2F2F5">other</text>
 <text x="56" y="810" font-size="20" fill="#B8B8C0">Fixture set &#x27;latency-corpus&#x27; (hand-written, fictional hu/en/de messages), a new session per request, mock upstream delay 50 ms; c = concurrent requests.</text>
 <text x="56" y="840" font-size="20" fill="#B8B8C0">Overhead = gateway total - time waiting on the upstream; &#x27;other&#x27; = untimed work (HTTP, scheduling). Hardware: Apple M1 Max, 10 CPUs, local loopback.</text>
-<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-27 to 2026-10-28 · commits 4ee1b15, 6750a17, e126829 · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-27 to 2026-10-30 · commits 40accd5, 4ee1b15, 6750a17, e126829 · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>

@@ -495,3 +495,11 @@ def test_serialized_scan_exempts_an_issued_id_enclosing_a_value() -> None:
     }
     assert check_outbound(body, collect_texts, session, "hu", issued=issued).result == "passed"
     assert check_outbound(body, collect_texts, session, "hu").result == "blocked"
+
+
+def test_enclosing_json_string_handles_trailing_escaped_backslash() -> None:
+    from pii_guard.gateway.outbound import _enclosing_json_string
+
+    serialized = json.dumps({"path": "C:\\", "id": "call-123456788"})
+    start = serialized.index("123456788")
+    assert _enclosing_json_string(serialized, start, start + 9) == "call-123456788"

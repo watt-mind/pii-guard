@@ -1,0 +1,26 @@
+{
+  "machine": "arm64 macOS-26.5.2-arm64-arm-64bit",
+  "torch": "2.14.1",
+  "torch_threads": 8,
+  "messages": 122,
+  "mean_chars": 382.5,
+  "load_average_end": [
+    20.39,
+    47.09,
+    56.39
+  ],
+  "results": {
+    "v20": {
+      "p50_ms": 42.3,
+      "p95_ms": 48.8,
+      "mean_ms": 42.8,
+      "load_s": 4.2
+    },
+    "v42-b3": {
+      "p50_ms": 42.8,
+      "p95_ms": 49.6,
+      "mean_ms": 43.0,
+      "load_s": 1.2
+    }
+  }
+}

@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "run_id": "2026-10-30-lab-1625-en-court-v42-b2",
+  "kind": "text",
+  "date": "2026-10-30",
+  "recorded_at": "2026-10-30T08:01:09+00:00",
+  "source": "recorded",
+  "imported_from": null,
+  "title": "pii-guard rules + ner (pii-guard-ner-xlmr-base-v42-b2) on en-court-smoke",
+  "notes": [
+    "LAB-1625: NER v4.2 candidates (v4.1-A1 mix, birth-date labels treated, v4.2 targeted data) vs v2.0, LAB-1535 gates, fast mode (rules + NER), CPU (PII_GUARD_NER_DEVICE=cpu), one commit.",
+    "Wall time 0.3 s, load average at end 13.3."
+  ],
+  "code": {
+    "commit": "357175c44d8ef6f4b85d35b2f4d1227527b70431",
+    "dirty": false,
+    "dirty_paths": [],
+    "pii_guard_version": "0.1.0",
+    "note": null
+  },
+  "system": {
+    "family": "pii-guard",
+    "role": "own",
+    "tool": "pii-guard",
+    "version": "0.1.0",
+    "detectors": [
+      {
+        "name": "rules",
+        "model": null,
+        "model_ref": null,
+        "revision": null,
+        "settings": {},
+        "serving": null
+      },
+      {
+        "name": "ner",
+        "model": "pii-guard-ner-xlmr-base-v42-b2",
+        "model_ref": "pii-guard fast, NER v4.2 candidate B2: v4.1-A1 mix, uncued third-party birth dates out of the loss, v4.2 targeted data (LAB-1625); local checkpoint, not published",
+        "revision": "sha256:439a90340e4ee49dd3132468c69313c9648c1d99bbae728647c0dd64403a7dad",
+        "settings": {},
+        "serving": "local PyTorch, CPU"
+      }
+    ],
+    "key": "rules+ner:pii-guard-ner-xlmr-base-v42-b2",
+    "label": "pii-guard fast, NER v4.2 candidate B2: v4.1-A1 mix, uncued third-party birth dates out of the loss, v4.2 targeted data (LAB-1625)"
+  },
+  "fixture_set": "en-court-smoke",
+  "fixtures": [
+    {
+      "path": "eval/fixtures/eu/en-court-smoke.jsonl",
+      "sha256": "ac711858534c9f4f3c93fc3b94d39bd94c5e8d5e3c73cc6ad73db6d293629f7c",
+      "set": "en-court-smoke",
+      "language": "en",
+      "origin": "hand-written",
+      "generator": null,
+      "documents": 6
+    }
+  ],
+  "languages": [
+    "en"
+  ],
+  "hardware": {
+    "description": null,
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "accelerator": null,
+    "python": "3.12.15"
+  },
+  "cost": null,
+  "metrics": {
+    "overall": {
+      "documents": 6,
+      "gold_spans": 15,
+      "predicted_spans": 15,
+      "unscored_predictions": 0,
+      "exact": {
+        "gold": 15,
+        "pred": 15,
+        "tp_pred": 15,
+        "tp_gold": 15,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "overlap": {
+        "gold": 15,
+        "pred": 15,
+        "tp_pred": 15,
+        "tp_gold": 15,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "macro_f1_overlap": 1.0,
+      "leak": {
+        "values": 13,
+        "leaked": 0,
+        "partial": 0,
+        "rate": 0.0,
+        "partial_rate": 0.0
+      },
+      "over_masking": {
+        "masked": 15,
+        "over_masked": 0,
+        "rate": 0.0
+      },
+      "roundtrip": {
+        "documents": 6,
+        "exact": 6,
+        "rate": 1.0
+      },
+      "consistency": {
+        "entities": 13,
+        "consistent": 13,
+        "multi_occurrence": 2,
+        "multi_consistent": 2,
+        "rate": 1.0,
+        "multi_rate": 1.0
+      },
+      "latency_ms": {
+        "detect": {
+          "p50": 43.336,
+          "p95": 48.02
+        },
+        "mask": {
+          "p50": 0.401,
+          "p95": 0.618
+        }
+      },
+      "per_type": {
+        "PERSON": {
+          "gold": 15,
+          "pred": 15,
+          "exact_tp_gold": 15,
+          "exact_tp_pred": 15,
+          "overlap_tp_gold": 15,
+          "overlap_tp_pred": 15,
+          "leak": {
+            "values": 13,
+            "leaked": 0,
+            "partial": 0
+          },
+          "over_masking": {
+            "masked": 15,
+            "over_masked": 0
+          }
+        }
+      }
+    },
+    "languages": {
+      "en": {
+        "documents": 6,
+        "gold_spans": 15,
+        "predicted_spans": 15,
+        "unscored_predictions": 0,
+        "exact": {
+          "gold": 15,
+          "pred": 15,
+          "tp_pred": 15,
+          "tp_gold": 15,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "overlap": {
+          "gold": 15,
+          "pred": 15,
+          "tp_pred": 15,
+          "tp_gold": 15,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "macro_f1_overlap": 1.0,
+        "leak": {
+          "values": 13,
+          "leaked": 0,
+          "partial": 0,
+          "rate": 0.0,
+          "partial_rate": 0.0
+        },
+        "over_masking": {
+          "masked": 15,
+          "over_masked": 0,
+          "rate": 0.0
+        },
+        "roundtrip": {
+          "documents": 6,
+          "exact": 6,
+          "rate": 1.0
+        },
+        "consistency": {
+          "entities": 13,
+          "consistent": 13,
+          "multi_occurrence": 2,
+          "multi_consistent": 2,
+          "rate": 1.0,
+          "multi_rate": 1.0
+        },
+        "latency_ms": {
+          "detect": {
+            "p50": 43.336,
+            "p95": 48.02
+          },
+          "mask": {
+            "p50": 0.401,
+            "p95": 0.618
+          }
+        },
+        "per_type": {
+          "PERSON": {
+            "gold": 15,
+            "pred": 15,
+            "exact_tp_gold": 15,
+            "exact_tp_pred": 15,
+            "overlap_tp_gold": 15,
+            "overlap_tp_pred": 15,
+            "leak": {
+              "values": 13,
+              "leaked": 0,
+              "partial": 0
+            },
+            "over_masking": {
+              "masked": 15,
+              "over_masked": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}

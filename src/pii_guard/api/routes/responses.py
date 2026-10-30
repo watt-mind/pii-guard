@@ -73,8 +73,10 @@ DEFAULT_MUSE_METADATA: dict[str, Any] = {
 def get_responses_gateway(request: Request) -> ResponsesGateway:
     state = request.app.state
     gateway = get_gateway(request)
-    if getattr(state, "hosted", None) is not None or getattr(
-        request.state, "project_routed_endpoint", False
+    if (
+        getattr(state, "hosted", None) is not None
+        or getattr(request.state, "project_routed_endpoint", False)
+        or getattr(request.state, "hosted_runtime", None) is not None
     ):
         return ResponsesGateway(gateway)
     responses = getattr(state, "responses_gateway", None)
@@ -177,31 +179,34 @@ async def muse_code_models(request: Request) -> JSONResponse:
     elif request.headers.get("authorization"):
         headers["Authorization"] = request.headers["authorization"]
     transport = getattr(state, "gateway_transport", None)
+    content = bytearray()
     async with httpx.AsyncClient(timeout=_TIMEOUT, transport=transport) as client:
         try:
-            response = await client.get(
-                muse_catalog_url(settings.upstream_base_url), headers=headers
-            )
+            async with client.stream(
+                "GET", muse_catalog_url(settings.upstream_base_url), headers=headers
+            ) as response:
+                if response.status_code in (404, 405):
+                    return await _from_models_route(request)
+                if response.status_code >= 400:
+                    return JSONResponse(
+                        {
+                            "error": {
+                                "code": "upstream_error",
+                                "message": f"upstream returned HTTP {response.status_code} for "
+                                "/muse-code/models",
+                                "type": "upstream_error",
+                            }
+                        },
+                        status_code=response.status_code if response.status_code < 500 else 502,
+                    )
+                async for chunk in response.aiter_bytes():
+                    if len(content) + len(chunk) > _MAX_BODY:
+                        raise UpstreamError("upstream model catalog is too large")
+                    content.extend(chunk)
         except httpx.HTTPError as exc:
             raise UpstreamError(f"upstream model catalog failed ({type(exc).__name__})") from None
-    if response.status_code in (404, 405):
-        return await _from_models_route(request)
-    if response.status_code >= 400:
-        return JSONResponse(
-            {
-                "error": {
-                    "code": "upstream_error",
-                    "message": f"upstream returned HTTP {response.status_code} for "
-                    "/muse-code/models",
-                    "type": "upstream_error",
-                }
-            },
-            status_code=response.status_code if response.status_code < 500 else 502,
-        )
-    if len(response.content) > _MAX_BODY:
-        raise UpstreamError("upstream model catalog is too large")
     try:
-        data = response.json().get("data")
+        data = json.loads(content).get("data")
     except (ValueError, AttributeError):
         raise UpstreamError("upstream model catalog is not a JSON object") from None
     if not isinstance(data, list):

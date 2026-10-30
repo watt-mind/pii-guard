@@ -29,6 +29,7 @@ from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT, check_upstream_pay
 from pii_guard.hosted.abuse import AbuseAdmission
 from pii_guard.hosted.egress import EgressPolicyError, _check_addresses
 from pii_guard.hosted.identity import ApiKeyStore, IdentityError, Principal
+from pii_guard.hosted.middleware import MAX_TOOL_DEFINITIONS, MAX_TOOL_NAMESPACE_DEPTH
 from pii_guard.hosted.quotas import (
     DEFAULT_INPUT_MICRODOLLARS_PER_TOKEN,
     DEFAULT_OUTPUT_MICRODOLLARS_PER_TOKEN,
@@ -539,6 +540,187 @@ def test_sponsored_requests_cannot_ask_for_provider_billed_tools(
     response = client.post(path, json=body, headers=auth())
     assert response.status_code == 403, response.text
     assert response.json()["error"]["code"] == "hosted_request_denied"
+    assert calls == []
+    assert client.app.state.hosted.quotas._spent_today == 0
+
+
+# --- LAB-1658: namespace tools that wrap client functions ---------------------------------
+
+
+def _function(name: str, description: str = "A synthetic client tool.") -> dict[str, Any]:
+    return {
+        "type": "function",
+        "name": name,
+        "description": description,
+        "strict": False,
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}},
+    }
+
+
+def _namespace(name: str, tools: Any, description: str = "Tools.") -> dict[str, Any]:
+    return {"type": "namespace", "name": name, "description": description, "tools": tools}
+
+
+def _responses_upstream(seen: list[dict[str, Any]], call: str | None = None) -> Any:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen.append(body)
+        output: list[dict[str, Any]] = [
+            {
+                "type": "message",
+                "id": "msg_synthetic",
+                "role": "assistant",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": "Done.", "annotations": []}],
+            }
+        ]
+        if call is not None:
+            output.append(
+                {
+                    "type": "function_call",
+                    "id": "fc_synthetic",
+                    "call_id": "call_synthetic",
+                    "name": call,
+                    "arguments": json.dumps({"path": "notes.txt"}),
+                    "status": "completed",
+                }
+            )
+        return httpx.Response(
+            200,
+            json={
+                "id": "resp_synthetic",
+                "object": "response",
+                "status": "completed",
+                "model": body["model"],
+                "output": output,
+                "usage": {"input_tokens": 5, "output_tokens": 3, "total_tokens": 8},
+            },
+        )
+
+    return handler
+
+
+def test_sponsored_responses_accept_a_namespace_of_client_functions(make_client: Any) -> None:
+    seen: list[dict[str, Any]] = []
+    client = make_client(_responses_upstream(seen, call="muse.read_file"))
+    tools = [
+        _function("exec_command"),
+        _namespace("muse", [_function("read_file"), _function("write_file")]),
+        _namespace("multi_agent_v1", [_function("spawn_agent")]),
+    ]
+    response = client.post(
+        "/v1/responses",
+        json={"model": "muse-spark-1.3", "input": "Hello", "store": False, "tools": tools},
+        headers=auth(),
+    )
+    assert response.status_code == 200, response.text
+    # Forwarded natively: the upstream takes namespace tools and calls them qualified.
+    assert [tool["type"] for tool in seen[0]["tools"]] == ["function", "namespace", "namespace"]
+    assert [tool["name"] for tool in seen[0]["tools"][1]["tools"]] == ["read_file", "write_file"]
+    calls = [item for item in response.json()["output"] if item["type"] == "function_call"]
+    assert [call["name"] for call in calls] == ["muse.read_file"]
+
+
+def test_sponsored_namespace_tool_text_is_still_masked(make_client: Any) -> None:
+    seen: list[dict[str, Any]] = []
+    client = make_client(_responses_upstream(seen))
+    email = "jordan.example@example.com"
+    tools = [
+        _namespace(
+            "muse",
+            [_function("read_file", f"Ask {email} before reading.")],
+            description=f"Escalate to {email}.",
+        )
+    ]
+    response = client.post(
+        "/v1/responses",
+        json={"model": "muse-spark-1.3", "input": "Hello", "tools": tools},
+        headers=auth(),
+    )
+    assert response.status_code == 200, response.text
+    namespace = seen[0]["tools"][0]
+    assert email not in json.dumps(seen[0])
+    assert namespace["name"] == "muse"
+    assert namespace["tools"][0]["name"] == "read_file"
+
+
+@pytest.mark.parametrize(
+    "tools",
+    [
+        [_namespace("muse", [_function("read_file"), {"type": "web_search"}])],
+        [_namespace("muse", [{"type": "file_search", "vector_store_ids": ["vs_synthetic"]}])],
+        [_namespace("muse", [{"type": "code_interpreter", "container": {"type": "auto"}}])],
+        [_namespace("muse", [{"type": "computer_use_preview"}])],
+        [_namespace("outer", [_namespace("inner", [{"type": "mcp", "server_label": "x"}])])],
+        [_namespace("muse", [_function("read_file"), "web_search"])],
+        [_namespace("muse", "web_search")],
+        [{"type": "namespace", "name": "muse"}],
+    ],
+)
+def test_sponsored_responses_refuse_provider_tools_inside_a_namespace(
+    make_client: Any, tools: list[Any]
+) -> None:
+    calls: list[dict[str, Any]] = []
+    client = make_client(_responses_upstream(calls))
+    response = client.post(
+        "/v1/responses",
+        json={"model": "muse-spark-1.3", "input": "Hello", "tools": tools},
+        headers=auth(),
+    )
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["message"] == (
+        "Provider-side tools are not allowed for sponsored requests"
+    )
+    assert calls == []
+    assert client.app.state.hosted.quotas._spent_today == 0
+
+
+def test_sponsored_chat_completions_keep_refusing_namespace_tools(make_client: Any) -> None:
+    client = make_client()
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "muse-spark-1.3",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "tools": [_namespace("muse", [_function("read_file")])],
+        },
+        headers=auth(),
+    )
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "hosted_request_denied"
+
+
+def _nested(depth: int) -> list[Any]:
+    tools: list[Any] = [_function("leaf")]
+    for level in range(depth):
+        tools = [_namespace(f"level_{level}", tools)]
+    return tools
+
+
+@pytest.mark.parametrize(
+    ("tools", "allowed"),
+    [
+        (_nested(MAX_TOOL_NAMESPACE_DEPTH), True),
+        (_nested(MAX_TOOL_NAMESPACE_DEPTH + 1), False),
+        # Bare definitions keep the body under the hosted size limit.
+        ([_namespace("m", [{"type": "function", "name": "t"}] * (MAX_TOOL_DEFINITIONS - 1))], True),
+        ([_namespace("m", [{"type": "function", "name": "t"}] * MAX_TOOL_DEFINITIONS)], False),
+    ],
+)
+def test_sponsored_tool_walk_is_bounded(make_client: Any, tools: list[Any], allowed: bool) -> None:
+    calls: list[dict[str, Any]] = []
+    client = make_client(_responses_upstream(calls))
+    response = client.post(
+        "/v1/responses",
+        json={"model": "muse-spark-1.3", "input": "Hello", "tools": tools},
+        headers=auth(),
+    )
+    if allowed:
+        # Past the hosted check; the gateway's own walk may still refuse deep nesting (400).
+        assert response.status_code != 403, response.text
+        return
+    assert response.status_code == 403, response.text
+    assert "tool definitions" in response.json()["error"]["message"]
     assert calls == []
     assert client.app.state.hosted.quotas._spent_today == 0
 

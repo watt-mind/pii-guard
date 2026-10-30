@@ -301,6 +301,8 @@ class ProjectService:
             hosted._workers if hosted is not None else self.worker_pools(config.concurrency)
         )
         gateway._session_holds, gateway._holds_lock = runtime.session_holds, runtime.holds_lock
+        gateway.issued_ids = runtime.issued_ids
+        gateway._session_incarnations = runtime.session_incarnations
         request.state.project_gateway = gateway
         return gateway
 

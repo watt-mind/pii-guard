@@ -182,6 +182,8 @@ class MessagesSseRestorer:
         return (name if isinstance(name, str) else None), json.dumps(data, ensure_ascii=False)
 
     def process(self, event: str | None, data: str) -> list[tuple[str | None, str]]:
+        if self._done:
+            return []
         try:
             parsed = json.loads(data)
         except ValueError:
@@ -191,7 +193,7 @@ class MessagesSseRestorer:
         self.chunks += 1
         event_type = parsed.get("type") if isinstance(parsed.get("type"), str) else event
         if event_type == "error":
-            return [self._emit(stream_error("upstream stream error"))]
+            return [*self._flush_open(), self._emit(stream_error("upstream stream error"))]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(parsed))
         self._scan_usage(event_type, parsed)
@@ -209,6 +211,8 @@ class MessagesSseRestorer:
             extra = self._flush(index)
             if extra is not None:
                 out.append(self._emit(extra))
+        elif event_type == "message_stop":
+            out.extend(self._flush_open())
         restored = _restore_value(self._session, parsed, self._report, self._budget)
         out.append(self._emit(restored))
         return out
@@ -255,14 +259,17 @@ class MessagesSseRestorer:
         field, _ = _DELTAS[delta_type]
         return {**template, "delta": {"type": delta_type, field: rest}}
 
-    def finish(self) -> list[tuple[str | None, str]]:
-        """Delta events for anything still held back when the stream ends early."""
-        if self._done:
-            return []
-        self._done = True
+    def _flush_open(self) -> list[tuple[str | None, str]]:
         out = []
         for index in list(self._unmaskers):
             extra = self._flush(index)
             if extra is not None:
                 out.append(self._emit(extra))
         return out
+
+    def finish(self) -> list[tuple[str | None, str]]:
+        """Delta events for anything still held back when the stream ends early."""
+        if self._done:
+            return []
+        self._done = True
+        return self._flush_open()

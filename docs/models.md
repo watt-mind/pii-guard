@@ -58,20 +58,27 @@ would run, without downloading).
    If it is set and can't load, startup stops (fail closed, ADR 0006).
 2. **The published PII Guard checkpoint**, the default:
    [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
-   (`PII_GUARD_NER_PUBLISHED_MODEL`), release `v2.0` at revision
-   `95f612a9ad65cc5ade5b9248bd152020541e7097`, `model.safetensors` SHA-256
-   `4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9`, both pinned in
-   `pii_guard.detect.ner_resolve.PUBLISHED` (LAB-1306). It is NER v2 base + hard negatives
-   (LAB-1150), Apache-2.0, trained in part on Ai4Privacy OpenPII-1M (CC-BY-4.0, "Ai4Privacy /
-   Ai Suisse SA"); see [NER v2.1](#ner-v21-and-the-published-checkpoint) and its
+   (`PII_GUARD_NER_PUBLISHED_MODEL`), release `v4.2` at revision
+   `33ef18fed56abd06e8caeb4ad0268633d5346ed5`, `model.safetensors` SHA-256
+   `40e8406cc7d5be7d809d43948a46b5b5059734f044ba87f5a5a8009f041ef05d`, both pinned in
+   `pii_guard.detect.ner_resolve.PUBLISHED` (LAB-1625). It is v2.0 fine-tuned on 24 EU
+   languages (candidate B3, [results](../eval/results/2026-10-30-lab-1625-ner-v42/README.md)),
+   Apache-2.0, trained in part on Ai4Privacy OpenPII-1M (CC-BY-4.0, "Ai4Privacy / Ai Suisse
+   SA"), kiji (Apache-2.0), nym and E3 (MIT) and pii-anon (CC0-1.0); see its
    [model card](../training/ner/model-card.md). A checkpoint is never loaded unpinned: another
    repo needs `repo@revision`. It downloads like the fallback below (1.1 GB, first run only,
-   into `~/.cache/pii-guard/models/ner/watt-mind--pii-guard-ner-xlmr-base-95f612a9ad65/`).
+   into `~/.cache/pii-guard/models/ner/watt-mind--pii-guard-ner-xlmr-base-33ef18fed56a/`).
+   **Rollback to v2.0:** set `PII_GUARD_NER_PUBLISHED_MODEL` to
+   `watt-mind/pii-guard-ner-xlmr-base@95f612a9ad65cc5ade5b9248bd152020541e7097` (tag `v2.0`,
+   NER v2 base + hard negatives, LAB-1150 / LAB-1306); its weights are still checked
+   (SHA-256 `4a9a598f6be493fab8bf81916e8c5d775e2559c91f42f58891dfe2ab7a2543e9`,
+   `ner_resolve.PREVIOUS_PUBLISHED`). See also
+   [NER v2.1](#ner-v21-and-the-published-checkpoint).
    The repo moved from `hdkiller/` to the `watt-mind` organization (LAB-1402) with its
-   history, so the revision is unchanged: a checked download under the old directory name,
-   `hdkiller--pii-guard-ner-xlmr-base-95f612a9ad65/`, is reused (offline and under `cached`
-   too), and `PII_GUARD_NER_PUBLISHED_MODEL` set to the old `hdkiller` id still names this
-   checkpoint.
+   history, so revisions are unchanged: a checked download under the old directory name
+   (`hdkiller--pii-guard-ner-xlmr-base-<revision>/`) is reused (offline and under `cached`
+   too), and `PII_GUARD_NER_PUBLISHED_MODEL` set to the old `hdkiller` id still names the
+   same checkpoint.
 3. **The public fallback**, a **stop-gap** used only when step 2 is turned off or replaced by
    an unpinned repo:
    [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)

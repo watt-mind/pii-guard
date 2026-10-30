@@ -50,6 +50,15 @@ SETS: dict[str, list[str]] = {
         f"eval/datasets/gretel-finance/{lang}-gretel-finance.jsonl" for lang in ("de", "en")
     ],
     "pl-pii-bench": ["eval/datasets/pl-pii-bench/pl-pl-pii-bench.jsonl"],
+    # LAB-1656: the rest of the published card and benchmark sets. pl-smoke completes the
+    # 62-document hand-written set (LAB-1589); the two below are fetch-only and git-ignored
+    # (`python -m pii_guard.eval.datasets fetch <name>`); TAB text never leaves the machine.
+    "pl-smoke": ["eval/fixtures/pl-smoke.jsonl"],
+    "gretel-finance-corrected": [
+        f"data/datasets/fixtures/gretel-finance-corrected/{lang}-gretel-finance-corrected.jsonl"
+        for lang in ("de", "en")
+    ],
+    "tab-echr": ["data/datasets/fixtures/tab-echr/en-tab-echr.jsonl"],
     "mapa-eur-lex": ["data/datasets/fixtures/mapa-eur-lex/*-mapa-eur-lex.jsonl"],
     # LAB-1525 fictional gate sets for the new languages (LAB-1535 gates, read per language).
     "eu-smoke": [f"eval/fixtures/eu/{lang}-smoke.jsonl" for lang in EU_GATE_LANGS],
@@ -85,11 +94,22 @@ LABELS = {
     "kept out of the loss (LAB-1547)",
     "v41-a2": "pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS "
     "taught as O (LAB-1547)",
+    "v42-b1": "pii-guard fast, NER v4.2 candidate B1: v4.1-A1 mix, implausible third-party birth "
+    "dates taught as O, v4.2 targeted data (LAB-1625)",
+    "v42-b2": "pii-guard fast, NER v4.2 candidate B2: v4.1-A1 mix, uncued third-party birth "
+    "dates out of the loss, v4.2 targeted data (LAB-1625)",
+    "v42-b3": "pii-guard fast, NER v4.2 candidate B3: B1 with the v4.2 targeted data twice "
+    "(LAB-1625)",
+    "v42-b4": "pii-guard fast, NER v4.2 candidate B4: soup 0.5 v2.0 + 0.5 B1 (LAB-1625)",
+    "ner-v20": "pii-guard NER v2.0 alone (no rules)",
+    "ner-v42-b3": "pii-guard NER v4.2 (B3) alone (no rules) (LAB-1625)",
+    "v42-b3t": "pii-guard fast, NER v4.2 B3 with dev-calibrated thresholds, post-hoc, not a "
+    "protocol candidate (LAB-1625)",
 }
 #: Tickets whose v2.0 runs are selection-only re-scores (LAB-1494): their records get a system
 #: key and label of their own, so the report's latest-per-system pick keeps the published v2.0
 #: rows (timed on a quiet machine) instead of these, timed on a loaded one.
-RESCORE_TICKETS = ("LAB-1494", "LAB-1512", "LAB-1535", "LAB-1547")
+RESCORE_TICKETS = ("LAB-1494", "LAB-1512", "LAB-1535", "LAB-1547", "LAB-1625")
 
 
 def system_extra(ticket: str, candidate: str) -> dict[str, Any]:
@@ -113,7 +133,13 @@ TICKETS = {
     "LAB-1535": "NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol",
     "LAB-1547": "NER v4.1 candidates (v4-A recipe, loose addresses treated, v4.1 data) vs v2.0, "
     "LAB-1535 protocol",
+    "LAB-1625": "NER v4.2 candidates (v4.1-A1 mix, birth-date labels treated, v4.2 targeted "
+    "data) vs v2.0, LAB-1535 gates",
 }
+
+
+#: Candidates that name v2.0 itself: scored on the pinned v2.0 release, not on PUBLISHED.
+V20_CANDIDATES = ("v20", "ner-v20")
 
 
 def _paths(name: str) -> list[str]:
@@ -128,11 +154,13 @@ def _detector(candidate: str, model: str | None) -> dict[str, Any]:
     from pii_guard.eval.stats import sha256_file
 
     if not model:
-        pub = ner_resolve.PUBLISHED
+        v20 = candidate in V20_CANDIDATES
+        pub = ner_resolve.PREVIOUS_PUBLISHED if v20 else ner_resolve.PUBLISHED
+        release = ner_resolve.PREVIOUS_RELEASE if v20 else ner_resolve.PUBLISHED_RELEASE
         return {
             "name": "ner",
-            "model": "xlmr-base-v2-hn",
-            "model_ref": f"{pub.repo_id} v2.0, revision {pub.revision[:12]}",
+            "model": "xlmr-base-v2-hn" if v20 else f"xlmr-base-{release}",
+            "model_ref": f"{pub.repo_id} {release}, revision {pub.revision[:12]}",
             "revision": f"sha256:{pub.weights_sha256}",
             "settings": {},
             "serving": "local PyTorch, CPU",
@@ -151,6 +179,11 @@ def _detector(candidate: str, model: str | None) -> dict[str, Any]:
 def _score(args: argparse.Namespace) -> int:
     if args.model:
         os.environ["PII_GUARD_NER_MODEL"] = args.model
+    elif args.candidate in V20_CANDIDATES:  # v2.0 stays the baseline after the v4.2 pin swap
+        from pii_guard.detect import ner_resolve
+
+        prev = ner_resolve.PREVIOUS_PUBLISHED
+        os.environ[ner_resolve.PUBLISHED_ENV_VAR] = f"{prev.repo_id}@{prev.revision}"
     thresholds: dict[str, Any] = {}
     if args.thresholds:  # LAB-1512 path 4: a dev-calibrated table (thresholds_v33.py)
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -163,16 +196,18 @@ def _score(args: argparse.Namespace) -> int:
     from pii_guard.eval.report import build_scorecard
     from pii_guard.eval.scorer import DetectorAnalyzer, run_documents
 
-    analyzer = DetectorAnalyzer(["rules", "ner"])
+    names = args.detectors.split(",")
+    analyzer = DetectorAnalyzer(names)
     if analyzer.skipped:
         print(f"detector unavailable: {analyzer.skipped}", file=sys.stderr)
         return 2
     analyzer.analyze("Warm-up text without personal data.", "en")
-    detectors = [{"name": "rules"}, _detector(args.candidate, args.model)]
+    detectors = [{"name": "rules"}] if "rules" in names else []
+    detectors.append(_detector(args.candidate, args.model))
     if thresholds:
         from pii_guard.eval.stats import sha256_file
 
-        detectors[1]["settings"] = {
+        detectors[-1]["settings"] = {
             "thresholds_file": str(args.thresholds),
             "thresholds_sha256": sha256_file(args.thresholds),
         }
@@ -187,7 +222,8 @@ def _score(args: argparse.Namespace) -> int:
         wall = time.perf_counter() - started
         card = build_scorecard(results, detectors=analyzer.loaded, fixture_paths=paths)
         notes = [
-            f"{args.ticket}: {TICKETS[args.ticket]}, fast mode (rules + NER), CPU "
+            f"{args.ticket}: {TICKETS[args.ticket]}, "
+            f"{'fast mode (rules + NER)' if 'rules' in names else 'NER alone (no rules)'}, CPU "
             "(PII_GUARD_NER_DEVICE=cpu), one commit.",
             f"Wall time {wall:.1f} s, load average at end {os.getloadavg()[0]:.1f}.",
         ]
@@ -205,9 +241,10 @@ def _score(args: argparse.Namespace) -> int:
             "LAB-1512",
             "LAB-1535",
             "LAB-1547",
+            "LAB-1625",
         ):
             notes.append(
-                "Selection set. No v3.1, v3.2, v3.3, v4 or v4.1 mix holds any agent-traffic "
+                "Selection set. No v3.1, v3.2, v3.3, v4, v4.1 or v4.2 mix holds any agent-traffic "
                 "generator document, so it is unseen by every candidate, as it was for v2.0."
             )
         records = build_records(
@@ -323,8 +360,13 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--scorecards", type=Path)
     score.add_argument("--summary", type=Path)
     score.add_argument("--thresholds", type=Path, help="thresholds_v33.py JSON (candidate H)")
+    score.add_argument(
+        "--detectors", default="rules,ner", help="rules,ner (fast mode) or ner (model alone)"
+    )
     lat = sub.add_parser("latency")
-    lat.add_argument("--model", action="append", required=True, help="name=dir (empty: v2.0)")
+    lat.add_argument(
+        "--model", action="append", required=True, help="name=dir (empty: the published release)"
+    )
     lat.add_argument("--n", type=int, default=150)
     lat.add_argument("--threads", type=int, default=8)
     lat.add_argument("--json", type=Path)
