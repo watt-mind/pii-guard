@@ -5,6 +5,7 @@ import type { EntityType } from "../api/types";
 import type { TrafficEvent, TrafficTiming } from "../api/traffic";
 import { detectorLabel } from "./entities";
 import { alignLoose, isEntityType, type RestoredSegment } from "./placeholders";
+import { clockTime } from "./time";
 
 // --- Waterfall ----------------------------------------------------------------------------
 
@@ -345,10 +346,8 @@ export const SESSION_SOURCE_LABEL: Record<string, string> = {
 /** Detector names as the other screens show them; "visual" is the image pipeline. */
 export const detectorName = (d: string) => (d === "visual" ? "Image pipeline" : detectorLabel(d));
 
-export const clock = (iso: string) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-};
+/** "14:05:09": the console's one clock format (lib/time, LAB-1619). */
+export const clock = (iso: string) => clockTime(iso);
 
 /** "fast: Rules + Multilingual NER" from what the calls actually ran. */
 export function modeNote(events: TrafficEvent[]): string {

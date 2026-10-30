@@ -108,7 +108,7 @@ describe("first run, sponsored on", () => {
     const setup = await screen.findByRole("region", { name: "Connect your client" });
     expect(location.hash).toBe("#connect");
     expect(await within(setup).findByText("Ready")).toBeInTheDocument();
-    expect(within(setup).getByText("Copy your guard key now. It is shown only once.")).toBeInTheDocument();
+    expect(within(setup).getByText("Copy your endpoint key now. It is shown only once.")).toBeInTheDocument();
     expect(within(setup).getAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}`).length).toBeGreaterThan(0);
     // The first sign-in's single call provisions and issues the key; nothing else mints one.
     expect(call.mock.calls.filter(([p]) => p === "/v1/account/first-run")).toHaveLength(1);
@@ -125,11 +125,16 @@ describe("first run, sponsored on", () => {
     expect(python.textContent).not.toContain("import os");
     await user.click(within(setup).getByRole("tab", { name: "Muse Code" }));
     expect(within(setup).getByText("Not for endpoint URLs yet.")).toBeInTheDocument();
+    // The tools that do work come from the server's blocks (LAB-1619).
+    expect(within(setup).getByText("Codex, OpenAI SDK and cURL work with this endpoint today.")).toBeInTheDocument();
 
     await user.click(within(setup).getByRole("button", { name: "Send a test request" }));
     expect(await within(setup).findByText(/Round trip complete: 2 values masked/)).toBeInTheDocument();
     expect(within(setup).getByText(/to \[\[EMAIL_1a2b3c\]\] \(phone/)).toBeInTheDocument();
     expect(within(setup).getByText("Note to jane.placeholder@example.net: confirmed.")).toBeInTheDocument();
+    // Done: say so, and where to go next (LAB-1619).
+    expect(within(setup).getByText(/You're connected\./)).toBeInTheDocument();
+    expect(within(setup).getByRole("link", { name: "Open this call in Logs" })).toHaveAttribute("href", "#logs");
     expect(storedAnywhere(KEY)).toBe(false);
   });
 
@@ -146,7 +151,7 @@ describe("first run, sponsored on", () => {
     const setup = await screen.findByRole("region", { name: "Connect your client" });
     expect(within(setup).queryByText(KEY, { exact: false })).not.toBeInTheDocument();
     expect(await within(setup).findByText(/env_key="PII_GUARD_ENDPOINT_KEY"/, { selector: "pre" }, { timeout: 3000 })).toBeInTheDocument();
-    await userEvent.setup().click(within(setup).getByRole("button", { name: "Create a new guard key" }));
+    await userEvent.setup().click(within(setup).getByRole("button", { name: "Create a new endpoint key" }));
     expect(await within(setup).findAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}2`, { exact: false })).not.toHaveLength(0);
     expect(call).toHaveBeenCalledWith("/v1/projects/project-default/endpoints/ep-default/keys", { name: "Console key" });
   });
@@ -174,8 +179,8 @@ describe("first run, sponsored off", () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/account/first-run", { meta_api_key: "example-meta-key", issue_key: true }));
     expect(await within(setup).findByText("Ready")).toBeInTheDocument();
     // The form is gone: focus moves on to step 1, not back to the page.
-    await waitFor(() => expect(document.activeElement).toHaveTextContent("Copy your guard key"));
-    // The guard key issued at sign-in is shown now, and the blocks embed it.
+    await waitFor(() => expect(document.activeElement).toHaveTextContent("Copy your endpoint key"));
+    // The endpoint key issued at sign-in is shown now, and the blocks embed it.
     expect(within(setup).getAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}`, { exact: false }).length).toBeGreaterThan(0);
     expect(within(setup).getByText(/Your Meta API key/)).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("example-meta-key");

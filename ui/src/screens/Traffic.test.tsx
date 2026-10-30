@@ -239,6 +239,15 @@ describe("Live traffic", () => {
     expect(screen.queryByText(/isn't reachable|Lost the connection/)).toBeNull();
   });
 
+  it("hosted: the status line describes the hosted service, not the machine (LAB-1619)", async () => {
+    const f = fakeConnect();
+    const session = { account: {}, error: "", refresh: async () => {}, call: vi.fn() } as unknown as HostedSession;
+    render(<HostedSessionContext.Provider value={session}><Traffic connect={f.connect} pageHost="guard.example" demoTraffic={false} /></HostedSessionContext.Provider>);
+    f.push([], { state: "live", via: "poll", level: "masked", size: 50 });
+    expect(await screen.findByText("Only what was sent to the model is logged: placeholders, never values.")).toBeInTheDocument();
+    expect(screen.queryByText(/left the machine/)).toBeNull();
+  });
+
   it("hosted: a 401 in the console says the session ended (LAB-1519)", async () => {
     const f = fakeConnect();
     const session = { account: {}, error: "", refresh: async () => {}, call: vi.fn() } as unknown as HostedSession;
@@ -418,10 +427,36 @@ describe("Endpoint traffic in project Logs (LAB-1492)", () => {
     f.push([{ ...viaEndpoint(huChat, "ep_a", "Synthetic CLI"), session_ref: "s_0123456789abcdef" }]);
     const detail = await screen.findByRole("region", { name: /Call at/ });
     expect(within(detail).getByText("Endpoint")).toBeInTheDocument();
-    await userEvent.click(within(detail).getByRole("button", { name: "Switch to endpoint Synthetic CLI to open its session" }));
+    await userEvent.click(within(detail).getByRole("button", { name: "Open session in Synthetic CLI" }));
     expect(onOpenSession).not.toHaveBeenCalled();
     const { getSelectedEndpoint } = await import("../projects/selection");
     expect(getSelectedEndpoint()).toBe("ep_a");
+  });
+
+  it("reopens the call and puts focus back after the switch remounts the console (LAB-1619)", async () => {
+    const f = fakeConnect();
+    const ev = { ...viaEndpoint(huChat, "ep_a", "Synthetic CLI"), session_ref: "s_0123456789abcdef" };
+    const first = render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} onOpenSession={vi.fn()} />);
+    f.push([ev]);
+    const detail = await screen.findByRole("region", { name: /Call at/ });
+    await userEvent.click(within(detail).getByRole("button", { name: "Open session in Synthetic CLI" }));
+    first.unmount();
+    const g = fakeConnect();
+    render(<Traffic connect={g.connect} pageHost="example.com" demoTraffic={false} onOpenSession={vi.fn()} />);
+    g.push([ev, { ...viaEndpoint(deTools, "ep_a", "Synthetic CLI") }]);
+    const open = await screen.findByRole("button", { name: /Open session s_0123456789abcdef in Vault/ });
+    await waitFor(() => expect(open).toHaveFocus());
+  });
+
+  it("truncates a long provider model id in the row and keeps it in the title (LAB-1619)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} />);
+    f.push([{ ...asMasked(huChat), model: "accounts/fireworks/models/llama-v3p3-70b-instruct-very-long-id" }]);
+    const list = await screen.findByTestId("call-list");
+    const model = within(list).getByTitle("accounts/fireworks/models/llama-v3p3-70b-instruct-very-long-id");
+    expect(model).toHaveTextContent(/^llama-v3p3-70b-instruct-very-long-id$/);
+    expect(model.className).toMatch(/\btruncate\b/);
+    expect(model.className).not.toMatch(/shrink-0/);
   });
 
   it("drops the tag and says the view is filtered while an endpoint is selected", async () => {

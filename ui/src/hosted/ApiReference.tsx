@@ -74,7 +74,7 @@ export function ApiReference({ consoleHref }: { consoleHref: string }) {
             <ButtonLink size="sm" href={specUrl} download="pii-guard-openapi.json">openapi.json</ButtonLink>
           </nav>
         </section>
-        <div className="api-reference-frame mx-auto max-w-[1280px] border-t border-line">
+        <div className="api-reference-frame mx-auto min-h-dvh max-w-[1280px] border-t border-line">
           {ScalarReference ? (
             <Suspense fallback={<p role="status" className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">Loading the reference…</p>}>
               <ScalarReference specUrl={specUrl} dark={dark} />
