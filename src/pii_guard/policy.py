@@ -26,6 +26,7 @@ from pii_guard.types import EntityType, PiiGuardError, Span
 
 __all__ = [
     "DEFAULT_POLICIES",
+    "LINKAGE_OVERRIDES",
     "BlockedEntityError",
     "Policy",
     "PolicyDecision",
@@ -50,6 +51,16 @@ _DEFAULT_KEEP = frozenset({EntityType.ORGANIZATION, EntityType.COMPANY_ID_HU, En
 #: The defaults from ``docs/entities.md``, for every entity type (text and visual).
 DEFAULT_POLICIES: Mapping[EntityType, Policy] = MappingProxyType(
     {t: (Policy.KEEP if t in _DEFAULT_KEEP else Policy.MASK) for t in EntityType}
+)
+
+
+#: Opt-in linkage protection (``docs/privacy-model.md``, LAB-1152): also mask the text types
+#: kept by default. A kept organization (an employer, the owner of an e-mail domain) narrows a
+#: candidate list even when every name is masked. Pair it with
+#: :func:`pii_guard.vault.generalize.generalize_context`; as configuration it is
+#: ``PII_GUARD_POLICY_OVERRIDES="ORGANIZATION=mask,COMPANY_ID_HU=mask"``.
+LINKAGE_OVERRIDES: Mapping[EntityType, Policy] = MappingProxyType(
+    {EntityType.ORGANIZATION: Policy.MASK, EntityType.COMPANY_ID_HU: Policy.MASK}
 )
 
 

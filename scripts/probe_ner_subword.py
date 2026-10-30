@@ -15,7 +15,10 @@ fragment and sends the rest of the name upstream. This script measures that, off
 
 ``--probe`` adds a synthetic set built here: five fictional surnames (Kerekes, Gyakorló,
 Minta, Próba, Teszt) with 20 given names inflected by a case ending (100 values) and 24 left
-bare (120 values), in short Hungarian sentences. No text or value is printed, only counts.
+bare (120 values), in short Hungarian sentences. It also scores ``probe-real``, the same 220
+values over five real surnames that are everyday words (Kovács, Szabó, Molnár, Fekete,
+Takács), to tell a probe artefact from a real miss (LAB-1359). No text or value is printed,
+only counts.
 
 ::
 
@@ -41,6 +44,9 @@ from pii_guard.vault.inflection import inflection_for, splits
 TEXT_TYPES = frozenset({EntityType.PERSON, EntityType.ORGANIZATION, EntityType.ADDRESS})
 
 SURNAMES = ("Kerekes", "Gyakorló", "Minta", "Próba", "Teszt")
+#: Real Hungarian surnames that are also everyday words (``common_word_surnames``), so a miss
+#: on the fictional test surnames above can be told apart from a probe artefact (LAB-1359).
+REAL_SURNAMES = ("Kovács", "Szabó", "Molnár", "Fekete", "Takács")
 INFLECTED = (
     ("Elek", "nek"), ("Piroska", "ról"), ("Tihamér", "ért"), ("Jakab", "bal"),
     ("Kelemen", "nek"), ("Ottó", "tól"), ("Hajna", "nak"), ("Zsuzsanna", "val"),
@@ -71,8 +77,12 @@ def _word(char: str) -> bool:
     return char.isalnum() or char == "_"
 
 
-def probe_documents() -> list[Document]:
-    """The synthetic probe: 100 inflected and 120 bare fictional names, one per sentence."""
+def probe_documents(surnames: Sequence[str] = SURNAMES) -> list[Document]:
+    """The synthetic probe: 100 inflected and 120 bare names, one per sentence.
+
+    ``surnames`` (five of them) default to the fictional test surnames; :data:`REAL_SURNAMES`
+    builds the same set over real common-word surnames (``--probe`` scores both).
+    """
     matcher = inflection_for("hu")
     docs: list[Document] = []
 
@@ -82,7 +92,7 @@ def probe_documents() -> list[Document]:
         span = GoldSpan(start, start + len(value), EntityType.PERSON, value)
         docs.append(Document(f"probe-{tag}-{len(docs):04d}", "hu", text, (span,), {"tags": [tag]}))
 
-    for i, surname in enumerate(SURNAMES):
+    for i, surname in enumerate(surnames):
         for j, (given, suffix) in enumerate(INFLECTED):
             value = matcher.restore(f"{surname} {given}", suffix, EntityType.PERSON)
             add(INFLECTED_TEMPLATES[(i + j) % len(INFLECTED_TEMPLATES)], value, "inflected")
@@ -221,6 +231,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     sets: dict[str, list[Document]] = {}
     if args.probe:
         sets["probe"] = probe_documents()
+        sets["probe-real"] = probe_documents(REAL_SURNAMES)
     for arg in args.paths:
         name, _, files = arg.rpartition("=")
         paths = files.split(",")

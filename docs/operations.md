@@ -552,12 +552,12 @@ runtime.
 | `outcome` | `ok`, `blocked` (a `block` policy, or the outbound re-check), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
 | `error` | `{"code", "status"}` and, for `blocked`, `entity_types` (counts) |
 | `outbound_check` | The [outbound re-check](architecture-gateway.md#outbound-re-check) of the masked request: `result` (`passed` or `blocked`), `texts` checked, `hits` (blocking occurrences per entity type), `short` (occurrences too short to block), `ms`; `null` when the call was refused before it |
-| `mode`, `language`, `stream`, `model` | As requested |
+| `mode`, `language`, `stream`, `model` | As requested; `model` is `"[withheld]"` unless it passed its identifier check (refused, blocked and failed calls), here and in the `full` original (LAB-1358) |
 | `session_ref`, `session_new`, `session_source` | Hashed session (see above); whether the call started the conversation; which step chose it: `header`, `path`, `prompt_cache_key` or `default` ([architecture-gateway.md](architecture-gateway.md#sessions)) |
 | `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`) |
 | `entities` | `detected` and `masked` counts per entity type, number of texts; `images` (count, regions masked / kept, OCR) |
 | `cache` | Detection cache `hits`, `misses`, `seeded` |
-| `upstream` | HTTP status, the model it reported, `unresolved_placeholders` (placeholders the model invented) |
+| `upstream` | HTTP status, the model it reported (`"[withheld]"` when it is not model-id shaped, for example holds an e-mail address), `unresolved_placeholders` (placeholders the model invented) |
 | `usage` | Token usage as the upstream reported it (streams: when `stream_options.include_usage` is set) |
 | `timing` | See [Timing](#timing) |
 | `request` | `masked` (the body sent upstream); `original` at level `full` |

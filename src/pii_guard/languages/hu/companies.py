@@ -35,6 +35,16 @@ surname (``Kis Bt.``, 0.7: a Bt./Kkt. name traditionally carries a member's name
 name does not). So ``Fekete Kft.`` and ``Kovács Autószerviz Kft.`` stay unmasked: a miss when
 they *are* named after a person, accepted to keep ordinary company names intact. Lower-case
 names (``kovács bt.``) are left to the NER and the LLM.
+
+**Law, notary and patent attorney offices** (LAB-1175): ``Somogyi Ügyvédi Iroda``, ``Dr. Takács
+Közjegyzői Iroda``, ``Mintás és Társa Ügyvédi Iroda``, ``Szilágyi Szabadalmi Ügyvivői Iroda``,
+also inflected (``Ügyvédi Irodával``) and in lower case (``Somogyi ügyvédi irodát``). Such an
+office is named after its members, so the office words are person evidence the way a
+sole-trader form is: a common-word surname (``Somogyi``, ``Kovács``) is masked at 0.8, and an
+unknown word that is not an everyday or place word (``Mintás``) at 0.7. A place adjective or
+ordinary word alone (``Budapesti Ügyvédi Iroda``) and the office words without a name
+(``Tisztelt Ügyvédi Iroda!``, ``Ügyvédi Kamara``) stay kept. Without the rule the NER keeps the
+whole office as an ``ORGANIZATION`` and the lawyer's masked surname reaches the model.
 """
 
 from __future__ import annotations
@@ -47,7 +57,7 @@ from pii_guard.detect.rules._base import _Hit
 from pii_guard.lang import LexiconUnavailable, lexicon
 from pii_guard.types import EntityType
 
-__all__ = ["find_company_person"]
+__all__ = ["family_word_in_firm", "find_company_person"]
 
 _UPPER = "A-ZÁÉÍÓÖŐÚÜŰ"
 
@@ -58,6 +68,7 @@ _FORM_RE = re.compile(
     r"(?P<company>(?:nonprofit[ \t]+)?(?:kft|zrt|nyrt|kht)\.?)"
     r"|(?P<partnership>(?:bt|kkt)\.?)"
     r"|(?P<sole>e\.[ \t]?v\.|ev\.|egyéni[ \t]+vállalkoz[óo]\w*)"
+    r"|(?P<office>(?:ügyvédi|közjegyzői|szabadalmi[ \t]+ügyvivői)[ \t]+irod\w*)"
     r")"
     r"(?![^\W_])",
     re.IGNORECASE,
@@ -78,7 +89,9 @@ _STOP = frozenset(
     {"a", "az", "egy", "tisztelt", "kedves", "alulírott", "kft", "bt", "kkt", "zrt", "nyrt"}
     | {"kht", "nonprofit", "ev", "dr", "ifj", "id", "özv"}
 )
-_FAMILY = frozenset({"társa", "társai", "testvérei", "testvérek", "utóda", "utódai"})
+_FAMILY = frozenset(
+    {"társa", "társai", "testvérei", "testvérek", "utóda", "utódai", "partnere", "partnerei"}
+)
 _CHILDREN = frozenset({"fia", "fiai", "lánya", "lányai", "fiaik"})
 
 # Surnames that are also everyday words, beyond the pack's ``common_word_surnames`` list:
@@ -143,6 +156,11 @@ def _is_given(word: str) -> bool:
     return folded in given or (folded.endswith("né") and folded[:-2] in given)
 
 
+def _is_member(word: str) -> bool:
+    """A word an office name takes as a member's surname: any surname, or no everyday word."""
+    return _is_surname(word) or not _is_common(word)
+
+
 def _full_name(words: Sequence[str], i: int) -> int:
     """End (exclusive) of a surname + given name(s) run starting at ``i``, or ``i``."""
     j = i + 1
@@ -174,6 +192,12 @@ def _persons(words: Sequence[str], kind: str) -> list[tuple[int, int, float]]:
         return [(0, n, SCORE_BARE_SURNAME)]
     if kind == "sole":
         return [(max(0, n - 3), n, SCORE_WEAK)]
+    if kind == "office":  # named after its members: every name-like word is one
+        return [
+            (k, k + 1, SCORE_BARE_SURNAME if _is_surname(w) else SCORE_WEAK)
+            for k, w in enumerate(words)
+            if _is_member(w)
+        ]
     first = words[0]
     if not _is_surname(first):
         return []
@@ -199,8 +223,33 @@ def _trailing_person(words: Sequence[str], children: bool) -> tuple[int, float] 
     return None
 
 
+# A family word's left and right context in a firm name: a connector right before it, then up
+# to two capitalised business words and a legal form after it ("és Fia Építő Kft.").
+_CONNECTOR_BEFORE_RE = re.compile(rf"(?<![\w\-]){_CONNECTOR}[ \t]+$")
+_WORDS_BEFORE_FORM_RE = re.compile(rf"[ \t]+(?:{_WORD}[ \t]+){{0,2}}")
+
+
+def family_word_in_firm(text: str, start: int, end: int) -> bool:
+    """Whether ``text[start:end]`` is the family word of a firm name (``és Fia Kkt.``).
+
+    ``Fia`` / ``Fiai`` / ``Társa`` in ``Balogh és Fia Kkt.`` say "and son(s)" / "and partner":
+    a relation, not a person's name (LAB-1220). True only for the bare word (any case), with
+    a connector (``és``, ``&``, ``+``) right before it and a legal form after it, optionally
+    after up to two capitalised business words (``és Lánya Építő Kft.``).
+    """
+    if text[start:end].casefold() not in _FAMILY | _CHILDREN:
+        return False
+    if _CONNECTOR_BEFORE_RE.search(text, max(0, start - 8), start) is None:
+        return False
+    gap = _WORDS_BEFORE_FORM_RE.match(text, end, min(len(text), end + 60))
+    if gap is None:
+        return False
+    form = _FORM_RE.match(text, gap.end())
+    return form is not None and _kind(form) in ("partnership", "company", "office")
+
+
 def _kind(form: re.Match[str]) -> str:
-    return next(k for k in ("sole", "partnership", "company") if form.group(k))
+    return next(k for k in ("sole", "office", "partnership", "company") if form.group(k))
 
 
 def find_company_person(text: str) -> Iterator[_Hit]:
@@ -227,16 +276,21 @@ def find_company_person(text: str) -> Iterator[_Hit]:
             right = [t.group() for t in tokens[c + 1 :]]
             after = right[0].casefold() if len(right) == 1 else ""
             if after in _FAMILY or after in _CHILDREN:
-                found = _trailing_person(left, children=after in _CHILDREN)
+                # An office's "és Társa" names a member even with an unknown surname.
+                children = after in _CHILDREN or (_kind(form) == "office" and _is_member(left[-1]))
+                found = _trailing_person(left, children=children)
                 if found is not None:
                     spans.append((found[0], c, found[1]))
-            elif (
-                len(right) == 1
-                and _is_surname(left[-1])
-                and _is_surname(right[0])
-                and (
-                    _kind(form) != "company" or not (_is_common(left[-1]) and _is_common(right[0]))
+            elif len(right) == 1 and (
+                (
+                    _is_surname(left[-1])
+                    and _is_surname(right[0])
+                    and (
+                        _kind(form) != "company"
+                        or not (_is_common(left[-1]) and _is_common(right[0]))
+                    )
                 )
+                or (_kind(form) == "office" and _is_member(left[-1]) and _is_member(right[0]))
             ):
                 spans += [(c - 1, c, SCORE_FAMILY), (c + 1, c + 2, SCORE_FAMILY)]
             else:  # "Fodor Bt és Gulyás Kkt": only the words after the connector name this one
