@@ -387,6 +387,36 @@ class TestBareNumbersAsAddress:
         text = "The vault holds up to 4096 keyed digests at 12 Sample Road."
         assert kept(text, hit(text, "12 Sample Road", E.ADDRESS)) == ["12 Sample Road"]
 
+    def test_bare_address_number_without_a_street_is_kept(self) -> None:
+        """LAB-1599: a missing street or city is no reason to drop a number (Ai4Privacy shapes,
+        fictional values). Only a positive non-address sign drops one."""
+        for text, value in (
+            ("Meet near building number 800, where the parade starts.", "800"),
+            ("   • Street: Sample Road\n   • Building No.: 607\n   • City: Exampleton", "607"),
+            ("the zip code for the area is 92004.", "92004"),
+            ("Please send your 123023 to ensure proper mailing.", "123023"),
+            ("Mintaköz 34 in Graz (1040) erfasst.", "1040"),
+            ("a gig-dolgozók a 6000 környékeken élnek", "6000"),
+            ("Mahamat, a Minta utca 94 szám alatt, a 1126 területen", "1126"),
+            ("Meet at Bypass Road #542 for the track.", "542"),
+            ("shipped to County Road 260 #1963", "1963"),
+        ):
+            assert kept(text, hit(text, value, E.ADDRESS)) == [value], text
+
+    def test_labelled_non_address_numbers_go(self) -> None:
+        for text, value in (
+            ("Fixed in PR #295 and issue 4471.", "295"),
+            ("Fixed in PR #295 and issue 4471.", "4471"),
+            ("Upgrade to version 2026 first.", "2026"),
+            ('{"pid": 81215, "timeout": 3000}', "81215"),
+            ("hrsz.: 0123", "0123"),
+        ):
+            assert kept(text, hit(text, value, E.ADDRESS)) == [], text
+
+    def test_weak_sign_next_to_an_address_keeps_it(self) -> None:
+        text = "The office listens to callers at Musterstraße 12, 10115 Berlin."
+        assert kept(text, hit(text, "10115", E.ADDRESS)) == ["10115"]
+
     def test_sweep_leaves_a_bare_port_alone(self) -> None:
         text = "Ports 18790 and 18787."
         s = text.index("18787")
