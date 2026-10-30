@@ -232,3 +232,31 @@ describe("Chat recovery and reset (LAB-1441)", () => {
     expect(screen.getByText("No messages yet")).toBeInTheDocument();
   });
 });
+
+describe("Chat kept-by-policy values (LAB-1180)", () => {
+  it("outlines a value the gateway kept by policy in your message", async () => {
+    const user = userEvent.setup();
+    const { client } = liveChat({
+      send: (req) => {
+        const text = req.messages[req.messages.length - 1]!.content;
+        const start = text.indexOf("Minta Kft");
+        const kept = req.messages.map((_, i) => (i === req.messages.length - 1 ? [{ entityType: "ORGANIZATION" as const, start, end: start + 9 }] : []));
+        req.onMaskedRequest?.(req.messages, kept);
+        return Promise.resolve({ sessionId: "s_1", answer: "ok", maskedAnswer: "ok", maskedMessages: req.messages, keptSpans: kept, masked: 0, mode: req.mode, ms: 1, finishReason: "stop" });
+      },
+    });
+    render(<Chat client={client} live draft={null} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    const input = screen.getByRole("textbox", { name: "Message" });
+    await user.clear(input);
+    await user.type(input, "I write for Minta Kft today.");
+    await user.click(screen.getByRole("button", { name: /send through/i }));
+    const turn = await screen.findByRole("article", { name: "Chat turn" });
+    await waitFor(() => expect(turn.querySelector("mark[data-kept]")).not.toBeNull());
+    const mark = turn.querySelector("mark[data-kept]")!;
+    expect(mark.getAttribute("data-kept")).toBe("ORGANIZATION");
+    expect(mark.className).toContain("outline-dashed");
+    expect(mark.textContent).toContain("Minta Kft");
+    expect(within(turn).getByText(/1 value detected but kept by policy/)).toBeInTheDocument();
+  });
+});
