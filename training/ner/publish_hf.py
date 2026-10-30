@@ -138,7 +138,7 @@ def clean_meta(meta: Mapping[str, Any], extra: Mapping[str, Any] | None = None) 
     out: dict[str, Any] = {k: v for k, v in meta.items() if k not in LOCAL_KEYS}
     for key in ("train", "dev", "report_dev"):
         files = out.get(key) or {}
-        if isinstance(files, dict):  # Modal's data-root mount -> the config's data:<corpus>/...
+        if key in out and isinstance(files, dict):  # Modal data root -> data:<corpus>/...
             files = {_data_ref(name): digest for name, digest in files.items()}
             out[key] = files
         for name in files:
