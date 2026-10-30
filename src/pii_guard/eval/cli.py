@@ -348,8 +348,19 @@ def _with_usage_cost(
 def _record(
     scorecard: dict[str, Any], slug: str, extra: dict[str, Any] | None, runs_dir: Path
 ) -> int:
-    """Write the run record(s) for ``scorecard`` and rebuild the benchmark report."""
-    from pii_guard.eval.record import RecordError, build_records, host_info, write_records
+    """Write the run record(s) for ``scorecard`` and rebuild the benchmark report.
+
+    With a non-default ``--runs-dir`` the report rebuild is skipped (LAB-1368): rebuilding
+    ``docs/benchmarks.md`` from a lone probe record would overwrite the committed page.
+    The default path rebuilds the committed docs as before.
+    """
+    from pii_guard.eval.record import (
+        DEFAULT_RUNS_DIR,
+        RecordError,
+        build_records,
+        host_info,
+        write_records,
+    )
     from pii_guard.eval.report_cli import main as report_main
 
     try:
@@ -360,4 +371,11 @@ def _record(
         return 2
     for path in paths:
         print(f"pii-guard eval: wrote {path}", file=sys.stderr)
+    if Path(runs_dir) != DEFAULT_RUNS_DIR:
+        print(
+            "pii-guard eval: --record: custom --runs-dir, skipping docs/benchmarks.md "
+            "rebuild (run `pii-guard eval report` for the committed runs dir)",
+            file=sys.stderr,
+        )
+        return 0
     return report_main(["--runs-dir", str(runs_dir)])

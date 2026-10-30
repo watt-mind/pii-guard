@@ -121,6 +121,9 @@ class Settings(BaseSettings):
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
     # the gateway fast-mode stack, rules + ner when available (pii_guard.detect.stack).
     detectors: Annotated[tuple[str, ...] | None, NoDecode] = None
+    # Upper bound on the analysed text, in code points (LAB-1095). Override per-app via
+    # app.state.max_text_chars (set by create_app from here).
+    max_text_chars: int = Field(default=200_000, ge=1)
     # A processing constraint, independent of the masked downstream LLM destination.
     detection_profile: Literal["standard", "local-only"] = "standard"
     # "TYPE=mask|keep|block,..." on top of the defaults in docs/entities.md.
@@ -223,6 +226,11 @@ class Settings(BaseSettings):
     # vLLM reads this instead of reasoning_effort; unset sends nothing.
     llm_detector_reasoning_strength: str | None = None
     sam_url: str | None = None
+    # SAM 3.1 on the Meta Model API: the key (PII_GUARD_SAM_API_KEY, else META_API_KEY)
+    # and the model (PII_GUARD_SAM_MODEL, default sam-3.1). SamClient resolves
+    # constructor -> these Settings fields -> process env (keeping the META_API_KEY fallback).
+    sam_api_key: SecretStr | None = None
+    sam_model: str | None = None
     # NER detector (fast mode). "transformers": a token-classification checkpoint
     # (PII_GUARD_NER_MODEL); "gliner": a GLiNER checkpoint, default the public zero-shot
     # urchade/gliner_multi-v2.1 (needs the gliner extra). See docs/models.md.

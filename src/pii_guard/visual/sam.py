@@ -199,10 +199,14 @@ class SamClient:
         self._settings = settings
         self.url = _resolve_url(base_url or settings.sam_url or DEFAULT_BASE_URL)
         if api_key is None:
-            env_key = os.environ.get(API_KEY_ENV_VAR)
-            api_key = env_key if env_key else settings.meta_api_key
+            settings_key = settings.sam_api_key
+            if settings_key is not None:
+                api_key = settings_key
+            else:
+                env_key = os.environ.get(API_KEY_ENV_VAR)
+                api_key = env_key if env_key else settings.meta_api_key
         self._api_key = api_key.get_secret_value() if isinstance(api_key, SecretStr) else api_key
-        self.model = model or os.environ.get(MODEL_ENV_VAR) or DEFAULT_MODEL
+        self.model = model or settings.sam_model or os.environ.get(MODEL_ENV_VAR) or DEFAULT_MODEL
         self.prompts: dict[EntityType, tuple[str, ...]] = {
             EntityType(k): tuple(v) for k, v in (prompts or DEFAULT_PROMPTS).items()
         }
