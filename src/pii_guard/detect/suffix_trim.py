@@ -106,7 +106,7 @@ def _whole_chain_stem(span: Span, language: str, is_name: Callable[[str], bool])
     if splits is None or not words or is_name(words[-1]):
         return None
     last_start = len(value) - len(words[-1])
-    stems = set()
+    stems: set[int] = set()
     for split in splits(value, span.entity_type):
         lemma_words = split.lemma.split()
         if (
