@@ -588,7 +588,16 @@ def test_responses_and_model_catalogs_use_hosted_boundary(
 
 
 @pytest.mark.parametrize(
-    "extra", [{"model": "unapproved"}, {"max_tokens": 32769}, {"max_tokens": True}, {"n": 2}]
+    "extra",
+    [
+        {"model": "unapproved"},
+        {"max_tokens": 0},
+        {"max_completion_tokens": -1},
+        {"max_tokens": True},
+        {"max_output_tokens": "100"},
+        {"max_tokens": 1.5},
+        {"n": 2},
+    ],
 )
 def test_sponsored_model_and_output_limits_admit_no_upstream_work(
     boundary: tuple[TestClient, list[httpx.Request]], extra: dict[str, Any]
@@ -606,6 +615,44 @@ def test_sponsored_model_and_output_limits_admit_no_upstream_work(
     assert response.status_code == 403
     assert not seen
     assert client.get("/v1/account", headers=auth()).json()["usage"]["requests_today"] == 0
+
+
+@pytest.mark.parametrize(
+    ("route", "extra", "field", "expected"),
+    [
+        # LAB-1651: OpenCode asks for 32000, pi 16384, Muse 32000; clamped, not refused.
+        ("/v1/chat/completions", {"max_tokens": 32000}, "max_completion_tokens", 8192),
+        ("/v1/chat/completions", {"max_completion_tokens": 16384}, "max_completion_tokens", 8192),
+        ("/v1/chat/completions", {"max_tokens": 10**12}, "max_completion_tokens", 8192),
+        ("/v1/chat/completions", {"max_tokens": 900}, "max_completion_tokens", 900),
+        (
+            "/v1/chat/completions",
+            {"max_tokens": 32000, "max_completion_tokens": 700},
+            "max_completion_tokens",
+            700,
+        ),
+        ("/v1/responses", {"max_output_tokens": 32000}, "max_output_tokens", 8192),
+    ],
+)
+def test_output_limit_above_the_hosted_cap_is_clamped(
+    boundary: tuple[TestClient, list[httpx.Request]],
+    route: str,
+    extra: dict[str, Any],
+    field: str,
+    expected: int,
+) -> None:
+    client, seen = boundary
+    content = {"messages": [{"role": "user", "content": EMAIL}]}
+    if route == "/v1/responses":
+        content = {"input": EMAIL}
+    response = client.post(
+        route, json={"model": "muse-spark-1.3", **content, **extra}, headers=auth()
+    )
+    assert response.status_code == 200, response.text
+    sent = json.loads(seen[-1].content)
+    assert sent[field] == expected
+    others = {"max_tokens", "max_completion_tokens", "max_output_tokens"} - {field}
+    assert not others & sent.keys()
 
 
 def test_cancelled_stream_releases_runtime_and_stream_slot_without_charge() -> None:

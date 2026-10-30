@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     hosted_runtime_ttl: int = Field(default=3600, ge=300, le=86400)
     hosted_max_sessions: int = Field(default=20, ge=1, le=100)
     hosted_max_body_bytes: int = Field(default=32768, ge=1024, le=262144)
+    # Project endpoint routes (/e/<id>/v1) serve coding agents, whose every request carries the
+    # agent's system prompt and tool schemas before any history: measured 2026-10-30
+    # (LAB-1651) pi 6-9 KB, OpenCode 3-35 KB, Codex 41-44 KB, Muse Code 72-135 KB per request.
+    # 256 KiB fits the largest (Muse) about twice over. Still bounded: a body reserves
+    # 2 x bytes + 4096 input tokens before work (docs/contracts.md), and its cold detection
+    # is the costly part of a request.
+    hosted_endpoint_max_body_bytes: int = Field(default=262144, ge=1024, le=524288)
     # At least the demo's reservation (DEMO_MAX_OUTPUT_TOKENS): smaller budgets leave a
     # reasoning model no room to answer (LAB-1372, LAB-1334).
     hosted_max_output_tokens: int = Field(default=8192, ge=4096, le=32768)
