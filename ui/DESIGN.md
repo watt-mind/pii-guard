@@ -324,3 +324,11 @@ A compact image-masking preview follows the unchanged hero. It uses the English 
 specimen and recorded cover geometry from the full Demo, reserves intrinsic image sizes,
 and links to the full image flow. The homepage copy states that this recording keeps
 signatures visible and that detection can miss information.
+
+Public supporting pages provide a page heading, an On this page navigation, and two
+related next steps. They use 32px/48px section gaps so the first useful controls are
+close to the introduction. Native links preserve history and legacy section anchors;
+skip links move focus without changing the current public route. Demo sample
+comparison preserves the custom draft and its language, including an empty draft.
+Optional recorded image loading is contained locally: a failed chunk leaves the shell
+and text draft available, and explicit reload warns that unsaved drafts will clear.

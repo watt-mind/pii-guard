@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { HostedApp } from "./HostedApp";
@@ -64,4 +64,65 @@ describe("focused public pages", () => {
     navigate("#site");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Send the work to the model.");
   });
+  it.each(["Synthetic review draft.", ""])("preserves a custom draft and its language after sample comparison: %j", async (draft) => {
+    open("#demo");
+    const user = userEvent.setup();
+    render(<HostedApp call={call(true)} />);
+    const input = await screen.findByRole("combobox", { name: "Input" });
+    await user.selectOptions(input, "custom");
+    await user.clear(screen.getByRole("textbox", { name: "Your text" }));
+    if (draft) await user.type(screen.getByRole("textbox", { name: "Your text" }), draft);
+    await user.selectOptions(input, "curated");
+    await user.click(within(screen.getByRole("radiogroup", { name: "Sample language" })).getByRole("radio", { name: "Hungarian" }));
+    await user.selectOptions(input, "custom");
+    expect(screen.getByRole("textbox", { name: "Your text" })).toHaveValue(draft);
+    expect(within(screen.getByRole("radiogroup", { name: "Text language" })).getByRole("radio", { name: "English" })).toBeChecked();
+  });
+
+  it.each(["#demo", "#trust", "#technical"])("skips to main without leaving the signed-in public page: %s", async (hash) => {
+    open(hash);
+    const user = userEvent.setup();
+    render(<HostedApp call={call(true)} console={() => <p>Private console</p>} />);
+    await screen.findByRole("link", { name: "Open console" });
+    await user.click(screen.getByRole("link", { name: "Skip to content" }));
+    expect(location.hash).toBe(hash);
+    expect(document.getElementById("main")).toHaveFocus();
+    expect(screen.queryByText("Private console")).toBeNull();
+  });
+
+  it("preserves a custom draft when its language changes and labels the next steps", async () => {
+    open("#demo");
+    const user = userEvent.setup();
+    render(<HostedApp call={call(true)} />);
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Input" }), "custom");
+    const editor = screen.getByRole("textbox", { name: "Your text" });
+    expect(editor).toHaveFocus();
+    await user.clear(editor);
+    await user.type(editor, "Synthetic draft stays put.");
+    await user.click(within(screen.getByRole("radiogroup", { name: "Text language" })).getByRole("radio", { name: "Hungarian" }));
+    expect(editor).toHaveValue("Synthetic draft stays put.");
+    expect(screen.getByRole("status")).toHaveTextContent("Language changed; your draft is preserved.");
+    expect(screen.getByRole("navigation", { name: "On this page" })).toHaveTextContent("Text walkthroughImage masking");
+    expect(screen.getByRole("complementary", { name: "Continue exploring" })).toHaveTextContent("Privacy & trust");
+  });
+
+  it("states policy-dependent image handling and self-hosting boundaries on Trust", () => {
+    open("#trust");
+    render(<HostedApp call={call()} />);
+    expect(screen.getByText(/Self-hosting puts the guard/)).toHaveTextContent(/masked requests still go to your chosen model provider/);
+    expect(screen.getByText(/Faces, ID photos and signatures are detected locally/)).toHaveTextContent(/project policy decides mask or keep.*stamp masking refuses/);
+    expect(screen.getByRole("heading", { name: "Processing and access" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Images, retention and provider" })).toBeInTheDocument();
+  });
+
+  it("distinguishes model roles and remote detection on Technical overview", () => {
+    open("#technical");
+    render(<HostedApp call={call()} />);
+    expect(screen.getByText("Training only")).toBeInTheDocument();
+    expect(screen.getByText("Optional remote audit")).toBeInTheDocument();
+    expect(screen.getByText(/The opt-in audit detector receives originals/)).toBeInTheDocument();
+    expect(screen.getByText(/Answers in this demo after masking/)).toHaveTextContent(/Detection can miss values/);
+    expect(screen.getByRole("complementary", { name: "Continue exploring" })).toHaveTextContent("integration guide");
+  });
+
 });
