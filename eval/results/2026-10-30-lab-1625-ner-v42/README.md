@@ -161,3 +161,94 @@ uv run --no-sync python training/ner/gates_v4.py --ticket LAB-1625 --date 2026-1
     --candidates v42-b1 v42-b2 v42-b3 v42-b4 --selection eval/results/2026-10-30-lab-1625-ner-v42/selection \
     --json eval/results/2026-10-30-lab-1625-ner-v42/gates.json
 ```
+
+## Result: B3 passes every gate and is selected. It goes to the owner; nothing is published
+
+`gates_v4.py --ticket LAB-1625 --selection selection/ --latency latency-cpu.json` on the run
+records ([`gates.json`](gates.json)). **B3 is the first candidate since v2.0 to pass every v4
+gate**, the latency gate included. It is not published, and the production pin
+(`watt-mind/pii-guard-ner-xlmr-base@95f612a9`) is unchanged: publishing needs the owner.
+
+The table shows leak % / over-masking %, rules + NER, fast mode, CPU, on this commit. v2.0 was
+re-scored here. Run records are in `eval/results/runs/2026-10-30-lab-1625-<set>-<candidate>.json`
+and the summaries in [`stage1/`](stage1/).
+
+| Candidate | smoke leak ≤ 0.00 | smoke over ≤ 1.58 | inflection leak ≤ 2.0 | eu per language | eu total leak < 0.95 | agent-traffic-dev (beat 0.13 / 1.66) | p95 ≤ 1.2× | selection-v42 leak / over | |
+|---|--:|--:|--:|---|--:|--:|--:|--:|---|
+| v2.0 (published) | 0.00 | 1.08 | 2.0 | – | 0.95 | 0.13 / 1.66 | – | 0.00 / 6.63 | |
+| B1 (implausible DOB → `O`) | 0.00 | **1.63 fail** | 0.0 | pass | 0.32 | 0.13 / 1.19 beats | – | 0.00 / 1.83 | no |
+| B2 (uncued DOB ignored) | 0.00 | **2.16 fail** | 0.0 | pass | 0.32 | 0.13 / 1.25 beats | – | 0.00 / 1.83 | no |
+| **B3** (B1, targeted ×2) | **0.00** | **1.09** | **0.0** | **pass** | **0.32** | **0.13 / 0.66 beats** | **0.94** | **0.00 / 1.58** | **selected** |
+| B4 (soup 0.5 v2.0 + 0.5 B1) | 0.00 | 1.09 | 0.0 | pass | 0.32 | **0.19** / 1.20 fails | – | 0.00 / 3.46 | no |
+
+Latency was measured on an idle Modal CPU container, alternating per message
+([`latency-cpu.json`](latency-cpu.json)): v2.0 p95 77.5 ms, B3 73.0 ms. It was run only for B3,
+the only candidate that passed the accuracy gates.
+
+Against v2.0, B3:
+
+- **Smoke:** the same leak (0.00) and over-masking (1.09 vs 1.08). v4.1's German name leak is
+  gone.
+- **Inflection:** leak 2.0 → 0.0.
+- **agent-traffic-dev:** over-masking 1.66 → 0.66, with the same leak.
+- **eu:** total leak 0.95 → 0.32 (3 → 1 of 315 values; the one left is in fr). Maltese
+  over-masking 12.9 → 0, Irish 7.7 → 0.
+- **Selection split:** `dates` false alarms 67 → 1, and `numbers` `PHONE`/`BANK_ACCOUNT` 3/1 → 3/0.
+
+**MAPA EUR-Lex (report-only, 21 languages, 42 documents, scored locally and never uploaded):**
+
+| | v2.0 | B1 | B2 | B3 | B4 |
+|---|--:|--:|--:|--:|--:|
+| leak % | 8.24 | 8.78 | 9.32 | 8.51 | **5.54** |
+| over-masking % | 55.5 | 45.5 | 45.5 | **44.7** | 48.5 |
+
+B3 leaks slightly more MAPA names than v2.0 (8.51 against 8.24) and much less than v4.1-A1 did
+on its own commit (5.9). The targeted data costs part of A1's MAPA gain. MAPA is not a gate.
+
+What the round shows, read after the choice:
+
+- **The birth-date fix works through the data.** Every v4.2 candidate cuts the `dates` false
+  alarms from 116 (A1) to 1-3, and agent-traffic-dev over-masking falls below v2.0's.
+- **The dose of targeted data decides the smoke over-masking.** B1 and B3 differ only in
+  copies (1 vs 2), and smoke over-masking goes 1.63 → 1.09.
+- **Ignoring uncued birth dates (B2) is worse than teaching the implausible ones as `O`.**
+- **The soup (B4)** cuts the MAPA leak by a third (8.24 → 5.54) but leaks one more agent-traffic-dev value.
+- **The selection split** ranks B3 first among the passers. Its `numbers` slice still
+  over-masks about 15 %, mostly from rules (Hungarian TAJ, tax and ID formats on order numbers).
+  That is not NER, and it is filed separately.
+
+### Post-hoc check, not a protocol candidate: dev-calibrated thresholds on B3
+
+The LAB-1650 finding (thresholds alone don't fix v4.1) prompted this check. `thresholds_v33.py`
+calibration was run on B3, on dev files only ([`thresholds-b3.json`](thresholds-b3.json)): s11
+hu/en dev, OpenPII hu/en/de dev and the v4.2 targeted dev files, 1,631 documents. The selection
+split and the gate sets were not used. **`hu-poa-dev` is left out:** its regenerated copy does
+not match LAB-1547's hash, because LAB-1597 changed Hungarian vowel harmony.
+
+The table raises most types to 0.9. It is scored as `v42-b3t` on the same records:
+
+| | smoke leak / over | agent-traffic-dev leak / over | selection-v42 leak / over |
+|---|--:|--:|--:|
+| B3 | 0.00 / 1.09 | 0.13 / 0.66 | 0.00 / 1.58 |
+| B3 + thresholds | **0.58** / 0.56 | **1.86** / 0.49 | 0.00 / 1.23 |
+
+The thresholds cut over-masking further but fail the smoke and agent-traffic leak gates. **Raw
+B3 stays the pick.** This variant was added after results were seen, so it could not have been
+selected anyway.
+
+## Compute and cost
+
+| Provider | What | Cost |
+|---|---|--:|
+| Modal | B1, B2, B3: one A10G each, about 25 min of training (`modal billing report`: $0.510, $0.522, $0.534). Latency gate: one CPU container, $0.007 | **$1.57** (cap $11; estimate was $1.70) |
+| Fireworks | not used | $0 |
+| Meta Model API | not used | $0 |
+| Local CPU | data, soup B4, all scoring, threshold calibration, one process at a time | $0 |
+
+No deployment was created. Each Modal app was ephemeral (`modal run`) and stopped when it
+returned.
+
+- Decontamination: `train.py` dropped 0 of 179,895 distinct train and dev documents on Modal.
+- Weights sha256: B1 `458be3c9…`, B2 `439a9034…`, B3 `40e8406c…`, B4 `c1ec9758…`.
+- The checkpoints are on the `pii-guard-ner-runs` volume (`pii-guard-ner-xlmr-base-v42-b1`
+  to `-b3`). B4 is local only. None is published.

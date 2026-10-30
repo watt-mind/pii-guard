@@ -201,6 +201,26 @@
       "color": "#999933",
       "shape": "circle"
     },
+    "rules+ner:pii-guard-ner-xlmr-base-v42-b1": {
+      "color": "#117733",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v42-b2": {
+      "color": "#AA4499",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v42-b3": {
+      "color": "#E69F00",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v42-b3@thresholds_file=eval/results/2026-10-30-lab-1625-ner-v42/thresholds-b3.json,thresholds_sha256=015032d245b3d86c8d98a74b42efe16fbd87a19fb94ce5b3a34ec8d1cf44382a": {
+      "color": "#0072B2",
+      "shape": "circle"
+    },
+    "rules+ner:pii-guard-ner-xlmr-base-v42-b4": {
+      "color": "#009E73",
+      "shape": "circle"
+    },
     "rules+ner:wismut-nym@decoder=word": {
       "color": "#117733",
       "shape": "circle"
@@ -259,6 +279,10 @@
     },
     "rules+ner:xlmr-base-v2-hn@rescore=lab-1547": {
       "color": "#882255",
+      "shape": "circle"
+    },
+    "rules+ner:xlmr-base-v2-hn@rescore=lab-1625": {
+      "color": "#D55E00",
       "shape": "circle"
     },
     "rules+ner:xlmr-base-v2-hn@thresholds_file=eval/results/2026-10-29-ner-v33/thresholds-h.json,thresholds_sha256=97afe86b2e5fcc45ba687d46ab8da23a556f22880a00e0bdf3b6f821e199206b": {

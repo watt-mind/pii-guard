@@ -92,6 +92,8 @@ LABELS = {
     "v42-b3": "pii-guard fast, NER v4.2 candidate B3: B1 with the v4.2 targeted data twice "
     "(LAB-1625)",
     "v42-b4": "pii-guard fast, NER v4.2 candidate B4: soup 0.5 v2.0 + 0.5 B1 (LAB-1625)",
+    "v42-b3t": "pii-guard fast, NER v4.2 B3 with dev-calibrated thresholds, post-hoc, not a "
+    "protocol candidate (LAB-1625)",
 }
 #: Tickets whose v2.0 runs are selection-only re-scores (LAB-1494): their records get a system
 #: key and label of their own, so the report's latest-per-system pick keeps the published v2.0

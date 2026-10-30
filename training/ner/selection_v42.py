@@ -174,12 +174,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     s.add_argument("--model", help="checkpoint directory (default: the published v2.0)")
     s.add_argument("--dir", type=Path, default=OUT)
     s.add_argument("--json", type=Path)
+    s.add_argument("--thresholds", type=Path, help="a thresholds_v33.py JSON (dev-calibrated)")
     args = parser.parse_args(argv)
     if args.command == "write":
         for path in write(args.out):
             print(path)
         return 0
     paths = sorted(args.dir.glob("*-selection-v42.jsonl"))
+    if args.thresholds:
+        import thresholds_v33
+
+        table = json.loads(args.thresholds.read_text(encoding="utf-8"))["thresholds"]
+        thresholds_v33.apply(table)
     result = {"candidate": args.candidate, "model": args.model or "v2.0 (published)",
               **score(paths, args.model)}  # fmt: skip
     a = result["all"]
