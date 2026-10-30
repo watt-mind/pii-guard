@@ -45,7 +45,6 @@ derive distinct sessions.
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import hmac
 import json
@@ -101,32 +100,27 @@ class SessionSource(StrEnum):
     DEFAULT = "default"
 
 
-#: The salt of an ``x-api-key`` identity: a domain label, so it never equals the identity
-#: of the same value sent as ``Authorization``.
-_X_API_KEY_LABEL = b"pii-guard:client-identity:x-api-key"
-
-
-@functools.lru_cache(maxsize=1024)
-def _api_key_identity(key: str) -> str:
-    """An ``x-api-key`` value's identity: a key derivation (scrypt), not a bare hash, since
-    the value is a credential (CodeQL ``py/weak-sensitive-data-hashing``). Its own salt keeps
-    it apart from the identity of the same value sent as ``Authorization``. Cached: one
-    derivation per key per process, not per request."""
-    derived = hashlib.scrypt(key.encode("utf-8"), salt=_X_API_KEY_LABEL, n=2**12, r=8, p=1)
-    return derived.hex()
+def _credential(headers: Mapping[str, str]) -> str | None:
+    """The client's credential header, as one value: ``Authorization``, else ``x-api-key``
+    (Anthropic clients, LAB-1605) marked with a NUL, which no ``Authorization`` value carries,
+    so the same value in the two headers never gives the same identity."""
+    raw = headers.get("authorization")
+    if raw is not None and raw.strip():
+        return raw.strip()
+    raw = headers.get("x-api-key")
+    if raw is not None and raw.strip():
+        return "x-api-key\x00" + raw.strip()
+    return None
 
 
 def client_identity(headers: Mapping[str, str]) -> str:
     """SHA-256 (hex) of the ``Authorization`` value; without one, of the ``x-api-key`` value
     (Anthropic clients, LAB-1605), so two keys never share a derived session; ``anonymous``
     without either."""
-    raw = headers.get("authorization")
-    if raw is not None and raw.strip():
-        return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()
-    key = headers.get("x-api-key")
-    if key is not None and key.strip():
-        return _api_key_identity(key.strip())
-    return "anonymous"
+    credential = _credential(headers)
+    if credential is None:
+        return "anonymous"
+    return hashlib.sha256(credential.encode("utf-8")).hexdigest()
 
 
 class _Conversations:
