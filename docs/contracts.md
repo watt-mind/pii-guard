@@ -1927,7 +1927,12 @@ the defaults a guest gets its five demos (about 8,250 reserved tokens and $0.14 
 fresh signed-in user can send a chat close to the 32 KiB body limit. Sponsored requests may not
 ask for provider-side tools (`web_search_options`, or a `tools` entry other than `function` or
 `custom`): Meta bills web search grounding per query, outside the token usage a reservation
-bounds, so they are refused with `403 hosted_request_denied` before any work. Completion, cancellation, invalid provider responses and client retries never refund
+bounds, so they are refused with `403 hosted_request_denied` before any work. On
+`/v1/responses` a `namespace` tool (Codex's `multi_agent_v1`, Muse Code's `muse`) is accepted
+when every tool it holds, at any depth, is a `function` or `custom` tool; it goes upstream as
+is (LAB-1658). A provider-side tool inside a namespace is refused like one at the top level,
+and so is a `tools` array holding more than 512 definitions or nesting namespaces more than 4
+deep. Completion, cancellation, invalid provider responses and client retries never refund
 requests, tokens or money. Concurrency releases only after the response stream and cleanup.
 There are no automatic upstream retries. Monetary units are integer microdollars, and configured
 per-token rates must upper-bound every permitted model and all reasoning charges. The rate
