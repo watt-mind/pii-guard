@@ -142,10 +142,11 @@ export function ApiReference(props: { consoleHref: string; embedded?: false } | 
         </div>
         <div aria-hidden="true" className="header-hairline" />
       </header>
-      <main id="main" tabIndex={-1} className="focus:outline-none">
+      {/* With Scalar, its own <main> is the page's main; a nested one fails axe (LAB-1640). */}
+      <div id="main" role={ScalarReference ? undefined : "main"} tabIndex={-1} className="focus:outline-none">
         {intro}
         {reference}
-      </main>
+      </div>
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-10">
           <p className="text-xs text-muted">Generated from the code and checked in CI. Every example is fictional.</p>

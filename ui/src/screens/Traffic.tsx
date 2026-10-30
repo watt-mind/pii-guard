@@ -753,7 +753,8 @@ function CallDetail({
           <Meta label="Session from" value={e.session_source ? (SESSION_SOURCE_LABEL[e.session_source] ?? e.session_source) : "–"} />
           <Meta label="Outbound check" value={outboundCheckLabel(e.outbound_check)} />
           <Meta label="Detectors" value={e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "–"} />
-          <Meta label="Upstream" value={e.upstream?.status ? `HTTP ${e.upstream.status}` : "not called"} />
+          {/* Whose status: the model's provider here, PII Guard's own in the failure note (LAB-1640). */}
+          <Meta label="Model provider answered" value={e.upstream?.status ? `HTTP ${e.upstream.status}` : "not called"} />
           <Meta label="Tokens" value={e.usage?.total_tokens !== undefined ? `${e.usage.prompt_tokens ?? "?"} in · ${e.usage.completion_tokens ?? "?"} out` : "–"} />
           <Meta label="Detection cache" value={e.cache ? `${e.cache.hits} hit · ${e.cache.misses} miss` : "–"} />
         </dl>
@@ -795,7 +796,7 @@ function CallDetail({
           </p>
           <p className="mt-1 text-ink">
             <code className="font-mono text-xs">{e.error?.code ?? e.outcome}</code>
-            {e.error?.status ? ` · HTTP ${e.error.status}` : ""}
+            {e.error?.status ? ` · PII Guard answered your client HTTP ${e.error.status}` : ""}
             {e.error?.entity_types ? ` · ${Object.entries(e.error.entity_types).map(([k, n]) => `${metaFor(k as EntityType).label} ×${n}`).join(", ")}` : ""}
           </p>
           <p className="mt-2 text-muted">

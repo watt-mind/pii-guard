@@ -288,7 +288,11 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
     setOpenedWanted(true);
     requestPolicyEdit(null);
     const family = policyFamilies(policies).find((f) => f.latest.policy_id === wantedEdit);
-    if (family) { setPolicyEdit(family.latest); setEndpointEdit(null); }
+    // Start from the version the endpoint uses, not the latest (LAB-1640): Tune changes what that
+    // endpoint masks, so a newer version's other changes must not ride along unseen.
+    const pinned = endpoints.find((e) => e.id === wantedEndpoint && e.policy_id === wantedEdit);
+    const start = (pinned && policies.find((p) => p.policy_version_id === pinned.policy_version_id)) ?? family?.latest;
+    if (start) { setPolicyEdit(start); setEndpointEdit(null); }
   }
   const policyForm = policyEdit && (
     <PolicyForm
@@ -297,6 +301,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
       policy={policyEdit === "new" ? undefined : policyEdit}
       endpoints={endpoints}
       preferred={policyEdit !== "new" && policyEdit.policy_id === wantedEdit ? wantedEndpoint : null}
+      latest={policyEdit === "new" ? undefined : latest.get(policyEdit.policy_id)}
       hosted={hosted}
       busy={busy}
       onCancel={closePolicyForm}
@@ -443,8 +448,8 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
         {endpoints.length > 0 && (
           <ul className={LIST}>
             {[...endpoints.filter((e) => e.enabled), ...endpoints.filter((e) => !e.enabled)].map((endpoint) => (
-              <li key={endpoint.id} className={ROW}>
-                <div className="min-w-0">
+              <li key={endpoint.id} className={`${ROW} sm:flex-nowrap`}>
+                <div className="min-w-0 sm:flex-1">
                   <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
                     {endpoint.name}
                     {!endpoint.enabled && <Badge>Disabled</Badge>}
@@ -455,11 +460,19 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
                     {endpoint.enabled && newerVersion(endpoint) && <Badge>v{newerVersion(endpoint)!.version} available</Badge>}
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:shrink-0 sm:justify-end">
                   {endpoint.enabled && newerVersion(endpoint) && (
-                    <Button size="sm" busy={busy} aria-label={`Apply v${newerVersion(endpoint)!.version} to ${endpoint.name}`} onClick={() => applyLatest(endpoint)}>
-                      Apply v{newerVersion(endpoint)!.version}
-                    </Button>
+                    // Asks first (LAB-1640): the endpoint may carry production traffic.
+                    <ConfirmAction
+                      size="sm"
+                      trigger={`Apply v${newerVersion(endpoint)!.version}`}
+                      triggerLabel={`Apply v${newerVersion(endpoint)!.version} to ${endpoint.name}`}
+                      title={`Apply ${newerVersion(endpoint)!.name} v${newerVersion(endpoint)!.version} to '${endpoint.name}'?`}
+                      body={`The next request through it uses v${newerVersion(endpoint)!.version} instead of v${endpoint.policy_version}. Other endpoints keep their versions.`}
+                      confirm={`Apply v${newerVersion(endpoint)!.version}`}
+                      busy={busy}
+                      onConfirm={() => applyLatest(endpoint)}
+                    />
                   )}
                   {!endpoint.enabled && (
                     <ConfirmAction
@@ -698,7 +711,7 @@ function listNames(items: { name: string }[]): string {
   return items.map((e) => `'${e.name}'`).join(" and ");
 }
 
-function PolicyForm({ policy, template, endpoints, preferred = null, hosted, busy, onSave, onCancel }: { policy?: PolicyVersion; template?: PolicyVersion; endpoints: Endpoint[]; /** The endpoint Connect's "Tune" came from: the one "Save and apply" moves. */ preferred?: string | null; hosted: boolean; busy: boolean; onSave: (body: PolicyBody, applyTo: Endpoint[]) => Promise<void>; onCancel: () => void }) {
+function PolicyForm({ policy, template, endpoints, preferred = null, latest, hosted, busy, onSave, onCancel }: { policy?: PolicyVersion; template?: PolicyVersion; endpoints: Endpoint[]; /** The endpoint Connect's "Tune" came from: the one "Save and apply" moves. */ preferred?: string | null; /** The family's latest version number. */ latest?: number; hosted: boolean; busy: boolean; onSave: (body: PolicyBody, applyTo: Endpoint[]) => Promise<void>; onCancel: () => void }) {
   const [name, setName] = useState(policy?.name ?? "");
   const [entities, setEntities] = useState({ ...(policy?.entity_policies ?? template?.entity_policies ?? defaults) });
   const [language, setLanguage] = useState(policy?.language ?? template?.language ?? "hu");
@@ -722,7 +735,7 @@ function PolicyForm({ policy, template, endpoints, preferred = null, hosted, bus
   return (
     <div onKeyDown={guard.onKeyDown}>
     <Card title={policy ? `New version of ${policy.name}` : "Create policy"} titleId={titleId} subtitle="Mask replaces detected values with reversible placeholders. Keep sends them unchanged. Block refuses the entire request when that type is detected.">
-      <form aria-labelledby={titleId} className="space-y-4" onChange={guard.onChange} onSubmit={(e) => { e.preventDefault(); void onSave(body(), policy ? applyTo : []); }}>
+      <form aria-labelledby={titleId} className="space-y-4" onChange={guard.onChange} onSubmit={(e) => { e.preventDefault(); void onSave(body(), policy && fromTune.length ? applyTo : []); }}>
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Policy name" required={!policy}>
             <Input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
@@ -787,21 +800,40 @@ function PolicyForm({ policy, template, endpoints, preferred = null, hosted, bus
           )}
         </fieldset>
         <div className={REVIEW}>
-          <p>{policy ? "Saving creates a new version." : "The new policy is available to endpoints in this project."}</p>
+          <p>
+            {policy ? "Saving creates a new version." : "The new policy is available to endpoints in this project."}
+            {policy && latest !== undefined && latest > policy.version && (
+              <> It starts from v{policy.version}{fromTune[0] ? `, the version '${fromTune[0].name}' uses` : ""}, not the latest v{latest}; v{latest + 1} gets these settings.</>
+            )}
+          </p>
           {policy && (
             <p className="mt-1">
               Endpoints using this policy: {affected.length ? affected.map((e) => `${e.name} (v${e.policy_version})`).join(", ") : "none"}.
-              {applyTo.length > 0 && <> Save and apply moves {listNames(applyTo)} to the new version; Save only keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version.</>}
+              {applyTo.length > 0 && (fromTune.length
+                ? <> Save and apply moves {listNames(applyTo)} to the new version; Save only keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version.</>
+                : <> Save new version keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version; Save and apply asks before moving {applyTo.length === 1 ? "it" : "them"}.</>)}
             </p>
           )}
         </div>
         {guard.prompt}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Enter saves. It applies only to the one endpoint Tune came from; moving endpoints
+              opened from Projects (production among them) is a confirmed second step (LAB-1640). */}
           <Button variant="primary" type="submit" busy={busy}>
-            {busy ? "Saving…" : !policy ? "Save policy" : applyTo.length ? `Save and apply to ${listNames(applyTo)}` : "Save new version"}
+            {busy ? "Saving…" : !policy ? "Save policy" : fromTune.length ? `Save and apply to ${listNames(applyTo)}` : "Save new version"}
           </Button>
-          {policy && applyTo.length > 0 && (
+          {policy && fromTune.length > 0 && (
             <Button disabled={busy} onClick={() => void onSave(body(), [])}>Save only</Button>
+          )}
+          {policy && !fromTune.length && applyTo.length > 0 && (
+            <ConfirmAction
+              trigger="Save and apply…"
+              title={`Save and apply the new version to ${applyTo.length === 1 && applyTo[0] ? `'${applyTo[0].name}'` : `${applyTo.length} endpoints`}?`}
+              body={`The next request through ${applyTo.map((e) => `'${e.name}'`).join(", ")} uses it. Other endpoints keep their versions.`}
+              confirm={applyTo.length === 1 ? "Save and apply" : `Save and apply to ${applyTo.length}`}
+              busy={busy}
+              onConfirm={() => onSave(body(), applyTo)}
+            />
           )}
           <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
         </div>

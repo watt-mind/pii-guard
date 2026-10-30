@@ -11,7 +11,7 @@ import type { BenchmarkIndex } from "../api/benchmarks";
 import bundled from "virtual:pii-guard/benchmarks-index";
 import { HostedApp } from "./HostedApp";
 import type { Account, Requester } from "./api";
-import { endpointState, parseFirstRun, resetFirstRun, testRecovery, TestRequestError, withKey } from "./firstRun";
+import { endpointState, parseFirstRun, resetFirstRun, testRecovery, TestRequestError, testSessionKey, withKey } from "./firstRun";
 
 // Slow runners get longer than the 1 s default for every async query in this file
 // (LAB-1498): the setup region appears only after a chain of account, first-run,
@@ -132,7 +132,10 @@ describe("first run, sponsored on", () => {
     expect(await within(setup).findByText(/Round trip complete: 2 values masked/)).toBeInTheDocument();
     // Its own vault session per policy version, so an applied Keep shows in the next test (LAB-1629).
     const sent = vi.mocked(globalThis.fetch).mock.calls.find(([u]) => String(u).includes("/chat/completions"));
-    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ stream: false, prompt_cache_key: "pii-guard-connect-test:pv-1" });
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ stream: false, prompt_cache_key: testSessionKey("pv-1") });
+    expect(testSessionKey("pv-1")).toMatch(/^pgtest_f[0-9a-f]+$/);
+    // The whole-id shape the gateway exempts from model hits (opaque_ids rule 3, LAB-1640).
+    expect(testSessionKey("pmnRn0C4txtT6QrZrleUwBaV")).toMatch(/^[A-Za-z]{1,24}_[0-9a-f]{16,128}$/);
     // The card names the policy, as Projects does (LAB-1629).
     expect(within(setup).getByText(/Policy · v1/)).toBeInTheDocument();
     // What the model saw, with its placeholders as chips (LAB-1626).
