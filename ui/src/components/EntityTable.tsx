@@ -58,7 +58,7 @@ export function EntityTable({ entities, spans, activeKey, onActivate }: Props) {
                 className={active ? "bg-surface-2" : ""}
               >
                 <td className="border-b border-line px-4 py-2 sm:pl-0">
-                  <Placeholder text={e.placeholder} entityType={e.entity_type} active={active} />
+                  <Placeholder text={e.placeholder} entityType={e.entity_type} active={active} onActivate={onActivate} />
                 </td>
                 <td className="border-b border-line px-3 py-2 text-ink">{metaFor(e.entity_type).label}</td>
                 <td className="border-b border-line px-3 py-2 text-right tabular-nums text-muted">{e.count}×</td>

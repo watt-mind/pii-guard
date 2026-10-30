@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { isFullStatus, type FullServerStatus } from "../api/status";
 import { recovery, request, type Requester } from "../hosted/api";
 import { projectPath, VISUAL_DETECTION_LABEL, type PolicyVersion, type Project, type ProjectList } from "../projects/api";
@@ -6,7 +6,7 @@ import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type EntityType } from "../api/
 import { NerHint } from "../components/NerHint";
 import { Button, ButtonLink, Card, KeyValues, Notice, PageHeader } from "../components/ui";
 import type { ServerStatusState } from "../hooks/useServerStatus";
-import { ENTITY_META, metaFor, type Policy as EntityPolicy } from "../lib/entities";
+import { metaFor, type Policy as EntityPolicy } from "../lib/entities";
 import { detectorName } from "../lib/traffic";
 
 /** Language codes in words (LAB-1626). */
@@ -34,6 +34,89 @@ const POLICY_CLASS: Record<EntityPolicy, string> = {
 // [overflow-wrap:anywhere]: a long override example wraps instead of widening a phone page.
 const mono = (s: string) => <code className="font-mono text-xs [overflow-wrap:anywhere]">{s}</code>;
 
+function unavailableStatusMessage(state: ServerStatusState["state"]): string {
+  if (state === "loading") return "Asking the server…";
+  if (state === "missing") {
+    return "This PII Guard server doesn't report its configuration (it predates /v1/status). The entity table shows the documented defaults.";
+  }
+  return "The PII Guard API isn't reachable, so its configuration is unknown. The entity table shows the documented defaults (docs/entities.md).";
+}
+
+function formatAuditMode(audit: FullServerStatus["gateway"]["modes"]["audit"]): ReactNode {
+  if (!audit.available) return <span className="text-muted [overflow-wrap:anywhere]">Unavailable: {audit.reason}</span>;
+  const suffix = audit.model ? `, ${audit.model.split("/").pop()}` : "";
+  return <>Fast + the LLM detector{suffix}</>;
+}
+
+function formatImagesStatus(server: FullServerStatus): ReactNode {
+  if (!server.images.available) return <span className="text-muted">Refused (fail closed): {imageGaps(server)}</span>;
+  const where = HOSTED_BUILD ? "server-side" : "on-device";
+  const faces = server.images.sam ? `by SAM 3.1 and the ${where} detector` : `by the ${where} detector`;
+  return <>On · faces {faces}, text by OCR</>;
+}
+
+function formatTrafficLogLevel(level: FullServerStatus["traffic_log"]): string {
+  if (level === "masked") return "Placeholders only";
+  if (level === "full") return "Originals too, on this machine only";
+  return "Off: Logs and Overview stay empty";
+}
+
+function formatUpstream(upstream: FullServerStatus["upstream"]): ReactNode {
+  if (upstream.mock) return "Offline mock model (echo)";
+  return upstream.origin ? mono(upstream.origin) : "Not configured";
+}
+
+function DetectionCard({ server }: { server: FullServerStatus }) {
+  return (
+    <Card title="Detection" titleId="policy-detection-title" className="min-w-0">
+      <KeyValues
+        items={[
+          {
+            label: "Default mode",
+            value: (
+              <>
+                <span className="font-medium capitalize">{server.gateway.default_mode}</span>
+                <span className="text-muted"> · a client can pick another mode per request (header {mono("X-PII-Guard-Mode")})</span>
+              </>
+            ),
+          },
+          { label: "Fast mode", value: server.gateway.modes.fast.detectors.map(detectorName).join(" + ") || "none" },
+          { label: "Audit mode", value: formatAuditMode(server.gateway.modes.audit) },
+          { label: "REST API", value: server.rest.detectors.map(detectorName).join(" + ") || "none" },
+          { label: "Default language", value: mono(server.default_language) },
+        ]}
+      />
+      {!server.ner.available && (
+        <p role="note" className="mt-3 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-ink">
+          <span className="font-medium text-warn">No NER: free-text names are not masked.</span> They need <NerHint />.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function ServerCard({ server }: { server: FullServerStatus }) {
+  return (
+    <Card title="Server" titleId="policy-server-title" className="min-w-0">
+      <KeyValues
+        items={[
+          { label: "Images", value: formatImagesStatus(server) },
+          {
+            label: "Traffic log",
+            value: (
+              <>
+                {formatTrafficLogLevel(server.traffic_log)} <span className="text-muted">(level {mono(server.traffic_log)})</span>
+              </>
+            ),
+          },
+          { label: "Authentication", value: server.auth.token_required ? "Bearer token required" : "None: keep it on localhost or behind a proxy" },
+          { label: "Upstream", value: formatUpstream(server.upstream) },
+        ]}
+      />
+    </Card>
+  );
+}
+
 export function Policy({ status }: PolicyProps) {
   const server = status.state === "ok" && isFullStatus(status.status) ? status.status : null;
   return (
@@ -43,78 +126,12 @@ export function Policy({ status }: PolicyProps) {
         lead="What this server does with each kind of personal data, read from its configuration. Read-only: the settings live in the server's environment, so a change here could not survive a restart."
       />
 
-      {!server && (
-        <Notice live>
-          {status.state === "loading"
-            ? "Asking the server…"
-            : status.state === "missing"
-              ? "This PII Guard server doesn't report its configuration (it predates /v1/status). The entity table shows the documented defaults."
-              : "The PII Guard API isn't reachable, so its configuration is unknown. The entity table shows the documented defaults (docs/entities.md)."}
-        </Notice>
-      )}
+      {!server && <Notice live>{unavailableStatusMessage(status.state)}</Notice>}
 
       {server && (
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card title="Detection" titleId="policy-detection-title" className="min-w-0">
-            <KeyValues
-              items={[
-                {
-                  label: "Default mode",
-                  value: (
-                    <>
-                      <span className="font-medium capitalize">{server.gateway.default_mode}</span>
-                      <span className="text-muted"> · a client can pick another mode per request (header {mono("X-PII-Guard-Mode")})</span>
-                    </>
-                  ),
-                },
-                { label: "Fast mode", value: server.gateway.modes.fast.detectors.map(detectorName).join(" + ") || "none" },
-                {
-                  label: "Audit mode",
-                  value: server.gateway.modes.audit.available ? (
-                    <>Fast + the LLM detector{server.gateway.modes.audit.model ? `, ${server.gateway.modes.audit.model.split("/").pop()}` : ""}</>
-                  ) : (
-                    <span className="text-muted [overflow-wrap:anywhere]">Unavailable: {server.gateway.modes.audit.reason}</span>
-                  ),
-                },
-                { label: "REST API", value: server.rest.detectors.map(detectorName).join(" + ") || "none" },
-                { label: "Default language", value: mono(server.default_language) },
-              ]}
-            />
-            {!server.ner.available && (
-              <p role="note" className="mt-3 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-ink">
-                <span className="font-medium text-warn">No NER: free-text names are not masked.</span> They need <NerHint />.
-              </p>
-            )}
-          </Card>
-          <Card title="Server" titleId="policy-server-title" className="min-w-0">
-            <KeyValues
-              items={[
-                {
-                  label: "Images",
-                  value: server.images.available ? (
-                    <>On · faces {server.images.sam ? `by SAM 3.1 and the ${HOSTED_BUILD ? "server-side" : "on-device"} detector` : `by the ${HOSTED_BUILD ? "server-side" : "on-device"} detector`}, text by OCR</>
-                  ) : (
-                    <span className="text-muted">Refused (fail closed): {imageGaps(server)}</span>
-                  ),
-                },
-                {
-                  label: "Traffic log",
-                  value: (
-                    <>
-                      {server.traffic_log === "masked"
-                        ? "Placeholders only"
-                        : server.traffic_log === "full"
-                          ? "Originals too, on this machine only"
-                          : "Off: Logs and Overview stay empty"}{" "}
-                      <span className="text-muted">(level {mono(server.traffic_log)})</span>
-                    </>
-                  ),
-                },
-                { label: "Authentication", value: server.auth.token_required ? "Bearer token required" : "None: keep it on localhost or behind a proxy" },
-                { label: "Upstream", value: server.upstream.mock ? "Offline mock model (echo)" : server.upstream.origin ? mono(server.upstream.origin) : "Not configured" },
-              ]}
-            />
-          </Card>
+          <DetectionCard server={server} />
+          <ServerCard server={server} />
         </div>
       )}
 
@@ -160,6 +177,47 @@ function defaultPolicyOf(project: Project, policies: PolicyVersion[]): PolicyVer
   return family.reduce<PolicyVersion | null>((best, p) => (best === null || p.version > best.version ? p : best), null);
 }
 
+async function fetchOwnerPolicy(call: Requester, projectId?: string): Promise<{ project: Project; policy: PolicyVersion | null } | null> {
+  const list = await call<ProjectList>("/v1/projects");
+  if (!Array.isArray(list.projects)) throw new Error("Invalid projects");
+  const project = list.projects.find((p) => p.id === projectId) ?? list.projects.find((p) => p.id === list.default_project_id) ?? list.projects[0];
+  if (!project) return null;
+  const data = await call<{ policies: PolicyVersion[] }>(`${projectPath(project.id)}/policies`);
+  if (!Array.isArray(data.policies)) throw new Error("Invalid policies");
+  return { project, policy: defaultPolicyOf(project, data.policies) };
+}
+
+function OwnerPolicyDetails({ project, policy }: { project: Project; policy: PolicyVersion }) {
+  return (
+    <>
+      <Card title="Default policy" titleId="owner-policy-title" className="min-w-0">
+        <KeyValues
+          items={[
+            { label: "Project", value: project.name },
+            {
+              label: "Policy",
+              value: (
+                <>
+                  {policy.name} <span className="text-muted">· v{policy.version}</span>
+                </>
+              ),
+            },
+            { label: "Detection mode", value: <span className="capitalize">{policy.mode}</span> },
+            { label: "Image detection", value: VISUAL_DETECTION_LABEL[policy.visual_detection ?? "local"] },
+            { label: "Language", value: LANGUAGE_NAME[policy.language] ?? mono(policy.language) },
+          ]}
+        />
+      </Card>
+      <Card title="Entity policies" titleId="policies-title" subtitle={`As ${policy.name} v${policy.version} applies them. An endpoint pinned to another policy or version applies that one.`}>
+        <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+          <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} policies={policy.entity_policies} />
+          <PolicyTable title="Images" types={VISUAL_ENTITY_TYPES} policies={policy.entity_policies} />
+        </div>
+      </Card>
+    </>
+  );
+}
+
 /**
  * Policy where the server has no policy of its own to show (a hosted owner): the owner's
  * project default policy, read-only, from the owner-scoped project API. Editing stays under
@@ -170,15 +228,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true;
-    (async () => {
-      const list = await call<ProjectList>("/v1/projects");
-      if (!Array.isArray(list.projects)) throw new Error("Invalid projects");
-      const project = list.projects.find((p) => p.id === projectId) ?? list.projects.find((p) => p.id === list.default_project_id) ?? list.projects[0];
-      if (!project) return null;
-      const data = await call<{ policies: PolicyVersion[] }>(`${projectPath(project.id)}/policies`);
-      if (!Array.isArray(data.policies)) throw new Error("Invalid policies");
-      return { project, policy: defaultPolicyOf(project, data.policies) };
-    })().then(
+    fetchOwnerPolicy(call, projectId).then(
       (ok) => active && setState(ok ? { state: "ok", ...ok } : { state: "empty" }),
       (e: unknown) => active && setState({ state: "error", message: recovery(e) }),
     );
@@ -217,35 +267,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
         </Notice>
       )}
       {state.state === "ok" && !policy && <Notice live>The project {state.project.name} has no default policy yet. Create one under Projects.</Notice>}
-
-      {state.state === "ok" && policy && (
-        <>
-          <Card title="Default policy" titleId="owner-policy-title" className="min-w-0">
-            <KeyValues
-              items={[
-                { label: "Project", value: state.project.name },
-                {
-                  label: "Policy",
-                  value: (
-                    <>
-                      {policy.name} <span className="text-muted">· v{policy.version}</span>
-                    </>
-                  ),
-                },
-                { label: "Detection mode", value: <span className="capitalize">{policy.mode}</span> },
-                { label: "Image detection", value: VISUAL_DETECTION_LABEL[policy.visual_detection ?? "local"] },
-                { label: "Language", value: LANGUAGE_NAME[policy.language] ?? mono(policy.language) },
-              ]}
-            />
-          </Card>
-          <Card title="Entity policies" titleId="policies-title" subtitle={`As ${policy.name} v${policy.version} applies them. An endpoint pinned to another policy or version applies that one.`}>
-            <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
-              <PolicyTable title="Text" types={TEXT_ENTITY_TYPES} policies={policy.entity_policies} />
-              <PolicyTable title="Images" types={VISUAL_ENTITY_TYPES} policies={policy.entity_policies} />
-            </div>
-          </Card>
-        </>
-      )}
+      {state.state === "ok" && policy && <OwnerPolicyDetails project={state.project} policy={policy} />}
 
       <div>
         <ButtonLink variant="primary" href="#projects">
@@ -274,12 +296,13 @@ function PolicyTable({ title, types, policies }: { title: string; types: readonl
       </thead>
       <tbody>
         {types.map((t) => {
-          const policy = (policies?.[t] ?? ENTITY_META[t]?.policy ?? "mask") as EntityPolicy;
-          const changed = policies && ENTITY_META[t] && ENTITY_META[t].policy !== policy;
+          const meta = metaFor(t);
+          const policy = (policies?.[t] ?? meta.policy) as EntityPolicy;
+          const changed = Boolean(policies && meta.policy !== policy);
           return (
             <tr key={t} className="border-b border-line last:border-0">
               <th scope="row" className="py-1.5 pr-3 text-left font-normal">
-                <span className="text-ink">{metaFor(t).label}</span> <span className="font-mono text-2xs text-faint">{t}</span>
+                <span className="text-ink">{meta.label}</span> <span className="font-mono text-2xs text-faint">{t}</span>
               </th>
               <td className="py-1.5 text-right">
                 <span className={["inline-block rounded-md px-1.5 py-px text-xs font-medium ring-1 ring-inset", POLICY_CLASS[policy]].join(" ")}>{POLICY_TEXT[policy]}</span>

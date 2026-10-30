@@ -6,6 +6,10 @@ serves everything else, and ``/`` explains how to get the UI.
 
 API routes win: the static mount is added last, and its SPA fallback (``index.html`` for an
 unknown path) never answers under an API prefix, so a typo there is still a JSON 404.
+
+``/robots.txt`` is answered at runtime from the request's host, not from the build: dev and
+prod run one image (``Dockerfile.hosted``, promoted), so only :data:`INDEXED_HOST` lets
+crawlers in, and every other host (dev, the Container Apps hostnames, localhost) keeps them out.
 """
 
 from __future__ import annotations
@@ -20,8 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, Response
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
@@ -34,6 +38,7 @@ from pii_guard.detect import ner_resolve
 from pii_guard.security_headers import SecurityHeadersMiddleware
 
 __all__ = [
+    "INDEXED_HOST",
     "UI_DIR",
     "MockServer",
     "Status",
@@ -41,6 +46,7 @@ __all__ = [
     "create_bundle_app",
     "image_gaps",
     "launcher",
+    "robots_txt",
     "run_up",
     "ui_available",
 ]
@@ -50,6 +56,13 @@ UI_DIR = Path(__file__).resolve().parent / "_ui"
 
 #: Paths the SPA fallback never answers: the API's own namespace.
 _API_PREFIXES = ("v1/", "healthz", "metrics", "docs", "redoc", "openapi.json")
+
+#: The one host crawlers may index: the public production landing (docs/hosted.md).
+INDEXED_HOST = "guard.watt-mind.com"
+#: API and machine paths kept out of the index even on :data:`INDEXED_HOST`.
+_ROBOTS_DISALLOWED = ("/v1/", "/docs", "/openapi.json", "/healthz", "/readyz")
+#: The sitemap shipped in the UI build, if any; announced in ``robots.txt`` when present.
+_SITEMAP = "sitemap.xml"
 
 _STRIP_ID = "pii-guard-up-status"
 
@@ -186,6 +199,16 @@ class _SpaFiles(StaticFiles):
         return HTMLResponse(self._index, headers={"Cache-Control": "no-cache"})
 
 
+def robots_txt(host: str | None, *, sitemap: bool = False) -> str:
+    """``robots.txt`` for a request to ``host``: indexable only on :data:`INDEXED_HOST`."""
+    if (host or "").lower() != INDEXED_HOST:
+        return "User-agent: *\nDisallow: /\n"
+    lines = ["User-agent: *", "Allow: /", *(f"Disallow: {path}" for path in _ROBOTS_DISALLOWED)]
+    if sitemap:
+        lines += ["", f"Sitemap: https://{INDEXED_HOST}/{_SITEMAP}"]
+    return "\n".join(lines) + "\n"
+
+
 def _no_ui_page(status: Status) -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -223,6 +246,16 @@ def create_bundle_app(
     settings = settings or get_settings()
     app = create_app(settings)
     app.state.up_status = status
+    sitemap = (ui_dir / _SITEMAP).is_file()
+
+    # Registered before the static mount, so the build's own robots.txt never answers.
+    @app.get("/robots.txt", include_in_schema=False)
+    def robots(request: Request) -> PlainTextResponse:
+        return PlainTextResponse(
+            robots_txt(request.url.hostname, sitemap=sitemap),
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
     if ui_available(ui_dir):
         spa = _SpaFiles(directory=ui_dir)
         app.mount("/", spa, name="ui")

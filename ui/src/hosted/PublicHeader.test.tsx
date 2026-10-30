@@ -85,6 +85,21 @@ describe("public header navigation", () => {
     await user.click(screen.getByRole("radio", { name: "Light theme" }));
     expect(document.documentElement).not.toHaveClass("dark");
   });
+  it("closes an open menu disclosure when Appearance is opened, and vice versa", async () => {
+    const user = userEvent.setup();
+    render(<PublicHeader accountHref="#overview" />);
+    const appearanceSummary = screen.getByLabelText("Appearance");
+    const appearanceDetails = appearanceSummary.closest("details")!;
+    await user.click(trigger());
+    expect(menu()).toHaveAttribute("open");
+    expect(appearanceDetails).not.toHaveAttribute("open");
+    await user.click(appearanceSummary);
+    expect(appearanceDetails).toHaveAttribute("open");
+    expect(menu()).not.toHaveAttribute("open");
+    await user.click(trigger());
+    expect(menu()).toHaveAttribute("open");
+    expect(appearanceDetails).not.toHaveAttribute("open");
+  });
   it("preserves modified-click navigation without closing or moving focus", async () => {
     const user = userEvent.setup(); render(<PublicHeader accountHref="#overview" />);
     await user.click(trigger());
