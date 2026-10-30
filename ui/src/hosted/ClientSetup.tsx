@@ -30,7 +30,7 @@ type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoi
 
 /**
  * Hosted Connect, "Connect your client" (LAB-1455): the first screen after sign-in. The server
- * provisions a default endpoint once (`/v1/account/first-run`), so a new owner gets a guard key,
+ * provisions a default endpoint once (`/v1/account/first-run`), so a new owner gets a endpoint key,
  * copy-paste blocks for their tool and a test request without creating anything. With sponsored
  * inference unavailable it first asks for one thing: the owner's own Meta API key.
  */
@@ -75,8 +75,8 @@ export function ClientSetup({ call }: { call: Requester }) {
         </h2>
         <p className="mt-0.5 text-sm text-pretty text-muted">
           {state === "needs_key"
-            ? "One step first: your endpoint needs a model key. Then copy your guard key, paste one block into your tool and send a test request."
-            : "Your client sends real data to your PII Guard endpoint. The model gets placeholders; the answer comes back with the real values. Three steps: copy your guard key, paste one block into your tool, send a test request."}
+            ? "One step first: your endpoint needs a provider key. Then copy your endpoint key, paste one block into your tool and send a test request."
+            : "Your client sends real data to your PII Guard endpoint. The model gets placeholders; the answer comes back with the real values. Three steps: copy your endpoint key, paste one block into your tool, send a test request."}
         </p>
       </div>
       {loaded.state === "loading" ? (
@@ -136,7 +136,7 @@ function ConnectEndpoint({
   onChanged: () => void;
 }) {
   const url = first?.gateway_url || `${globalThis.location?.origin ?? ""}/e/${endpoint.id}/v1`;
-  // The key this page was shown (first sign-in, or "Create a new guard key"): the blocks embed it.
+  // The key this page was shown (first sign-in, or "Create a new endpoint key"): the blocks embed it.
   const [key, setKey] = useState<IssuedKey | null>(() => getShownKey(endpoint.id));
   // After the Meta key is saved its form goes away: focus moves on to step 1, not to <body>.
   const wasNeedsKey = useRef(state === "needs_key");
@@ -178,7 +178,7 @@ function ConnectEndpoint({
         <Notice tone="warn">This endpoint is disabled. Re-enable it in Projects to connect a client.</Notice>
       ) : (
         <ol className="space-y-6">
-          <Step n={1} title="Copy your guard key" headingRef={stepOne}>
+          <Step n={1} title="Copy your endpoint key" headingRef={stepOne}>
             <KeyStep call={call} endpoint={endpoint} projectId={projectId} onKey={setKey} />
           </Step>
           <Step n={2} title="Paste one block into your tool">
@@ -291,9 +291,9 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
     return (
       <div className="space-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 sm:p-4">
         <p role="status" className="text-sm font-medium text-warn">
-          Copy your guard key now. It is shown only once.
+          Copy your endpoint key now. It is shown only once.
         </p>
-        <CodeBlock text={`export ${ENDPOINT_KEY_ENV}=${key.key}`} label="Copy the export line with your guard key" />
+        <CodeBlock text={`export ${ENDPOINT_KEY_ENV}=${key.key}`} label="Copy the export line with your endpoint key" />
         <p className="text-xs text-pretty text-muted">
           The blocks below already contain it. PII Guard keeps only a hash, so after you leave or reload this page it can&apos;t be shown again: store it now (for example in a
           password manager). It works only for this endpoint; revoke it in Projects.
@@ -318,7 +318,7 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
   return (
     <div className="space-y-2">
       <p className="text-sm text-pretty text-muted">
-        Your guard key was shown once, when it was created. Use the key you stored, as {mono(`$${ENDPOINT_KEY_ENV}`)}, or create a new one in one click and the blocks below fill it in. Old keys keep working until you revoke them in{" "}
+        Your endpoint key was shown once, when it was created. Use the key you stored, as {mono(`$${ENDPOINT_KEY_ENV}`)}, or create a new one in one click and the blocks below fill it in. Old keys keep working until you revoke them in{" "}
         <a className="text-ink underline underline-offset-4" href="#projects">
           Projects
         </a>
@@ -326,7 +326,7 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
       </p>
       {error && <p className="text-sm text-danger" role="alert">{error}</p>}
       <Button ref={createRef} busy={busy} onClick={() => void create()}>
-        {busy ? "Creating…" : "Create a new guard key"}
+        {busy ? "Creating…" : "Create a new endpoint key"}
       </Button>
     </div>
   );
@@ -348,13 +348,14 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
   }, [endpointId, attempt]);
   const tools: ToolSnippet[] = result.state === "ok" ? ORDER.map((id) => result.snippets.tools.find((t) => t.id === id)).filter((t): t is ToolSnippet => Boolean(t)) : [];
   const tabs = tools.length ? tools.map((t) => ({ id: t.id, label: LABEL[t.id] ?? t.label })) : ORDER.map((id) => ({ id, label: LABEL[id] ?? TOOLS.find((t) => t.id === id)?.label ?? id }));
-  const [tool, setTool] = useState<string>(() => readPref("first-run-tool") ?? "codex");
+  const [tool, setTool] = useState<string>(() => readPref("first-run-tool") ?? "");
   const chosen = tools.find((t) => t.id === tool) ?? tools.find((t) => t.supported) ?? null;
   const pick = (id: string) => {
     setTool(id);
     writePref("first-run-tool", id);
   };
-  const shown = chosen?.id ?? tool;
+  // No pick yet: the first tool in ORDER that works with this endpoint, Muse Code first (LAB-1619).
+  const shown = chosen?.id ?? (tool || ORDER[0]);
   return (
     <div className="space-y-3">
       <ToolTabs tabs={tabs} tool={shown} onTool={pick} />
@@ -370,14 +371,15 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
         ) : !chosen.supported ? (
           <div role="note" className="space-y-1 text-sm">
             <p className="text-pretty text-ink">{chosen.note.replace(/; use another tool\.?$/, ".")}</p>
-            <p className="text-muted">Codex, pi, OpenCode, the OpenAI SDK and cURL work with this endpoint today.</p>
+            <p className="text-muted">{listJoin(tools.filter((t) => t.supported).map((t) => LABEL[t.id] ?? t.label))} work with this endpoint today.</p>
           </div>
         ) : (
           <>
             <CodeBlock text={withKey(chosen, guardKey)} label={`Copy the ${LABEL[chosen.id] ?? chosen.label} block`} />
             <p className="text-xs text-pretty text-muted">
-              {guardKey ? "Your guard key is filled in: paste it as is. " : <>Reads your guard key from {mono(`$${ENDPOINT_KEY_ENV}`)}. </>}
-              {chosen.note}
+              {guardKey ? "Your endpoint key is filled in: paste it as is. " : <>Reads your endpoint key from {mono(`$${ENDPOINT_KEY_ENV}`)}. </>}
+              {/* With the key filled in, the block itself exports it: no "export it first" (LAB-1619). */}
+              {guardKey ? chosen.note.replace(/: export it first\./g, " (the block sets it).") : chosen.note}
               {chosen.id === "pi" && (
                 <>
                   {" "}
@@ -406,6 +408,11 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
       </div>
     </div>
   );
+}
+
+/** "A, B and C". */
+function listJoin(items: string[]): string {
+  return items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[]; tool: string; onTool: (t: string) => void }) {
@@ -513,6 +520,15 @@ function TestStep({ endpointId }: { endpointId: string }) {
             <p className="text-xs text-muted">
               Detection can miss values: check the masked request. Every call also shows up in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>, tagged with this endpoint.
             </p>
+            <div role="note" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-guard/40 bg-guard-soft p-3 text-sm">
+              <p className="min-w-0 flex-1 font-medium text-guard-ink">You&apos;re connected. Your client&apos;s calls go through this endpoint the same way.</p>
+              <ButtonLink size="sm" href="#logs">
+                Open this call in Logs
+              </ButtonLink>
+              <ButtonLink size="sm" variant="ghost" href="#policy">
+                Tune what is masked
+              </ButtonLink>
+            </div>
           </div>
         )}
       </div>

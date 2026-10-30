@@ -323,7 +323,7 @@ describe("hosted console for a signed-in owner", () => {
     expect(within(preview).getByRole("tab", { name: "Claude Code" })).toBeInTheDocument();
     expect(within(preview).getByRole("link", { name: /Create an endpoint/ })).toHaveAttribute("href", "#projects");
     // Client setup comes before the Playground's provider keys.
-    const keys = screen.getByRole("region", { name: "Model provider keys for the Playground" });
+    const keys = screen.getByRole("region", { name: "Provider keys for the Playground" });
     expect(setup.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

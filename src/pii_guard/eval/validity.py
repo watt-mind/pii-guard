@@ -151,9 +151,9 @@ def validity_block(results: Sequence[DocumentResult]) -> dict[str, Any]:
             return [classes[cls], row[cls]]
 
         for g in doc.spans:
+            alike = matching_types(g.entity_type)  # BANK_ACCOUNT gold ~ PAYMENT_CARD, as scored
             found = any(
-                p.entity_type is g.entity_type and g.start < p.end and p.start < g.end
-                for p in r.predicted
+                p.entity_type in alike and g.start < p.end and p.start < g.end for p in r.predicted
             )
             for c in bucket(g.entity_type, g.text):
                 c["gold"] += 1

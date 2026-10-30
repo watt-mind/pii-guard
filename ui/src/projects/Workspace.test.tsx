@@ -45,6 +45,26 @@ describe("project workspace", () => {
     expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: reduced ? "auto" : "smooth" });
   });
 
+  it("marks the latest policy version and opens a row's panels inside that row (LAB-1619)", async () => {
+    const user = userEvent.setup(); render(<Workspace call={fixture()} />);
+    await screen.findByText("Synthetic support");
+    // Policies exist: no "create a policy first", and a new project name is optional.
+    expect(screen.queryByText(/Create a policy first/)).toBeNull();
+    expect(screen.getByLabelText("New project name")).not.toBeRequired();
+    const v2 = screen.getByRole("heading", { name: /Default protection · v2/ });
+    expect(within(v2).getByText("Latest")).toBeInTheDocument();
+    expect(within(screen.getByRole("heading", { name: /Default protection · v1/ })).queryByText("Latest")).toBeNull();
+    // The endpoint pins v1 while v2 exists.
+    expect(screen.getByText("v2 available")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Edit Synthetic support" }));
+    const row = screen.getByRole("button", { name: "Edit Synthetic support" }).closest("li")!;
+    expect(within(row).getByRole("form", { name: "Edit Synthetic support" })).toBeInTheDocument();
+    expect(within(row).getByRole("option", { name: "Default protection · v2 (latest)" })).toBeInTheDocument();
+    await user.click(within(row).getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Connect & keys for Synthetic support" }));
+    expect(within(row).getByRole("region", { name: "Connect Synthetic support" })).toBeInTheDocument();
+  });
+
   it("requires an explicit policy version and never preloads a provider secret", async () => {
     const call = fixture(); const user = userEvent.setup(); render(<Workspace call={call} />);
     await screen.findByText("Synthetic support");

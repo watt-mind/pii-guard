@@ -52,7 +52,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
                 <span aria-hidden="true" className="mr-2 inline-block text-muted transition-transform group-open:rotate-90">
                   ›
                 </span>
-                Optional: model provider keys for the Playground
+                Optional: provider keys for the Playground
               </summary>
               <div className="border-t border-line p-4 sm:p-5">{accounts}</div>
             </details>
