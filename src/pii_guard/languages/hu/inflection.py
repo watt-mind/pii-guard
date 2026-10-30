@@ -132,9 +132,8 @@ _HU_ROUNDED_VOWELS = frozenset("öőüű")
 def _hu_harmony_class(lemma: str) -> int | None:
     """0 back, 1 front unrounded, 2 front rounded, ``None`` when unsure.
 
-    ``i``/``í`` are neutral: the vowel before them decides (``Emil`` -> front). A lemma whose
-    last vowel is a neutral one after a back vowel (``Márti``, ``Dávid``) is ``None``: both
-    ``-nak`` and ``-nek`` occur in writing, so the suffix as written is kept.
+    ``i``/``í`` are neutral: the vowel before them decides (``Emil`` -> front, ``Márti`` and
+    ``Dávid`` -> back, LAB-1597).
     """
     word = lemma.split()[-1].casefold() if lemma.split() else ""
     if word.endswith("né") and len(word) > 2:
@@ -144,7 +143,7 @@ def _hu_harmony_class(lemma: str) -> int | None:
         return None
     for v in reversed(vowels):
         if v in _HU_BACK_VOWELS:
-            return 0 if v == vowels[-1] else None
+            return 0
         if v in _HU_ROUNDED_VOWELS:
             return 2
         if v in "eé":
