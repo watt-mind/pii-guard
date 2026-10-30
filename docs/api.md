@@ -200,7 +200,7 @@ codes (`429 quota_exceeded`, `abuse_throttled`, `sign_in_required`, `hosted_capa
 | 503 | `detector_loading` | The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. | `analyze`, `chat/completions`, `mask`, `responses` |
 | 503 | `project_storage_unavailable` | The project configuration store is unavailable. | endpoint keys |
 | 503 | `upstream_not_configured` | The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). | `chat/completions`, `models`, `responses` |
-| 503 | `vault_capacity_exhausted` | A new session is needed while every vault slot is held by an active request; retry. | `chat/completions`, `responses` |
+| 503 | `vault_capacity_exhausted` | A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes. | `chat/completions`, `responses` |
 <!-- END error-codes -->
 
 ## Keeping the reference current

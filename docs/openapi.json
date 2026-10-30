@@ -227,7 +227,7 @@
             }
           },
           "503": {
-            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request; retry. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
+            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
             "content": {
               "application/json": {
                 "schema": {
@@ -253,7 +253,7 @@
                     }
                   },
                   "vault_capacity_exhausted": {
-                    "summary": "A new session is needed while every vault slot is held by an active request; retry.",
+                    "summary": "A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes.",
                     "value": {
                       "error": {
                         "code": "vault_capacity_exhausted",
@@ -724,7 +724,7 @@
             }
           },
           "503": {
-            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request; retry. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
+            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
             "content": {
               "application/json": {
                 "schema": {
@@ -750,7 +750,7 @@
                     }
                   },
                   "vault_capacity_exhausted": {
-                    "summary": "A new session is needed while every vault slot is held by an active request; retry.",
+                    "summary": "A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes.",
                     "value": {
                       "error": {
                         "code": "vault_capacity_exhausted",

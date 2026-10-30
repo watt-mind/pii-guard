@@ -157,7 +157,8 @@ class SessionNotFoundError(PiiGuardError):
 
 
 class VaultCapacityError(MaskingError):
-    """Every capacity slot is pinned by an active request; retry after one finishes."""
+    """Every capacity slot is pinned by an active request, or the caller's identity is at its
+    lease cap (existing sessions included); retry after one finishes."""
 
     code = "vault_capacity_exhausted"
     status_code = 503

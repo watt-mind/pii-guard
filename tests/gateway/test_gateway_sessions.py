@@ -614,6 +614,28 @@ def test_unmask_of_unbound_and_anonymous_sessions_is_unchanged() -> None:
         assert chat(http, "/s/anon-box/v1/chat/completions").status_code == 200
 
 
+def test_a_refused_unmask_does_not_extend_the_owners_ttl() -> None:
+    """LAB-1584: ``/v1/unmask`` checks the owner before the lookup slides the TTL, so another
+    identity's refused unmask can't keep the owner's session alive."""
+    clock = _Clock()
+    upstream = MockUpstream()
+    app = make_app(upstream)
+    app.state.vault = vault = Vault(KEY_A, clock=clock, ttl_seconds=60.0)
+    with TestClient(app) as http:
+        assert chat(http, "/s/ttl-box/v1/chat/completions", **BEARER_1).status_code == 200
+        masked = upstream.bodies[-1]["messages"][-1]["content"]
+        victim = vault.session("ttl-box")
+        expiry = victim._expires_at
+        body = {"session_id": "ttl-box", "text": masked}
+        for headers in (BEARER_2, {}):
+            clock.now += 25.0
+            refused = http.post("/v1/unmask", json=body, headers=headers)
+            assert refused.status_code == 404
+            assert victim._expires_at == expiry
+        clock.now += 10.0
+        assert victim.expired  # the owner's TTL ran out on schedule despite the refusals
+
+
 @pytest.mark.parametrize("source", ["header", "path"])
 def test_a_refused_identity_does_not_extend_the_victims_ttl(source: str) -> None:
     """LAB-1584: the binding refuses before the lookup slides the TTL, so presenting another

@@ -151,7 +151,9 @@ GATEWAY_ERRORS: dict[str, tuple[str, str | None]] = {
     ),
     "vault_capacity_exhausted": (
         "pii_guard.vault.vault:VaultCapacityError",
-        "A new session is needed while every vault slot is held by an active request; retry.",
+        "A new session is needed while every vault slot is held by an active request, or this "
+        "client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then "
+        "existing sessions are refused too); retry once a request finishes.",
     ),
     "vault_not_configured": (
         "pii_guard.types:MaskingError",
