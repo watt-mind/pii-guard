@@ -3,6 +3,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { parseTrafficEvent, type TrafficEvent } from "../api/traffic";
 import {
+  refusalDetail,
   refusalReason,
   OWN_STAGES,
   alignValues,
@@ -131,6 +132,16 @@ describe("payloads", () => {
     expect(responseChoices(stream.response?.unmasked)[0]!.content).toContain("1051 Budapest, Minta utca 12.");
   });
 
+  it("reads a stream's collected tool calls next to its content", () => {
+    const call = (args: string) => ({ index: 0, id: "call_0", type: "function", function: { name: "send_email", arguments: args } });
+    const masked = { content: { "0": "Sending." }, tool_calls: { "0": [call('{"to": "[[EMAIL_7f3a]]"}')], "1": [call("{}")] } };
+    const choices = responseChoices(masked);
+    expect(choices.map((c) => c.index)).toEqual([0, 1]);
+    expect(choices[0]).toEqual({ index: 0, content: "Sending.", toolCalls: [{ name: "send_email", arguments: '{"to": "[[EMAIL_7f3a]]"}' }] });
+    expect(choices[1]).toMatchObject({ content: null, toolCalls: [{ name: "send_email", arguments: "{}" }] });
+    expect(responseChoices({ content: {} })).toEqual([]);
+  });
+
   it("keeps an image part as its summary", () => {
     const img = recorded.find((e) => e.entities?.images)!;
     const [m] = requestMessages(img.request?.original);
@@ -160,5 +171,18 @@ describe("refusalReason (LAB-1287)", () => {
     expect(refusalReason("detection_unavailable", false)).toMatch(/audit mode/);
     expect(refusalReason("blocked_entity", false)).toMatch(/policy block/);
     expect(refusalReason(undefined, false)).toMatch(/fails closed/);
+  });
+});
+
+describe("refusalDetail (LAB-1314)", () => {
+  it("prefers the server's message when the event carries it", () => {
+    expect(refusalDetail({ code: "blocked_entity", message: "the text contains entity types blocked by policy: EMAIL (1)" }, false)).toBe(
+      "the text contains entity types blocked by policy: EMAIL (1)",
+    );
+  });
+
+  it("falls back to the client-side reason without a server message", () => {
+    expect(refusalDetail({ code: "not_found" }, false)).toMatch(/Unknown or expired session/);
+    expect(refusalDetail(null, false)).toMatch(/fails closed/);
   });
 });

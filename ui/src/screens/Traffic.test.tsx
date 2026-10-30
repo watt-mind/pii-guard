@@ -33,6 +33,7 @@ function fakeConnect() {
         opts!.onEvents(events);
       }),
     status: (s: TrafficStatus) => act(() => opts!.onStatus(s)),
+    restart: (boot: string) => act(() => opts!.onRestart!(boot)),
   };
 }
 
@@ -64,6 +65,23 @@ describe("Live traffic", () => {
     expect([...restored.querySelectorAll("mark[data-restored]")].map((m) => m.firstChild?.textContent)).toEqual(
       expect.arrayContaining(["teszt.elek@example.com", "+36 30 123 4567"]),
     );
+  });
+
+  it("selects the call it is asked to open, and moves focus to it once it arrives (LAB-1626)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" focus={{ id: huStream.id, nonce: 1 }} />);
+    f.push([huChat]);
+    // Not here yet: the latest call shows, focus stays put.
+    await screen.findByTestId("original-request");
+    expect(screen.getByRole("heading", { name: /^Call at/ })).not.toHaveFocus();
+    f.push([huStream, deTools]);
+    // The test request's call, even with a newer one after it.
+    await waitFor(() => expect(screen.getByRole("heading", { name: /^Call at/ })).toHaveFocus());
+    const rows = document.querySelectorAll("button[aria-current]");
+    expect(rows).toHaveLength(1);
+    // The middle of the three calls, not the newest.
+    const all = [...document.querySelectorAll("button")].filter((b) => b.className.includes("text-left"));
+    expect(all.indexOf(rows[0] as HTMLButtonElement)).toBe(all.length - 2);
   });
 
   it("labels the NER-only demo call as an expected miss in rules-only mode", async () => {
@@ -147,6 +165,44 @@ describe("Live traffic", () => {
     expect(screen.getByText("Nothing was forwarded.")).toBeInTheDocument();
     expect(screen.getByTestId("wf-upstream")).toHaveTextContent("not called");
     expect(screen.getAllByText(/The log keeps a summary of each image/).length).toBeGreaterThan(0);
+  });
+
+  it("shows the masked-image thumbnail in the masked request, matched by image index (LAB-1188)", async () => {
+    const thumb = "data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==";
+    const imageCall: TrafficEvent = {
+      ...asMasked(huChat),
+      id: "req_thumbnail",
+      entities: { ...huChat.entities!, images: { count: 2, masked: { FACE: 1 }, kept: {}, ocr: true } },
+      request: {
+        masked: {
+          model: "test-model",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Two pictures" },
+                { type: "image_url", image_url: { url: "[inline image/png, 5000 chars]" } },
+                { type: "image_url", image_url: { url: "[inline image/png, 9000 chars]" } },
+              ],
+            },
+          ],
+        },
+        thumbnails: [
+          { index: 0, omitted: "too_large" },
+          { index: 1, width: 1, height: 1, data: thumb },
+        ],
+      } as TrafficEvent["request"],
+    };
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([imageCall]);
+    const masked = await screen.findByTestId("masked-request");
+    const img = within(masked).getByTestId("masked-thumbnail");
+    expect(img).toHaveAttribute("src", thumb);
+    expect(img).toHaveAccessibleName(/masked image as sent to the model/);
+    expect(within(masked).getAllByTestId("masked-thumbnail")).toHaveLength(1);
+    expect(masked).toHaveTextContent(/too large or unreadable for a thumbnail/);
+    expect(masked).toHaveTextContent(/the original is never kept/);
   });
 
   it("draws the waterfall from the event's timing", async () => {
@@ -236,6 +292,15 @@ describe("Live traffic", () => {
     f.status({ state: "denied", reason: "forbidden", message: "denied" });
     expect(await screen.findByText("This account can't read this traffic log.")).toBeInTheDocument();
     expect(screen.queryByText(/isn't reachable|Lost the connection/)).toBeNull();
+  });
+
+  it("hosted: the status line describes the hosted service, not the machine (LAB-1619)", async () => {
+    const f = fakeConnect();
+    const session = { account: {}, error: "", refresh: async () => {}, call: vi.fn() } as unknown as HostedSession;
+    render(<HostedSessionContext.Provider value={session}><Traffic connect={f.connect} pageHost="guard.example" demoTraffic={false} /></HostedSessionContext.Provider>);
+    f.push([], { state: "live", via: "poll", level: "masked", size: 50 });
+    expect(await screen.findByText("Only what was sent to the model is logged: placeholders, never values.")).toBeInTheDocument();
+    expect(screen.queryByText(/left the machine/)).toBeNull();
   });
 
   it("hosted: a 401 in the console says the session ended (LAB-1519)", async () => {
@@ -384,12 +449,49 @@ describe("Upstream refusals in the drawer (LAB-1335)", () => {
     expect(box).not.toHaveTextContent("Nothing was sent to the model");
   });
 
+  it("labels a forwarded call whose upstream failed, and shows its model (LAB-1629)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    const failed: TrafficEvent = {
+      ...asMasked(huChat),
+      outcome: "upstream_failed",
+      model: "synthetic-model",
+      error: { code: "upstream_did_not_stream", status: 502 },
+      upstream: { status: 200, model: null, unresolved_placeholders: 0 },
+      response: null,
+    };
+    f.push([failed]);
+    expect(await screen.findByText("The model answered without streaming.")).toBeInTheDocument();
+    expect(screen.getAllByText("Upstream failed").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Refused")).toBeNull();
+    expect(screen.queryByText("not forwarded")).toBeNull();
+    expect(screen.getAllByText("synthetic-model").length).toBeGreaterThan(0);
+    expect(screen.getByText(/the masked request was forwarded, but the model's provider did not answer usably/)).toBeInTheDocument();
+  });
+
   it("keeps the refusal text when pii-guard stopped the request", async () => {
     const f = fakeConnect();
     render(<Traffic connect={f.connect} pageHost="localhost" />);
     f.push([refused]);
     expect(await screen.findByText(/Refused\. Nothing was sent to the model\./)).toBeInTheDocument();
     expect(screen.queryByText(/The upstream refused/)).toBeNull();
+  });
+
+  it("shows the server's message instead of the client-side reason (LAB-1314)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    const blocked: TrafficEvent = {
+      ...asMasked(refused),
+      outcome: "blocked",
+      error: {
+        code: "blocked_entity",
+        status: 422,
+        message: "the text contains entity types blocked by policy: EMAIL (1)",
+        entity_types: { EMAIL: 1 },
+      },
+    };
+    f.push([blocked]);
+    expect(await screen.findByText("the text contains entity types blocked by policy: EMAIL (1)")).toBeInTheDocument();
   });
 });
 
@@ -417,10 +519,36 @@ describe("Endpoint traffic in project Logs (LAB-1492)", () => {
     f.push([{ ...viaEndpoint(huChat, "ep_a", "Synthetic CLI"), session_ref: "s_0123456789abcdef" }]);
     const detail = await screen.findByRole("region", { name: /Call at/ });
     expect(within(detail).getByText("Endpoint")).toBeInTheDocument();
-    await userEvent.click(within(detail).getByRole("button", { name: "Switch to endpoint Synthetic CLI to open its session" }));
+    await userEvent.click(within(detail).getByRole("button", { name: "Open session in Synthetic CLI" }));
     expect(onOpenSession).not.toHaveBeenCalled();
     const { getSelectedEndpoint } = await import("../projects/selection");
     expect(getSelectedEndpoint()).toBe("ep_a");
+  });
+
+  it("reopens the call and puts focus back after the switch remounts the console (LAB-1619)", async () => {
+    const f = fakeConnect();
+    const ev = { ...viaEndpoint(huChat, "ep_a", "Synthetic CLI"), session_ref: "s_0123456789abcdef" };
+    const first = render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} onOpenSession={vi.fn()} />);
+    f.push([ev]);
+    const detail = await screen.findByRole("region", { name: /Call at/ });
+    await userEvent.click(within(detail).getByRole("button", { name: "Open session in Synthetic CLI" }));
+    first.unmount();
+    const g = fakeConnect();
+    render(<Traffic connect={g.connect} pageHost="example.com" demoTraffic={false} onOpenSession={vi.fn()} />);
+    g.push([ev, { ...viaEndpoint(deTools, "ep_a", "Synthetic CLI") }]);
+    const open = await screen.findByRole("button", { name: /Open session s_0123456789abcdef in Vault/ });
+    await waitFor(() => expect(open).toHaveFocus());
+  });
+
+  it("truncates a long provider model id in the row and keeps it in the title (LAB-1619)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="example.com" demoTraffic={false} />);
+    f.push([{ ...asMasked(huChat), model: "accounts/fireworks/models/llama-v3p3-70b-instruct-very-long-id" }]);
+    const list = await screen.findByTestId("call-list");
+    const model = within(list).getByTitle("accounts/fireworks/models/llama-v3p3-70b-instruct-very-long-id");
+    expect(model).toHaveTextContent(/^llama-v3p3-70b-instruct-very-long-id$/);
+    expect(model.className).toMatch(/\btruncate\b/);
+    expect(model.className).not.toMatch(/shrink-0/);
   });
 
   it("drops the tag and says the view is filtered while an endpoint is selected", async () => {
@@ -432,5 +560,18 @@ describe("Endpoint traffic in project Logs (LAB-1492)", () => {
     f.push([viaEndpoint(huChat, "ep_a", "Synthetic CLI")]);
     const list = await screen.findByTestId("call-list");
     expect(within(list).queryByTitle(/^Endpoint:/)).toBeNull();
+  });
+});
+
+describe("backend restart", () => {
+  it("marks the new run with a divider above its first call", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([huChat, huStream]);
+    expect(screen.queryByText(/Server restarted/)).toBeNull();
+    f.restart("boot_b");
+    f.push([refused]);
+    expect(await screen.findByText(/Server restarted/)).toBeInTheDocument();
+    expect(screen.getByText(/sessions are keyed per server process/i)).toBeInTheDocument();
   });
 });

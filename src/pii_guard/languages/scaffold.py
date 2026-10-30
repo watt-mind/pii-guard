@@ -10,6 +10,7 @@ It writes:
 - ``<dest>/<code>/prompt.md``: generic LLM notes to replace with the language's own;
 - ``<dest>/<code>/cues.tsv``: cue words for context-cued numbers, commented examples only;
 - ``<dest>/<code>/brands.tsv``: the country's company and brand names, commented examples;
+- ``<dest>/<code>/references.tsv``: order/invoice/tracking labels, commented examples only;
 - ``<fixtures>/<code>-smoke.jsonl.example``: one fictional document in the fixture format;
 - optionally ``<tests>/test_<code>_pack.py``: a test hook running the conformance suite (for
   a pack in its own distribution; inside this repository ``tests/languages`` already runs it
@@ -75,6 +76,7 @@ def pack() -> LanguagePack:
         # captions=files(__name__).joinpath("captions.tsv"),  # ID card field captions
         # cues=files(__name__).joinpath("cues.tsv"),  # cue words before numbers (cues.tsv)
         # brands=files(__name__).joinpath("brands.tsv"),  # brand names that are not persons
+        # references=files(__name__).joinpath("references.tsv"),  # order/invoice labels
     )
 '''
 
@@ -139,6 +141,19 @@ _CUES = """# Cue words for context-cued numbers (pii_guard/languages/cues.py; do
 # order number\t-
 """
 
+_REFERENCES = """# Reference words: labels that make a number a business number, not personal data
+# (pii_guard/languages/references.py; docs/languages.md). One label per line, written
+# without accents; a trailing "*" lets the word take suffixes. Optional second column:
+# "both" (both checks read it), "rules" or "ner", "weak" (a poor negative cue such as an
+# amount word, honored by the rules check only). Uncomment the pack's ``references=`` line
+# in __init__.py once there is a line here.
+# Examples (languages/de/references.tsv is complete):
+# bestellung*
+# rechnung*
+# tracking*\tner
+"""
+
+
 _BRANDS = """# The country's well-known company and brand names (pii_guard/detect/ner_orgs.py;
 # docs/languages.md). One name per line, as it is written; case is ignored. An NER PERSON
 # span that is only one of these names (plus a suffix the inflection matcher allows) becomes
@@ -191,6 +206,7 @@ def new_pack(
         package / "prompt.md": _PROMPT.format(name=name),
         package / "cues.tsv": _CUES,
         package / "brands.tsv": _BRANDS,
+        package / "references.tsv": _REFERENCES,
     }
     if fixtures_dir is not None:
         files[Path(fixtures_dir) / f"{code}-smoke.jsonl.example"] = _example_line(code)

@@ -28,6 +28,21 @@ SECRET_URI = re.compile(
     r"https://[a-z0-9][a-z0-9-]{1,22}[a-z0-9]\.vault\.azure\.net/"
     r"secrets/[A-Za-z0-9-]{1,127}/[a-fA-F0-9]{32}\Z"
 )
+# Forwarded security and control headers that are only ever sent once. nginx joins
+# repeated lines into one $http_* value with ", ", so a comma means a repeat (LAB-1467).
+SINGLE_VALUE_HEADERS = (
+    "Authorization",
+    "Origin",
+    "X-PII-Guard-Token",
+    "X-PII-Guard-Session",
+    "X-PII-Guard-Connection",
+    "X-PII-Guard-Mode",
+    "X-PII-Guard-Language",
+    "X-PII-Guard-Echo",
+)
+# Repeated Cookie lines are joined with "; ", like one ordinary Cookie header. A __Host-
+# cookie has exactly one possible scope, so a repeated guest cookie is cookie tossing.
+GUEST_COOKIE = "__Host-pii-guard-guest"
 
 
 class BootstrapError(Exception):
@@ -194,6 +209,7 @@ def nginx_config(aca_fqdn: str, tail_ip: str, pem_path: str) -> str:
     forwarded = "\n".join(
         f"      proxy_set_header {key} {value};" for key, value in headers.items()
     )
+    single = "|".join("$http_" + name.lower().replace("-", "_") for name in SINGLE_VALUE_HEADERS)
     return f"""user www-data;
 worker_processes 1;
 error_log /dev/null crit;
@@ -205,6 +221,15 @@ http {{
   client_body_temp_path /run/piiguard-dev-router/body;
   proxy_temp_path /run/piiguard-dev-router/proxy;
   resolver 168.63.129.16 valid=30s ipv6=off;
+  # The app refuses duplicate security headers, but only nginx sees the separate lines.
+  map "{single}" $piiguard_repeated_header {{
+    default 0;
+    "~," 1;
+  }}
+  map $http_cookie $piiguard_repeated_cookie {{
+    default 0;
+    "~{GUEST_COOKIE}=.*{GUEST_COOKIE}=" 1;
+  }}
   server {{
     listen {tail_ip}:443 ssl;
     server_name {DNS_NAME};
@@ -215,6 +240,8 @@ http {{
     client_max_body_size 16m;
     client_body_buffer_size 16m;
     client_body_in_file_only off;
+    if ($piiguard_repeated_header) {{ return 400; }}
+    if ($piiguard_repeated_cookie) {{ return 400; }}
     location / {{
       set $aca_origin {aca_fqdn};
       proxy_pass https://$aca_origin;

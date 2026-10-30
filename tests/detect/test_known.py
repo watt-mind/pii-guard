@@ -88,6 +88,22 @@ def test_digraph_and_consonant_doubling() -> None:
     assert session.unmask(masked) == text
 
 
+def test_hungarian_known_values_mask_unmask_round_trip() -> None:
+    # LAB-1385: one regression pinning the whole known-values path for Hungarian
+    # stem changes (vowel lengthening, ``-val``/``-vel`` doubling): every inflected
+    # form shares its lemma's placeholder and unmasking restores the exact text.
+    text = (
+        "Próba Zsuzsannának írtunk; Próba Zsuzsanna válaszolt; "
+        "Próba Zsuzsannát hívjuk; Kovács Bélával jön; Kovács Béla marad."
+    )
+    detector = KnownValuesDetector(known(("Próba Zsuzsanna", "PERSON"), ("Kovács Béla", "PERSON")))
+    session = Vault(KEY).session()
+    masked = session.mask(text, detector.detect(text, "hu"), language="hu")
+    assert "Zsuzsann" not in masked and "Kovács" not in masked
+    assert len(set(PLACEHOLDER_RE.findall(masked))) == 2
+    assert session.unmask(masked) == text
+
+
 def test_english_possessive_and_case() -> None:
     text = f"{NAME_EN}'s file. {NAME_EN}{RSQUO}s manager. quillon ashgrove called."
     detector = KnownValuesDetector(known((NAME_EN, "PERSON")))

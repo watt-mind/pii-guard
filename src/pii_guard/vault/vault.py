@@ -3,6 +3,21 @@
 The mapping (placeholder -> original value) lives only in this process and expires after a
 TTL of inactivity. Nothing in this module logs, reprs or raises with an original value: logs
 and errors carry entity types, counts and placeholder ids only (AGENTS.md, ADR 0006).
+
+Compiled patterns (the ``re`` module cache, at most 512 entries process-wide) may briefly
+outlive a dropped session: the vault and the detectors build patterns from folded values,
+and CPython keeps them until LRU eviction or a restart. This is accepted residual risk
+(LAB-1364): the cache is bounded and memory-only, in the same trust boundary as the
+running vault, and it never reaches logs, traces or error messages. Wiring ``re.purge()``
+into the delete path would force every live session to recompile its patterns, so it is
+deliberately not done.
+
+Doubled case suffixes are out of scope (LAB-1142): a case ending stacked on a case ending
+is not Hungarian (``Hajnának`` + ``nak``), so the vault does not split the surface to its
+lemma first. Both occurrences share one placeholder keyed on the labelled value's lemma
+and the extra suffix is not restored on unmask; nothing leaks, the text just does not
+round-trip. Real stacked suffixes (``-é``/``-ék``/``-éi`` plus a case ending, LAB-1337)
+round-trip normally.
 """
 
 from __future__ import annotations
@@ -26,8 +41,14 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from pii_guard.detect.ner_context import sweep_vetoed
 from pii_guard.detect.normalize import INVISIBLE_CHARS, normalize_for_detection
-from pii_guard.types import EntityType, MaskingError, PiiGuardError, Span
-from pii_guard.vault.fold import FoldedText, fold_value, fold_views, spaced
+from pii_guard.types import (
+    EntityType,
+    MaskingError,
+    PiiGuardError,
+    Span,
+    VaultNotConfiguredError,
+)
+from pii_guard.vault.fold import FoldedText, dropped, fold_value, fold_views, spaced
 from pii_guard.vault.inflection import (
     InflectionMatcher,
     Split,
@@ -104,6 +125,10 @@ DEFAULT_MAX_SESSIONS = 10_000
 #: Most placeholders a get-or-create session (:meth:`Vault.session_or_create`) collects before
 #: its id moves on to a new, empty generation (LAB-1286).
 DEFAULT_MAX_ENTRIES = 10_000
+#: Most requests one gateway client identity may hold sessions for at once (LAB-1584): without
+#: it, one client with ~``max_sessions`` in-flight streams pins every slot and the rest get
+#: ``503 vault_capacity_exhausted``.
+DEFAULT_MAX_LEASES_PER_IDENTITY = 1_000
 MIN_TENANT_KEY_BYTES = 16
 #: Most characters of original values one unmask call, or one gateway response, restores: five
 #: times the 200,000-character text limit (LAB-1350). A placeholder of a long value repeated in
@@ -153,7 +178,8 @@ class SessionNotFoundError(PiiGuardError):
 
 
 class VaultCapacityError(MaskingError):
-    """Every capacity slot is pinned by an active request; retry after one finishes."""
+    """Every capacity slot is pinned by an active request, or the caller's identity is at its
+    lease cap (existing sessions included); retry after one finishes."""
 
     code = "vault_capacity_exhausted"
     status_code = 503
@@ -266,10 +292,13 @@ class _Entry:
         "casing",
         "changed",
         "count",
+        "detector",
         "entity_type",
         "exact",
+        "first_seen",
         "initials",
         "language",
+        "last_seen",
         "model_only",
         "needles",
         "normalized",
@@ -297,6 +326,13 @@ class _Entry:
         self.normalized = normalized
         self.language = language
         self.count = 0
+        # The detector of the first span that created the entry (LAB-1332): provenance for
+        # the vault inspector. Never overwritten; a neutral re-mask (``gateway``) leaves it.
+        self.detector: str | None = None
+        # Vault-clock times of the first and latest masked occurrence (LAB-1332). ``None``
+        # until the entry's first occurrence is assembled.
+        self.first_seen: float | None = None
+        self.last_seen: float | None = None
         # The session generation at which this entry was created or its patterns last
         # changed (a new surface or alias): see :attr:`VaultSession.generation`.
         self.changed = 0
@@ -363,7 +399,9 @@ class _Entry:
             if self.exact is None:
                 self.exact = frozenset(_exact(v) for v in (self.original, *self.surfaces))
             allowed = self.exact
-        return _exact(written) in allowed or _exact(spaced(written)) in allowed
+        return any(
+            _exact(reading) in allowed for reading in (written, spaced(written), dropped(written))
+        )
 
     def remember(self, suffix: str, stem: str) -> None:
         if suffix:
@@ -566,6 +604,23 @@ class _Plan:
     aliases: tuple[str, ...] = ()
 
 
+#: The mask state :meth:`VaultSession.commit` replays into a staged copy and publishes
+#: (LAB-1584). An allow-list: every other attribute (identity, lifecycle, limits, the lock) is
+#: left as it is, so a write to one of them during a commit is never reverted. The memo
+#: caches (``_masked``, ``_folds``, ``_initials``) are not copied: the staged copy starts them
+#: empty, so a commit never deep-copies up to 512k characters of memo under the lock.
+_COMMITTED_STATE = (
+    "_by_key",
+    "_by_placeholder",
+    "_identifiers",
+    "_reserved",
+    "_generation",
+    "_touched",
+    "_touched_base",
+)
+_RESET_CACHES = ("_masked", "_masked_chars", "_folds", "_folded_chars", "_initials")
+
+
 class VaultSession:
     """The placeholder mapping of one conversation. Obtain one from :meth:`Vault.session`.
 
@@ -586,6 +641,14 @@ class VaultSession:
         entry_limit: int | None = None,
     ) -> None:
         self.session_id = session_id
+        #: The gateway client identity this session is bound to (LAB-1565, LAB-1580), set by
+        #: :func:`pii_guard.gateway.sessions.check_and_bind`; ``None``: not presented yet.
+        #: On the session itself, so the binding lives exactly as long as the session.
+        self.owner: str | None = None
+        #: Random per session object (LAB-1580): a dropped/expired/rotated id re-created as a
+        #: new session gets a new one, so per-session state keyed by it (the gateway's
+        #: detection cache) starts clean in every runtime that shares that state.
+        self.incarnation = secrets.token_hex(8)
         self._case_sensitive = case_sensitive_placeholders
         self._max_restored = max_restored_chars
         #: Explicit-session placeholder cap enforced at mask time (LAB-1565); ``None``:
@@ -604,6 +667,10 @@ class VaultSession:
         # never issued later, so a token the caller wrote can't turn into a masked value.
         # Bounded (LAB-1565): at most _MAX_RESERVED, oldest forgotten first (see above).
         self._reserved: OrderedDict[str, None] = OrderedDict()
+        # Placeholder -> (value text, JSON number literal) when it has only ever replaced a
+        # whole JSON number leaf; ``None`` once it also replaced a whole string (LAB-1361).
+        # Bounded: issued placeholders only.
+        self._json_numbers: dict[str, tuple[str, str] | None] = {}
         self._closed = False
         self._expires_at = clock() + ttl_seconds
         self._known = KnownValues()
@@ -654,6 +721,7 @@ class VaultSession:
             self._by_placeholder.clear()
             self._identifiers.clear()
             self._reserved.clear()
+            self._json_numbers.clear()
             self._known.clear()
             self._folds.clear()
             self._folded_chars = 0
@@ -707,11 +775,13 @@ class VaultSession:
             fork._by_placeholder = copy.deepcopy(self._by_placeholder, memo)
             fork._identifiers = copy.deepcopy(self._identifiers, memo)
             fork._reserved = OrderedDict(self._reserved)
+            fork._json_numbers = dict(self._json_numbers)
             fork._generation = self._generation
             fork._masked = None  # its journal is replayed in full anyway
             fork._known = self._known
             fork._journal = []
             fork._parent = self
+            fork.owner, fork.incarnation = self.owner, self.incarnation
             return fork
 
     def commit(self, fork: VaultSession) -> None:
@@ -727,20 +797,31 @@ class VaultSession:
                 raise ValueError("not a fork of this session")
             journal, fork._journal = fork._journal, None
         with self._lock:
-            # Copy all mutable mask state together: entries, variants, memo references and
-            # generation indexes must continue to refer to the same copied objects.
-            excluded = {"_lock", "_clock", "_known", "_parent", "_journal"}
-            state = copy.deepcopy({k: v for k, v in vars(self).items() if k not in excluded})
+            if self.expired:
+                self.close()
+                raise SessionNotFoundError("vault session not found or expired")
+            # Copy the mask state together (one memo): entries, variants and generation
+            # indexes must continue to refer to the same copied objects. Only the
+            # :data:`_COMMITTED_STATE` allow-list is copied and published (LAB-1584).
+            state = copy.deepcopy({name: getattr(self, name) for name in _COMMITTED_STATE})
             staged = copy.copy(self)
             staged.__dict__.update(state)
+            staged._masked = None if self._masked is None else OrderedDict()
+            staged._masked_chars = 0
+            staged._folds = OrderedDict()
+            staged._folded_chars = 0
+            staged._initials = None
             staged._lock = threading.RLock()
             staged._journal = None
-            staged._check_alive()
+            scanned = staged.entries_scanned
             for text, spans, language, remask, expected in journal:
                 result = staged.mask_with_report(text, spans, language=language, remask=remask)
                 if result.text != expected:
                     raise MaskingError("the session changed while an image was masked")
-            self.__dict__.update({k: v for k, v in vars(staged).items() if k not in excluded})
+            for name in (*_COMMITTED_STATE, *_RESET_CACHES):
+                setattr(self, name, getattr(staged, name))
+            self.entries_scanned += staged.entries_scanned - scanned
+            self._check_alive()  # extend the TTL only once the commit succeeded
             if self._journal is not None:
                 self._journal.extend(journal)
 
@@ -767,6 +848,10 @@ class VaultSession:
         Every form of one value shares one placeholder keyed on its lemma: a span that ends
         in a suffix is narrowed to the stem (``Próba Zsuzsannának`` -> ``[[PERSON_x]]nak``)
         and stem-changed forms (``Próba Zsuzsannát``, ``Kováccsal``) are found as occurrences.
+        A single-word value that is also a common word (``Bor``/``bor``) masks that word's
+        inflected forms too (``bort``): accepted over-masking (LAB-1343). Telling the surname
+        from the common word would need a capitalisation or lexicon gate, and either would
+        leak a lower-case name in chat text; the guard stays biased toward masking.
 
         Casing: by default every casing of a value shares its placeholder too, and
         :meth:`unmask` restores the value as first written (``TESZT ELEK és Teszt Elek`` with
@@ -1114,6 +1199,10 @@ class VaultSession:
             parts.append(entry.placeholder)
             entry.remember(following_suffix(text, end), text[start:end])
             entry.count += 1
+            now = self._clock()
+            if entry.first_seen is None:
+                entry.first_seen = now
+            entry.last_seen = now
             per_type[entry.entity_type.value] += 1
             cursor = end
         parts.append(text[cursor:])
@@ -1273,6 +1362,8 @@ class VaultSession:
         placeholder = self._new_placeholder(entity_type, normalized)
         entry = _Entry(placeholder, entity_type, value, normalized, language)
         entry.model_only = detector in MODEL_DETECTORS
+        if detector not in NEUTRAL_DETECTORS:
+            entry.detector = detector
         entry.order = len(self._by_key)
         self._by_key[key] = entry
         self._by_placeholder[placeholder] = entry
@@ -1326,6 +1417,7 @@ class VaultSession:
             variant = _Entry(
                 placeholder, entry.entity_type, original, entry.normalized, entry.language
             )
+            variant.detector = entry.detector
             entry.variants[form] = variant
             self._by_placeholder[placeholder] = variant
         return variant
@@ -1345,6 +1437,29 @@ class VaultSession:
             if length >= MAX_ID_LENGTH:  # pragma: no cover - a full SHA-256 collision
                 raise MaskingError(f"could not derive a unique {entity_type.value} placeholder")
             length = min(length + 2, MAX_ID_LENGTH)
+
+    # --- JSON leaf types (LAB-1361) ------------------------------------------------------
+
+    def note_json_leaf(self, placeholder: str, number: tuple[str, str] | None) -> None:
+        """Record that ``placeholder`` replaced a whole JSON leaf: a number (``number`` is
+        its value text and JSON literal, ``("<NUMBER>", "<NUMBER>.0")``) or a string
+        (``None``). A placeholder of a session-issued value only; any mix of the two, or of
+        two literals, makes it a string for good (fail closed)."""
+        with self._lock:
+            self._check_alive()
+            if placeholder not in self._by_placeholder:
+                return
+            if placeholder not in self._json_numbers:
+                self._json_numbers[placeholder] = number
+            elif self._json_numbers[placeholder] != number:
+                self._json_numbers[placeholder] = None
+
+    def json_number(self, placeholder: str) -> tuple[str, str] | None:
+        """``(value text, JSON literal)`` if ``placeholder`` only ever replaced whole JSON
+        number leaves of that one literal; else ``None`` (restore it as a string)."""
+        with self._lock:
+            self._check_alive()
+            return self._json_numbers.get(placeholder)
 
     # --- re-identification ---------------------------------------------------------------
 
@@ -1694,6 +1809,16 @@ def _validated(text: str, spans: Sequence[Span]) -> list[Span]:
     return ordered
 
 
+#: A check run on a session before a lookup extends its TTL; raises to refuse the caller
+#: (:func:`pii_guard.gateway.sessions.check_and_bind`).
+Authorize = Callable[[VaultSession], None]
+
+
+def _authorized(session: VaultSession, authorize: Authorize | None) -> None:
+    if authorize is not None:
+        authorize(session)
+
+
 class Vault:
     """Per-tenant store of :class:`VaultSession` mappings, held in memory with a TTL.
 
@@ -1723,6 +1848,11 @@ class Vault:
     ``max_restored_chars`` caps the characters of original values one unmask call (or one
     :meth:`VaultSession.restore_budget`, a gateway response) restores: see
     :class:`RestoreBudget` (LAB-1350).
+
+    ``max_leases_per_identity`` caps the leases (:meth:`acquire_session`: in-flight gateway
+    requests, streams included) one client identity holds at once, so one client can't pin
+    every session slot: over it, that identity gets ``503 vault_capacity_exhausted`` while
+    others still acquire (LAB-1584).
     """
 
     def __init__(
@@ -1736,6 +1866,7 @@ class Vault:
         max_sessions: int = DEFAULT_MAX_SESSIONS,
         max_entries: int = DEFAULT_MAX_ENTRIES,
         max_restored_chars: int = DEFAULT_MAX_RESTORED_CHARS,
+        max_leases_per_identity: int = DEFAULT_MAX_LEASES_PER_IDENTITY,
     ) -> None:
         if not isinstance(tenant_key, bytes | bytearray):
             raise TypeError("tenant_key must be bytes")
@@ -1751,6 +1882,9 @@ class Vault:
             raise ValueError("max_entries must be at least 1")
         if max_restored_chars < 1:
             raise ValueError("max_restored_chars must be at least 1")
+        if max_leases_per_identity < 1:
+            raise ValueError("max_leases_per_identity must be at least 1")
+        self._max_leases_per_identity = max_leases_per_identity
         self._max_restored = max_restored_chars
         self._max_sessions = max_sessions
         self._max_entries = max_entries
@@ -1763,6 +1897,7 @@ class Vault:
         self._case_sensitive = case_sensitive_placeholders
         self._lock = threading.RLock()
         self._leases: Counter[VaultSession] = Counter()
+        self._identity_leases: Counter[str] = Counter()
         self._sessions: dict[str, VaultSession] = {}
 
     @classmethod
@@ -1771,16 +1906,18 @@ class Vault:
 
         ``PII_GUARD_VAULT_CASE_SENSITIVE_PLACEHOLDERS`` sets ``case_sensitive_placeholders``
         ``PII_GUARD_VAULT_MAX_SESSIONS`` sets ``max_sessions``, ``PII_GUARD_VAULT_MAX_ENTRIES``
-        sets ``max_entries`` and ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` sets
-        ``max_restored_chars``, unless ``kwargs`` does.
+        sets ``max_entries``, ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` sets
+        ``max_restored_chars`` and ``PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY`` sets
+        ``max_leases_per_identity``, unless ``kwargs`` does.
         """
         key = settings.tenant_key_bytes()
         if key is None:
-            raise MaskingError("PII_GUARD_TENANT_KEY is not set", code="vault_not_configured")
+            raise VaultNotConfiguredError("PII_GUARD_TENANT_KEY is not set")
         kwargs.setdefault("case_sensitive_placeholders", settings.vault_case_sensitive_placeholders)
         kwargs.setdefault("max_sessions", settings.vault_max_sessions)
         kwargs.setdefault("max_entries", settings.vault_max_entries)
         kwargs.setdefault("max_restored_chars", settings.unmask_max_restored_chars)
+        kwargs.setdefault("max_leases_per_identity", settings.vault_max_leases_per_identity)
         return cls(key, **kwargs)
 
     def __repr__(self) -> str:
@@ -1794,10 +1931,14 @@ class Vault:
             self._purge_locked()
             return len(self._sessions)
 
-    def session(self, session_id: str | None = None) -> VaultSession:
+    def session(
+        self, session_id: str | None = None, *, authorize: Authorize | None = None
+    ) -> VaultSession:
         """``None`` -> a new session with a fresh random id; an existing id -> that session.
 
         Raises :class:`SessionNotFoundError` for an unknown, expired or closed id.
+        ``authorize`` (the gateway's identity binding) runs on the session before its TTL is
+        extended: a caller it refuses leaves the session's expiry as it was (LAB-1584).
         """
         with self._lock:
             self._purge_locked()
@@ -1809,17 +1950,22 @@ class Vault:
             if session is None:
                 raise SessionNotFoundError("vault session not found or expired")
             with session._lock:
+                _authorized(session, authorize)
                 session._check_alive()
                 if session._entry_limit is None:
                     session._entry_limit = self._max_entries  # addressed explicitly now
             return session
 
-    def session_or_create(self, session_id: str) -> tuple[VaultSession, bool]:
+    def session_or_create(
+        self, session_id: str, *, authorize: Authorize | None = None
+    ) -> tuple[VaultSession, bool]:
         """The live session for ``session_id``, created when there is none: ``(session, new)``.
 
         For ids the caller chose or derived (:meth:`derive_session_id`), never 404. The
         returned session's id differs from ``session_id`` once that id rotated to a later
         generation (``max_entries``); send the returned id back to address it directly.
+        ``authorize`` runs as in :meth:`session`, before any TTL extension, on the live
+        session found (a refused caller can't rotate it either) and on the one returned.
         """
         if not session_id:
             raise ValueError("session_id must not be empty")
@@ -1829,10 +1975,11 @@ class Vault:
             current = self._generation_id(session_id, generation)
             session = self._sessions.get(current)
             if session is not None and not session.expired:
-                if session.entry_count < self._max_entries:
-                    with session._lock:
+                with session._lock:
+                    _authorized(session, authorize)
+                    if session.entry_count < self._max_entries:
                         session._check_alive()
-                    return session, False
+                        return session, False
                 generation += 1
                 current = self._generation_id(session_id, generation)
                 logger.info(
@@ -1842,23 +1989,36 @@ class Vault:
                 )
                 existing = self._sessions.get(current)
                 if existing is not None and not existing.expired:  # pragma: no cover - race
-                    existing._check_alive()
+                    with existing._lock:
+                        _authorized(existing, authorize)
+                        existing._check_alive()
                     return existing, False
             session = self._create_locked(current)
             if generation:
                 self._generations[session_id] = generation
+            _authorized(session, authorize)
             return session, True
 
     def acquire_session(
-        self, resolve: Callable[[], tuple[VaultSession, bool, _SessionMetadata]]
+        self,
+        resolve: Callable[[], tuple[VaultSession, bool, _SessionMetadata]],
+        *,
+        identity: str | None = None,
     ) -> tuple[VaultSession, bool, _SessionMetadata]:
         """Resolve and pin a session atomically against LRU eviction.
 
         ``resolve`` must use this vault's session lookup methods. Each successful acquire
-        requires one :meth:`release_session`, including on failure or cancellation. Pins
-        protect against capacity eviction only; explicit deletion and TTL still apply.
+        requires one :meth:`release_session` (with the same ``identity``), including on
+        failure or cancellation. Pins protect against capacity eviction only; explicit
+        deletion and TTL still apply. An ``identity`` already holding
+        ``max_leases_per_identity`` leases is refused with :class:`VaultCapacityError`
+        before ``resolve`` runs, so nothing is created for it (LAB-1584).
         """
         with self._lock:
+            if identity is not None and (
+                self._identity_leases[identity] >= self._max_leases_per_identity
+            ):
+                raise VaultCapacityError("too many active requests for this client")
             result = resolve()
             session = result[0]
             if self._sessions.get(session.session_id) is not session:
@@ -1866,16 +2026,24 @@ class Vault:
             with session._lock:
                 session._check_alive()
             self._leases[session] += 1
+            if identity is not None:
+                self._identity_leases[identity] += 1
             return result
 
-    def release_session(self, session: VaultSession) -> None:
+    def release_session(self, session: VaultSession, *, identity: str | None = None) -> None:
         """Release one pin, even if TTL or explicit deletion already removed the session."""
         with self._lock:
             if self._leases[session] <= 0:
                 raise ValueError("session has no lease")
+            if identity is not None and self._identity_leases[identity] <= 0:
+                raise ValueError("identity has no lease")
             self._leases[session] -= 1
             if not self._leases[session]:
                 del self._leases[session]
+            if identity is not None:
+                self._identity_leases[identity] -= 1
+                if not self._identity_leases[identity]:
+                    del self._identity_leases[identity]
 
     def derive_session_id(self, material: str) -> str:
         """A stable session id for ``material``, keyed with the tenant key: ``d_`` + 32 hex.
@@ -1908,14 +2076,22 @@ class Vault:
         return session
 
     def drop(self, session_id: str) -> None:
-        """Close and forget a session now (no error if it is already gone)."""
+        """Close and forget a session now (no error if it is already gone).
+
+        Compiled patterns built from its values may stay in the process-wide ``re`` cache
+        until eviction: accepted residual risk, see the module docstring (LAB-1364).
+        """
         with self._lock:
             session = self._sessions.pop(session_id, None)
         if session is not None:
             session.close()
 
     def purge_expired(self) -> int:
-        """Drop every expired session; returns how many were dropped."""
+        """Drop every expired session; returns how many were dropped.
+
+        Like :meth:`drop`, this leaves compiled patterns in the process-wide ``re`` cache
+        until eviction (LAB-1364).
+        """
         with self._lock:
             return self._purge_locked()
 

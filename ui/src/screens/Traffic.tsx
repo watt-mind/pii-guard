@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LABELLED_SCENARIOS, labelledScenarioFor, sendDemoTraffic, type DemoProgress, type LabelledMatch } from "../api/demoTraffic";
 import { ApiError } from "../api/http";
 import type { TrafficConnectOptions, TrafficEvent, TrafficStatus } from "../api/traffic";
@@ -27,7 +27,7 @@ import {
   requestMessages,
   requestTools,
   responseChoices,
-  refusalReason,
+  refusalDetail,
   totalMasked,
   type Message,
 } from "../lib/traffic";
@@ -35,6 +35,9 @@ import { NerHint } from "../components/NerHint";
 import { useHostedSession } from "../hosted/session";
 import { setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 import { TimingWaterfall } from "./TrafficCharts";
+
+/** Language codes in words (LAB-1626). */
+const LANGUAGE_NAME: Record<string, string> = { hu: "Hungarian", en: "English", de: "German" };
 
 export interface TrafficProps {
   /** Replay the recorded demo traffic (the header's engine is set to Demo engine). */
@@ -62,15 +65,21 @@ export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureInterv
 
 type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 
+/**
+ * "Open session in <endpoint>" re-scopes the console, which remounts it (LAB-1619): the call
+ * to reopen, and to put focus back on, once the endpoint's log has it.
+ */
+let reopenAfterSwitch: string | null = null;
+
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
-export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession">) {
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession" | "focus">) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }
 
 export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, pageHost = globalThis.location?.hostname ?? "", mockUpstream = false, focus = null, onOpenSession, demoTraffic = true }: LogsProps) {
   const [filters, setFilters] = useState<Filters>({ mode: "all", type: "all", problems: false });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => reopenAfterSwitch);
   const [cleared, setCleared] = useState(0);
   const detailRef = useRef<HTMLDivElement>(null);
   // No endpoint picked in the header: the server merges the project's endpoints (LAB-1492),
@@ -88,6 +97,9 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
       ),
     [t.events, filters],
   );
+  // Backend restarts noticed while these calls arrived: the divider renders above the
+  // first call of each new run (LAB-1366). A filtered-out first call hides its divider too.
+  const breaksById = useMemo(() => new Map(t.runBreaks.map((b) => [b.beforeId, b])), [t.runBreaks]);
   const modes = useMemo(() => modeOrder([...new Set(t.events.map((e) => e.mode ?? "unknown"))]), [t.events]);
   const types = useMemo(
     () => [...new Set(t.events.flatMap((e) => [...Object.keys(e.entities?.detected ?? {}), ...Object.keys(maskedCounts(e))]))].sort() as EntityType[],
@@ -98,6 +110,12 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
   const selected = (selectedId && filtered.find((e) => e.id === selectedId)) || filtered[filtered.length - 1] || null;
   const following = !selectedId || !filtered.some((e) => e.id === selectedId);
 
+  useEffect(() => {
+    if (!reopenAfterSwitch || selected?.id !== reopenAfterSwitch) return;
+    reopenAfterSwitch = null;
+    (document.getElementById("open-session") ?? document.getElementById("detail-title"))?.focus();
+  }, [selected?.id]);
+
   const pick = (id: string, scroll = false) => {
     setSelectedId(id);
     if (scroll && window.matchMedia?.("(max-width: 1023px)").matches) detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -105,11 +123,20 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
 
   // A call opened from the Overview: select it, with the filters cleared so it is in the list.
   const [focused, setFocused] = useState<number | null>(null);
+  // Focus follows to the call once it is in the list (Connect's test request, LAB-1626), never to <body>.
+  const [focusTo, setFocusTo] = useState<{ id: string; nonce: number } | null>(null);
+  const focusedFor = useRef<number | null>(null);
   if (focus && focus.nonce !== focused) {
     setFocused(focus.nonce);
     setSelectedId(focus.id);
+    setFocusTo(focus);
     setFilters({ mode: "all", type: "all", problems: false });
   }
+  useEffect(() => {
+    if (!focusTo || focusedFor.current === focusTo.nonce || selected?.id !== focusTo.id) return;
+    focusedFor.current = focusTo.nonce;
+    document.getElementById("detail-title")?.focus();
+  }, [focusTo, selected?.id]);
 
   const overheads = filtered.map((e) => e.timing.overhead_ms);
   const p50 = percentile(overheads, 50);
@@ -222,9 +249,16 @@ export function Logs({ t, forceFixture = false, sendDemo = sendDemoTraffic, page
           ) : (
             <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[calc(100dvh-10rem)]" data-testid="call-list">
               {[...filtered].reverse().map((e) => (
-                <li key={e.id}>
-                  <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} showEndpoint={!endpointSelected} />
-                </li>
+                <Fragment key={e.id}>
+                  {breaksById.get(e.id) && (
+                    <li>
+                      <RestartDivider at={breaksById.get(e.id)!.time} />
+                    </li>
+                  )}
+                  <li>
+                    <CallRow event={e} selected={selected?.id === e.id} onSelect={() => pick(e.id, true)} mockUpstream={mockUpstream} showEndpoint={!endpointSelected} />
+                  </li>
+                </Fragment>
               ))}
             </ul>
           )}
@@ -397,7 +431,11 @@ function SourceBanner({
             {status.level === "full" ? "Originals logged" : "Placeholders only"}
           </span>
           <span className="text-xs">
-            {status.level === "full" ? "Originals are kept in memory on this machine only." : "Only what left the machine is logged: placeholders, never values."}
+            {hosted
+              ? "Only what was sent to the model is logged: placeholders, never values."
+              : status.level === "full"
+                ? "Originals are kept in memory on this machine only."
+                : "Only what left the machine is logged: placeholders, never values."}
           </span>
         </>
       )}
@@ -486,6 +524,19 @@ export function DemoButton({ send }: { send: typeof sendDemoTraffic }) {
 
 // --- List ---------------------------------------------------------------------------------
 
+/** A backend restart between two shown runs (LAB-1366): numbering restarts at 1 and
+session refs change, because sessions are keyed per server process. */
+function RestartDivider({ at }: { at: string }) {
+  return (
+    <div role="separator" aria-label="Server restarted" className="bg-warn-soft px-4 py-2 text-center sm:px-5">
+      <p className="text-xs font-medium text-warn">
+        Server restarted{at ? ` · ${clock(new Date(at).toISOString())}` : ""} — calls below are from the new run
+      </p>
+      <p className="mt-0.5 text-2xs text-muted">Numbering restarts at 1, and session refs changed: sessions are keyed per server process.</p>
+    </div>
+  );
+}
+
 function OutcomeBadge({ outcome }: { outcome: string }) {
   if (outcome === "ok") return null;
   const blocked = outcome === "blocked" || outcome === "refused";
@@ -558,7 +609,7 @@ function EntityChips({ counts }: { counts: Partial<Record<EntityType, number>> }
   return (
     <span className="flex flex-wrap gap-1">
       {entries.map(([type, n]) => (
-        <span key={type} title={`${metaFor(type).label}: ${n} masked`} className={["rounded-md px-1.5 py-px font-mono text-2xs font-medium ring-1 ring-inset", metaFor(type).chip].join(" ")}>
+        <span key={type} title={`${metaFor(type).label}: ${n} masked`} className={["rounded-md px-1.5 py-px font-mono text-2xs font-medium whitespace-nowrap ring-1 ring-inset", metaFor(type).chip].join(" ")}>
           {metaFor(type).short} {n}
           <span className="sr-only"> {metaFor(type).label}</span>
         </span>
@@ -628,9 +679,19 @@ function CallRow({
         ) : (
           <EntityChips counts={maskedCounts(e)} />
         )}
-        <span className="shrink-0 truncate text-xs text-faint">{e.outcome === "blocked" || e.outcome === "refused" ? "not forwarded" : mockUpstream ? "mock upstream" : (e.model ?? "")}</span>
+        <RowModel label={e.outcome === "blocked" || e.outcome === "refused" ? "not forwarded" : mockUpstream ? "mock upstream" : (e.model ?? "")} />
       </span>
     </button>
+  );
+}
+
+/** The row's model: provider ids (`accounts/fireworks/models/…`) show their last segment, truncated. */
+function RowModel({ label }: { label: string }) {
+  const short = label.includes("/") ? label.slice(label.lastIndexOf("/") + 1) : label;
+  return (
+    <span className="min-w-0 max-w-[45%] truncate text-right text-xs text-faint" title={label || undefined}>
+      {short}
+    </span>
   );
 }
 
@@ -662,7 +723,7 @@ function CallDetail({
   const forwarded = maskedBody !== undefined && maskedBody !== null;
   const labelled = labelledScenarioFor(e);
   // An upstream refusal reached the model's provider (masked); everything else here stopped in pii-guard (LAB-1335).
-  const failCode = e.error?.code ?? (e.outcome === "upstream_error" ? "upstream_error" : e.outcome === "stream_error" ? "stream_failed" : undefined);
+  const failCode = e.error?.code ?? (e.outcome === "upstream_error" ? "upstream_error" : e.outcome === "upstream_failed" ? "upstream_unavailable" : e.outcome === "stream_error" ? "stream_failed" : undefined);
   const upstreamCopy = errorCopy(failCode, e.error?.status ?? e.upstream?.status ?? null);
   const upstreamSide = upstreamCopy.kind === "upstream" || upstreamCopy.kind === "stream";
   return (
@@ -670,7 +731,7 @@ function CallDetail({
       <section aria-labelledby="detail-title" className="rounded-xl border border-line bg-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 id="detail-title" className="flex flex-wrap items-center gap-2 text-lg font-normal text-ink">
+            <h2 id="detail-title" tabIndex={-1} className="flex flex-wrap items-center gap-2 text-lg font-normal text-ink outline-none">
               Call at {clock(e.time)} <OutcomeBadge outcome={e.outcome} />
             </h2>
             <p className="mt-0.5 font-mono text-xs break-all text-faint">{e.id}</p>
@@ -687,22 +748,31 @@ function CallDetail({
           {e.endpoint && <Meta label="Endpoint" value={e.endpoint.name} />}
           <Meta label="Mode" value={e.mode ?? "–"} />
           <Meta label="Model" value={modelOf(e, mockUpstream)} />
-          <Meta label="Language" value={e.language ?? "auto"} />
+          <Meta label="Language" value={e.language ? (LANGUAGE_NAME[e.language] ?? e.language) : "auto"} />
           <Meta label="Session" value={e.session_ref ? `${e.session_new ? "new" : "continued"} · ${e.session_ref}` : "–"} />
           <Meta label="Session from" value={e.session_source ? (SESSION_SOURCE_LABEL[e.session_source] ?? e.session_source) : "–"} />
           <Meta label="Outbound check" value={outboundCheckLabel(e.outbound_check)} />
           <Meta label="Detectors" value={e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "–"} />
-          <Meta label="Upstream" value={e.upstream?.status ? `HTTP ${e.upstream.status}` : "not called"} />
+          {/* Whose status: the model's provider here, PII Guard's own in the failure note (LAB-1640). */}
+          <Meta label="Model provider answered" value={e.upstream?.status ? `HTTP ${e.upstream.status}` : "not called"} />
           <Meta label="Tokens" value={e.usage?.total_tokens !== undefined ? `${e.usage.prompt_tokens ?? "?"} in · ${e.usage.completion_tokens ?? "?"} out` : "–"} />
           <Meta label="Detection cache" value={e.cache ? `${e.cache.hits} hit · ${e.cache.misses} miss` : "–"} />
         </dl>
         {e.session_ref && onOpenSession && aggregated && e.endpoint ? (
           // The Vault is per endpoint: switch the console to this one, where the session lives.
-          <Button size="sm" className="mt-3" onClick={() => setSelectedEndpoint(e.endpoint!.id)}>
-            Switch to endpoint {e.endpoint.name} to open its session
+          <Button
+            size="sm"
+            className="mt-3 h-auto! min-h-8 max-w-full py-1.5 text-left whitespace-normal! pointer-coarse:min-h-11"
+            title={`Switches the console to endpoint ${e.endpoint.name}, where this call's session is kept`}
+            onClick={() => {
+              reopenAfterSwitch = e.id;
+              setSelectedEndpoint(e.endpoint!.id);
+            }}
+          >
+            <span className="min-w-0 break-words">Open session in {e.endpoint.name}</span>
           </Button>
         ) : e.session_ref && onOpenSession && (
-          <Button size="sm" className="mt-3" onClick={() => onOpenSession(e.session_ref!)}>
+          <Button id="open-session" size="sm" className="mt-3" onClick={() => onOpenSession(e.session_ref!)}>
             Open session <span className="font-mono">{e.session_ref}</span> in Vault
           </Button>
         )}
@@ -726,11 +796,11 @@ function CallDetail({
           </p>
           <p className="mt-1 text-ink">
             <code className="font-mono text-xs">{e.error?.code ?? e.outcome}</code>
-            {e.error?.status ? ` · HTTP ${e.error.status}` : ""}
+            {e.error?.status ? ` · PII Guard answered your client HTTP ${e.error.status}` : ""}
             {e.error?.entity_types ? ` · ${Object.entries(e.error.entity_types).map(([k, n]) => `${metaFor(k as EntityType).label} ×${n}`).join(", ")}` : ""}
           </p>
           <p className="mt-2 text-muted">
-            {upstreamSide ? upstreamCopy.body : refusalReason(e.error?.code, Boolean(e.entities?.images))}
+            {upstreamSide ? upstreamCopy.body : refusalDetail(e.error, Boolean(e.entities?.images))}
           </p>
         </div>
       )}
@@ -803,35 +873,77 @@ function Role({ role }: { role: string }) {
   return <p className="mb-1 font-mono text-2xs text-muted">{role}</p>;
 }
 
-function ImagePart({ summary, event }: { summary: string; event?: TrafficEvent }) {
+interface Thumbnail {
+  index: number;
+  width?: number;
+  height?: number;
+  data?: string;
+  omitted?: string;
+}
+
+/** The masked-image thumbnails of an event by image index (LAB-1188); the log keeps no originals. */
+function thumbnailsOf(event?: TrafficEvent): Map<number, Thumbnail> {
+  const out = new Map<number, Thumbnail>();
+  const list = (event?.request as { thumbnails?: unknown } | null | undefined)?.thumbnails;
+  if (!Array.isArray(list)) return out;
+  for (const t of list) {
+    if (typeof t !== "object" || t === null || typeof (t as Thumbnail).index !== "number") continue;
+    const thumb = t as Thumbnail;
+    // Only our own small WebP/PNG data URLs render as an image.
+    if (thumb.data !== undefined && !/^data:image\/(?:webp|png);base64,/.test(thumb.data)) continue;
+    out.set(thumb.index, thumb);
+  }
+  return out;
+}
+
+function ImagePart({ summary, event, thumbnail }: { summary: string; event?: TrafficEvent; thumbnail?: Thumbnail }) {
   const img = event?.entities?.images;
+  const shown = thumbnail?.data;
   return (
     <div className="flex items-start gap-3 rounded-lg border border-field bg-surface-2 p-3 text-xs text-muted">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-8 shrink-0 text-faint" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <rect x="6" y="8" width="5" height="5" fill="currentColor" />
-        <path d="M13 9h5M13 12h5M6 16h12" />
-      </svg>
-      <p>
-        <span className="font-medium text-ink">Image</span> <span className="font-mono">{summary}</span>
+      {shown ? (
+        <img
+          src={shown}
+          width={thumbnail?.width}
+          height={thumbnail?.height}
+          alt="The masked image as sent to the model (downscaled)"
+          data-testid="masked-thumbnail"
+          className="h-auto max-h-48 w-auto max-w-[min(100%,20rem)] shrink-0 rounded border border-line bg-surface"
+        />
+      ) : (
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-8 shrink-0 text-faint" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <rect x="6" y="8" width="5" height="5" fill="currentColor" />
+          <path d="M13 9h5M13 12h5M6 16h12" />
+        </svg>
+      )}
+      <p className="min-w-0">
+        <span className="font-medium text-ink">Image</span> <span className="break-all font-mono">{summary}</span>
         <br />
         {img
           ? `${Object.values(img.masked).reduce((a, b) => a + (b ?? 0), 0)} regions blacked out, ${Object.values(img.kept).reduce((a, b) => a + (b ?? 0), 0)} kept, OCR ${img.ocr ? "on" : "off"}. `
           : ""}
-        The log keeps a summary of each image, not its pixels.
+        {shown
+          ? "A downscaled copy of the masked image the model received; the original is never kept."
+          : thumbnail?.omitted
+            ? "The masked image was too large or unreadable for a thumbnail, so the log keeps only this summary."
+            : "The log keeps a summary of each image, not its pixels."}
       </p>
     </div>
   );
 }
 
 function MessageList({ messages, event }: { messages: Message[]; event?: TrafficEvent }) {
+  const thumbnails = thumbnailsOf(event);
+  // Image index across all messages, the way the server numbers its thumbnails.
+  let imageIndex = 0;
   return (
     <>
       {messages.map((m, i) => (
         <div key={i}>
           <Role role={m.role} />
           <div className="space-y-2">
-            {m.parts.map((p, j) => (p.kind === "text" ? <MaskedText key={j} text={p.text} /> : <ImagePart key={j} summary={p.summary} event={event} />))}
+            {m.parts.map((p, j) => (p.kind === "text" ? <MaskedText key={j} text={p.text} /> : <ImagePart key={j} summary={p.summary} event={event} thumbnail={thumbnails.get(imageIndex++)} />))}
             {m.toolCalls.map((c, j) => (
               <ToolCallView key={`t${j}`} name={c.name}>
                 <MaskedText text={c.arguments} />
@@ -924,10 +1036,15 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
           This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (email, phone, IBAN, IDs) are
           masked; other names need <NerHint />.
         </>
-      ) : (
+      ) : e.detectors.length ? (
         <>
-          This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (email, phone, IBAN, IDs) but{" "}
+          This call ran {e.detectors.map((d) => detectorName(d)).join(", ")} only, which finds structured values (email, phone, IBAN, IDs) but{" "}
           <strong className="font-medium text-ink">not names</strong>: names need <NerHint />.
+        </>
+      ) : (
+        // No detector list logged (LAB-1629): say what the rules cover, without "ran no detector only".
+        <>
+          Structured values (email, phone, IBAN, IDs) are found by rules, but <strong className="font-medium text-ink">not names</strong>: names need <NerHint />.
         </>
       )}
     </p>
@@ -940,7 +1057,16 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
   const hosted = useHostedSession() !== null;
   const masked = responseChoices(e.response?.masked);
   const unmasked = showOriginals ? responseChoices(e.response?.unmasked) : [];
-  if (!e.response) return <Quiet>{e.outcome === "ok" ? "No answer was logged." : "No answer: the call did not reach the model."}</Quiet>;
+  if (!e.response)
+    return (
+      <Quiet>
+        {e.outcome === "ok"
+          ? "No answer was logged."
+          : e.outcome === "upstream_failed" || e.outcome === "upstream_error"
+            ? "No answer: the masked request was forwarded, but the model's provider did not answer usably."
+            : "No answer: the call did not reach the model."}
+      </Quiet>
+    );
   const nothing = masked.every((c) => !c.content && !c.toolCalls.length);
   const streamedTool = nothing && e.stream && e.outcome === "ok";
   const count = masked.reduce((n, c) => n + placeholdersIn(c.content ?? "") + c.toolCalls.reduce((k, t) => k + placeholdersIn(t.arguments), 0), 0);

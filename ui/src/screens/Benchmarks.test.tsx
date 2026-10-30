@@ -1,6 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Benchmarks } from "./Benchmarks";
 import { App } from "../App";
 import { FAST_MODE_SYSTEM, groupOf, type BenchmarkIndex, type BenchmarkLoader } from "../api/benchmarks";
 import bundled from "virtual:pii-guard/benchmarks-index";
@@ -63,9 +64,9 @@ describe("Benchmarks screen", () => {
     await user.click(screen.getByRole("link", { name: /evaluation/i }));
     expect(screen.getByRole("link", { name: /evaluation/i })).toHaveAttribute("aria-current", "page");
     expect(location.hash).toBe("#evaluation");
-    expect(load).toHaveBeenCalledTimes(1);
     const panel = screen.getByRole("region", { name: "Evaluation" });
     expect(await within(panel).findByRole("region", { name: "Results" })).toBeInTheDocument();
+    expect(load).toHaveBeenCalledTimes(1);
   });
 
   it("works in demo mode without the API and says the data is bundled", async () => {
@@ -117,7 +118,20 @@ describe("Benchmarks screen", () => {
     const names = rowNames(table);
     const partial = names.findIndex((n) => / only$/.test(n!));
     if (partial >= 0) expect(names.slice(partial).every((n) => / only$/.test(n!))).toBe(true);
-    const f1s = names.filter((n) => !/ only$/.test(n!)).map((n) => parseFloat(cell(table, n!, "F1")));
+    // Read each row in place: re-scores of one model share a display name (LAB-1547).
+    const f1Col = within(table)
+      .getAllByRole("columnheader")
+      .findIndex((h) => h.textContent?.replace(/[▲▼]/g, "").trim() === "F1");
+    const f1s = within(table)
+      .getAllByRole("row")
+      .filter((r) => {
+        const n = nameOf(within(r).queryByRole("rowheader"));
+        return n && !/ only$/.test(n);
+      })
+      .map((r) => {
+        const cells = [within(r).getByRole("rowheader"), ...within(r).getAllByRole("cell")];
+        return parseFloat(cells[f1Col]!.textContent!);
+      });
     expect(f1s).toEqual([...f1s].sort((a, b) => b - a));
 
     for (const box of within(panel).getAllByRole("checkbox")) {
@@ -154,8 +168,13 @@ describe("Benchmarks screen", () => {
   });
 
   it("says so when the results can't be loaded", async () => {
-    const { panel } = await openBenchmarks(() => Promise.reject(new Error("chunk failed")));
-    expect(await within(panel).findByRole("alert")).toHaveTextContent(/could not be loaded.*chunk failed/);
+    const loader = vi.fn().mockRejectedValueOnce(new Error("private diagnostic /assets/hash.json")).mockResolvedValue(INDEX);
+    const { user, panel } = await openBenchmarks(loader);
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(/could not be loaded/);
+    expect(panel).not.toHaveTextContent("private diagnostic");
+    await user.click(within(panel).getByRole("button", { name: "Retry benchmark results" }));
+    await within(panel).findByRole("region", { name: "Results" });
+    expect(loader).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -193,7 +212,7 @@ describe("Benchmarks screen, round E1 (LAB-1493)", () => {
     const best = Math.min(...tools.map((s) => s.all.leak ?? 1));
     expect(head).toHaveTextContent(new RegExp(`fast mode lets ${pct(fast.all.leak).replace(".", "\\.")} of personal values through`));
     expect(head).toHaveTextContent(new RegExp(`lets ${pct(best).replace(".", "\\.")} through`));
-    expect(head).toHaveTextContent(/hand-written German, English and Hungarian documents/);
+    expect(head).toHaveTextContent(/hand-written German, English, Hungarian and Polish documents/);
     expect(head).not.toHaveTextContent(/pii-guard/);
     // The production row is marked in the table.
     const row = within(resultsTable(panel)).getAllByRole("row").find((r) => within(r).queryByText("fast mode"));
@@ -230,13 +249,13 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
     const toolSets = new Set(INDEX.snapshots.filter((s) => INDEX.systems[s.system]?.family === "comparison").map((s) => s.fixture_set));
     const expected = Object.keys(INDEX.fixture_sets).filter((k) => fastSets.has(k) && toolSets.has(k) && INDEX.fixture_sets[k]!.origin !== "generated");
     const table = within(section).getByRole("table");
-    const names = within(table).getAllByRole("rowheader").map((h) => within(h).getByRole("button").textContent);
+    const names = within(table).getAllByRole("rowheader").map((h) => within(h).getByRole("button").getAttribute("title"));
     expect(names.sort()).toEqual([...expected].sort());
     // Numbers come from the index: fast mode's pooled leak on a public set.
     const other = expected.find((k) => k !== INDEX.headline_set)!;
-    const row = within(table).getAllByRole("row").find((r) => within(r).queryByRole("button", { name: other }))!;
-    expect(row).toHaveTextContent(pct(snap(other, FAST_MODE_SYSTEM).all.leak));
-    await user.click(within(row).getByRole("button", { name: other }));
+    const row = within(table).getAllByRole("row").find((r) => within(r).queryByRole("button", { name: new RegExp(other) }))!;
+    await waitFor(() => expect(row).toHaveTextContent(pct(snap(other, FAST_MODE_SYSTEM).all.leak)));
+    await user.click(within(row).getByRole("button", { name: new RegExp(other) }));
     expect(within(panel).getByRole("combobox", { name: "Fixture set" })).toHaveValue(other);
   });
 
@@ -249,4 +268,37 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
     expect(legend).toHaveTextContent(/fast mode/);
     expect(within(chart).getByText(/p50 to p95/)).toBeInTheDocument();
   });
+});
+
+
+describe("Benchmarks screen, deep links (LAB-1133)", () => {
+  it("opens on the filters a shared link names", async () => {
+    history.replaceState(null, "", "#evaluation?lang=en");
+    render(<App api={offlineApi()} mock={createMockClient()} loadBenchmarks={load} />);
+    const panel = screen.getByRole("region", { name: "Evaluation" });
+    await within(panel).findByRole("region", { name: "Results" });
+    expect(within(panel).getByRole("radio", { name: "English" })).toBeChecked();
+    expect(cell(resultsTable(panel), "rules", "Leak")).toBe(pct(snap("smoke", "rules").languages.en!.leak));
+  });
+
+  it("writes filter changes back to the hash, so the URL stays shareable", async () => {
+    const { user, panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    await user.click(within(panel).getByRole("radio", { name: "English" }));
+    await waitFor(() => expect(location.hash).toContain("lang=en"));
+  });
+});
+
+it("retries failed dataset and run-log reads independently", async () => {
+  const user = userEvent.setup();
+  const set = vi.fn().mockRejectedValueOnce(new Error("internal set path")).mockImplementation(async (name: string) => ({ snapshots: INDEX.snapshots.filter((s) => s.fixture_set === name), history: INDEX.history.filter((s) => s.fixture_set === name) }));
+  const runs = vi.fn().mockRejectedValueOnce(new Error("internal runs path")).mockResolvedValue({ runs: INDEX.runs });
+  render(<Benchmarks load={{ summary: async () => ({ ...INDEX, snapshots: [], history: [], runs: [] }), set, runs }} />);
+  await user.click(await screen.findByRole("button", { name: "Retry dataset results" }));
+  await screen.findByRole("region", { name: "Results" });
+  await user.click(screen.getByText("Run log"));
+  expect(document.body).not.toHaveTextContent("internal runs path");
+  await user.click(screen.getByRole("button", { name: "Retry run log" }));
+  await screen.findByRole("button", { name: `Show all ${INDEX.runs.length} runs` });
+  expect(runs).toHaveBeenCalledTimes(2);
 });

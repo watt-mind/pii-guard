@@ -27,7 +27,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import Protocol, runtime_checkable
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageOps
 
 from pii_guard.types import DetectionError, Detector, PiiGuardError
 from pii_guard.visual.captions import (
@@ -59,6 +59,7 @@ __all__ = [
     "estimate_skew",
     "join_words",
     "ocr_text",
+    "suppress_background",
     "tesseract_available",
     "text_regions",
 ]
@@ -157,11 +158,29 @@ MAX_TILE_PIXELS = 24_000_000
 #: Measured on the fictional set (LAB-1210): upright documents read 0.72-1.0, rotated ones
 #: 0.03-0.28.
 POOR_READING = 0.35
+#: A page read below :data:`GOOD_READING` whose pixels are at least this share tinted (a
+#: coloured security print: guilloche, rainbow print) is read again with the background
+#: suppressed (:func:`suppress_background`). The 65 official specimens are 6-91 % tinted, a
+#: screenshot or a scan of black print on white about 0 %.
+TINTED_PAGE = 0.05
+#: A pixel whose channels differ by more than this counts as tinted.
+TINT = 24
+#: Tesseract's page segmentation for the suppressed reading: sparse text. Values on an ID card
+#: are scattered blocks between captions, not paragraphs (LAB-1183).
+SPARSE_TEXT = "--psm 11"
 #: A reading at least this confident is taken as upright without trying another orientation.
 #: Between :data:`POOR_READING` and this, Tesseract's orientation detection (OSD) decides
 #: whether an upside-down reading is worth a pass: the fictional card upside down reads 0.37,
 #: while half of the official specimens read below 0.53 upright.
 GOOD_READING = 0.7
+#: The upside-down discriminator (LAB-1305) reads the page turned 180 degrees at most this
+#: long side (px): enough for confident text, a fraction of a full pass. An upright page
+#: reads it as junk, so upright documents skip both the OSD call and the full extra pass;
+#: only a competitive upside-down reading proceeds, so turned-document recall is unchanged.
+ORIENT_MAX_SIDE = 800
+#: Skip the OSD call and the extra pass when the upright reading beats the upside-down one
+#: by more than this share. One-sided on purpose: anything competitive proceeds as before.
+ORIENT_MARGIN = 0.15
 #: Tesseract's own confidence (0-100) for a character to count as confidently read.
 CONFIDENT = 60.0
 #: The skew search: up to this many degrees either way.
@@ -318,13 +337,22 @@ class TesseractOcr:
     Tesseract reads; enlarged, they come back (``Családi név / Surname``), and so do the
     values under them. ``None`` reads the image as it is.
 
-    ``orient`` (LAB-1210): a page whose words stand upright (text running up or down) is read
-    again a quarter turn either way; a page read poorly, upside down; one read middlingly, in
-    the orientation Tesseract's OSD suggests. The best reading wins, so a wrong guess costs a
-    pass, never the upright reading.
+    ``orient`` (LAB-1210, LAB-1305): a page whose words stand upright (text running up or
+    down) is read again a quarter turn either way; a page read poorly, upside down; one read
+    middlingly, in the orientation Tesseract's OSD suggests — but only after a downscaled
+    upside-down read (:data:`ORIENT_MAX_SIDE`) reads competitively with the upright one.
+    An upright page reads upside down as junk, so upright documents skip both the OSD call
+    and the full extra pass. The best reading wins, so a wrong guess costs a pass, never the
+    upright reading.
     ``deskew``: a page skewed by :data:`MIN_SKEW`-:data:`MAX_SKEW` degrees (estimated from its
     row profile) is straightened before reading. Both read in a :class:`PageFrame` and map the
     boxes back (:meth:`read`). Upright, straight pages cost nothing extra.
+
+    ``suppress`` (LAB-1183): a colour-printed page read poorly (security print: guilloche,
+    rainbow print, holograms under 2-4 px strokes) is read once more, in the frame the best
+    reading was made in, with the background suppressed (:func:`suppress_background`) and as
+    sparse text (:data:`SPARSE_TEXT`). The reading with more confidently read characters
+    wins, so coloured ink the suppression whitens never loses the first reading.
 
     ``small_text``: a line read under :data:`MIN_TEXT_HEIGHT` pixels high is read again on a
     tile enlarged to :data:`TARGET_TEXT_HEIGHT` (a 2560 px screenshot is not enlarged as a
@@ -343,6 +371,7 @@ class TesseractOcr:
         orient: bool = True,
         deskew: bool = True,
         small_text: bool = True,
+        suppress: bool = True,
     ) -> None:
         self.lang = lang
         self.config = config
@@ -351,6 +380,7 @@ class TesseractOcr:
         self.orient = orient
         self.deskew = deskew
         self.small_text = small_text
+        self.suppress = suppress
 
     def scale_for(self, size: tuple[int, int]) -> float:
         """The factor :meth:`words` enlarges an image of ``size`` by (``1.0``: not at all)."""
@@ -378,6 +408,8 @@ class TesseractOcr:
                     best = candidate
                 if not best.sideways and best.share >= GOOD_READING:
                     break
+        if self.suppress and best.share < GOOD_READING:
+            best = self._suppressed(image, best, scale)
         words = best.words
         if self.small_text:
             words = self._small_text(image, best, scale)
@@ -385,15 +417,37 @@ class TesseractOcr:
             logger.debug("ocr: read in a frame turned %.1f degrees", best.frame.angle)
         return OcrPage(words, best.frame)
 
+    def _upside_down_share(self, image: Image.Image) -> float:
+        """The confident-character share of ``image`` turned 180 degrees and downscaled to
+        :data:`ORIENT_MAX_SIDE` (LAB-1305): the cheap upright/upside-down discriminator.
+        No deskew, no small-text tiles: it only decides whether a full extra pass is worth
+        running. Respects the image deadline like every other pass."""
+        frame = PageFrame.of(image.size, 180.0)
+        framed = frame.render(image)
+        longest = max(framed.size)
+        if longest > ORIENT_MAX_SIDE:
+            ratio = ORIENT_MAX_SIDE / longest
+            framed = framed.resize(
+                (max(1, round(framed.width * ratio)), max(1, round(framed.height * ratio))),
+                Image.Resampling.BILINEAR,
+            )
+        words, confidences = self._tesseract(framed, 1.0, (0, 0), ())
+        return _Reading(frame, words, confidences).share
+
     def _turns(self, image: Image.Image, reading: _Reading, scale: float) -> list[float]:
         """The quarter turns worth reading ``image`` in, given its upright ``reading``.
 
-        Words standing up: a quarter turn either way. A poor reading: upside down. A middling
-        one (a busy real document reads like that upright): whatever Tesseract's orientation
-        detection suggests, or upside down when it can't tell.
+        Words standing up: a quarter turn either way. Otherwise the downscaled upside-down
+        reading decides first (LAB-1305): an upright page reads it as junk, so when it is
+        clearly worse the upright reading stands — no OSD call, no extra pass. Only a
+        competitive upside-down reading proceeds: a poor one upside down, a middling one
+        (a busy real document reads like that upright) in whatever orientation Tesseract's
+        OSD suggests, or upside down when OSD can't tell.
         """
         if reading.sideways:
             return [90.0, 270.0]
+        if self._upside_down_share(image) + ORIENT_MARGIN < reading.share:
+            return []
         if reading.share < POOR_READING:
             return [180.0]
         hint = self._osd_turn(image, scale)
@@ -444,6 +498,20 @@ class TesseractOcr:
         straightened = self._read(image, PageFrame.of(image.size, turn + skew), scale)
         return straightened if straightened.rank >= reading.rank else reading
 
+    def _suppressed(self, image: Image.Image, reading: _Reading, scale: float) -> _Reading:
+        """``reading``, or a reading of the same frame with the coloured background
+        suppressed, whichever read more confidently. A page with no tint is left alone."""
+        framed = reading.frame.render(image)
+        if _tinted_share(framed) < TINTED_PAGE:
+            return reading
+        check_deadline()
+        config = f"{self.config} {SPARSE_TEXT}".strip()
+        words, confidences = self._tesseract(
+            suppress_background(framed), scale, (0, 0), (), config=config
+        )
+        candidate = _Reading(reading.frame, words, confidences)
+        return candidate if candidate.rank > reading.rank else reading
+
     def _read(self, image: Image.Image, frame: PageFrame, scale: float) -> _Reading:
         """One Tesseract pass over ``image`` in ``frame``, enlarged ``scale`` times."""
         framed = frame.render(image)
@@ -456,9 +524,12 @@ class TesseractOcr:
         scale: float,
         offset: tuple[int, int],
         line_prefix: tuple[int, ...],
+        *,
+        config: str | None = None,
     ) -> tuple[list[OcrWord], list[float]]:
         """Tesseract on ``source`` enlarged ``scale`` times; boxes at ``source`` resolution
-        plus ``offset``, line keys prefixed with ``line_prefix``."""
+        plus ``offset``, line keys prefixed with ``line_prefix``. ``config`` replaces the
+        engine's own Tesseract options."""
         import pytesseract
 
         check_deadline()
@@ -472,7 +543,7 @@ class TesseractOcr:
             data = pytesseract.image_to_data(
                 source,
                 lang=self.lang,
-                config=self.config,
+                config=self.config if config is None else config,
                 output_type=pytesseract.Output.DICT,
                 # pytesseract kills the subprocess when it runs out (0: no limit).
                 timeout=max(left, 0.01) if left is not None else 0,
@@ -581,6 +652,35 @@ class TesseractOcr:
             words = [w for w, _ in merged]
             confidences = [c for _, c in merged]
         return words
+
+
+def suppress_background(image: Image.Image) -> Image.Image:
+    """``image`` in greyscale, each pixel its brightest channel (HSV value).
+
+    Security print is light and coloured (a pastel guilloche, rainbow print), the values on it
+    dark: the brightest channel turns a pastel tint near white and leaves dark ink dark, where
+    plain greyscale keeps the tint mid-grey around the strokes. On the official specimens it
+    cut the values Tesseract read no word of from 109 of 274 to 57 (LAB-1183). Saturated
+    coloured ink (pure red) whitens too, which is why its reading only replaces a worse one.
+    """
+    rgb = image.convert("RGB")
+    red, green, blue = rgb.split()
+    return ImageChops.lighter(ImageChops.lighter(red, green), blue)
+
+
+def _tinted_share(image: Image.Image) -> float:
+    """The share of ``image``'s pixels whose channels differ by more than :data:`TINT`
+    (measured on a copy at most 256 px on its longer side)."""
+    if image.mode in ("1", "L", "LA", "I", "F", "I;16"):
+        return 0.0
+    small = image.convert("RGB")
+    small.thumbnail((256, 256))
+    red, green, blue = small.split()
+    high = ImageChops.lighter(ImageChops.lighter(red, green), blue)
+    low = ImageChops.darker(ImageChops.darker(red, green), blue)
+    spread = ImageChops.subtract(high, low).point(lambda v: 255 if v > TINT else 0)
+    histogram = spread.histogram()
+    return histogram[255] / max(1, small.width * small.height)
 
 
 def _background(image: Image.Image) -> tuple[int, ...] | int:

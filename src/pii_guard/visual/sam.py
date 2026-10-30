@@ -67,6 +67,13 @@ API_KEY_ENV_VAR = "PII_GUARD_SAM_API_KEY"
 #: ``ID_PHOTO``: on the same specimens ``"id photo"`` and ``"passport photo"`` returned nothing
 #: (0/37 portraits), while ``"photo of a person"`` found 89 % at IoU >= 0.5 with 3 stray
 #: regions; see ``eval/results/visual/``.
+#: On the synthetic prompt-study set (LAB-1118, ``eval/visual/prompt-set``, 2026-10-30;
+#: ``eval/results/visual/prompt-study-synthetic.md``) the defaults hold: the signature pair
+#: finds 4/4 pen scribbles and 2/4 scanned-look signatures, but **no prompt tried finds a
+#: signature set in a script font** (0/4 for each of six prompts); ``"stamp"`` finds 5/6 stamps
+#: (``"rubber stamp"``, ``"ink stamp"`` none). ``"portrait"`` found 6/6 framed ID photos against
+#: 4/6 for ``"photo of a person"``, but only 65 % of specimen portraits, so it is not added
+#: until the pair is measured on the specimens.
 DEFAULT_PROMPTS: dict[EntityType, tuple[str, ...]] = {
     EntityType.FACE: ("face",),
     EntityType.SIGNATURE: ("signature", "squiggly line"),
@@ -192,10 +199,17 @@ class SamClient:
         self._settings = settings
         self.url = _resolve_url(base_url or settings.sam_url or DEFAULT_BASE_URL)
         if api_key is None:
-            env_key = os.environ.get(API_KEY_ENV_VAR)
-            api_key = env_key if env_key else settings.meta_api_key
+            settings_key = settings.sam_api_key
+            if settings_key is not None:
+                api_key = settings_key
+            else:
+                # An explicitly emptied PII_GUARD_SAM_API_KEY disables SAM even when
+                # META_API_KEY (or the repo .env) has a key: the smoke stack is offline by
+                # contract (LAB-1255). Settings ignores empty values, so check the env here.
+                env_key = os.environ.get(API_KEY_ENV_VAR)
+                api_key = (env_key or None) if env_key is not None else settings.meta_api_key
         self._api_key = api_key.get_secret_value() if isinstance(api_key, SecretStr) else api_key
-        self.model = model or os.environ.get(MODEL_ENV_VAR) or DEFAULT_MODEL
+        self.model = model or settings.sam_model or os.environ.get(MODEL_ENV_VAR) or DEFAULT_MODEL
         self.prompts: dict[EntityType, tuple[str, ...]] = {
             EntityType(k): tuple(v) for k, v in (prompts or DEFAULT_PROMPTS).items()
         }
@@ -241,10 +255,16 @@ class SamClient:
             raise DetectionError("image could not be decoded for segmentation") from exc
         data_url = "data:image/png;base64," + base64.b64encode(encode_image(decoded)).decode()
 
+        from pii_guard.visual.ocr import check_deadline  # local import: ocr never imports sam
+
         regions: list[Region] = []
         with self._client() as client:
             for entity_type in types:
                 for prompt in self.prompts[entity_type]:
+                    # The request's image deadline (LAB-1234): stop before a prompt whose
+                    # time is already up, so a timed-out request frees its image-pool slot
+                    # instead of holding it for prompts x timeout x (1 + retries).
+                    check_deadline()
                     text = self._request(client, prompt, data_url)
                     regions.extend(parse_sam_output(text, entity_type, decoded.size))
         logger.debug("sam: %d region(s) for %s", len(regions), ",".join(t.value for t in types))
@@ -273,12 +293,20 @@ class SamClient:
         )
 
     def _request(self, client: httpx.Client, prompt: str, data_url: str) -> str:
+        from pii_guard.visual.ocr import remaining  # local import: ocr never imports sam
+
         refuse_remote(self._settings, "SAM segmentation")
         payload = self.payload(prompt, data_url)
         last: str = "no attempt"
         for _attempt in range(self.max_retries + 1):
+            # Cap this request at the image deadline and skip retries once it is up
+            # (LAB-1234): each call gets at most the time the request still has.
+            left = remaining()
+            if left is not None and left <= 0:
+                raise DetectionError("SAM request ran past the image deadline")
+            timeout = self.timeout if left is None else min(self.timeout, max(left, 0.01))
             try:
-                response = client.post(self.url, json=payload)
+                response = client.post(self.url, json=payload, timeout=timeout)
             except httpx.TimeoutException:
                 last = "timed out"
                 continue

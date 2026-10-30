@@ -65,7 +65,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
     <div className="space-y-6">
       <div className="space-y-4">
         <div>
-          <h3 className="text-lg font-normal text-ink">Bring your own model key</h3>
+          <h3 className="text-lg font-normal text-ink">Bring your own provider key</h3>
           <p className="mt-0.5 text-sm text-muted">Connections are held in memory by the hosted guard. Disconnect to remove a key. Requests use your provider’s terms and billing.</p>
         </div>
         <form
@@ -110,7 +110,7 @@ export function Settings({ call, account, refresh, onDisconnect, onConnect }: { 
         <h3 id={listTitle} tabIndex={-1} className="text-lg font-normal text-ink focus:outline-none">Your connections</h3>
         <Announcer message={announce} />
         {account.connections.length === 0 ? (
-          <p className="text-sm text-muted">No provider connections yet. {account.limits.sponsored_enabled === false ? "Free runs are paused. Connect your own model key to use Playground chat." : "Playground chat uses Meta Muse Spark."}</p>
+          <p className="text-sm text-muted">No provider connections yet. {account.limits.sponsored_enabled === false ? "Free runs are paused. Connect your own provider key to use Playground chat." : "Playground chat uses Meta Muse Spark."}</p>
         ) : (
           <ul className="divide-y divide-line" aria-labelledby={listTitle}>
             {account.connections.map((c) => (
@@ -158,9 +158,9 @@ export function AccountSummary({ active = true, calls = 0 }: { active?: boolean;
         <span className="text-xs text-muted">Signed in with Google · {account.tier} tier</span>
       </div>
       <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-        <Metric label="Requests today" value={account.usage.requests_today} suffix={typeof perDay === "number" ? `of ${perDay}` : undefined} />
+        <Metric label="Requests today (all features)" value={account.usage.requests_today} suffix={typeof perDay === "number" ? `of ${perDay}` : undefined} />
         <Metric label="Allowance resets" value={<span className="text-sm font-normal">{time(account.usage.resets_at)}</span>} />
-        <Metric label="Provider connections" value={account.connections.length} />
+        {account.connections.length > 0 && <Metric label="Provider connections" value={account.connections.length} />}
       </dl>
       <div className="mt-4"><Limits account={account} /></div>
       {error && (
@@ -169,7 +169,7 @@ export function AccountSummary({ active = true, calls = 0 }: { active?: boolean;
         </Notice>
       )}
       <SetupChecklist call={session.call} account={account} active={active} calls={calls} />
-      <p className="mt-3 text-xs text-muted">Sessions and provider connections are temporary. A guard restart loses ephemeral state. Every section shows only your own projects, activity and sessions.</p>
+      <p className="mt-3 text-xs text-muted">Sessions and provider connections are temporary. If the service restarts, sessions are lost. Every section shows only your own projects, activity and sessions.</p>
     </section>
   );
 }
@@ -184,8 +184,8 @@ export function ProviderConnections() {
   return (
     <section aria-labelledby="connections-title" className="space-y-4">
       <div>
-        <h2 id="connections-title" className="text-lg font-normal text-ink">Model provider keys for the Playground</h2>
-        <p className="mt-0.5 text-sm text-muted">Connect your own model key for Playground chat. Your application doesn&apos;t use these: it uses an endpoint key from <a className="underline underline-offset-4" href="#projects">Projects</a>.</p>
+        <h2 id="connections-title" className="text-lg font-normal text-ink">Provider keys for the Playground</h2>
+        <p className="mt-0.5 text-sm text-muted">Connect your own provider key for Playground chat. Your application doesn&apos;t use these: it uses an endpoint key from <a className="underline underline-offset-4" href="#projects">Projects</a>.</p>
       </div>
       <div className="space-y-6 rounded-xl border border-line bg-surface p-4 sm:p-5">
         <Field label="Playground chat sends through" className="sm:max-w-md">

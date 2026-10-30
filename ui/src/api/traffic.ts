@@ -28,7 +28,20 @@ import type { EntityType } from "./types";
 import { ApiError, UnreachableError } from "./http";
 
 export type TrafficLevel = "masked" | "full";
-export type TrafficOutcome = "ok" | "blocked" | "refused" | "upstream_error" | "stream_error" | "error";
+export type TrafficOutcome = "ok" | "blocked" | "refused" | "upstream_error" | "upstream_failed" | "stream_error" | "error";
+
+/** `upstream_*` codes raised before anything was forwarded: those calls stay `refused`. */
+const NOT_FORWARDED_UPSTREAM = new Set(["upstream_not_configured", "upstream_destination_not_allowed"]);
+
+/**
+ * The event's outcome, with servers from before LAB-1629 read like newer ones: they logged a
+ * forwarded call whose upstream then failed as `refused` with an `upstream_*` code.
+ */
+export function readOutcome(outcome: unknown, code: unknown): string {
+  if (typeof outcome !== "string") return "ok";
+  if (outcome === "refused" && typeof code === "string" && code.startsWith("upstream_") && !NOT_FORWARDED_UPSTREAM.has(code)) return "upstream_failed";
+  return outcome;
+}
 
 export interface TrafficTiming {
   total_ms: number;
@@ -58,7 +71,7 @@ export interface TrafficEvent {
   time: string;
   level: TrafficLevel;
   outcome: TrafficOutcome | string;
-  error: { code: string; status: number | null; entity_types?: Partial<Record<EntityType, number>> } | null;
+  error: { code: string; status: number | null; message?: string | null; entity_types?: Partial<Record<EntityType, number>> } | null;
   mode: string | null;
   language: string | null;
   stream: boolean;
@@ -138,7 +151,7 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     seq: raw.seq,
     time: typeof raw.time === "string" ? raw.time : new Date().toISOString(),
     level: raw.level === "full" ? "full" : "masked",
-    outcome: typeof raw.outcome === "string" ? raw.outcome : "ok",
+    outcome: readOutcome(raw.outcome, isRecord(raw.error) ? raw.error.code : undefined),
     error: isRecord(raw.error) && typeof raw.error.code === "string" ? (raw.error as TrafficEvent["error"]) : null,
     mode: typeof raw.mode === "string" ? raw.mode : null,
     language: typeof raw.language === "string" ? raw.language : null,
@@ -223,6 +236,8 @@ export interface TrafficConnectOptions {
   backlog?: number;
   onEvents: (events: TrafficEvent[]) => void;
   onStatus: (status: TrafficStatus) => void;
+  /** The server restarted (a new `boot` id): events after this point start a new run. */
+  onRestart?: (boot: string) => void;
 }
 
 export interface TrafficConnection {
@@ -384,6 +399,10 @@ export function connectTraffic(options: TrafficConnectOptions): TrafficConnectio
     const restarted = page.boot !== null && boot !== null && page.boot !== boot;
     if (page.boot !== null) boot = page.boot;
     if (restarted) lastSeq = 0;
+    // The cursor reset hides the break: tell the feed a new run starts here (LAB-1366),
+    // so the Logs screen can mark it instead of silently mixing the two runs. This fires
+    // before the after>0 refetch, whose page carries the already-seen boot id.
+    if (restarted) options.onRestart?.(page.boot ?? boot ?? "");
     if (restarted && after > 0) return false;
     emit(page.events);
     return true;

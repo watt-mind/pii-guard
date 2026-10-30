@@ -2,7 +2,7 @@
 
 A **run record** (``eval/results/runs/<YYYY-MM-DD>-<slug>.json``) says what ran (the system:
 pii-guard detectors with their models and settings, or a comparison tool), on what (fixture
-files with their SHA-256, the fixture set, whether it was hand-written or generated), at which
+files with their SHA-256, the fixture set and origin (hand-written, generated, public), at which
 commit, on which hardware, at what cost, and what came out (per-language and per-entity-type
 counts and ratios). The format is specified by ``eval/results/schema/run.schema.json``
 (``schema_version`` 1) and documented in ``docs/evaluation.md``.
@@ -46,14 +46,19 @@ __all__ = [
     "merge_extra",
     "rate_errors",
     "system_key",
+    "system_role",
     "text_metrics",
     "validate",
     "visual_metrics",
+    "with_role",
     "write_records",
 ]
 
 RECORD_SCHEMA_VERSION = 1
 DEFAULT_RUNS_DIR = Path("eval/results/runs")
+#: At most this many changed paths are kept in a record's ``code.dirty_paths``.
+_MAX_DIRTY_PATHS = 50
+
 SCHEMA_PATH = Path("eval/results/schema/run.schema.json")
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
@@ -156,7 +161,22 @@ def text_metrics(block: Mapping[str, Any], *, reversible: bool = True) -> dict[s
             "mask": None if not mask else {"p50": _r(mask["p50"], 3), "p95": _r(mask["p95"], 3)},
         },
         "per_type": per_type,
+        **(
+            {"outbound_check": outbound_check(block["outbound_check"])}
+            if block.get("outbound_check")
+            else {}
+        ),
         **({"validity": _validity(block["validity"])} if block.get("validity") else {}),
+    }
+
+
+def outbound_check(block: Mapping[str, Any]) -> dict[str, Any]:
+    """A scorecard's ``outbound_check`` block (:mod:`pii_guard.eval.outbound`), counts only."""
+    ms = block.get("check_ms")
+    return {
+        **_counts(block, ("requests", "checked", "blocked")),
+        "rate": _r(block.get("rate")),
+        "check_ms": None if not ms else {"p50": _r(ms["p50"], 3), "p95": _r(ms["p95"], 3)},
     }
 
 
@@ -235,6 +255,54 @@ def system_key(system: Mapping[str, Any]) -> str:
     return "+".join(parts) or "none"
 
 
+#: Roles a system can have (``system.role``): pii-guard's own configuration, someone else's
+#: model run through pii-guard's pipeline, or a comparison tool (LAB-1495).
+ROLES = ("own", "other-model", "tool")
+
+#: NER models of other organisations, by the ``model`` name run records give them (short
+#: names and Hugging Face ids). pii-guard's own checkpoints and fine-tunes are not here.
+OTHER_MODELS = frozenset(
+    {
+        "bardsai-v1-fallback",
+        "bardsai-v3",
+        "bardsai/eu-pii-anonimization-multilang",
+        "eu-pii-anonimization-multilang",
+        "eu-pii-safeguard",
+        "horizon-base",
+        "horizon-small",
+        "wismut-nym",
+        "xlm-roberta-base-ner-hrl",
+        "xlmr-ner-hrl",
+        "gliner-multi-v2.1",
+    }
+)
+
+
+def system_role(system: Mapping[str, Any]) -> str:
+    """``tool`` for a comparison tool; ``other-model`` when every NER detector of a pii-guard
+    system runs another organisation's model (:data:`OTHER_MODELS`), alone or in place of
+    pii-guard's NER; ``own`` otherwise (rules, pii-guard's NER, the LLM detector, or
+    pii-guard's NER in union with another model).
+    """
+    if system.get("family") == "comparison":
+        return "tool"
+    ner = [d for d in system.get("detectors", []) if str(d.get("name", "")).startswith("ner")]
+    if ner and all(d.get("model") in OTHER_MODELS for d in ner):
+        return "other-model"
+    return "own"
+
+
+def with_role(system: dict[str, Any], role: str | None = None) -> dict[str, Any]:
+    """``system`` with ``role`` (computed when not given) placed right after ``family``."""
+    role = role or system_role(system)
+    items = [(k, v) for k, v in system.items() if k != "role"]
+    at = next((i + 1 for i, (k, _) in enumerate(items) if k == "family"), len(items))
+    items.insert(at, ("role", role))
+    system.clear()
+    system.update(items)
+    return system
+
+
 def _default_label(system: Mapping[str, Any]) -> str:
     if system.get("family") == "comparison":
         return str(system["tool"])
@@ -276,7 +344,9 @@ def _origin_from_file(path: Path) -> tuple[str, str | None, int | None, list[str
                 generators.add(str(meta["model"]))
         if record.get("language"):
             languages.add(str(record["language"]))
-    origin = "generated" if synthetic else "hand-written"
+    origin = (  # converted third-party benchmarks live under public/
+        "public" if "public" in path.parts else ("generated" if synthetic else "hand-written")
+    )
     generator = ", ".join(sorted(generators)) or None
     return origin, generator, len(lines), sorted(languages)
 
@@ -287,7 +357,8 @@ def fixture_info(
     """Describe fixture files: path, SHA-256, language, set name, hand-written or generated.
 
     The origin comes from the file (a record whose ``meta`` names a generator or
-    ``source: synthetic`` makes the file *generated*); when the file isn't available (a
+    ``source: synthetic`` makes the file *generated*; a file under a ``public/`` directory
+    is a converted third-party benchmark, origin *public*); when the file isn't available (a
     generated split that isn't committed), a set name starting with ``synth`` or ``distill`` is
     taken as generated and anything else as unknown. A file edited since the run (another
     SHA-256) still says whether the set is hand-written, but not how many documents ran.
@@ -380,6 +451,8 @@ def merge_extra(record: dict[str, Any], extra: Mapping[str, Any] | None) -> dict
         system["key"] = system_extra.get("key") or system_key(system)
     if "label" in system_extra or not explicit_label:
         system["label"] = system_extra.get("label") or _default_label(system)
+    if "role" in system or "role" in system_extra:
+        with_role(system, system_extra.get("role"))
     if notes_extra:
         record["notes"] = [*record["notes"], *notes_extra]
     return record
@@ -415,6 +488,7 @@ def _base_record(
 ) -> dict[str, Any]:
     system.setdefault("key", system_key(system))
     system.setdefault("label", _default_label(system))
+    with_role(system, system.get("role"))
     sets = sorted({f["set"] for f in fixtures}) or ["unknown"]
     return {
         "schema_version": RECORD_SCHEMA_VERSION,
@@ -429,6 +503,7 @@ def _base_record(
         "code": {
             "commit": str(code.get("commit") or "unknown"),
             "dirty": bool(code.get("dirty", False)),
+            "dirty_paths": [str(p) for p in code.get("dirty_paths") or []][:_MAX_DIRTY_PATHS],
             "pii_guard_version": code.get("pii_guard_version"),
             "note": code.get("note"),
         },
@@ -490,7 +565,7 @@ def build_records(
     )
     languages = sorted(card.get("languages", {}))
     dets = [_detector(**d) for d in (detectors or [{"name": n} for n in meta.get("detectors", [])])]
-    code = {k: meta.get(k) for k in ("commit", "dirty", "pii_guard_version")}
+    code = {k: meta.get(k) for k in ("commit", "dirty", "dirty_paths", "pii_guard_version")}
     ours = _base_record(
         run_id=run_id,
         kind="text",
@@ -797,7 +872,8 @@ def rate_errors(block: Mapping[str, Any], path: str) -> list[str]:
     """Rates in a text block that aren't their count / denominator (``null`` = not measured).
 
     A rate given for an empty denominator is an error too. Checked: precision, recall and F1
-    in both match modes, leak and partial leak, over-masking, round trip, consistency.
+    in both match modes, leak and partial leak, over-masking, round trip, consistency, the
+    outbound re-check's false-block rate.
     """
     errors: list[str] = []
 
@@ -831,6 +907,9 @@ def rate_errors(block: Mapping[str, Any], path: str) -> list[str]:
             c["multi_rate"],
             _q(c["multi_consistent"], c["multi_occurrence"]),
         )
+    if block.get("outbound_check"):
+        ob = block["outbound_check"]
+        check("outbound_check.rate", ob["rate"], _q(ob["blocked"], ob["checked"]))
     return errors
 
 

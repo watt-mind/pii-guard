@@ -139,6 +139,63 @@ def test_common_word_surnames_need_person_evidence() -> None:
     assert persons("A Mészáros Építő Kft. ajánlata.") == ["Mészáros"]
 
 
+# --- Law and notary offices (LAB-1175) ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # A common-word surname is a person here: an office is named after its members.
+        ("Somogyi Ádám ügyvéd (Somogyi Ügyvédi Iroda, telefon: +36 30 555 0142)", ["Somogyi"]),
+        ("Megbízott: Dr. Kovács Ügyvédi Iroda.", ["Kovács"]),
+        ("A Dr. Fehér Gábor Ügyvédi Iroda képviseli.", ["Fehér Gábor"]),
+        ("Ügyfelünk a Mintás és Társa Ügyvédi Iroda.", ["Mintás"]),
+        ("A Varga és Kiss Ügyvédi Iroda két tagja.", ["Varga", "Kiss"]),
+        ("A Bodnár és Partnerei Ügyvédi Iroda levele.", ["Bodnár"]),
+        ("Okiratot készít a Takács Közjegyzői Iroda.", ["Takács"]),
+        ("A Szilágyi Szabadalmi Ügyvivői Iroda bejelentése.", ["Szilágyi"]),
+        # Inflected and lower-case office words.
+        ("A Somogyi Ügyvédi Irodával szerződtünk.", ["Somogyi"]),
+        ("Felhívtam a Somogyi ügyvédi irodát.", ["Somogyi"]),
+        ("A Mintás Ügyvédi Irodánál volt.", ["Mintás"]),
+    ],
+)
+def test_law_and_notary_offices_mask_the_member_name(text: str, expected: list[str]) -> None:
+    assert persons(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Az Ügyvédi Iroda címe megváltozott.",
+        "A Budapesti Ügyvédi Kamara nyilvántartása.",
+        "Az ügyvédi iroda nyitvatartása: 9-17.",
+        "Tisztelt Ügyvédi Iroda!",
+        "A Budapesti Ügyvédi Iroda.",  # a place adjective, not a member's name
+        "Új irodát nyitott a Fekete Kavics Kft. mellett.",
+    ],
+)
+def test_office_words_without_a_member_name_stay_kept(text: str) -> None:
+    assert persons(text) == []
+
+
+def test_the_contract_sample_keeps_no_masked_surname() -> None:
+    text = (
+        "3. A szerződést Somogyi Ádám ügyvéd (Somogyi Ügyvédi Iroda, telefon: +36 30 555 0142, "
+        "e-mail: somogyi.adam@example.com) ellenjegyzi."
+    )
+    first = text.index("Somogyi Ádám")
+    ner = [
+        Span(first, first + 12, EntityType.PERSON, "Somogyi Ádám", 0.99, "ner"),
+        _org(text, "Somogyi Ügyvédi Iroda"),
+    ]
+    resolved = resolve_spans(text, [*RuleDetector().detect(text, "hu"), *ner])
+    to_mask = [s for s in resolved if s.entity_type is not EntityType.ORGANIZATION]
+    masked = Vault(b"k" * 32).session().mask(text, to_mask, language="hu")
+    assert "Somogyi" not in masked
+    assert " Ügyvédi Iroda, telefon:" in masked
+
+
 def test_runs_only_for_hungarian_text() -> None:
     detector = RuleDetector()
     text = "Invoice from Tóth és Társa Bt. attached."

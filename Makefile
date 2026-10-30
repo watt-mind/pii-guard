@@ -1,5 +1,9 @@
 .PHONY: help setup lint format test test-all types gate serve check docker docker-smoke audit licences \
-	pii-diff gitleaks links baselines demo demo-traffic smoke smoke-fast bench wheel wheel-smoke
+	pii-diff gitleaks links baselines openapi demo demo-traffic smoke smoke-fast bench wheel wheel-smoke
+
+# Hygiene (LAB-1254): `uv sync` once via `make setup` (or `make baselines` for that extra),
+# then every `uv run` below is `uv run --no-sync`, so a source edit never rebuilds pii-guard
+# into ~/.cache/uv. Per-target flags (not UV_NO_SYNC): CI does a fresh sync first.
 
 help: ## list targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
@@ -10,12 +14,12 @@ setup: ## install dependencies and the pre-commit hook
 	uv run --with pre-commit pre-commit install --hook-type commit-msg
 
 lint: ## ruff lint + format check
-	uv run ruff check .
-	uv run ruff format --check .
+	uv run --no-sync ruff check .
+	uv run --no-sync ruff format --check .
 
 format: ## apply ruff fixes and formatting
-	uv run ruff check --fix .
-	uv run ruff format .
+	uv run --no-sync ruff check --fix .
+	uv run --no-sync ruff format .
 
 # The fast suite (pull requests) skips the tests marked slow and measures line coverage with the
 # sys.monitoring core (about twice as fast as branch coverage on Python 3.12), so it has its own
@@ -25,22 +29,25 @@ FAST_COV_FLOOR := 90
 
 test: ## fast suite as pull-request CI runs it: parallel, no slow tests, line coverage, its floor
 	COVERAGE_CORE=sysmon COVERAGE_BRANCH=false \
-		uv run pytest -n auto --dist worksteal -m "not slow" --cov-fail-under=$(FAST_COV_FLOOR)
+		uv run --no-sync pytest -n auto --dist worksteal -m "not slow" --cov-fail-under=$(FAST_COV_FLOOR)
 
 # test-all keeps the default (C) tracer: its floor is branch coverage, and on Python 3.12
 # sys.monitoring measures lines only, so COVERAGE_CORE=sysmon would fall back to it anyway, with
 # a warning (coverage.py no-sysmon). Revisit on Python 3.14, where sysmon measures branches.
 test-all: ## every test, as main, nightly and manual CI run it: parallel, full coverage floor
-	uv run pytest -n auto --dist worksteal
+	uv run --no-sync pytest -n auto --dist worksteal
 
 serve: ## run the API on http://127.0.0.1:8787
-	uv run pii-guard serve --reload
+	uv run --no-sync pii-guard serve --reload
 
 types: ## mypy on src/, failing only on errors not in scripts/ci/mypy-baseline.txt
-	uv run python scripts/ci/mypy_baseline.py
+	uv run --no-sync python scripts/ci/mypy_baseline.py
 
 gate: ## quality regression gate: leak / round trip / over-masking vs committed runs (offline)
-	uv run python -m pii_guard.eval.gate
+	uv run --no-sync python -m pii_guard.eval.gate
+
+openapi: ## regenerate docs/openapi.json and the docs/api.md error table from the app
+	uv run python scripts/export_openapi.py
 
 check: lint types test gate ## the Python checks CI runs (CONTRIBUTING.md lists every CI job)
 
@@ -55,12 +62,12 @@ audit: ## known vulnerabilities in uv.lock (OSV) and the UI's production depende
 	cd ui && pnpm audit --prod --audit-level high
 
 licences: ## no GPL/AGPL runtime dependency (Python environment as installed, UI production)
-	uv run python scripts/ci/licenses.py
+	uv run --no-sync python scripts/ci/licenses.py
 	cd ui && pnpm licenses list --prod --json > "$${TMPDIR:-/tmp}/pii-guard-ui-licenses.json"
-	uv run python scripts/ci/licenses.py --pnpm-json "$${TMPDIR:-/tmp}/pii-guard-ui-licenses.json"
+	uv run --no-sync python scripts/ci/licenses.py --pnpm-json "$${TMPDIR:-/tmp}/pii-guard-ui-licenses.json"
 
 pii-diff: ## real-looking PII on lines added since origin/develop (pii-guard rules, dogfood)
-	uv run python scripts/ci/pii_in_diff.py --base origin/develop
+	uv run --no-sync python scripts/ci/pii_in_diff.py --base origin/develop
 
 gitleaks: ## secrets in commits since origin/develop (needs gitleaks on PATH off Linux)
 	scripts/ci/gitleaks.sh "$$(git merge-base origin/develop HEAD)" HEAD
@@ -82,20 +89,20 @@ MODE ?= fast
 DEMO_EXTRAS := --extra local-vision $(if $(filter rules,$(MODE)),,--extra ner)
 
 demo: ## start API + gateway + UI on a mock upstream, fast mode (rules + NER); MODE=rules: offline
-	uv run $(DEMO_EXTRAS) python -m pii_guard.visual.segment fetch
-	uv run $(DEMO_EXTRAS) python scripts/demo.py --mode $(MODE)
+	uv run --no-sync $(DEMO_EXTRAS) python -m pii_guard.visual.segment fetch
+	uv run --no-sync $(DEMO_EXTRAS) python scripts/demo.py --mode $(MODE)
 
 demo-traffic: ## send scripted fictional hu/en/de requests through the running demo gateway
-	uv run python scripts/demo_traffic.py
+	uv run --no-sync python scripts/demo_traffic.py
 
 smoke: ## rules only (CI): start the stack on the mock upstream, send the demo traffic, no leak
-	uv run python scripts/smoke.py --mode rules
+	uv run --no-sync python scripts/smoke.py --mode rules
 
 smoke-fast: ## fast mode (local): as smoke with rules + NER, the NER-only scenario must be masked
-	uv run --extra ner python scripts/smoke.py --mode fast
+	uv run --no-sync --extra ner python scripts/smoke.py --mode fast
 
 bench: ## gateway latency benchmark on the mock upstream (fast mode, concurrency 1 and 8)
-	uv run pii-guard bench latency
+	uv run --no-sync pii-guard bench latency
 
 wheel: ## release wheel with the web UI bundled (needs pnpm): dist/*.whl for `uvx --from`
 	cd ui && pnpm install --frozen-lockfile && VITE_PII_GUARD_MODE=api pnpm build

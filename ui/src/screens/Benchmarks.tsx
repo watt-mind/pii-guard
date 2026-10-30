@@ -32,6 +32,7 @@ import {
   type SystemInfo,
 } from "../api/benchmarks";
 import { SOURCE } from "../hosted/session";
+import type { EvaluationParams } from "../lib/routes";
 import { Button, Notice, PageHeader, SegmentedControl, Select } from "../components/ui";
 import { LanguageBars, LeakLatencyChart, MarkerIcon, ProgressChart, TypeHeatmap } from "./BenchmarksCharts";
 
@@ -89,6 +90,14 @@ type RunsLoad = BenchmarkIndex["runs"] | null | { error: string };
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
+const datasetLabels: Record<string, string> = {
+  "gretel-finance": "Gretel",
+  "gretel-finance-corrected": "Gretel fixed",
+  "nemotron-pii": "Nemotron",
+  "mapa-eur-lex": "MAPA",
+  "pl-pii-bench": "PL PII",
+};
+
 const DOCS = `${SOURCE}/blob/develop/docs`;
 const MODEL_CARD = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
 
@@ -98,16 +107,22 @@ const MODEL_CARD = "https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base";
  * loads first; each fixture set's results load when the set is picked (LAB-1454), and the run
  * log arrives on its own without holding up the headline (LAB-1493).
  */
-export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader }) {
+export function Benchmarks({ load = benchmarkSource, initial, onParams }: { load?: BenchmarkLoader; initial?: EvaluationParams | null; onParams?: (params: EvaluationParams) => void }) {
   const source = useMemo(() => sourceOf(load), [load]);
   const [data, setData] = useState<Load>({ state: "loading" });
   const [runs, setRuns] = useState<RunsLoad>(null);
+  const [summaryAttempt, retrySummary] = useState(0);
+  const [runsAttempt, retryRuns] = useState(0);
   useEffect(() => {
     let live = true;
     source.summary().then(
       (index) => live && setData({ state: "ready", index: withoutTickets(tidyLabels(index)) }),
       (err: unknown) => live && setData({ state: "error", message: messageOf(err) }),
     );
+    return () => { live = false; };
+  }, [source, summaryAttempt]);
+  useEffect(() => {
+    let live = true;
     source.runs?.().then(
       (part) => live && setRuns(part.runs),
       (err: unknown) => live && setRuns({ error: messageOf(err) }),
@@ -115,12 +130,12 @@ export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader 
     return () => {
       live = false;
     };
-  }, [source]);
+  }, [source, runsAttempt]);
   // A source without `runs()` puts the run log in the summary.
   const runLog = source.runs ? runs : data.state === "ready" ? data.index.runs : null;
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen space-y-6">
       <PageHeader
         title="Evaluation"
         lead="How much personal data gets through. Every evaluation run of PII Guard, and of the open-source tools it is compared with, is recorded with its commit (and whether the working tree had uncommitted changes), models, fixtures and hardware. All test documents are fictional or come from public test sets."
@@ -145,10 +160,11 @@ export function Benchmarks({ load = benchmarkSource }: { load?: BenchmarkLoader 
       )}
       {data.state === "error" && (
         <Notice tone="danger" live title="The benchmark results could not be loaded.">
-          <p className="text-muted">{data.message}</p>
+          <p>Check your connection and try again.</p>
+          <Button size="sm" onClick={() => { setData({ state: "loading" }); retrySummary((n) => n + 1); }}>Retry benchmark results</Button>
         </Notice>
       )}
-      {data.state === "ready" && <Explorer summary={data.index} runLog={runLog} source={source} />}
+      {data.state === "ready" && <Explorer summary={data.index} runLog={runLog} source={source} retryRuns={() => { setRuns(null); retryRuns((n) => n + 1); }} initial={initial} onParams={onParams} />}
     </div>
   );
 }
@@ -159,7 +175,7 @@ const GROUPS: { id: SystemGroup; label: string; hint?: string }[] = [
   { id: "tool", label: "Open-source tools" },
 ];
 
-function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; runLog: RunsLoad; source: BenchmarkSource }) {
+function Explorer({ summary: base, runLog, source, retryRuns, initial, onParams }: { summary: BenchmarkIndex; runLog: RunsLoad; source: BenchmarkSource; retryRuns: () => void; initial?: EvaluationParams | null; onParams?: (params: EvaluationParams) => void }) {
   const runsReady = Array.isArray(runLog);
   const summary = useMemo(() => (Array.isArray(runLog) ? { ...base, runs: runLog } : base), [base, runLog]);
   const sets = useMemo(() => textSets(summary), [summary]);
@@ -186,6 +202,45 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
   const featured = useMemo(() => available.filter((k) => index.systems[k]?.featured), [available, index]);
   const [chosen, setChosen] = useState<string[] | null>(null); // null: the featured systems
   const [allSystems, setAllSystems] = useState(false);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const onSort = (c: (typeof COLUMNS)[number]) =>
+    setSort((prev) =>
+      prev.key === c.key ? { key: c.key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key: c.key, dir: c.better === "low" ? "asc" : "desc" },
+    );
+  // A shared link's filters (the URL hash) land once the sets are known, and again when
+  // the link changes under the open screen (Back/forward, LAB-1133). While another section
+  // is open `initial` is undefined and the kept state is left alone; a plain `#evaluation`
+  // link (`initial` null) resets to the defaults.
+  const initialKey = initial === undefined ? undefined : JSON.stringify(initial);
+  const [appliedKey, setAppliedKey] = useState<string | null>(null);
+  if (initialKey !== undefined && sets.length && initialKey !== appliedKey) {
+    const params = (JSON.parse(initialKey) ?? {}) as EvaluationParams;
+    const nextSet = params.set && sets.includes(params.set) ? params.set : (sets[0] ?? "");
+    const nextLangs = index.fixture_sets[nextSet]?.languages ?? [];
+    const nextLang = params.lang && (params.lang === "all" || nextLangs.includes(params.lang)) ? params.lang : "all";
+    const nextAvailable = systemsOn(index, nextSet);
+    const nextChosen = params.systems === undefined ? null : params.systems.filter((id) => nextAvailable.includes(id));
+    setAppliedKey(initialKey);
+    setSet(nextSet);
+    setLang(nextLang);
+    setChosen(nextChosen);
+    setSort(parseSort(params.sort));
+  }
+  // Every filter change rewrites the hash (replaced, not pushed), so the URL stays shareable.
+  const reported = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sets.length || !onParams) return;
+    const params: EvaluationParams = {
+      set,
+      lang,
+      ...(chosen !== null ? { systems: chosen } : {}),
+      sort: `${sort.key}:${sort.dir}`,
+    };
+    const key = JSON.stringify(params);
+    if (reported.current === key) return;
+    reported.current = key;
+    onParams(params);
+  }, [sets, set, lang, chosen, sort, onParams]);
   const selected = (chosen ?? (featured.length ? featured : available)).filter((k) => available.includes(k));
   const info = index.fixture_sets[set];
   const languages = info?.languages ?? [];
@@ -253,7 +308,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
 
   return (
     <>
-      {ready ? <Headline index={index} set={set} lang={lang} /> : <SetStatus set={set} part={part} />}
+      {ready ? <Headline index={index} set={set} lang={lang} /> : <SetStatus set={set} part={part} retry={() => setLoaded((m) => { const next = { ...m }; delete next[set]; return next; })} />}
 
       {/* Until the first set's results land, only the headline placeholder shows: nothing below it
           jumps when they arrive (layout shift, LAB-1493). */}
@@ -357,7 +412,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
       ) : (
         <>
           <Section id="bench-table" title="Results" note="Latest run of each system. Leak = labeled values still readable after masking. Underlined: the best value among systems run on every language.">
-            <ResultsTable snapshots={snapshots} index={index} lang={lang} />
+            <ResultsTable snapshots={snapshots} index={index} lang={lang} sort={sort} onSort={onSort} />
             <RunNotes key={set} snapshots={snapshots} index={index} open={info?.origin === "generated"} loading={!runsReady} />
           </Section>
           <Section id="bench-scatter" title="Leak rate vs latency" note="Down and left is better. Latency was measured where each system ran, so it is not a like-for-like speed test.">
@@ -409,7 +464,7 @@ function Explorer({ summary: base, runLog, source }: { summary: BenchmarkIndex; 
         {runsReady ? (
           <RunLog index={index} />
         ) : runLog && "error" in runLog ? (
-          <p role="alert" className="px-4 pb-3 text-sm text-danger sm:px-5">The run log could not be loaded: {runLog.error}</p>
+          <div className="px-4 pb-3 sm:px-5"><Notice tone="danger" live title="The run log could not be loaded."><p>Check your connection and try again.</p><Button size="sm" onClick={retryRuns}>Retry run log</Button></Notice></div>
         ) : (
           <p role="status" className="px-4 pb-3 text-sm text-muted sm:px-5">Loading the run log…</p>
         )}
@@ -453,11 +508,11 @@ function FastModeTag() {
 }
 
 /** In place of a set's results while they load, or when they could not be loaded. */
-function SetStatus({ set, part }: { set: string; part: SetLoad | undefined }) {
+function SetStatus({ set, part, retry }: { set: string; part: SetLoad | undefined; retry: () => void }) {
   if (part?.state === "error")
     return (
       <Notice tone="danger" live title={`The results for ${set} could not be loaded.`}>
-        <p className="text-muted">{part.message}</p>
+        <p>Check your connection and try again.</p><Button size="sm" onClick={retry}>Retry dataset results</Button>
       </Notice>
     );
   return (
@@ -530,10 +585,12 @@ function AcrossSets({ rows, summary, current, onPick }: { rows: AcrossRow[] | nu
                       <button
                         type="button"
                         onClick={() => onPick(set)}
+                        title={set}
+                        aria-label={`${datasetLabels[set] ?? set.replace(/-/g, " ")} (${set})`}
                         aria-current={on ? "true" : undefined}
-                        className="rounded text-left font-medium [overflow-wrap:anywhere] text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                        className="rounded text-left font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                       >
-                        {set}
+                        <span className="block max-w-28 truncate sm:max-w-none">{datasetLabels[set] ?? set.replace(/-/g, " ")}</span>
                       </button>
                     ) : (
                       <span className="block h-4 w-28 animate-pulse rounded bg-surface-2 motion-reduce:animate-none" />
@@ -676,13 +733,21 @@ const COLUMNS: { key: SortKey; label: string; better: "high" | "low" }[] = [
   { key: "detect_p50_ms", label: "Latency p50", better: "low" },
 ];
 
-function ResultsTable({ snapshots, index, lang }: { snapshots: Snapshot[]; index: BenchmarkIndex; lang: LanguageFilter }) {
+type SortState = { key: SortKey; dir: "asc" | "desc" };
+
+const DEFAULT_SORT: SortState = { key: "leak", dir: "asc" };
+
+/** A `sort` hash value (`key` or `key:dir`) as sort state, or the default (LAB-1133). */
+function parseSort(value: string | undefined): SortState {
+  const [key, dir] = value?.split(":") ?? [];
+  const column = COLUMNS.find((c) => c.key === key);
+  if (!column) return DEFAULT_SORT;
+  if (dir === "asc" || dir === "desc") return { key: column.key, dir };
+  return { key: column.key, dir: column.better === "low" ? "asc" : "desc" };
+}
+
+function ResultsTable({ snapshots, index, lang, sort, onSort }: { snapshots: Snapshot[]; index: BenchmarkIndex; lang: LanguageFilter; sort: SortState; onSort: (column: (typeof COLUMNS)[number]) => void }) {
   // Each column first sorts best-first (lowest leak, highest F1); clicking again reverses.
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "leak", dir: "asc" });
-  const onSort = (c: (typeof COLUMNS)[number]) =>
-    setSort((prev) =>
-      prev.key === c.key ? { key: c.key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key: c.key, dir: c.better === "low" ? "asc" : "desc" },
-    );
   const rows = snapshots
     .map((s) => ({ s, m: pick(s, lang) }))
     .sort((a, b) => {

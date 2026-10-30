@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import gc
 import re
+from collections.abc import Iterator
 
 import pytest
 
@@ -23,6 +24,23 @@ N_VALUES = 1000
 @pytest.fixture
 def detector() -> LlmDetector:
     return LlmDetector(api_key="test-key", base_url="https://llm.test/v1", settings=Settings())
+
+
+@pytest.fixture(autouse=True)
+def isolated_re_cache() -> Iterator[None]:
+    """LAB-1406: these tests assert on the global ``re`` cache, so run hermetic.
+
+    A full-suite worker compiles patterns in earlier modules; the starting fill of
+    ``re._cache`` then decides which of this file's value-embedding patterns survive its
+    whole-cache evictions, so the live-pattern scan below saw other runs' leftovers.
+    Snapshot the cache, start empty, and restore it afterwards."""
+    saved = dict(re._cache)
+    re._cache.clear()
+    try:
+        yield
+    finally:
+        re._cache.clear()
+        re._cache.update(saved)
 
 
 def _name(i: int) -> str:

@@ -1,7 +1,8 @@
 """Detection cache: history messages are detected once per conversation.
 
-Key: (session id, keyed digest of language + detector config + message text). Value: span
-offsets, types, scores and detector names -- **never the text or the values**; spans are
+Key: (session id, keyed digest of session incarnation + language + detector config + message
+text). Value: span offsets, types, scores, detector names and ``forced_by`` -- **never the
+text or the values**; spans are
 rebuilt from the message text on a hit. The digest is an HMAC under a random per-process key,
 so the cache doesn't even hold a plain hash of a short value. Bounded (LRU) with a sliding TTL
 equal to the vault session TTL, so an entry never outlives its conversation's mapping by much.
@@ -23,7 +24,7 @@ from pii_guard.vault import DEFAULT_TTL_SECONDS
 __all__ = ["CacheKey", "DetectionCache"]
 
 CacheKey = tuple[str, bytes]
-_Stored = tuple[tuple[int, int, EntityType, float, str], ...]
+_Stored = tuple[tuple[int, int, EntityType, float, str, str | None], ...]
 
 
 class DetectionCache:
@@ -47,9 +48,15 @@ class DetectionCache:
     def __repr__(self) -> str:
         return f"DetectionCache(entries={len(self._data)}, max_entries={self.max_entries})"
 
-    def key(self, session_id: str, language: str, config_id: str, text: str) -> CacheKey:
+    def key(
+        self, session_id: str, language: str, config_id: str, text: str, incarnation: str = ""
+    ) -> CacheKey:
+        """``incarnation``: the session object's :attr:`~pii_guard.vault.VaultSession.incarnation`
+        (LAB-1580). A re-created session id never hits the entries of its previous
+        incarnation, however many gateways share this cache (hosted/project runtimes build
+        one per request); those entries age out of the LRU."""
         mac = hmac.new(self._secret, digestmod=hashlib.sha256)
-        for part in (language, config_id, text):
+        for part in (incarnation, language, config_id, text):
             mac.update(part.encode("utf-8", "surrogatepass"))
             mac.update(b"\x1f")
         return session_id, mac.digest()
@@ -68,16 +75,28 @@ class DetectionCache:
             self._data[key] = (now + self._ttl, stored)
             self._data.move_to_end(key)
         spans: list[Span] = []
-        for start, end, entity_type, score, detector in stored:
+        for start, end, entity_type, score, detector, forced_by in stored:
             if end > len(text):
                 return None
-            spans.append(Span(start, end, entity_type, text[start:end], score, detector))
+            spans.append(
+                Span(
+                    start,
+                    end,
+                    entity_type,
+                    text[start:end],
+                    score,
+                    detector,
+                    forced_by=forced_by,
+                )
+            )
         return spans
 
     def put(self, key: CacheKey, spans: Sequence[Span]) -> None:
         if self.max_entries <= 0:
             return
-        stored: _Stored = tuple((s.start, s.end, s.entity_type, s.score, s.detector) for s in spans)
+        stored: _Stored = tuple(
+            (s.start, s.end, s.entity_type, s.score, s.detector, s.forced_by) for s in spans
+        )
         with self._lock:
             self._data[key] = (self._clock() + self._ttl, stored)
             self._data.move_to_end(key)

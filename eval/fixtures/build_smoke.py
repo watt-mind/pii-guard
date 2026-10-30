@@ -5,8 +5,10 @@ Polish pack's, LAB-1400).
 
 Every person, address, number and organisation below is **fictional** (ADR 0005). Names use
 placeholder-style Hungarian and English surnames; e-mail domains are the reserved
-``example.com`` / ``example.org`` / ``example.net``; English phone numbers come from ranges set
-aside for drama and fiction. Checksummed identifiers are computed from made-up payloads with
+``example.com`` / ``example.org`` / ``example.net``; English and German phone numbers come from
+ranges set aside for drama and fiction (German: the Bundesnetzagentur drama numbers), and
+Hungarian and Polish ones use a real area code with an ascending-run or ``555 01xx``
+subscriber number (ADR 0005). Checksummed identifiers are computed from made-up payloads with
 :mod:`pii_guard.detect.checksums`, so they are valid in form but issued to nobody.
 
 Labels are written inline as ``{{TYPE|value}}`` (see :func:`pii_guard.eval.from_markup`), so
@@ -296,7 +298,7 @@ def hu_documents() -> list[Document]:
             f"Tisztelt {P('Kovács Teszt Ödön')}!\n\nAz útlevél ({IDD('BA1234567')}) megérkezett. "
             f"Átvehető a {A('3300 Eger, Próba köz 1.')} szám alatti irodánkban, vagy "
             f"{P('Kovács Teszt Ödön')}nel egyeztetett időpontban kiszállítjuk. Telefon: "
-            f"{PH('06-20-987-6543')}.",
+            f"{PH('06-20-555-0187')}.",
             {"kind": "email"},
         ),
         (
@@ -352,7 +354,7 @@ def hu_documents() -> list[Document]:
         ),
         (
             "hu-chat-0019",
-            f"{P('Virág')}, felhívnád {P('Fekete')} urat? a szama {PH('+36 30 765 4321')}, "
+            f"{P('Virág')}, felhívnád {P('Fekete')} urat? a szama {PH('+36 30 345 6789')}, "
             f"az email cime {E('fekete.u@example.com')}",
             {"kind": "chat", "tags": ["common-word-names"]},
         ),
@@ -412,7 +414,7 @@ def hu_documents() -> list[Document]:
         (
             "hu-email-0028",
             f"Tárgy: hiányzó adatok\n\nKedves {P('Szabó Molnár Kata')}!\n\nA nyilvántartásunkban "
-            f"a következő szerepel: {E('kata.sz.m@example.org')}, {PH('+36 20 111 2233')}, "
+            f"a következő szerepel: {E('kata.sz.m@example.org')}, {PH('+36 20 555 0161')}, "
             f"{A('4025 Debrecen, Mintás tér 6.')}. Kérjük, jelezze, ha változott.",
             {"kind": "email"},
         ),
@@ -563,7 +565,7 @@ def de_documents() -> list[Document]:
         (
             "de-email-0001",
             f"Betreff: Kaution\n\nHallo {P('Erika Beispiel')},\n\ndie Kaution überweisen "
-            f"wir auf {BANK(iban_de_1)}. Rückfragen gern unter {PH('+49 30 901820')} oder an "
+            f"wir auf {BANK(iban_de_1)}. Rückfragen gern unter {PH('+49 30 23125042')} oder an "
             f"{E('erika.beispiel@example.com')}.\n\nViele Grüße\n{P('Jonas Muster')}",
             {"kind": "email"},
         ),
@@ -580,13 +582,13 @@ def de_documents() -> list[Document]:
             "de-letter-0003",
             f"{P('Lena Testmann')}\n{A('Am Beispielweg 3a\n50667 Köln')}\n\n"
             f"Sehr geehrte Frau {P('Testmann')},\n\nbitte rufen Sie uns unter "
-            f"{PH('(0221) 4567890')} an. Ihre Rentenversicherungsnummer {IDD(sv_2)} liegt "
+            f"{PH('(0221) 4710123')} an. Ihre Rentenversicherungsnummer {IDD(sv_2)} liegt "
             f"uns vor.\n\nMit freundlichen Grüßen\n{ORG('Musterkasse Rheinland')}",
             {"kind": "letter"},
         ),
         (
             "de-chat-0004",
-            f"hi, hier ist {P('Tim Fiktiv')}! meine neue nummer ist {PH('0171 2345678')}, "
+            f"hi, hier ist {P('Tim Fiktiv')}! meine neue nummer ist {PH('0171 3920042')}, "
             f"mail an {E('tim.fiktiv@example.net')} geht auch",
             {"kind": "chat", "tags": ["informal"]},
         ),
@@ -602,7 +604,7 @@ def de_documents() -> list[Document]:
             "Antrag auf Erstattung\n"
             f"Name: {P('Paula Beispielfrau')}\nGeburtsdatum: {DOB('02.07.1979')}\n"
             f"Anschrift: {A('Hauptstraße 101, 80331 München')}\n"
-            f"Identifikationsnummer: {IDD(st_2)}\nTelefon: {PH('089 1234567')}",
+            f"Identifikationsnummer: {IDD(st_2)}\nTelefon: {PH('089 99998123')}",
             {"kind": "form"},
         ),
         (
@@ -617,7 +619,7 @@ def de_documents() -> list[Document]:
             "de-insurance-0008",
             f"Versicherte Person: {P('Greta Fiktiva')}, geb. {DOB('28.01.1972')}\n"
             f"Versicherungsnummer {IDD(sv_3)}\n"
-            f"Rückruf erbeten an {E('g.fiktiva@example.org')} oder {PH('+49 40 123456789')}.",
+            f"Rückruf erbeten an {E('g.fiktiva@example.org')} oder {PH('+49 40 66969123')}.",
             {"kind": "form"},
         ),
         (
@@ -697,7 +699,7 @@ def pl_documents() -> list[Document]:
             "pl-email-0001",
             f"Temat: Kaucja\n\nDzień dobry Pani {P('Anna Przykładowa')},\n\nkaucję przelejemy "
             f"na rachunek {BANK(iban_pl_1)}. W razie pytań proszę dzwonić pod "
-            f"{PH('+48 555 010 203')} albo pisać na {E('anna.przykladowa@example.com')}.\n\n"
+            f"{PH('+48 22 555 01 03')} albo pisać na {E('anna.przykladowa@example.com')}.\n\n"
             f"Z poważaniem\n{P('Jan Testowy')}",
             {"kind": "email"},
         ),
@@ -725,13 +727,13 @@ def pl_documents() -> list[Document]:
             "pl-letter-0004",
             f"{P('Katarzyna Wzorcowa')}\n{A('os. Kwiatowe 3 m. 14\n61-001 Poznań')}\n\n"
             f"Szanowna Pani,\n\ninformujemy, że paszport nr {IDD(paszport_1)} jest gotowy do "
-            f"odbioru. Prosimy o kontakt pod numerem {PH('(61) 555 12 34')}.\n\n"
+            f"odbioru. Prosimy o kontakt pod numerem {PH('(61) 555 01 34')}.\n\n"
             f"Z wyrazami szacunku\n{ORG('Urząd Fikcyjny w Poznaniu')}",
             {"kind": "letter"},
         ),
         (
             "pl-chat-0005",
-            f"hej, tu {P('Ola Fikcyjna')}! mój nowy numer to {PH('555 123 456')}, "
+            f"hej, tu {P('Ola Fikcyjna')}! mój nowy numer to {PH('512 345 678')}, "
             f"możesz też pisać na {E('ola.fikcyjna@example.net')}",
             {"kind": "chat", "tags": ["informal"]},
         ),

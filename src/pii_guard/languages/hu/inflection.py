@@ -112,6 +112,55 @@ def _hu_old_digraph(value: str) -> str | None:
     return None
 
 
+# Case endings by vowel harmony: (back, front unrounded, front rounded). Used to re-inflect a
+# suffix whose harmony disagrees with the lemma (a model's slip, or context generalization
+# writing every suffix in its back form, LAB-1152): Teszt Elek + nak -> Teszt Eleknek.
+_HU_HARMONY: dict[str, tuple[str, str, str]] = {
+    form: group
+    for group in (
+        ("nak", "nek", "nek"), ("ban", "ben", "ben"), ("ba", "be", "be"),
+        ("ból", "ből", "ből"), ("hoz", "hez", "höz"), ("nál", "nél", "nél"),
+        ("tól", "től", "től"), ("ra", "re", "re"), ("ról", "ről", "ről"),
+        ("val", "vel", "vel"), ("vá", "vé", "vé"), ("on", "en", "ön"), ("ot", "et", "öt"),
+    )
+    for form in group
+}  # fmt: skip
+_HU_BACK_VOWELS = frozenset("aáoóuú")
+_HU_ROUNDED_VOWELS = frozenset("öőüű")
+
+
+def _hu_harmony_class(lemma: str) -> int | None:
+    """0 back, 1 front unrounded, 2 front rounded, ``None`` when unsure.
+
+    ``i``/``í`` are neutral: the vowel before them decides (``Emil`` -> front, ``Márti`` and
+    ``Dávid`` -> back, LAB-1597).
+    """
+    word = lemma.split()[-1].casefold() if lemma.split() else ""
+    if word.endswith("né") and len(word) > 2:
+        word = word[:-2]  # married name: the base decides (Kovácsnénak, Péternének)
+    vowels = [c for c in word if c in _HU_VOWELS]
+    if not vowels:
+        return None
+    for v in reversed(vowels):
+        if v in _HU_BACK_VOWELS:
+            return 0
+        if v in _HU_ROUNDED_VOWELS:
+            return 2
+        if v in "eé":
+            return 1
+    return 1  # only i/í: front (Kitti -> Kittinek)
+
+
+def _reharmonize(lemma: str, suffix: str) -> str:
+    """``suffix`` in the vowel harmony of ``lemma`` (case endings only; others unchanged)."""
+    group = _HU_HARMONY.get(suffix.casefold())
+    harmony = _hu_harmony_class(lemma) if group else None
+    if group is None or harmony is None:
+        return suffix
+    form = group[harmony]
+    return form.upper() if suffix.isupper() else form
+
+
 def _is_consonant(char: str) -> bool:
     return char.isalpha() and char.casefold() not in _HU_VOWELS and char.casefold() != "y"
 
@@ -344,7 +393,8 @@ class HungarianSuffixMatcher:
         ``Próba Zsuzsanna`` + ``nak`` -> ``Próba Zsuzsannának`` (also when the model already
         wrote the long vowel: ``ának``); ``Kovács`` + ``al`` or ``val`` -> ``Kováccsal``;
         ``Kiss Tóth`` + ``val`` -> ``Kiss Tóthtal``; ``Elek`` + ``vel`` -> ``Elekkel``. Anything
-        else is ``lemma + suffix``.
+        else is ``lemma + suffix``. A case ending in the wrong vowel harmony is re-inflected
+        first (``Teszt Elek`` + ``nak`` -> ``Teszt Eleknek``, LAB-1152).
 
         Known limitation: a value the detector only saw inflected (``Teszt Zoltánt``) has no
         confirmed lemma, so a suffix the model adds is appended to the whole word. Choosing
@@ -353,9 +403,10 @@ class HungarianSuffixMatcher:
         if not suffix or suffix.startswith("-") or not lemma or not lemma[-1].isalpha():
             return lemma + suffix
         # Stem changes belong to names, as in variant_stems/splits: an e-mail address or an
-        # ID keeps its spelling (anna@firma.de + re -> anna@firma.dere, not ...dére).
+        # ID keeps its spelling (anna@example.de + re -> anna@example.dere, not ...dére).
         if entity_type not in _STEM_CHANGE_TYPES or not _word_like(lemma):
             return lemma + suffix
+        suffix = _reharmonize(lemma, suffix)
         folded = suffix.casefold()
         long_vowel = _HU_LONG.get(lemma[-1])
         wrote_long = long_vowel is not None and suffix[0].casefold() == long_vowel.casefold()

@@ -9,6 +9,12 @@ import type { ServerStatusState } from "../hooks/useServerStatus";
 import { ENTITY_META, metaFor, type Policy as EntityPolicy } from "../lib/entities";
 import { detectorName } from "../lib/traffic";
 
+/** Language codes in words (LAB-1626). */
+const LANGUAGE_NAME: Record<string, string> = { hu: "Hungarian", en: "English", de: "German" };
+
+/** Hosted builds run detection on the PII Guard server, not on the owner's device (LAB-1626). */
+const HOSTED_BUILD = import.meta.env.VITE_PII_GUARD_HOSTED === "true";
+
 export interface PolicyProps {
   status: ServerStatusState;
 }
@@ -86,7 +92,7 @@ export function Policy({ status }: PolicyProps) {
                 {
                   label: "Images",
                   value: server.images.available ? (
-                    <>On · faces {server.images.sam ? "by SAM 3.1 and the on-device detector" : "by the on-device detector"}, text by OCR</>
+                    <>On · faces {server.images.sam ? `by SAM 3.1 and the ${HOSTED_BUILD ? "server-side" : "on-device"} detector` : `by the ${HOSTED_BUILD ? "server-side" : "on-device"} detector`}, text by OCR</>
                   ) : (
                     <span className="text-muted">Refused (fail closed): {imageGaps(server)}</span>
                   ),
@@ -144,6 +150,7 @@ export interface OwnerPolicyProps {
 
 type OwnerState =
   | { state: "loading" }
+  | { state: "empty" }
   | { state: "error"; message: string }
   | { state: "ok"; project: Project; policy: PolicyVersion | null };
 
@@ -167,12 +174,12 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
       const list = await call<ProjectList>("/v1/projects");
       if (!Array.isArray(list.projects)) throw new Error("Invalid projects");
       const project = list.projects.find((p) => p.id === projectId) ?? list.projects.find((p) => p.id === list.default_project_id) ?? list.projects[0];
-      if (!project) throw new Error("No project");
+      if (!project) return null;
       const data = await call<{ policies: PolicyVersion[] }>(`${projectPath(project.id)}/policies`);
       if (!Array.isArray(data.policies)) throw new Error("Invalid policies");
       return { project, policy: defaultPolicyOf(project, data.policies) };
     })().then(
-      (ok) => active && setState({ state: "ok", ...ok }),
+      (ok) => active && setState(ok ? { state: "ok", ...ok } : { state: "empty" }),
       (e: unknown) => active && setState({ state: "error", message: recovery(e) }),
     );
     return () => {
@@ -188,6 +195,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
         lead="What happens to each kind of personal data in your project. Policies belong to projects and are versioned: each endpoint applies the version it is pinned to. Read-only here; create policies and new versions under Projects."
       />
 
+      {state.state === "empty" && <Notice live action={<ButtonLink href="#projects">Create a project</ButtonLink>}>No projects yet. Create a project to configure its policies.</Notice>}
       {state.state === "loading" && <Notice live>Loading your project's policy…</Notice>}
       {state.state === "error" && (
         <Notice
@@ -226,7 +234,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
                 },
                 { label: "Detection mode", value: <span className="capitalize">{policy.mode}</span> },
                 { label: "Image detection", value: VISUAL_DETECTION_LABEL[policy.visual_detection ?? "local"] },
-                { label: "Language", value: mono(policy.language) },
+                { label: "Language", value: LANGUAGE_NAME[policy.language] ?? mono(policy.language) },
               ]}
             />
           </Card>
@@ -275,7 +283,7 @@ function PolicyTable({ title, types, policies }: { title: string; types: readonl
               </th>
               <td className="py-1.5 text-right">
                 <span className={["inline-block rounded-md px-1.5 py-px text-xs font-medium ring-1 ring-inset", POLICY_CLASS[policy]].join(" ")}>{POLICY_TEXT[policy]}</span>
-                {changed && <span className="ml-1.5 text-2xs text-muted">changed</span>}
+                {changed && <span className="ml-1.5 text-2xs text-muted">changed from default</span>}
               </td>
             </tr>
           );

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from pii_guard.eval.datasets import (
     cee,
+    cee_dev,
     corrections,
     gretel,
     mapa,
@@ -47,6 +48,7 @@ REGISTRY: dict[str, Dataset] = {
         mapa.DATASET,
         synthetic.DATASET,
         synthetic.DEV_DATASET,
+        cee_dev.DATASET,
     )
 }
 

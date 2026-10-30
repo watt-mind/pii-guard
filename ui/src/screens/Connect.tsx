@@ -25,23 +25,26 @@ export interface ConnectProps {
   accounts?: ReactNode;
   /** Hosted: the owner's endpoint picker, which renders the client blocks for the picked endpoint. */
   clientSetup?: (quickstart: (load: SnippetsLoader) => ReactNode) => ReactNode;
+  /** A `#connect/<client>` deep link names this client tab first (LAB-1314). */
+  initialClient?: string | null;
 }
 
-export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts, clientSetup }: ConnectProps) {
+export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts, clientSetup, initialClient = null }: ConnectProps) {
   const server = status.state === "ok" ? status.status : null;
   const gateway = server?.gateway.url ?? DEFAULT_GATEWAY_URL;
 
   return (
     <div className="space-y-6">
+      {/* Hosted, the client setup below has its own lead: one, not two saying the same (LAB-1626). */}
       <PageHeader
         title="Connect"
-        lead="Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back restored."
+        lead={clientSetup ? undefined : "Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back restored."}
       />
 
       {clientSetup ? (
         <>
           {clientSetup((load) => (
-            <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={load} />
+            <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={load} initialTool={initialClient} />
           ))}
           {/* The Playground's own provider keys: optional, folded so the first run asks for one key only (LAB-1455). */}
           {accounts && (
@@ -50,7 +53,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
                 <span aria-hidden="true" className="mr-2 inline-block text-muted transition-transform group-open:rotate-90">
                   ›
                 </span>
-                Optional: model provider keys for the Playground
+                Optional: provider keys for the Playground
               </summary>
               <div className="border-t border-line p-4 sm:p-5">{accounts}</div>
             </details>
@@ -62,7 +65,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
 
       {clientSetup ? null : serverSnippets ? (
         <>
-          <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} />
+          <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} initialTool={initialClient} />
 
           {gatewayLine && <GatewayLine status={status} server={server} gateway={gateway} />}
         </>

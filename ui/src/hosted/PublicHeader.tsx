@@ -4,7 +4,7 @@ import { useTheme } from "../hooks/useTheme";
 import { SOURCE } from "./session";
 import "./publicNavigation.css";
 
-const PRIMARY = [{ href: "#demo", label: "Demo" }, { href: "#how", label: "How it works" }, { href: "#results", label: "Benchmarks" }];
+const PRIMARY = [{ href: "#demo", label: "Demo" }, { href: "#how", label: "How it works" }, { href: "#results", label: "Benchmarks" }, { href: "#api", label: "API" }];
 const RESOURCES = [
   { href: "#technical", label: "Technical overview" },
   { href: "#images", label: "Image masking" },

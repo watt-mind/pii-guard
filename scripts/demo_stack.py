@@ -118,6 +118,11 @@ def plan(
         env["PII_GUARD_TENANT_KEY"] = secrets.token_hex(32)  # this run only
     if force_mock:
         p.upstream = "mock"
+        # Offline by contract (LAB-1255): the smoke API must not see a SAM key, whether it
+        # comes from the environment or the repo .env (Settings would otherwise configure
+        # SAM and flip hu-image from refused to masked). Empty counts as unset.
+        env["PII_GUARD_SAM_API_KEY"] = ""
+        env["META_API_KEY"] = ""
     elif setting("PII_GUARD_UPSTREAM_BASE_URL", env_file):
         p.upstream = "configured"
     elif setting("BASETEN_API_KEY", env_file):
@@ -125,6 +130,9 @@ def plan(
     if p.upstream == "mock":
         env["PII_GUARD_UPSTREAM_BASE_URL"] = p.mock_url + "/v1"
         env["PII_GUARD_UPSTREAM_API_KEY"] = ""
+        # The API runs as plain `serve` (no up_status): mark the upstream as the mock so
+        # /v1/status and Connect report it as the mock (LAB-1311).
+        env["PII_GUARD_UPSTREAM_MOCK"] = "true"
     elif p.upstream == "baseten":
         env["PII_GUARD_UPSTREAM_BASE_URL"] = BASETEN_URL
         env["PII_GUARD_UPSTREAM_API_KEY"] = setting("BASETEN_API_KEY", env_file)

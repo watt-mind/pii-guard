@@ -53,7 +53,9 @@ def test_hu_smoke_covers_every_text_entity_type() -> None:
     assert 25 <= len(docs) <= 40
     assert {d.language for d in docs} == {"hu"}
     # SECRET (API keys, passwords) is not Hungarian prose: eval/fixtures/secrets covers it.
-    expected = set(TEXT_ENTITY_TYPES) - {EntityType.SECRET}
+    # PAYMENT_CARD (LAB-1102) is newer than this gate fixture, which has no card number; the
+    # card rule's own tests cover it, and adding a document would move the gate baseline.
+    expected = set(TEXT_ENTITY_TYPES) - {EntityType.SECRET, EntityType.PAYMENT_CARD}
     assert {s.entity_type for d in docs for s in d.spans} == expected
     negatives = [d for d in docs if "hard-negative" in d.meta.get("tags", [])]
     assert len(negatives) >= 3
@@ -175,3 +177,26 @@ def test_scorecard_api_for_other_tools() -> None:
     text = render_markdown(card)
     assert "`abc123`" in text
     assert "## Per entity type: `en`" in text
+
+
+def test_record_to_custom_runs_dir_leaves_benchmarks_untouched(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LAB-1368: --record --runs-dir DIR must not rewrite docs/benchmarks.md."""
+    import hashlib
+
+    from pii_guard.eval.cli import _record
+
+    monkeypatch.chdir(REPO_ROOT)
+    before = (REPO_ROOT / "docs" / "benchmarks.md").read_bytes()
+    digest_before = hashlib.sha256(before).hexdigest()
+    card = build_scorecard(
+        run_documents(load_fixtures([HU]), DetectorAnalyzer(["rules"])),
+        detectors=["rules"],
+        fixture_paths=[HU],
+    )
+    runs_dir = tmp_path / "runs"
+    assert _record(card, "probe-custom-dir", None, runs_dir) == 0
+    assert list(runs_dir.glob("*.json")), "the probe record lands in the custom dir"
+    after = (REPO_ROOT / "docs" / "benchmarks.md").read_bytes()
+    assert hashlib.sha256(after).hexdigest() == digest_before

@@ -35,6 +35,9 @@ describe("the Evaluation page while signed out (LAB-1533)", () => {
     // Sign-in comes back to Evaluation.
     const nav = screen.getByRole("navigation", { name: "Main navigation" }).closest("header")!;
     expect(within(nav).getByRole("link", { name: "Sign in to console" })).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23evaluation");
+    // The wide nav and the phone menu both list it.
+    for (const link of within(nav).getAllByRole("link", { name: "API" })) expect(link).toHaveAttribute("href", "#api");
+    expect(screen.getByRole("link", { name: "API reference" })).toHaveAttribute("href", "#api");
     // Only the account check goes to the API; the benchmarks are static bundled files.
     await vi.waitFor(() => expect(fetched.length).toBeGreaterThan(0));
     expect((call as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual(["/v1/account"]);

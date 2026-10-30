@@ -401,6 +401,31 @@ class HostedService:
         from pii_guard.projects.runtime import policy_pipeline
 
         runtime = request.state.hosted_runtime
+        # Inline images admitted for this request (LAB-1439); none keeps the gateway text-only.
+        images = getattr(request.state, "hosted_chat_images", 0)
+        image_kwargs: dict[str, Any] = {}
+        if images:
+            from pii_guard.hosted.images import (
+                hosted_image_limits,
+                hosted_visual_policies,
+                local_ocr,
+                local_segmenter,
+                require_local_visual_policies,
+            )
+
+            # The owner's policy, text and visual, with the operator's stricter overrides,
+            # exactly as /v1/mask/image; a policy only SAM could serve is refused first.
+            policy = getattr(request.state, "project_policy", None)
+            request.state.project_policies = hosted_visual_policies(
+                policy, get_policies(request), self.settings, request.app.state.policies
+            )
+            require_local_visual_policies(request.state.project_policies, policy)
+            max_pixels, image_timeout = hosted_image_limits(self.settings)
+            image_kwargs = {
+                "sam": local_segmenter(request.app.state),
+                "ocr": local_ocr(request.app.state),
+                "image_workers": self.image_workers,
+            }
         analyzer = get_analyzer(request)
         # RegistryAnalyzer's pipeline is shared across all owners and REST/gateway requests.
         detectors = getattr(request.app.state, "gateway_detectors", None)
@@ -438,6 +463,11 @@ class HostedService:
                 for mode, item in detectors.items()
             }
         provider = self.provider_settings(request)
+        if images:
+            # Hosted pixel cap, OCR required: an image the text check can't read is refused.
+            provider = provider.model_copy(
+                update={"image_max_pixels": max_pixels, "image_require_ocr": True}
+            )
         # The owner's traffic log, scrubbing the provider key this request may send (the
         # sponsored key or the selected connection's), as the local and project gateways do.
         credential = provider.upstream_api_key
@@ -452,7 +482,9 @@ class HostedService:
             vault=runtime.vault,
             config=GatewayConfig(
                 mode=Mode.FAST,
-                max_images=0,
+                max_images=self.settings.hosted_chat_max_images if images else 0,
+                max_image_bytes=self.settings.hosted_max_image_bytes,
+                image_timeout=image_timeout if images else self.settings.hosted_image_timeout,
                 upstream_timeout=120,
                 cache_size=256,
                 concurrency=4,
@@ -461,6 +493,7 @@ class HostedService:
             cache=runtime.cache,
             transport=SecureTransport(),
             observability=observability,
+            **image_kwargs,
         )
         if getattr(request.state, "hosted_connection", None) is None:
             # Sponsored (operator-key) route only; a selected own connection gets neither.

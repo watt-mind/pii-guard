@@ -120,8 +120,9 @@ def test_sse_restorer_flushes_tool_calls_on_finish_into_a_new_entry() -> None:
             out.append(json.loads(payload)["choices"][0]["delta"]["tool_calls"][0])
     final = restorer.process(json.dumps({"choices": [{"index": 0, "finish_reason": "stop"}]}))
     calls = json.loads(final[0])["choices"][0]["delta"]["tool_calls"]
-    assert calls == [{"index": 2, "function": {"arguments": "[["}}]
-    joined = "".join(c["function"]["arguments"] for c in out) + "[["
+    # The quote before a possible placeholder is held too: it may open a number (LAB-1361).
+    assert calls == [{"index": 2, "function": {"arguments": '"[['}}]
+    joined = "".join(c["function"]["arguments"] for c in out) + '"[['
     assert joined == '{"a": "Teszt Elek", "b": "[['
 
 
@@ -409,7 +410,7 @@ def test_json_key_collision_does_not_replace_object(nested: bool, serialized: bo
     "field", ["content", "refusal", "reasoning_content", "reasoning", "text_part", "refusal_part"]
 )
 def test_chat_gutters_preserve_offsets_and_mask_whole_names(role: str, field: str) -> None:
-    original = "Header\n12|Jane Placeholder\n \t3|Jane Placeholder\nplain\n"
+    original = "Header\n12|Jane Placeholder\n \t13|Jane Placeholder\nplain\n"
     message = {"role": role, "content": None}
     if field.endswith("_part"):
         kind = field.removesuffix("_part")
@@ -422,7 +423,7 @@ def test_chat_gutters_preserve_offsets_and_mask_whole_names(role: str, field: st
         holder[key] = original
     body = {"model": "m", "messages": [message]}
     slot = next(s for s in collect_texts(body).slots if "Jane Placeholder" in s.text)
-    assert slot.text == "Header\n   Jane Placeholder\n    Jane Placeholder\nplain\n"
+    assert slot.text == "Header\n   Jane Placeholder\n     Jane Placeholder\nplain\n"
     assert len(slot.text) == len(original)
     session, _ = make_session()
     spans = [
@@ -433,7 +434,7 @@ def test_chat_gutters_preserve_offsets_and_mask_whole_names(role: str, field: st
     masked = session.mask(slot.text, spans)
     slot.write(masked)
     placeholder = masked.split("\n")[1].strip()
-    assert holder[key] == f"Header\n12|{placeholder}\n \t3|{placeholder}\nplain\n"
+    assert holder[key] == f"Header\n12|{placeholder}\n \t13|{placeholder}\nplain\n"
     assert "Jane" not in holder[key] and "Placeholder" not in holder[key]
 
 
@@ -450,3 +451,73 @@ def test_chat_gutter_multiline_mask_never_restores_original_text() -> None:
     assert message["content"].endswith("\n   safe")
     assert "|" not in message["content"]
     assert "Jane" not in message["content"] and "Placeholder" not in message["content"]
+
+
+def test_cache_hit_preserves_forced_by_and_masked_type() -> None:
+    """LAB-1248: the span cache stores ``forced_by`` (the fail-closed override), and a hit
+    restores both it and the masked type. Types only: the cache still holds no values."""
+    cache = DetectionCache(2)
+    text = "Teszt Elek írt a Kft.-ről"
+    span = Span(0, 10, EntityType.PERSON, "Teszt Elek", 0.9, "llm", forced_by="llm")
+    key = cache.key("s1", "hu", "audit", text)
+    cache.put(key, [span])
+    assert "Teszt" not in repr(cache._data)
+    (hit,) = cache.get(key, text) or []
+    assert hit.entity_type is EntityType.PERSON
+    assert hit.forced_by == "llm"
+    assert hit == span
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1234567|Teszt Elek|Budapest",  # one pipe-delimited table row with an id
+        "id|name\n1234567|Teszt Elek\n7654321|Jane Placeholder",  # ids, not line numbers
+        "3|Teszt Elek\n1|Jane Placeholder",  # decreasing
+        "4|Teszt Elek\nplain\n5|Jane Placeholder",  # not adjacent
+    ],
+)
+def test_lone_or_unnumbered_pipe_rows_stay_visible_to_detection(text: str) -> None:
+    """LAB-1583: only runs of line numbers are gutters; ids stay visible and re-checked."""
+    message = {"role": "user", "content": text}
+    slots = collect_texts({"model": "m", "messages": [message]}).slots
+    [slot] = [s for s in slots if s.kind == "content"]
+    assert slot.text == text
+    slot.write(text.replace("Teszt Elek", "[[PERSON_aaaa]]"))
+    assert message["content"] == text.replace("Teszt Elek", "[[PERSON_aaaa]]")
+
+
+def test_gutter_runs_need_consecutive_numbers() -> None:
+    message = {"role": "tool", "content": "Header\n5|a\n6|b\n99|c\n 7|d"}
+    slots = collect_texts({"model": "m", "messages": [message]}).slots
+    [slot] = [s for s in slots if s.kind == "content"]
+    assert slot.text == "Header\n  a\n  b\n99|c\n 7|d"
+
+
+def test_responses_instructions_and_reasoning_get_gutters() -> None:
+    """LAB-1583: Responses instructions and reasoning parts, as chat system and reasoning."""
+    from pii_guard.gateway.responses_request import collect_response_texts
+
+    numbered = "Quoted:\n11|Dear team,\n12|Jane Placeholder"
+    reasoning = {
+        "type": "reasoning",
+        "summary": [{"type": "summary_text", "text": numbered}],
+        "content": [{"type": "reasoning_text", "text": numbered}],
+    }
+    body = {
+        "model": "m",
+        "instructions": numbered,
+        "input": [reasoning, {"role": "user", "content": "1234567|Teszt Elek"}],
+    }
+    slots = collect_response_texts(body).slots
+    gutter_slots = [s for s in slots if s.kind in ("instructions", "reasoning")]
+    assert len(gutter_slots) == 3
+    for slot in gutter_slots:
+        assert slot.text == "Quoted:\n   Dear team,\n   Jane Placeholder"
+        slot.write(slot.text.replace("Jane Placeholder", "[[PERSON_abcd12]]"))
+    expected = "Quoted:\n11|Dear team,\n12|[[PERSON_abcd12]]"
+    assert body["instructions"] == expected
+    assert reasoning["summary"][0]["text"] == expected
+    assert reasoning["content"][0]["text"] == expected
+    [user] = [s for s in slots if s.kind == "content"]
+    assert user.text == "1234567|Teszt Elek"

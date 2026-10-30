@@ -111,6 +111,18 @@ describe("console shell", () => {
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
     await waitFor(() => expect(container.querySelector('img[src^="/samples/"]')).not.toBeNull());
+    const image = container.querySelector('img[src^="/samples/"]');
+    act(() => {
+      history.replaceState(null, "", "#overview");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(image).not.toBeVisible();
+    act(() => {
+      history.replaceState(null, "", "#playground/images");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(container.querySelector('img[src^="/samples/"]')).toBe(image);
+    await waitFor(() => expect(image).toBeVisible());
   });
 
   it("switches sections on a hash change, also away from Images (LAB-1294)", async () => {
@@ -213,7 +225,7 @@ describe("Overview", () => {
     expect(value("Values masked")).toBe(String(EVENTS.reduce((n, e) => n + totalMasked(e), 0)));
     expect(value("Requests blocked")).toBe(String(EVENTS.filter((e) => e.outcome === "blocked" || e.outcome === "refused").length));
     const types = within(region("Overview")).getByRole("region", { name: "Top entity types" });
-    expect(within(types).getAllByRole("listitem")[0]).toHaveTextContent(/^(Bank account|Email|Phone)2$/);
+    expect(within(types).getAllByRole("listitem")[0]).toHaveTextContent(/^(Bank account \/ card|Email|Phone)2$/);
     const stages = within(region("Overview")).getByRole("region", { name: "Latency per stage" });
     expect(within(stages).getByRole("rowheader", { name: "Detect" })).toBeInTheDocument();
     expect(within(region("Overview")).getByText(/Detectors seen in the shown calls\. Fast: Rules \+ Image pipeline\./)).toBeInTheDocument();

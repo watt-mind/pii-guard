@@ -11,6 +11,7 @@ from pii_guard.api.deps import get_vault
 from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import check_text_size, log_extra, v1_router
 from pii_guard.api.routes.mask import SessionId
+from pii_guard.gateway.sessions import check_owner, client_identity
 from pii_guard.vault import Vault
 
 __all__ = ["UnmaskRequest", "UnmaskResponse", "router"]
@@ -67,8 +68,17 @@ def unmask(
     Tokens shaped like a placeholder but unknown to the session are reported in
     ``unresolved`` and left in place. Unknown or expired session: 404 ``not_found``.
     Restoring more than ``PII_GUARD_UNMASK_MAX_RESTORED_CHARS`` characters of original values:
-    413 ``unmask_output_too_large``, nothing returned (LAB-1350)."""
+    413 ``unmask_output_too_large``, nothing returned (LAB-1350).
+
+    A session a gateway request bound to a client identity (LAB-1565) restores only for that
+    identity (LAB-1580): a different ``Authorization`` value, or none for a credentialed
+    owner, gets the same 404 as a missing session. Unbound sessions (``/v1/mask``) and
+    anonymous-owned ones restore as before; unmasking never binds."""
     check_text_size(request, body.text)
-    result = vault.session(body.session_id).unmask_with_report(body.text)
+    identity = client_identity(request.headers)
+    # The owner check runs before the TTL is extended: a refused caller can't keep another
+    # owner's session alive (LAB-1584).
+    session = vault.session(body.session_id, authorize=lambda s: check_owner(s, identity))
+    result = session.unmask_with_report(body.text)
     log_extra(request, unresolved=len(result.unresolved))
     return {"text": result.text, "unresolved": list(result.unresolved)}

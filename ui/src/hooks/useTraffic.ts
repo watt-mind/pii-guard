@@ -25,12 +25,24 @@ export interface TrafficOptions {
   fixtureIntervalMs?: number;
 }
 
+/** A backend restart between two shown calls: `beforeId` starts the new run. */
+export interface RunBreak {
+  /** Id of the first call after the restart (the divider renders above it). */
+  beforeId: string;
+  /** The new run's `boot` id. */
+  boot: string;
+  /** When the feed noticed the restart. */
+  time: string;
+}
+
 export interface TrafficHandle {
   source: TrafficSource;
   status: TrafficStatus;
   /** The API's own status (also while the fixture plays: why it plays). */
   apiStatus: TrafficStatus;
   events: TrafficEvent[];
+  /** Backend restarts noticed while these events arrived (LAB-1366). */
+  runBreaks: RunBreak[];
   paused: boolean;
   /** Events that arrived while paused (shown on resume). */
   held: number;
@@ -46,40 +58,65 @@ export interface TrafficHandle {
   replay: () => void;
 }
 
+interface FeedStore {
+  key: string;
+  events: TrafficEvent[];
+  held: TrafficEvent[];
+  status: TrafficStatus;
+  runBreaks: RunBreak[];
+  /** Backend restart noticed but not yet anchored to a call (LAB-1366). */
+  pendingBreak: string | null;
+}
+
+const emptyStore = (key: string): FeedStore => ({
+  key,
+  events: [],
+  held: [],
+  status: { state: "connecting" },
+  runBreaks: [],
+  pendingBreak: null,
+});
+
 export function useTraffic({ forceFixture = false, connect = connectTraffic, fixtureIntervalMs }: TrafficOptions = {}): TrafficHandle {
   const [chosenFixture, setChosenFixture] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const source: TrafficSource = forceFixture || chosenFixture ? "fixture" : "api";
   // Everything below belongs to one connection; a new source or retry starts from empty.
   const key = `${source}:${attempt}`;
-  const [store, setStore] = useState<{ key: string; events: TrafficEvent[]; held: TrafficEvent[]; status: TrafficStatus }>({
-    key,
-    events: [],
-    held: [],
-    status: { state: "connecting" },
-  });
+  const [store, setStore] = useState<FeedStore>(() => emptyStore(key));
   const [paused, setPausedState] = useState(false);
   const pausedRef = useRef(false);
-  const current = store.key === key ? store : { key, events: [], held: [], status: { state: "connecting" } as TrafficStatus };
+  const current = store.key === key ? store : emptyStore(key);
 
+  // The feed noticed a backend restart; the next new call starts the new run (LAB-1366).
+  // Kept in the store (not a ref) so anchoring stays a pure state update.
+  const noteRestart = useCallback(
+    (boot: string) =>
+      setStore((prev) => (prev.key === key ? { ...prev, pendingBreak: boot } : prev)),
+    [key],
+  );
   const ingest = useCallback(
     (incoming: TrafficEvent[]) =>
       setStore((prev) => {
-        const base = prev.key === key ? prev : { key, events: [], held: [], status: { state: "connecting" } as TrafficStatus };
+        const base = prev.key === key ? prev : emptyStore(key);
         // A reconnect (or React re-running the effect) replays the backlog: keep each call once.
         const known = new Set([...base.events, ...base.held].map((e) => e.id));
         incoming = incoming.filter((e) => !known.has(e.id) && (known.add(e.id), true));
         if (!incoming.length) return prev;
+        const runBreaks =
+          base.pendingBreak !== null && !base.runBreaks.some((b) => b.boot === base.pendingBreak)
+            ? [...base.runBreaks, { beforeId: incoming[0]!.id, boot: base.pendingBreak, time: new Date().toISOString() }]
+            : base.runBreaks;
         return pausedRef.current
-          ? { ...base, held: [...base.held, ...incoming].slice(-MAX_EVENTS) }
-          : { ...base, events: [...base.events, ...incoming].slice(-MAX_EVENTS) };
+          ? { ...base, pendingBreak: null, runBreaks, held: [...base.held, ...incoming].slice(-MAX_EVENTS) }
+          : { ...base, pendingBreak: null, runBreaks, events: [...base.events, ...incoming].slice(-MAX_EVENTS) };
       }),
     [key],
   );
   const [doneKey, setDoneKey] = useState<string | null>(null);
   const onStatus = useCallback(
     (status: TrafficStatus) =>
-      setStore((prev) => (prev.key === key ? { ...prev, status } : { key, events: [], held: [], status })),
+      setStore((prev) => (prev.key === key ? { ...prev, status } : { ...emptyStore(key), status })),
     [key],
   );
 
@@ -94,9 +131,9 @@ export function useTraffic({ forceFixture = false, connect = connectTraffic, fix
       });
       return () => feed.close();
     }
-    const conn = connect({ onEvents: ingest, onStatus });
+    const conn = connect({ onEvents: ingest, onStatus, onRestart: noteRestart });
     return () => conn.close();
-  }, [source, key, connect, ingest, onStatus, fixtureIntervalMs]);
+  }, [source, key, connect, ingest, onStatus, noteRestart, fixtureIntervalMs]);
 
   const apiStatus: TrafficStatus = source === "api" ? current.status : { state: "offline", message: "" };
   // Offline on first contact: fall back to the recorded traffic, as the other screens fall
@@ -121,13 +158,14 @@ export function useTraffic({ forceFixture = false, connect = connectTraffic, fix
     if (!p) setStore((prev) => (prev.held.length ? { ...prev, events: [...prev.events, ...prev.held].slice(-MAX_EVENTS), held: [] } : prev));
   }, []);
 
-  const clear = useCallback(() => setStore((prev) => ({ ...prev, events: [], held: [] })), []);
+  const clear = useCallback(() => setStore((prev) => ({ ...prev, events: [], held: [], runBreaks: [], pendingBreak: null })), []);
 
   return {
     source,
     status: source === "fixture" ? { state: "live", via: "poll", level: "masked", size: FIXTURE_EVENTS.length } : current.status,
     apiStatus: source === "api" ? apiStatus : lastApi,
     events: current.events,
+    runBreaks: current.runBreaks,
     paused,
     held: current.held.length,
     setPaused,

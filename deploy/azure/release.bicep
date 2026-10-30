@@ -10,6 +10,8 @@ param environmentName string = 'prod'
 param location string = resourceGroup().location
 @description('Production public ingress remains an explicit release gate.')
 param publicEnabled bool = false
+@description('Prod stage only: the driver read the live app as already external (LAB-1541). Keeps, never opens, public ingress.')
+param preserveExternalIngress bool = false
 @description('Dev only: driver has verified the actual internal environment, disabled public network access, and reviewed proxy/TLS/ACL evidence. This flag is not evidence itself.')
 param privateDevReviewed bool = false
 @description('Reviewed immutable hosted image reference, shared by dev and prod.')
@@ -85,7 +87,8 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
       maxInactiveRevisions: 2
       ingress: {
         // An internal environment needs app-external ingress for its VNet proxy to wake it.
-        external: environmentName == 'dev' ? true : publicEnabled
+        // A prod stage keeps the live app's flag instead of rewriting it internal (LAB-1541).
+        external: environmentName == 'dev' ? true : (publicEnabled || preserveExternalIngress)
         targetPort: 8787
         transport: 'http'
         allowInsecure: false
@@ -138,9 +141,15 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_TRAFFIC_LOG', value: 'off' }
           { name: 'PII_GUARD_METRICS', value: 'false' }
         ]
+        // Readiness admits the replica while the bundled NER model still loads (LAB-1548):
+        // scale-to-zero cold starts serve the landing page at once, detecting requests wait or
+        // get 503 detector_loading. Full /readyz (model loaded) stays the deploy smoke gate.
+        // Startup and Readiness tick every 2 s (LAB-1594): 10 s ticks cost about 11 s of a 54 s
+        // cold start. Startup keeps failureThreshold 60 (2 min for /healthz, up in about 1 s);
+        // Readiness tolerates 20 s of failures so the CPU-bound NER load never drops the replica.
         probes: [
-          { type: 'Startup', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 60, timeoutSeconds: 5 }
-          { type: 'Readiness', httpGet: { path: '/readyz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5 }
+          { type: 'Startup', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 2, failureThreshold: 60, timeoutSeconds: 5 }
+          { type: 'Readiness', httpGet: { path: '/readyz/serving', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 2, failureThreshold: 10, timeoutSeconds: 5 }
           { type: 'Liveness', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 30, failureThreshold: 3, timeoutSeconds: 5 }
         ]
       }]

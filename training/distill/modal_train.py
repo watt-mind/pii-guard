@@ -20,10 +20,12 @@ nothing of it is uploaded::
 
     modal run training/distill/modal_train.py --config <toml> --data phase1b@6fbb52b62d99
 The app is ephemeral (``modal run``): it stops when the function returns.
+``PII_GUARD_TRAIN_TIMEOUT_S=<seconds>`` sets a hard timeout on the run (default 3 h).
 """
 
 from __future__ import annotations
 
+import os
 import sys
 import tomllib
 from pathlib import Path
@@ -114,7 +116,8 @@ def _train(config_text: str, files: dict[str, bytes], data: tuple[str, ...] = ()
 
 
 _kwargs = {
-    "timeout": 3 * 60 * 60,
+    # LAB-1547: a hard cap per run when Modal credit is short (seconds; default 3 h).
+    "timeout": int(os.environ.get("PII_GUARD_TRAIN_TIMEOUT_S", 3 * 60 * 60)),
     "volumes": {RUNS: runs},
 }
 

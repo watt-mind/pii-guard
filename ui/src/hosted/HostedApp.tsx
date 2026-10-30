@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { lazy, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import demoRecording from "../content/demoRecording.json";
 import { createHttpChat, pickDefaultModel, SYSTEM_PROMPT } from "../api/chat";
 import type { EntityType } from "../api/types";
@@ -26,8 +26,11 @@ import { publicPageOf } from "./publicRoutes";
 import { useCurrentSection } from "./useCurrentSection";
 import { consoleSectionOf } from "./consoleLink";
 import { PublicHeader } from "./PublicHeader";
+import { DeferredSection } from "./DeferredSection";
 import { RecordedImageExample } from "./RecordedImageExample";
 import { PublicEvaluation } from "./PublicEvaluation";
+import { ApiReference } from "./ApiReference";
+import { isApiHash } from "./apiConfig";
 import { SignedOutConsole } from "./SignedOut";
 
 // Without a return address Easy Auth ends on its own bare "signed in" page (LAB-1425);
@@ -67,7 +70,7 @@ const LANGUAGES = [{ value: "en", label: "English" }, { value: "hu", label: "Hun
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
 const SECTIONS = ["image-preview", "how", "results", "account"] as const;
 
-const link = "underline underline-offset-4 hover:text-ink";
+const link = "inline-flex min-h-6 items-center underline underline-offset-4 hover:text-ink";
 
 /** Anonymous visitors get the public page; a signed-in owner gets the console (`console`). */
 export function HostedApp({ call = request, console: renderConsole }: { call?: Requester; console?: (session: HostedSession) => ReactNode }) {
@@ -76,7 +79,10 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
   // Signed in earlier on this page, so an anonymous account now means the session ended.
   const [wasSignedIn, setWasSignedIn] = useState(false);
   if (account?.authenticated && !wasSignedIn) setWasSignedIn(true);
-  if (renderConsole && account?.authenticated && !SITE_HASHES.has(hash)) return renderConsole({ account, error, refresh, call });
+  // The API reference is static and the same for everyone, signed in or not (LAB-1586).
+  // A signed-in owner reads it inside the console, with its sidebar and switcher (LAB-1626).
+  if (isApiHash(hash) && !(renderConsole && account?.authenticated)) return <ApiReference consoleHref={account?.login_url || LOGIN} />;
+  if (renderConsole && account?.authenticated && (!SITE_HASHES.has(hash) || isApiHash(hash))) return renderConsole({ account, error, refresh, call });
   // A console deep link without a session: say what the screen is and how to get there (LAB-1519).
   const section = renderConsole && account && !account.authenticated ? consoleSectionOf(hash) : null;
   // Evaluation shows only the published benchmarks bundled with the page, so it needs no sign-in
@@ -344,8 +350,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <SectionHead id="results-heading" eyebrow="Benchmarks" title="The lowest leak rate on each test set below." lead="Committed runs on fictional and public data. Leak rate measures personal values left unmasked; lower is better. These are specific test sets, so small differences should be treated with care." />
         <p className="max-w-3xl text-muted">{RUNS.label} committed benchmark runs. {MEASURED}. Detection adds {LATENCY.value} per request (p50) in the published measurement.</p>
         <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
-          <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English and Hungarian set (51 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
-            <Suspense fallback={<div className="h-[340px] rounded-lg bg-surface-2" role="status"><span className="sr-only">Loading the comparison chart…</span></div>}><ResultsChart /></Suspense>
+          <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English, Hungarian and Polish set (62 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
+            <DeferredSection anchor="results" className="min-h-[340px]"><ResultsChart /></DeferredSection>
           </Card>
           <LandingBenchmarkChart />
         </div>
@@ -435,6 +441,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div><h2>Build</h2>
             <a href={SELF_HOST}>Self-hosting <span aria-hidden="true">↗</span></a>
             <a href={`${DOCS}/integrations/README.md`}>Integration guide <span aria-hidden="true">↗</span></a>
+            <a href="#api">API reference</a>
             <a href="#demo">Try the demo</a>
           </div>
           <div><h2>Learn</h2>

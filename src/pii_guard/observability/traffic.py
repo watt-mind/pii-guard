@@ -60,7 +60,10 @@ SENSITIVE_KEYS = frozenset(
         "set_cookie",
     }
 )
-_CREDENTIAL_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]+")
+_CREDENTIAL_RE = re.compile(r"(?i)\b(bearer|basic)\s+([A-Za-z0-9._~+/=-]+)")
+#: A ``bearer``/``basic`` value shorter than this that is letters only is prose ("basic idea",
+#: "bearer bonds"), not a credential (LAB-1581). Digits or token punctuation always redact.
+_CREDENTIAL_MIN_WORD = 8
 _SUBSCRIBER_QUEUE = 256
 
 #: Words (splitting a key on separators and camelCase) that make it a credential by meaning
@@ -118,6 +121,14 @@ def _sensitive(key: str) -> bool:
     return flat.endswith("token") and flat != "tokenizer"
 
 
+def _redact_credential(match: re.Match[str]) -> str:
+    """``Bearer <token>`` -> ``Bearer [redacted]``; a short plain word after it is prose."""
+    token = match.group(2)
+    if token.isalpha() and len(token) < _CREDENTIAL_MIN_WORD:
+        return match.group(0)
+    return f"{match.group(1)} {REDACTED}"
+
+
 def scrub(value: Any, secrets_: Iterable[str] = (), *, max_string: int = MAX_STRING) -> Any:
     """A JSON-safe copy of ``value`` with credentials, known secrets and images taken out."""
     known = [s for s in secrets_ if s and len(s) >= 3]
@@ -129,7 +140,7 @@ def scrub(value: Any, secrets_: Iterable[str] = (), *, max_string: int = MAX_STR
         for secret in known:
             if secret in text:
                 text = text.replace(secret, REDACTED)
-        text = _CREDENTIAL_RE.sub(lambda m: f"{m.group(1)} {REDACTED}", text)
+        text = _CREDENTIAL_RE.sub(_redact_credential, text)
         if len(text) > max_string:
             text = text[:max_string] + f"... [truncated, {len(text)} chars]"
         return text

@@ -5,9 +5,10 @@ from __future__ import annotations
 import pytest
 from vault_helpers import TEST_KEY, FakeClock, span_of
 
+import pii_guard.vault.vault as vault_module
 from pii_guard.config import Settings
 from pii_guard.types import EntityType, MaskingError
-from pii_guard.vault import SessionNotFoundError, Vault
+from pii_guard.vault import SessionNotFoundError, Vault, VaultSession
 
 NAME = "Teszt Elek"
 EMAIL = "teszt.elek@example.com"
@@ -197,3 +198,107 @@ def test_lookup_and_pin_share_the_vault_lock() -> None:
     assert errors == ["vault_capacity_exhausted"]
     assert not session.expired
     vault.release_session(session)
+
+
+# --- LAB-1584: commit allow-list, image commit cost, per-identity lease cap -----------------
+
+
+def test_commit_leaves_non_mask_state_written_during_the_replay(
+    vault: Vault, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only mask state is published: a write elsewhere during a commit is never reverted."""
+    session = vault.session()
+    fork = session.fork()
+    fork.mask(NAME, [span_of(NAME, NAME, EntityType.PERSON)])
+    original = VaultSession.mask_with_report
+
+    def replay(self: VaultSession, *args: object, **kwargs: object) -> object:
+        # Lands on the parent while its commit replays into the staged copy.
+        session._entry_limit = 7
+        session.owner = "f" * 64
+        return original(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(VaultSession, "mask_with_report", replay)
+    session.commit(fork)
+    monkeypatch.undo()
+    assert session._entry_limit == 7
+    assert session.owner == "f" * 64
+    assert session.unmask(session.mask(NAME, [])) == NAME
+
+
+def test_image_commit_does_not_deep_copy_the_memo_caches(
+    vault: Vault, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = vault.session()
+    history = f"{NAME} írt. " + "x" * 50_000
+    session.mask(history, [span_of(history, NAME, EntityType.PERSON)])
+    assert session._masked and session._folds
+    memo, folds = session._masked, session._folds
+    fork = session.fork()
+    fork.mask(EMAIL, [span_of(EMAIL, EMAIL, EntityType.EMAIL)])
+    copied: list[int] = []
+    deepcopy = vault_module.copy.deepcopy
+
+    def spy(value: object, memo_: object = None) -> object:
+        copied.append(id(value))
+        if isinstance(value, dict):
+            copied.extend(id(item) for item in value.values())
+        return deepcopy(value, memo_)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(vault_module.copy, "deepcopy", spy)
+    session.commit(fork)
+    monkeypatch.undo()
+    assert copied, "commit stages a copy of the mask state"
+    assert id(memo) not in copied
+    assert id(folds) not in copied
+    assert session._masked is not memo and session._folds is not folds  # reset, not copied
+    assert session._masked_chars == sum(len(key[0]) for key in session._masked)
+    assert NAME not in session.mask(history, [])  # the mapping survives the reset memo
+
+
+def _lease(vault: Vault, identity: str) -> VaultSession:
+    session, _, _ = vault.acquire_session(lambda: (vault.session(), True, None), identity=identity)
+    return session
+
+
+def test_one_identity_cannot_pin_every_session_slot(clock: FakeClock) -> None:
+    """The ~10k in-flight streams scenario, scaled down: the over-cap identity gets 503, the
+    others still acquire (LAB-1584)."""
+    vault = Vault(TEST_KEY, clock=clock, max_sessions=10, max_leases_per_identity=3)
+    flood = [_lease(vault, "a" * 64) for _ in range(3)]
+    created = len(vault)
+    with pytest.raises(MaskingError) as error:
+        _lease(vault, "a" * 64)
+    assert error.value.code == "vault_capacity_exhausted"
+    assert error.value.status_code == 503
+    assert len(vault) == created  # refused before resolving: nothing created for it
+    other = _lease(vault, "b" * 64)
+    anonymous = _lease(vault, "anonymous")
+    vault.release_session(flood.pop(), identity="a" * 64)
+    flood.append(_lease(vault, "a" * 64))  # a slot of its own is free again
+    for session in flood:
+        vault.release_session(session, identity="a" * 64)
+    vault.release_session(other, identity="b" * 64)
+    vault.release_session(anonymous, identity="anonymous")
+    assert not vault._leases
+    assert not vault._identity_leases
+
+
+def test_releasing_an_identity_without_a_lease_fails_closed(vault: Vault) -> None:
+    session = _lease(vault, "a" * 64)
+    with pytest.raises(ValueError, match="identity has no lease"):
+        vault.release_session(session, identity="b" * 64)
+    assert vault._leases[session] == 1  # nothing released by the refused call
+    vault.release_session(session, identity="a" * 64)
+
+
+def test_max_leases_per_identity_comes_from_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY", "1")
+    settings = Settings(tenant_key=TEST_KEY.hex())
+    assert settings.vault_max_leases_per_identity == 1
+    vault = Vault.from_settings(settings)
+    _lease(vault, "a" * 64)
+    with pytest.raises(MaskingError, match="too many active requests"):
+        _lease(vault, "a" * 64)
+    with pytest.raises(ValueError, match="max_leases_per_identity"):
+        Vault(TEST_KEY, max_leases_per_identity=0)

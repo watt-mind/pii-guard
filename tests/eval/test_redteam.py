@@ -15,6 +15,7 @@ from pii_guard.eval import dump_document, from_markup, label
 from pii_guard.eval.cli import main as eval_main
 from pii_guard.eval.redteam import (
     CONTEXTS,
+    GENERALIZED,
     Attacker,
     RedTeamError,
     Target,
@@ -23,6 +24,7 @@ from pii_guard.eval.redteam import (
     build_messages,
     build_targets,
     candidate_lists,
+    generalized_results,
     guess_matches,
     parse_guesses,
     redteam_breakdown,
@@ -79,6 +81,15 @@ def test_targets_split_leaked_and_masked_values() -> None:
     assert EMAIL_A not in results[0].masked_text
     assert build_targets(results[2]) == []
     assert "jane" not in repr(email).casefold()
+
+
+def test_targets_without_replacements_have_no_placeholders() -> None:
+    """A result that recorded no replacements (``None``) yields targets, not a TypeError."""
+    import dataclasses
+
+    result = dataclasses.replace(_results()[0], replacements=None)
+    targets = build_targets(result)
+    assert targets and all(t.placeholders == () for t in targets)
 
 
 def test_candidate_lists_hold_the_truth_plus_decoys_and_are_deterministic() -> None:
@@ -270,6 +281,75 @@ def test_failed_requests_are_counted_and_excluded_from_the_rate() -> None:
         run_redteam(_results(), garbled, contexts=["nope"])
 
 
+def _requests(handler: Callable[[httpx.Request], httpx.Response], seen: list[str]):
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content)["messages"][1]["content"])
+        return handler(request)
+
+    return record
+
+
+def test_decoys_isolated_asks_once_per_type_with_that_types_candidates_only() -> None:
+    docs = [
+        from_markup(
+            "en-4",
+            f"Pay {label('BANK_ACCOUNT', IBAN)}, contact {label('EMAIL', EMAIL_B)}.",
+            language="en",
+        ),
+        *_docs(),
+    ]
+    results = run_documents(docs, DetectorAnalyzer(["rules"]))
+    seen: list[str] = []
+    attacker = Attacker(
+        api_key="k", transport=httpx.MockTransport(_requests(_oracle({"EMAIL": EMAIL_B}), seen))
+    )
+    outcomes = run_redteam(results, attacker, contexts=["decoys-isolated"], decoys=4)
+    # en-4 and en-2: BANK_ACCOUNT and EMAIL asked apart; en-1: EMAIL only (the name leaks).
+    assert attacker.usage["requests"] == 5
+    for content in seen:
+        listed = [line for line in content.splitlines() if "candidates" in line]
+        assert len({line.split("_", 1)[0] for line in listed}) == 1  # one type per request
+    total = redteam_breakdown(outcomes)["decoys-isolated"]["all"]
+    assert (total["values"], total["leaked"], total["masked"]) == (6, 1, 5)
+    assert total["recovered"] == 2  # EMAIL_B in en-4 and en-2
+
+
+def test_generalized_results_mask_organizations_and_rewrite_context() -> None:
+    docs = [
+        from_markup(
+            "en-5",
+            f"Dear Ms {label('PERSON', 'Jane Example')} of Acme Ltd, she is 42 years old.",
+            language="en",
+        )
+    ]
+    results = run_documents(docs, DetectorAnalyzer(["rules"]))
+    (plain,) = results
+    (generalized,), rewrites = generalized_results(results)
+    assert "40-49 years old" in generalized.masked_text
+    assert rewrites["age"] == 1 and set(rewrites) == {"gender_title", "age", "hu_harmony"}
+    assert generalized.document is plain.document
+    assert generalized.predicted == plain.predicted  # detections reused, no detector call
+
+
+def test_generalized_contexts_attack_the_generalized_text() -> None:
+    results = _results()
+    seen: list[str] = []
+    attacker = Attacker(
+        api_key="k", transport=httpx.MockTransport(_requests(_oracle({"EMAIL": EMAIL_A}), seen))
+    )
+    contexts = ["decoys", "decoys" + GENERALIZED]
+    outcomes = run_redteam(results, attacker, contexts=contexts, decoys=4)
+    breakdown = redteam_breakdown(outcomes)
+    assert set(breakdown) == set(contexts)
+    assert attacker.usage["requests"] == 4
+    # The same candidate lists in both variants: chance is identical.
+    assert (
+        breakdown["decoys"]["all"]["chance_rate"]
+        == breakdown["decoys" + GENERALIZED]["all"]["chance_rate"]
+    )
+    assert any("Dear Jane Example" in c for c in seen)  # rules leave the name; no title here
+
+
 # --- CLI ----------------------------------------------------------------------------------
 
 
@@ -291,6 +371,7 @@ def test_cli_needs_an_attacker_key(
     assert "MY_KEY" in capsys.readouterr().err
     monkeypatch.setenv("MY_KEY", "k")
     assert eval_main([*args, "--redteam-contexts", "bogus"]) == 2
+    assert eval_main([*args, "--redteam-contexts", "decoys+bogus"]) == 2
 
 
 def test_attacker_from_args_reads_the_named_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -333,7 +414,17 @@ def test_cli_redteam_writes_the_scorecard_block(
     assert block["results"]["masked-only"]["all"]["recovered"] == 1
     assert block["usage"]["requests"] == 4
     assert block["detector_usage"] == {}  # the rules keep no token counters
+    assert "generalization" not in block
     assert EMAIL_A not in out.read_text()
+
+    out2 = tmp_path / "card2.json"
+    contexts = "decoys,decoys+generalized"
+    args = ["--fixtures", str(_fixture(tmp_path)), "--redteam", "--json", str(out2)]
+    assert eval_main([*args, "--redteam-contexts", contexts]) == 0
+    block = json.loads(out2.read_text())["redteam"]
+    assert set(block["results"]) == {"decoys", "decoys+generalized"}
+    assert block["generalization"]["linkage_overrides"] == ["COMPANY_ID_HU", "ORGANIZATION"]
+    assert set(block["generalization"]["rewrites"]) == {"gender_title", "age", "hu_harmony"}
 
 
 # --- Live --------------------------------------------------------------------------------

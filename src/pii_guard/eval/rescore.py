@@ -7,11 +7,13 @@ python -m pii_guard.eval.rescore --check    # exit 1 if any record still needs i
 
 A run record keeps every count next to its ratios (per language and per entity type), so a
 rule that only adds or removes whole entity types, or drops a metric, can be applied to an
-old run without running it again. Two rules exist (LAB-1213):
+old run without running it again. Two rules exist (LAB-1213, widened by LAB-1223):
 
 - **unscored-types**: on a set where an entity type can't be scored
   (:data:`pii_guard.eval.scorer.LEGACY_UNSCORED_TYPES`, by fixture kind: ``DATE_OF_BIRTH`` on
-  Ai4Privacy, whose ``DATE`` label covers every date and is policy-excluded), predictions of
+  Ai4Privacy, whose ``DATE`` label covers every date and is policy-excluded, plus
+  ``ORGANIZATION``, ``VEHICLE_PLATE``, ``PARCEL_NUMBER_HU`` and ``COMPANY_ID_HU``, which the
+  set has no label for), predictions of
   that type are taken out of precision, F1, macro F1 and over-masking. Recall and leak rate
   don't change (the type has no gold spans there). What *can't* be re-scored from counts:
   predictions overlapping a policy-excluded title or bare city, which need the per-document
@@ -19,7 +21,10 @@ old run without running it again. Two rules exist (LAB-1213):
 - **no-consistency**: a comparison tool doesn't report its replacements, so its placeholder
   consistency was a placeholder 0.0 by construction; it becomes ``null``.
 
-Each rewritten record gets ``rescored`` (who, which rule, what changed), and a second pass
+It also backfills ``system.role`` (``own`` | ``other-model`` | ``tool``, LAB-1495) on records
+written before the field existed; that is not a re-score and adds no ``rescored``.
+
+Each re-scored record gets ``rescored`` (who, which rule, what changed), and a second pass
 changes nothing. This is a change of *method*: no detector ran again and no number improved
 because a system got better.
 """
@@ -33,20 +38,35 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from pii_guard.eval.record import DEFAULT_RUNS_DIR, dumps, load_records
+from pii_guard.eval.record import DEFAULT_RUNS_DIR, dumps, load_records, with_role
 
 __all__ = ["RESCORE_BY", "drop_types", "main", "rescore_record"]
 
-RESCORE_BY = "LAB-1213"
+RESCORE_BY = "LAB-1223"
 #: Fixture-path marker -> types its documents can't score (mirrors the scorer's fallback).
-_UNSCORED_BY_FIXTURE: dict[str, tuple[str, ...]] = {"-ai4privacy.jsonl": ("DATE_OF_BIRTH",)}
+_UNSCORED_BY_FIXTURE: dict[str, tuple[str, ...]] = {
+    "-ai4privacy.jsonl": (
+        "DATE_OF_BIRTH",
+        "ORGANIZATION",
+        "VEHICLE_PLATE",
+        "PARCEL_NUMBER_HU",
+        "COMPANY_ID_HU",
+    )
+}
 _OLD_NOTE = (
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold "
     "spans), so masking them counts as over-masking."
 )
-_NEW_NOTE = (
+_PREV_NEW_NOTE = (
     "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold "
     "spans). DATE_OF_BIRTH predictions are not scored on this set (re-scored, LAB-1213); a "
+    "masked title or bare city still counts as over-masking, since the run kept no "
+    "per-document predictions to apply ignore regions to."
+)
+_NEW_NOTE = (
+    "Dates, ages, gender, titles and bare city names are policy-excluded (not in the gold "
+    "spans). DATE_OF_BIRTH, ORGANIZATION, VEHICLE_PLATE, PARCEL_NUMBER_HU and COMPANY_ID_HU "
+    "predictions are not scored on this set (re-scored, LAB-1223); a "
     "masked title or bare city still counts as over-masking, since the run kept no "
     "per-document predictions to apply ignore regions to."
 )
@@ -125,17 +145,35 @@ def _unscored_types(record: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(found)
 
 
+def _still_counted(record: Mapping[str, Any], name: str) -> bool:
+    """Whether the record still counts predictions of ``name`` in precision/over-masking."""
+    entry = record["metrics"]["overall"].get("per_type", {}).get(name)
+    return bool(entry) and bool(entry.get("pred"))
+
+
 def rescore_record(record: Mapping[str, Any]) -> dict[str, Any] | None:
-    """The re-scored record, or ``None`` if no rule applies (or it was already re-scored)."""
-    if record["kind"] != "text" or record.get("rescored"):
-        return None
+    """The re-scored record, or ``None`` if no rule applies (or nothing is left to drop).
+
+    A record without ``system.role`` (LAB-1495) gets it here too, on any kind of record. That
+    is a backfill, not a change of scoring method, so it adds no ``rescored`` marker.
+    """
     out = copy.deepcopy(dict(record))
+    backfilled = "role" not in out["system"]
+    if backfilled:
+        with_role(out["system"])
+    scored = _rescore(out) if record["kind"] == "text" else None
+    return scored if scored is not None else (out if backfilled else None)
+
+
+def _rescore(out: dict[str, Any]) -> dict[str, Any] | None:
+    """``out`` (a copy) with the scoring rules applied, or ``None`` if none applies."""
+    record = out
     methods: list[str] = []
     notes: list[str] = []
-    # A record written by the current scorer has ``unscored_predictions``: nothing to redo.
-    types = (
-        () if "unscored_predictions" in record["metrics"]["overall"] else _unscored_types(record)
-    )
+    # Drop whatever of the current unscored set the record still counts, even if an earlier
+    # rescore (or the scorer that wrote it) already dropped a narrower set (LAB-1223 widens
+    # the LAB-1213 set). ``drop_types`` skips types with no predictions, so this is idempotent.
+    types = tuple(t for t in _unscored_types(record) if _still_counted(record, t))
     if types:
         metrics = out["metrics"]
         metrics["overall"], dropped = drop_types(metrics["overall"], types)
@@ -153,7 +191,7 @@ def rescore_record(record: Mapping[str, Any]) -> dict[str, Any] | None:
             " policy-excluded title or bare city are still counted: the run kept no"
             " per-document predictions, so ignore regions can't be applied."
         )
-        out["notes"] = [_NEW_NOTE if n == _OLD_NOTE else n for n in out["notes"]]
+        out["notes"] = [_NEW_NOTE if n in (_OLD_NOTE, _PREV_NEW_NOTE) else n for n in out["notes"]]
     if record["system"]["family"] == "comparison":
         blocks = [out["metrics"]["overall"], *out["metrics"]["languages"].values()]
         if any(b.get("consistency") is not None for b in blocks):
@@ -173,13 +211,13 @@ def rescore_record(record: Mapping[str, Any]) -> dict[str, Any] | None:
     }
     if types:
         rescored["unscored_types"] = list(types)
-    # ``rescored`` goes right after ``notes``, as in the schema.
+    # ``rescored`` goes right after ``notes``, as in the schema (replacing any earlier mark).
     keys = list(out)
     at = keys.index("notes") + 1
     return {
-        **{k: out[k] for k in keys[:at]},
+        **{k: out[k] for k in keys[:at] if k != "rescored"},
         "rescored": rescored,
-        **{k: out[k] for k in keys[at:]},
+        **{k: out[k] for k in keys[at:] if k != "rescored"},
     }
 
 
@@ -196,7 +234,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     pending = []
     for record in load_records(args.runs_dir):
         new = rescore_record(record)
-        if new is not None:
+        # ``--check`` is about the scoring method; a missing ``system.role`` (a backfill the
+        # index derives anyway) doesn't fail it.
+        if new is not None and not (args.check and new.get("rescored") == record.get("rescored")):
             pending.append((args.runs_dir / f"{record['run_id']}.json", new))
     if args.check:
         if pending:

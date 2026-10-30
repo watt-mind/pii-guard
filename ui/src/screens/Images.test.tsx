@@ -37,7 +37,8 @@ function recorded(id: string, overrides: Partial<ImageMaskResponse> = {}): Image
 async function openImages(api: HttpGuardClient) {
   const user = userEvent.setup();
   render(<App api={api} mock={createMockClient()} loadImage={loadImage} />);
-  await user.click(screen.getByRole("tab", { name: /images/i }));
+  await user.click(await screen.findByRole("tab", { name: /images/i }));
+  await screen.findByRole("button", { name: /mask image/i });
   return { user, panel: screen.getByRole("tabpanel", { name: /images/i }) };
 }
 
@@ -81,6 +82,17 @@ describe("Images screen", () => {
     await user.keyboard("{ArrowRight}");
     expect(screen.getByRole("tab", { name: /images/i })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel", { name: /images/i })).toBeVisible();
+  });
+
+  it("replays both Hungarian name lines with region boxes for the ID card", async () => {
+    // LAB-1260: the stale SAM-era bundle left the surname without a region box; the replay
+    // now sources the fresh local-detector recording, which covers both name lines.
+    for (const id of ["id-card", "id-card-en"]) {
+      const persons = IMAGE_RECORDINGS.samples[id]!.regions.filter(
+        (r) => r.entity_type === "PERSON" && r.policy === "mask",
+      );
+      expect(persons.length, id).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it("in demo mode replays recorded regions for a sample and draws the masking in the browser", async () => {
@@ -171,12 +183,15 @@ describe("Images screen", () => {
     expect(maskImage).toHaveBeenCalledWith(expect.objectContaining({ sampleId: "id-card", language: "hu" }));
     expect(loadImage).toHaveBeenCalledWith("/samples/id-card.png");
     const note = within(panel).getByTestId("image-scope-note");
-    expect(note).toHaveTextContent("SAM 3.1 looked for faces, signatures, ID photos and stamps");
-    expect(note).not.toHaveTextContent("Not covered"); // rules + llm ran: nothing to flag
+    expect(note).toHaveTextContent(
+      "The on-device face detector (YuNet) looked for faces and ID photos",
+    );
+    // The fresh local-detector recording runs rules only: the gaps read as known scope.
+    expect(note).toHaveTextContent("Not covered");
     expect(within(panel).getByText(/exactly as the API returned it/)).toBeInTheDocument();
 
     // Hover a region box: the matching legend type lights up; the toggle hides the boxes.
-    const face = within(panel).getByRole("button", { name: "Face, found by SAM 3.1, masked" });
+    const face = within(panel).getByRole("button", { name: "Face, found by YuNet (on-device), masked" });
     await user.hover(face);
     expect(face).toHaveAttribute("aria-pressed", "true");
     await user.click(within(panel).getByRole("checkbox", { name: "Show regions" }));

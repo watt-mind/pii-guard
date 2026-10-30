@@ -30,6 +30,6 @@ export function LandingBenchmarkChart() {
       </li>)}
     </ul>
     <div aria-hidden="true" className="mt-3 flex justify-between font-mono text-xs tabular-nums text-faint"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
-    <figcaption id={`${id}-caption`} className="mt-5 max-w-3xl text-xs text-muted">{SETS[dataset]} · published runs from 27–28 Oct 2026. Each tool is measured on the same dataset. These results describe these test sets, not a guarantee for your documents.</figcaption>
+    <figcaption id={`${id}-caption`} className="mt-5 max-w-3xl text-xs text-muted">{SETS[dataset]} · published runs from 27–30 Oct 2026. Each tool is measured on the same dataset. These results describe these test sets, not a guarantee for your documents.</figcaption>
   </figure>;
 }

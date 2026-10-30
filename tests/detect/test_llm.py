@@ -229,6 +229,15 @@ def test_language_selects_notes_and_entity_types() -> None:
         assert "PERSON" in content
 
 
+def test_english_notes_ask_for_a_surname_after_a_title() -> None:
+    # LAB-1138: a surname after a title ("Ms Doe") was missed when the full name was already listed,
+    # or never appeared, because the notes only said to drop the title.
+    system, _ = llm.build_messages("text", "en")
+    content = system["content"]
+    assert '"Mr Smith"' in content
+    assert "on its own" in content
+
+
 @pytest.mark.parametrize("language", ["fi", "cs-CZ", "", "xx"])  # "de" and "pl" have packs now
 def test_unknown_language_falls_back(language: str) -> None:
     system, _ = llm.build_messages("Text", language)
@@ -374,6 +383,7 @@ def test_usage_counts_tokens_invalid_outputs_and_refusals() -> None:
         "invalid_outputs": 1,
         "refusals": 0,
         "empty_challenged": 0,
+        "truncated_completions": 0,
     }
 
     refusal = completion("I can't help with that.")
@@ -524,6 +534,19 @@ def test_retry_recovers_from_a_transient_error() -> None:
     rec = Recorder(httpx.Response(502), completion(entities_json(("PERSON", "Ede"))))
     assert len(make(rec).detect("Szia Ede!")) == 1
     assert len(rec.requests) == 2
+
+
+def test_truncated_retry_raises_max_tokens() -> None:
+    truncated = completion(entities_json(("PERSON", "Ede")), finish_reason="length")
+    answered = completion(entities_json(("PERSON", "Ede")))
+    rec = Recorder(truncated, answered)
+    det = make(rec, max_tokens=1000)
+    assert len(det.detect("Szia Ede!")) == 1
+    assert len(rec.requests) == 2
+    assert rec.payloads()[0]["max_tokens"] == 1000
+    assert rec.payloads()[1]["max_tokens"] == 2000
+    assert det.usage["truncated_completions"] == 1
+    assert det.usage["invalid_outputs"] == 1
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404])

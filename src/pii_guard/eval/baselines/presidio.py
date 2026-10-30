@@ -6,6 +6,7 @@ entity with ``<ENTITY_TYPE>``). The only choice we make is the spaCy model per l
 because Presidio ships none for Hungarian:
 
 - ``en``: ``en_core_web_lg`` (Presidio's own default model).
+- ``de``: ``de_core_news_lg``, the standard German spaCy pipeline.
 - ``hu``: ``hu_core_news_lg`` (huSpaCy), the strongest spaCy pipeline for Hungarian. The
   predefined recognizers that Presidio registers for a non-English language are the
   language-independent ones (email, IBAN, phone, IP, URL, date, crypto, ...); the
@@ -28,7 +29,7 @@ from pii_guard.eval.baselines.models import HU_CORE_NEWS_LG, import_model
 
 __all__ = ["SPACY_MODELS", "PresidioBaseline"]
 
-SPACY_MODELS = {"en": "en_core_web_lg", "hu": "hu_core_news_lg"}
+SPACY_MODELS = {"en": "en_core_web_lg", "de": "de_core_news_lg", "hu": "hu_core_news_lg"}
 _EXTRA_HINT = "install the extra: uv sync --extra baselines"
 
 
@@ -57,7 +58,11 @@ class PresidioBaseline:
                 f"spaCy model {SPACY_MODELS['en']} not installed ({_EXTRA_HINT})"
             )
         # huSpaCy loads from its unpacked, pinned wheel, by path (LAB-1249).
-        model_paths = {"en": SPACY_MODELS["en"], "hu": str(import_model(HU_CORE_NEWS_LG))}
+        model_paths = {
+            "en": SPACY_MODELS["en"],
+            "de": SPACY_MODELS["de"],
+            "hu": str(import_model(HU_CORE_NEWS_LG)),
+        }
         _no_suffix_list_download()
 
         languages = sorted(SPACY_MODELS)
@@ -83,6 +88,7 @@ class PresidioBaseline:
             },
             "models": [
                 f"{SPACY_MODELS['en']} {_version('en-core-web-lg')} (en)",
+                f"{SPACY_MODELS['de']} {_version('de-core-news-lg')} (de)",
                 f"{SPACY_MODELS['hu']} {HU_CORE_NEWS_LG.version} (hu, huSpaCy)",
             ],
             "config": {

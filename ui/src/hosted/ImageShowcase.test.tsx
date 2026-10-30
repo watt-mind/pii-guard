@@ -35,6 +35,15 @@ describe("landing image showcase (labels render, LAB-1484; English specimen, LAB
     expectMasked(container, IMAGE_LABELS_EN, "Jane Placeholder");
   });
 
+  it("the answer is a recorded Muse Spark run, labeled as one (LAB-1524)", () => {
+    for (const rec of [IMAGE_LABELS_EN, IMAGE_LABELS]) {
+      expect(rec.answer.model).toMatch(/^muse-spark/);
+      expect(rec.answer.by).not.toMatch(/stand-in/);
+    }
+    render(<ImageShowcase />);
+    expect(screen.getByText(/Muse Spark’s recorded answer/)).toBeInTheDocument();
+  });
+
   it("switches to the Hungarian specimen, unchanged", async () => {
     const { container } = render(<ImageShowcase />);
     await userEvent.click(screen.getByRole("radio", { name: "Hungarian ID card" }));

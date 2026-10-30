@@ -16,9 +16,11 @@ function of the inputs so ``--check`` compares them byte for byte:
 - ``docs/benchmarks/*.svg``: the charts (:mod:`pii_guard.eval.report_charts`), plus
   ``validity-<set>.svg`` for each set with a number-validity breakdown;
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
-- ``docs/benchmarks/colours.json``: the append-only colour registry
+- the results block of ``README.md`` (:mod:`pii_guard.eval.report_readme`), when the config
+  has a ``readme`` section;
+- ``docs/benchmarks/colours.json``: the append-only color registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
-  needs a colour;
+  needs a color;
 - with ``--journey``, the generated block of ``docs/journey.md``.
 
 The index (:mod:`pii_guard.eval.report_index`) is a build output, never committed: the report
@@ -55,6 +57,9 @@ from pii_guard.eval.report_journey import (
     load_entries,
 )
 from pii_guard.eval.report_journey import render as render_journey
+from pii_guard.eval.report_readme import parse_spec as parse_readme_spec
+from pii_guard.eval.report_readme import render_block as render_readme_block
+from pii_guard.eval.report_readme import splice as splice_readme
 from pii_guard.eval.stats import fmt_duration, fmt_pct
 
 __all__ = [
@@ -72,6 +77,8 @@ __all__ = [
 DEFAULT_INDEX = Path("eval/results/index.json")
 DEFAULT_DOCS_DIR = Path("docs")
 DEFAULT_CONFIG = Path("docs/benchmarks/config.json")
+#: Its results block is generated when the config has a ``readme`` section (LAB-1239).
+DEFAULT_README = Path("README.md")
 
 Chart = Callable[[Mapping[str, Any], str, Sequence[str]], str]
 
@@ -179,9 +186,20 @@ def _marks(s: Mapping[str, Any]) -> str:
     return ("" if s.get("complete", True) else " †") + (" ‡" if s.get("rescored") else "")
 
 
+def _false_blocks(m: Mapping[str, Any]) -> str:
+    """``0.0% (0/120)``: the outbound re-check's false blocks of a snapshot, else ``—``."""
+    ob = m.get("outbound_check")
+    if not ob:
+        return "—"
+    return f"{fmt_pct(ob['rate'], sign=True)} ({ob['blocked']}/{ob['checked']})"
+
+
 def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
+    snaps = _ordered_snapshots(index, fixture_set)
+    # The outbound re-check column only once a run of the set measured it (LAB-1505).
+    outbound = any(s["all"].get("outbound_check") for s in snaps)
     rows = []
-    for s in _ordered_snapshots(index, fixture_set):
+    for s in snaps:
         m = s["all"]
         rows.append(
             [
@@ -195,6 +213,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
                 fmt_pct(m["over_masking"], sign=True),
                 fmt_pct(m["roundtrip"], sign=True),
                 fmt_duration(m["detect_p50_ms"]) + ("*" if m["latency_pooled"] else ""),
+                *([_false_blocks(m)] if outbound else []),
                 ", ".join(s["dates"]),
                 _commits(s),
             ]
@@ -211,6 +230,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             "Over-masking",
             "Round trip",
             "Detect p50",
+            *(["False blocks"] if outbound else []),
             "Run",
             "Commit",
         ],
@@ -225,6 +245,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             "---:",
             "---:",
             "---:",
+            *(["---:"] if outbound else []),
             "---",
             "---",
         ],
@@ -488,8 +509,11 @@ def _segmenter_table(index: Mapping[str, Any]) -> str:
 
 
 def _latency_table(index: Mapping[str, Any]) -> str:
+    runs = charts.latest_latency(index)
+    # The re-check column only once a run recorded it (LAB-1505).
+    outbound = any(c.get("outbound_check_ms") for r in runs for c in r["cells"])
     rows = []
-    for run in charts.latest_latency(index):
+    for run in runs:
         for c in run["cells"]:
             o, t = c["overhead_ms"] or {}, c.get("added_ttft_ms") or {}
             det = c.get("stages_ms", {}).get("detect") or {}
@@ -505,6 +529,11 @@ def _latency_table(index: Mapping[str, Any]) -> str:
                     fmt_duration(det.get("p50")),
                     fmt_duration(t.get("p50")) if c["stream"] else "—",
                     fmt_duration(t.get("p95")) if c["stream"] else "—",
+                    *(
+                        [fmt_duration((c.get("outbound_check_ms") or {}).get("p50"))]
+                        if outbound
+                        else []
+                    ),
                     f"{run['upstream_delay_ms']:g}",
                     f"`{run['run_id']}`",
                 ]
@@ -521,6 +550,7 @@ def _latency_table(index: Mapping[str, Any]) -> str:
             "Detect p50",
             "Added TTFT p50",
             "p95",
+            *(["Re-check p50"] if outbound else []),
             "Upstream delay ms",
             "Run",
         ],
@@ -535,6 +565,7 @@ def _latency_table(index: Mapping[str, Any]) -> str:
             "---:",
             "---:",
             "---:",
+            *(["---:"] if outbound else []),
             "---:",
             "---",
         ],
@@ -582,7 +613,7 @@ def _run_log(index: Mapping[str, Any]) -> str:
 _METHOD = """\
 ## How to read this
 
-- **Leak rate** is the share of labelled values that still appear, in any surface form, in
+- **Leak rate** is the share of labeled values that still appear, in any surface form, in
   the text the model would receive after masking (case- and whitespace-insensitive, through
   the language's inflected forms, structured identifiers by their letters and digits with any
   separators). Lower is safer; it is the number that matters most. **Partial leak** counts
@@ -597,9 +628,10 @@ _METHOD = """\
   (comparison tools that can't unmask show —).
 - **Hand-written vs generated sets.** `smoke` is written by hand with inline labels and has
   adversarial look-alikes; `synth-*` sets are written by a Meta Muse model around fictional
-  identities and labelled automatically. **Generated sets flatter Muse-based detectors**: the
+  identities and labeled automatically. **Muse-generated sets flatter Muse-based detectors**: the
   same model family wrote the text and reads it, so its phrasing and its idea of what an
-  entity is match. The headline charts use the hand-written set for that reason.
+  entity is match. Converted third-party (`public`) sets carry no such advantage.
+  The headline charts use the hand-written set for that reason.
 - **Small sets.** The sets have tens of documents per language: differences of a few points
   are noise. Every number below says which set, which run date and which commit it came from.
 - **Latency** is detection time per document (p50) on the hardware in the run log; it is not
@@ -668,7 +700,7 @@ def render_page(
     if index["visual"]:
         out.append("## Image masking\n")
         out.append(
-            "Share of labelled regions masked with IoU >= 0.5. `specimens` are official "
+            "Share of labeled regions masked with IoU >= 0.5. `specimens` are official "
             "specimen ID documents published by their issuers; `fictional-specimens` are "
             "specimen-style documents built from Muse Image output (LAB-1121). The two sets "
             "hold different documents, so compare runs within a set.\n"
@@ -713,11 +745,18 @@ def render_page(
 # --- Outputs ------------------------------------------------------------------------------
 
 
-def load_config(path: Path) -> tuple[str, list[str]]:
+def _read_config(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RecordError(f"{path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RecordError(f"{path}: must be a JSON object")
+    return data
+
+
+def load_config(path: Path) -> tuple[str, list[str]]:
+    data = _read_config(path)
     headline = data.get("headline_set")
     featured = data.get("featured")
     if not isinstance(headline, str) or not isinstance(featured, list):
@@ -733,11 +772,13 @@ def build_outputs(
     ui_index_path: Path | None = None,
     docs_dir: Path = DEFAULT_DOCS_DIR,
     colours: Path = DEFAULT_REGISTRY,
+    readme: Path = DEFAULT_README,
 ) -> dict[Path, str]:
     """Every generated file and its content, from the records in ``runs_dir``.
 
-    ``colours`` is the append-only colour registry; it is an output too, so a new system's
-    colour is committed with it and ``--check`` fails until it is.
+    ``colours`` is the append-only color registry; it is an output too, so a new system's
+    color is committed with it and ``--check`` fails until it is. ``readme`` is an output
+    only when the config has a ``readme`` section: its results block is rewritten.
     """
     records = load_records(runs_dir)
     if not records:
@@ -759,25 +800,47 @@ def build_outputs(
     for name, _, render in CHARTS:
         if not _drawn(index, name):
             continue
-        outputs[docs_dir / "benchmarks" / name] = render(index, headline, systems)
-    for name in validity_sets(index):
-        outputs[docs_dir / "benchmarks" / validity_chart(name)] = charts.number_validity(
-            index, fixture_set=name
+        svg = render(index, headline, systems)
+        outputs[docs_dir / "benchmarks" / name] = svg
+        outputs[docs_dir / "benchmarks" / name.replace(".svg", "-dark.svg")] = charts.dark_variant(
+            svg
         )
+    for name in validity_sets(index):
+        svg = charts.number_validity(index, fixture_set=name)
+        outputs[docs_dir / "benchmarks" / validity_chart(name)] = svg
+        outputs[docs_dir / "benchmarks" / validity_chart(name).replace(".svg", "-dark.svg")] = (
+            charts.dark_variant(svg)
+        )
+    counts = _dataset_counts(runs_dir)
     outputs[docs_dir / "benchmarks.md"] = render_page(
-        index, headline_set=headline, featured=systems, datasets_section=_datasets_section(runs_dir)
+        index, headline_set=headline, featured=systems, datasets_section=_datasets_section(counts)
     )
+    raw_readme = _read_config(config).get("readme")
+    if raw_readme is not None:
+        spec = parse_readme_spec(raw_readme, str(config))
+        try:
+            doc = readme.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RecordError(f"{readme}: {exc}") from exc
+        block = render_readme_block(index, counts, spec)
+        outputs[readme] = splice_readme(doc, block, str(readme))
     return outputs
 
 
-def _datasets_section(runs_dir: Path) -> str:
-    """Per-dataset CIs from the counts next to ``runs_dir`` (``eval/datasets/results``)."""
-    from pii_guard.eval.datasets import REGISTRY
-    from pii_guard.eval.datasets.ci import load_counts, render_section
+def _dataset_counts(runs_dir: Path) -> list[dict[str, Any]]:
+    """The per-dataset counts next to ``runs_dir`` (``eval/datasets/results``), oldest first."""
+    from pii_guard.eval.datasets.ci import load_counts
 
-    counts_dir = runs_dir.resolve().parent.parent / "datasets" / "results"
+    return load_counts(runs_dir.resolve().parent.parent / "datasets" / "results")
+
+
+def _datasets_section(counts: Sequence[Mapping[str, Any]]) -> str:
+    """Per-dataset CIs from the counts (:mod:`pii_guard.eval.datasets.ci`)."""
+    from pii_guard.eval.datasets import REGISTRY
+    from pii_guard.eval.datasets.ci import render_section
+
     order = [(d.name, d.title, d.split) for d in REGISTRY.values()]
-    return render_section(load_counts(counts_dir), order)
+    return render_section(counts, order)
 
 
 def current_index(root: Path = Path(".")) -> dict[str, Any]:
@@ -789,6 +852,7 @@ def current_index(root: Path = Path(".")) -> dict[str, Any]:
         index_path=index_path,
         docs_dir=root / DEFAULT_DOCS_DIR,
         colours=root / DEFAULT_REGISTRY,
+        readme=root / DEFAULT_README,
     )
     index: dict[str, Any] = json.loads(outputs[index_path])
     return index
@@ -847,6 +911,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="append-only system -> colour registry",
     )
     parser.add_argument(
+        "--readme",
+        type=Path,
+        default=DEFAULT_README,
+        help="its results block is rewritten when the config has a 'readme' section",
+    )
+    parser.add_argument(
         "--journey-dir",
         type=Path,
         default=DEFAULT_ENTRIES_DIR,
@@ -890,6 +960,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ui_index_path=ui_index,
             docs_dir=args.docs_dir,
             colours=args.colours,
+            readme=args.readme,
         )
         # Always rendered, so a broken entry fails every mode; written or compared only on
         # --journey, so pull requests that add an entry never touch docs/journey.md.

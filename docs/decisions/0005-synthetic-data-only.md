@@ -31,8 +31,9 @@ visibly placeholder pattern where it has none (added 2026-10-27, LAB-1214):
 | UK | Ofcom's drama ranges (`020 7946 0xxx`, `07700 900xxx`) | `+44 20 7946 0123` |
 | DE | the Bundesnetzagentur "Drama Numbers": fixed line `030 23125 xxx`, `040 66969 xxx`, `069 90009 xxx`, `0221 4710 xxx`, `089 99998 xxx`; mobile `0171 39200 xx`, `0176 040690 xx` | `+49 30 23125042`, `0171 3920042` |
 | HU | no range is reserved (the national numbering plan has none). We use a real area code, so the detectors see a well-formed number, with a subscriber number that is an ascending digit run (`123 4567`, `234 5678`, `345 6789`, `456 7890`) or in the block `555 01xx` | `+36 1 234 5678`, `06 30 123 4567`, `+36 70 555 0123` |
+| PL | no range is reserved either (added 2026-10-30, LAB-1589). As for HU: a real area code with a subscriber number in the block `555 01 xx`, or a mobile prefix followed by an ascending digit run | `+48 22 555 01 03`, `(61) 555 01 34`, `512 345 678` |
 
-The Hungarian rule can't rule out that such a number is assigned to someone; it keeps the
+The Hungarian and Polish rules can't rule out that such a number is assigned to someone; it keeps the
 chance low and makes the intent obvious. A new language pack documents its country's rule
 here. Generators (`eval/fixtures/build_*.py`) are the place to change a number: the committed
 JSONL files are regenerated from them.

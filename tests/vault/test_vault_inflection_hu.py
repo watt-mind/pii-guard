@@ -12,10 +12,10 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from vault_helpers import TEST_KEY, span_of
 
+from pii_guard.languages.hu.inflection import HungarianSuffixMatcher
 from pii_guard.types import EntityType, Span
 from pii_guard.vault import (
     PLACEHOLDER_RE,
-    HungarianSuffixMatcher,
     StreamUnmasker,
     Vault,
     VaultSession,
@@ -266,7 +266,7 @@ def test_stream_releases_long_runs_after_a_placeholder(vault: Vault) -> None:
     (placeholder,) = placeholders(session.mask("Elek.", [span_of("Elek.", "Elek", PERSON)]))
     unmasker = StreamUnmasker(session)
     assert unmasker.feed(placeholder + "nak") == ""
-    assert unmasker.feed(" ") == "Eleknak "
+    assert unmasker.feed(" ") == "Eleknek "  # re-harmonized (LAB-1152)
     assert unmasker.feed(placeholder + "x" * (MAX_SUFFIX_LENGTH + 1)) == (
         "Elek" + "x" * (MAX_SUFFIX_LENGTH + 1)
     )

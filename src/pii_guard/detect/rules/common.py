@@ -4,8 +4,8 @@ IBAN (any country, mod-97), email addresses, international phone numbers (``+`` 
 country code; ``+36`` is left to the Hungarian pack, which validates the area code) and
 payment card numbers (issuer prefix + Luhn).
 
-Payment cards are reported as ``BANK_ACCOUNT``: there is no card type in the taxonomy yet,
-and a card number is a financial account identifier with the same policy (mask).
+Payment cards are reported as ``PAYMENT_CARD`` (LAB-1102), apart from ``BANK_ACCOUNT``, so a
+policy override or a per-type score can treat them on their own. Both are masked by default.
 """
 
 from __future__ import annotations
@@ -179,15 +179,17 @@ _CARD_CONTEXT = (
 )  # fmt: skip
 
 # Printed in groups of 4 ("4111 1111 1111 1111", Amex "3782 822463 10005") with one consistent
-# separator, or compact. Never part of a longer number.
+# separator, or compact. Never part of a longer number. A comma on either side separates CSV
+# fields, not thousands: only a comma before 1-3 trailing digits blocks, as for other numbers
+# (LAB-1367), so a card in a CSV field ("name,4111111111111111,x") is found (LAB-1381).
 _CARD_RE = re.compile(
-    r"(?<![\w\-./,])(?<!\d )"
+    r"(?<![\w\-./])(?:(?<!\d,)|(?=\d{4}))(?<!\d )"
     r"(?:"
     r"(?P<grouped>\d{4}(?P<sep>[ -])\d{4}(?:(?P=sep)\d{4}){1,2}(?:(?P=sep)\d{1,3})?)"
     r"|(?P<amex>3[47]\d{2}(?P<asep>[ -])\d{6}(?P=asep)\d{5})"
     r"|(?P<compact>\d{12,19})"
     r")"
-    r"(?![\w\-./,]\w)(?! \d)"
+    r"(?!\d)(?![-./]\d)(?!,\d{1,3}(?!\d))" + NOT_IN_WORD_AFTER + r"(?! \d)"
 )
 
 
@@ -203,7 +205,7 @@ def _find_payment_card(text: str) -> Iterator[_Hit]:
             ):
                 continue
             score = 0.9 if m.group("compact") else 0.95
-            yield _Hit(m.start(), m.end(), EntityType.BANK_ACCOUNT, score)
+            yield _Hit(m.start(), m.end(), EntityType.PAYMENT_CARD, score)
 
 
 RULES: tuple[Rule, ...] = (_find_iban, _find_email, _find_intl_phone, _find_payment_card)

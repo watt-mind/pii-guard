@@ -22,9 +22,12 @@ function section(set: string): string[] {
   return report.slice(start, end < 0 ? undefined : end).split("\n").filter((line) => line.startsWith("| "));
 }
 
-/** The cells of the first row in `rows` whose system cell starts with `system`. */
+/**
+ * The cells of the first row in `rows` whose system cell starts with `system`, skipping `†`
+ * rows: those are older systems not run on every language of the current fixtures (LAB-1302).
+ */
 function cells(rows: string[], system: string): string[] {
-  const row = rows.find((line) => line.slice(2).startsWith(system));
+  const row = rows.find((line) => line.slice(2).startsWith(system) && !line.split("|")[1]!.includes("†"));
   expect(row, `row ${system}`).toBeDefined();
   return row!.split("|").slice(1, -1).map((cell) => cell.trim());
 }

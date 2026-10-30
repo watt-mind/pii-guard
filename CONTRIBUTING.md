@@ -82,6 +82,7 @@ one always conflict, even when their inputs don't overlap (LAB-1269). So:
 |---|---|---|
 | the benchmark index (`eval/results/index.json`, the UI's copy) | run records | **no**: `pii-guard eval report` writes it locally, and the UI build gets it from `pii-guard eval report --print-index` (`ui/vite.config.ts`; run `uv sync` once) |
 | `docs/benchmarks.md`, `docs/benchmarks/*.svg`, `docs/benchmarks/colours.json` | run records, `docs/benchmarks/config.json` | yes, so they read on GitHub |
+| the results block of `README.md` (between `<!-- results:start -->` and `<!-- results:end -->`) | run records, per-dataset counts, the `readme` section of `docs/benchmarks/config.json` | yes |
 | the milestones block of `docs/journey.md` | `docs/journey/*.md`, one file per milestone | yes; numbers are given when it is rendered |
 
 Who renders the committed ones depends on the repository variable `RENDER_DOCS_ON_MERGE`:
@@ -180,7 +181,7 @@ dependencies; the test and type-check jobs keep their development dependencies.
 | `gitleaks` | a secret in the commits the change adds ([`.gitleaks.toml`](.gitleaks.toml)) | `make gitleaks` |
 | `links` | a broken relative link in `README.md` or `docs/` ([`lychee.toml`](lychee.toml)) | `make links` |
 | `ci-ok` | any job it needs failing or being cancelled (skipped-on-purpose jobs pass) | — (aggregator only) |
-| `pii-in-diff` | **report-only for now.** pii-guard's own rules find a real-looking value on a line the PR adds: an e-mail outside the reserved example domains, or a validated identifier (tax, TAJ, IBAN, card, ID document, company number) not in `scripts/ci/pii-allowlist.txt` | `make pii-diff` |
+| `pii-in-diff` | pii-guard's own rules find a real-looking value on a line the PR adds: an e-mail outside the reserved example domains, or a validated identifier (tax, TAJ, IBAN, card, ID document, company number) not in `scripts/ci/pii-allowlist.txt` | `make pii-diff` |
 
 Separately, [`codeql.yml`](.github/workflows/codeql.yml) runs CodeQL on Python,
 JavaScript/TypeScript and the workflows (results under Security, code scanning),

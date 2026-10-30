@@ -6,7 +6,7 @@ behind each placeholder. Each guess is scored against the hidden labelled value,
 result is an *adversarial leak score* next to precision, recall and the plain leak rate.
 
 ```
-pii-guard eval --detectors rules,llm --redteam [--redteam-contexts masked-only,decoys]
+pii-guard eval --detectors rules,llm --redteam [--redteam-contexts masked-only,decoys,...]
                [--redteam-decoys 4] [--redteam-cache DIR] [--json OUT] [--markdown OUT]
 ```
 
@@ -20,6 +20,17 @@ Attack contexts (what the attacker gets besides the masked text):
   same corpus (preferably the same language). This models an attacker who already holds a
   customer list and wants to link a masked document to a row. Random picking gives the
   ``chance`` rate reported next to the result.
+- ``decoys-isolated`` (opt-in): the same candidate lists, but one request per entity type of
+  a document, with candidates for that type only. The attacker can no longer pick the
+  candidates that agree with each other (a name and the e-mail address that spells it), so
+  the difference to ``decoys`` is the share of linkage that comes from cross-candidate
+  consistency rather than from the masked text.
+
+Any context with a ``+generalized`` suffix (``decoys+generalized``) attacks the same
+documents masked with the opt-in linkage protection instead: the default ``keep`` text types
+masked too (:data:`pii_guard.policy.LINKAGE_OVERRIDES`) and the masked text passed through
+:func:`pii_guard.vault.generalize.generalize_context`. The detections are reused, so the
+masking detector is not called again; the scorecard records how many rewrites each rule made.
 
 Scoring, per distinct labelled value of a ``mask``-policy type (the unit of
 :func:`~pii_guard.eval.scorer.leak_report`):
@@ -66,7 +77,7 @@ import unicodedata
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -74,15 +85,20 @@ import httpx
 
 from pii_guard.eval.fixtures import Document, GoldSpan
 from pii_guard.eval.forms import find_surface_forms, language_forms
-from pii_guard.eval.scorer import DEFAULT_POLICY, DocumentResult, leak_report
+from pii_guard.eval.scorer import DEFAULT_POLICY, EVAL_TENANT_KEY, DocumentResult, leak_report
 from pii_guard.eval.stats import fmt_pct
+from pii_guard.policy import LINKAGE_OVERRIDES
 from pii_guard.types import EntityType, PiiGuardError
-from pii_guard.vault import PLACEHOLDER_RE, normalize_value
+from pii_guard.vault import PLACEHOLDER_RE, Vault, normalize_value
+from pii_guard.vault.generalize import RULES as GENERALIZE_RULES
+from pii_guard.vault.generalize import generalize_context
 
 __all__ = [
     "CONTEXTS",
     "DEFAULT_MODEL",
     "DEFAULT_URL",
+    "GENERALIZED",
+    "KNOWN_CONTEXTS",
     "AttackOutcome",
     "Attacker",
     "RedTeamError",
@@ -92,6 +108,7 @@ __all__ = [
     "build_messages",
     "build_targets",
     "candidate_lists",
+    "generalized_results",
     "guess_matches",
     "parse_guesses",
     "redteam_breakdown",
@@ -110,6 +127,10 @@ FALLBACK_KEY_ENV_VAR = "BASETEN_API_KEY"
 REASONING_EFFORT_ENV_VAR = "PII_GUARD_REDTEAM_REASONING_EFFORT"
 
 CONTEXTS = ("masked-only", "decoys")
+BASE_CONTEXTS = (*CONTEXTS, "decoys-isolated")
+#: Suffix of a context run on the documents masked with linkage protection.
+GENERALIZED = "+generalized"
+KNOWN_CONTEXTS = (*BASE_CONTEXTS, *(c + GENERALIZED for c in BASE_CONTEXTS))
 DEFAULT_DECOYS = 4
 #: Seed for the decoy draw, so candidate lists (and cached responses) are reproducible.
 DECOY_SEED = 1088
@@ -124,6 +145,7 @@ _CODE_TYPES = frozenset(
     {
         EntityType.PHONE,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.ID_DOCUMENT,
         EntityType.NATIONAL_ID_HU_TAX,
         EntityType.NATIONAL_ID_HU_TAJ,
@@ -209,7 +231,7 @@ def build_targets(
         placeholders = sorted(
             {
                 ph
-                for start, end, ph in result.replacements
+                for start, end, ph in result.replacements or ()
                 if any(start < s.end and s.start < end for s in spans)
             }
         )
@@ -257,6 +279,42 @@ def candidate_lists(
             for ph in t.placeholders:
                 out[(doc_id, ph)] = chosen
     return out
+
+
+def generalized_results(
+    results: Sequence[DocumentResult],
+    *,
+    policy: Mapping[EntityType, str] = DEFAULT_POLICY,
+    tenant_key: bytes = EVAL_TENANT_KEY,
+) -> tuple[list[DocumentResult], dict[str, int]]:
+    """``results`` re-masked with linkage protection, and the rewrite count of each rule.
+
+    Every prediction is masked unless its type is ``keep`` under ``policy`` updated with
+    :data:`~pii_guard.policy.LINKAGE_OVERRIDES`; the masked text then goes through
+    :func:`~pii_guard.vault.generalize.generalize_context`. Detections are reused as they are.
+    """
+    effective = {**policy, **{t: p.value for t, p in LINKAGE_OVERRIDES.items()}}
+    vault = Vault(tenant_key)
+    counts = dict.fromkeys(GENERALIZE_RULES, 0)
+    out: list[DocumentResult] = []
+    for r in results:
+        doc = r.document
+        spans = [p for p in r.predicted if effective.get(p.entity_type, "mask") != "keep"]
+        session = vault.session()
+        masked = session.mask_with_report(doc.text, spans, language=doc.language)
+        vault.drop(session.session_id)
+        generalized = generalize_context(masked.text, doc.language)
+        for rule, n in generalized.rewrites.items():
+            counts[rule] += n
+        out.append(
+            replace(
+                r,
+                masked_spans=tuple(spans),
+                masked_text=generalized.text,
+                replacements=masked.replacements,
+            )
+        )
+    return out, counts
 
 
 # --- Prompt and answer -------------------------------------------------------------------
@@ -617,6 +675,17 @@ def _score(
     return outcome
 
 
+def _merge(context: str, parts: Sequence[AttackOutcome]) -> AttackOutcome:
+    merged = AttackOutcome(context=context, targets=[])
+    for part in parts:
+        merged.targets.extend(part.targets)
+        merged.outcomes.extend(part.outcomes)
+        merged.exact.extend(part.exact)
+        merged.chance.extend(part.chance)
+        merged.error = merged.error or part.error
+    return merged
+
+
 def run_redteam(
     results: Sequence[DocumentResult],
     attacker: Attacker,
@@ -625,44 +694,76 @@ def run_redteam(
     decoys: int = DEFAULT_DECOYS,
     workers: int = 4,
     progress: Callable[[str], None] | None = None,
+    generalized: Sequence[DocumentResult] | None = None,
 ) -> list[AttackOutcome]:
     """Attack every document's masked text once per context. Documents without a masked
-    target are scored without a request (their values are leaked or uncovered)."""
-    unknown = [c for c in contexts if c not in CONTEXTS]
+    target are scored without a request (their values are leaked or uncovered).
+
+    ``+generalized`` contexts attack ``generalized`` (computed with
+    :func:`generalized_results` when not given)."""
+    unknown = [c for c in contexts if c not in KNOWN_CONTEXTS]
     if unknown:
         raise ValueError(f"unknown red-team context(s): {', '.join(unknown)}")
-    targets_by_doc = {r.document.id: build_targets(r) for r in results}
-    candidates = candidate_lists(targets_by_doc, decoys=decoys) if "decoys" in contexts else {}
+    variants: dict[str, Sequence[DocumentResult]] = {"": results}
+    if any(c.endswith(GENERALIZED) for c in contexts):
+        variants[GENERALIZED] = (
+            generalized if generalized is not None else generalized_results(results)[0]
+        )
+    targets_by: dict[str, dict[str, list[Target]]] = {
+        v: {r.document.id: build_targets(r) for r in rs} for v, rs in variants.items()
+    }
+    with_decoys = any(not c.startswith("masked-only") for c in contexts)
+    candidates_by = {
+        v: candidate_lists(t, decoys=decoys) if with_decoys else {} for v, t in targets_by.items()
+    }
 
-    def attack(job: tuple[DocumentResult, str]) -> AttackOutcome:
-        result, context = job
-        targets = targets_by_doc[result.document.id]
+    def ask(
+        result: DocumentResult,
+        context: str,
+        targets: Sequence[Target],
+        candidates: Mapping[tuple[str, str], Sequence[str]],
+    ) -> AttackOutcome:
+        """One request about ``result``; candidates for (and scores of) ``targets`` only."""
         asked = sorted({ph for t in targets if t.masked for ph in t.placeholders})
-        ctx_candidates = candidates if context == "decoys" else {}
         if not asked:
-            return _score(targets, {}, context, ctx_candidates)
+            return _score(targets, {}, context, candidates)
         # Ask about every placeholder in the text (over-masks too), so the request doesn't
         # reveal which placeholders hide a labelled value.
         present = PLACEHOLDER_RE.finditer(result.masked_text)
         ordered = list(dict.fromkeys(m.group(0) for m in present)) or asked
         doc_id = result.document.id
-        per_ph = {
-            ph: ctx_candidates[(doc_id, ph)] for ph in asked if (doc_id, ph) in ctx_candidates
-        }
+        per_ph = {ph: candidates[(doc_id, ph)] for ph in asked if (doc_id, ph) in candidates}
         messages = build_messages(result.masked_text, ordered, per_ph or None)
         try:
             guesses = parse_guesses(attacker.complete(messages))
         except RedTeamError as exc:
             attacker._count(failures=1)
-            return _score(targets, None, context, ctx_candidates, error=exc.message)
+            return _score(targets, None, context, candidates, error=exc.message)
         except ValueError:
             attacker._count(failures=1)
-            return _score(targets, None, context, ctx_candidates, error="unparseable answer")
+            return _score(targets, None, context, candidates, error="unparseable answer")
         if progress:
             progress(f"{context} {result.document.id}")
-        return _score(targets, guesses, context, ctx_candidates)
+        return _score(targets, guesses, context, candidates)
 
-    jobs = [(r, c) for c in contexts for r in results]
+    def attack(job: tuple[DocumentResult, str]) -> AttackOutcome:
+        result, context = job
+        variant = GENERALIZED if context.endswith(GENERALIZED) else ""
+        base = context.removesuffix(GENERALIZED)
+        targets = targets_by[variant][result.document.id]
+        candidates = {} if base == "masked-only" else candidates_by[variant]
+        if base != "decoys-isolated":
+            return ask(result, context, targets, candidates)
+        passive = [t for t in targets if not t.masked]
+        parts = [_score(passive, {}, context, candidates)] if passive else []
+        for entity_type in dict.fromkeys(t.entity_type for t in targets if t.masked):
+            group = [t for t in targets if t.masked and t.entity_type is entity_type]
+            parts.append(ask(result, context, group, candidates))
+        return _merge(context, parts)
+
+    jobs = [
+        (r, c) for c in contexts for r in variants[GENERALIZED if c.endswith(GENERALIZED) else ""]
+    ]
     try:
         with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
             return list(pool.map(attack, jobs))
@@ -780,7 +881,8 @@ def add_redteam_arguments(parser: argparse.ArgumentParser) -> None:
         type=_csv,
         default=list(CONTEXTS),
         metavar="NAMES",
-        help=f"attack contexts (default: {','.join(CONTEXTS)})",
+        help=f"attack contexts (default: {','.join(CONTEXTS)}; also decoys-isolated and any "
+        f"context with a {GENERALIZED} suffix)",
     )
     group.add_argument("--redteam-decoys", type=int, default=DEFAULT_DECOYS, metavar="N")
     group.add_argument("--redteam-workers", type=int, default=4, metavar="N")
@@ -803,7 +905,7 @@ def add_redteam_arguments(parser: argparse.ArgumentParser) -> None:
 def attacker_from_args(args: argparse.Namespace) -> Attacker:
     if args.redteam_decoys < 1:
         raise RedTeamError("--redteam-decoys must be at least 1")
-    unknown = [c for c in args.redteam_contexts if c not in CONTEXTS]
+    unknown = [c for c in args.redteam_contexts if c not in KNOWN_CONTEXTS]
     if unknown:
         raise RedTeamError(f"unknown red-team context(s): {', '.join(unknown)}")
     key = os.environ.get(args.attacker_key_env) if args.attacker_key_env else None
@@ -830,12 +932,17 @@ def redteam_section(
     analyzer: Any = None,
 ) -> tuple[dict[str, Any], str]:
     """Run the attack for ``pii-guard eval --redteam``: the scorecard block and Markdown."""
+    generalized: list[DocumentResult] | None = None
+    rewrites: dict[str, int] | None = None
+    if any(c.endswith(GENERALIZED) for c in args.redteam_contexts):
+        generalized, rewrites = generalized_results(results)
     outcomes = run_redteam(
         results,
         attacker,
         contexts=args.redteam_contexts,
         decoys=args.redteam_decoys,
         workers=args.redteam_workers,
+        generalized=generalized,
     )
     breakdown = redteam_breakdown(outcomes)
     block = {
@@ -846,6 +953,11 @@ def redteam_section(
         "results": breakdown,
         "usage": dict(attacker.usage),
     }
+    if rewrites is not None:  # counts only, never what was rewritten
+        block["generalization"] = {
+            "linkage_overrides": sorted(t.value for t in LINKAGE_OVERRIDES),
+            "rewrites": rewrites,
+        }
     if analyzer is not None:  # the masking side's token counters (the LLM detector), for cost
         from pii_guard.eval.injection import _usage
 

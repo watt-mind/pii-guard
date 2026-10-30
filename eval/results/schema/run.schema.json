@@ -56,7 +56,8 @@
       "additionalProperties": false,
       "properties": {
         "commit": {"type": "string", "pattern": "^([0-9a-f]{7,40}|unknown)$"},
-        "dirty": {"type": "boolean"},
+        "dirty": {"type": "boolean", "description": "Whether a tracked file under src/, eval/fixtures/, scripts/, pyproject.toml or uv.lock differed from the commit (LAB-1496). Docs and results churn does not count; older records counted any tracked change."},
+        "dirty_paths": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Which of those files differed (at most 50). Absent in records made before LAB-1496."},
         "pii_guard_version": {"type": ["string", "null"]},
         "note": {"type": ["string", "null"]}
       }
@@ -94,6 +95,7 @@
         "key": {"type": "string", "minLength": 1, "description": "Stable id of the system; runs with the same key are the same system over time."},
         "label": {"type": "string", "minLength": 1},
         "family": {"enum": ["pii-guard", "comparison"]},
+        "role": {"enum": ["own", "other-model", "tool"], "description": "Whose system it is: pii-guard's own configuration, another organisation's model run through pii-guard's pipeline (family pii-guard), or a comparison tool. Derived from the detectors (pii_guard.eval.record.system_role); older records are backfilled by eval rescore (LAB-1495)."},
         "tool": {"type": "string"},
         "version": {"type": ["string", "null"]},
         "detectors": {"type": "array", "items": {"$ref": "#/$defs/detector"}},
@@ -109,7 +111,7 @@
         "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16,64}$"},
         "set": {"type": "string", "minLength": 1},
         "language": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/language"}]},
-        "origin": {"enum": ["hand-written", "generated", "specimens", "unknown"], "description": "generated sets were written by a Muse model, which flatters Muse-based detectors."},
+        "origin": {"enum": ["hand-written", "generated", "public", "specimens", "unknown"], "description": "generated sets were written by a Muse model, which flatters Muse-based detectors; public sets are third-party benchmarks converted to fixtures."},
         "generator": {"type": ["string", "null"]},
         "documents": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/count"}]}
       }
@@ -260,9 +262,32 @@
           "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]*$"},
           "additionalProperties": {"$ref": "#/$defs/type_metrics"}
         },
+        "outbound_check": {
+          "$ref": "#/$defs/outbound_check",
+          "description": "Optional (pii-guard eval --outbound-check, LAB-1505). The documents replayed through the gateway in fast mode: how many requests the outbound re-check refused. On the evaluation sets every block is a false block."
+        },
         "validity": {
           "$ref": "#/$defs/validity",
           "description": "Optional (public sets). Recall and leak split by whether a structured identifier passes the language packs' validators; the headline counts are unchanged. See docs/evaluation.md#number-validity."
+        }
+      }
+    },
+    "outbound_check": {
+      "type": "object",
+      "required": ["requests", "checked", "blocked", "rate", "check_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "requests": {"$ref": "#/$defs/count", "description": "Documents sent, one request each."},
+        "checked": {"$ref": "#/$defs/count", "description": "Requests the re-check read (the rest were refused before it, such as by a block policy)."},
+        "blocked": {"$ref": "#/$defs/count", "description": "Requests the re-check refused (422 outbound_check_failed)."},
+        "rate": {"$ref": "#/$defs/rate", "description": "blocked / checked: the false-block rate."},
+        "check_ms": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "object", "required": ["p50", "p95"], "additionalProperties": false,
+             "properties": {"p50": {"type": "number", "minimum": 0}, "p95": {"type": "number", "minimum": 0}}}
+          ],
+          "description": "The re-check's own time per passed request; null when none passed."
         }
       }
     },
@@ -399,7 +424,8 @@
         "client_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Wall time seen by the benchmark client."},
         "client_ttft_ms": {"$ref": "#/$defs/latency_percentiles"},
         "stages_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "parse, detect, image, mask, forward, upstream_ttfb, upstream, unmask, response, client (streams: time handing events to the client)."},
-        "detectors_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "Per detector, summed over the texts of a request."}
+        "detectors_ms": {"type": "object", "additionalProperties": {"$ref": "#/$defs/latency_percentiles"}, "description": "Per detector, summed over the texts of a request."},
+        "outbound_check_ms": {"$ref": "#/$defs/latency_percentiles", "description": "Optional (LAB-1505). The outbound re-check's own time per request (the traffic events' outbound_check.ms); null when no request was re-checked."}
       }
     },
     "latency_metrics": {

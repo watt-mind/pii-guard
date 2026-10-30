@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { TOOLS, fetchSnippets, type Snippets, type ToolSnippet } from "../api/connect";
+import { ApiError } from "../api/http";
 import { Button, ButtonLink, Field, Input, Notice, Select } from "../components/ui";
-import { projectPath, type Endpoint, type ProjectList } from "../projects/api";
+import { MaskedText } from "../components/MaskedText";
+import { projectPath, requestPolicyEdit, type Endpoint, type PolicyVersion, type ProjectList } from "../projects/api";
 import { getSelectedProject, setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 import { CodeBlock, CopyButton } from "../screens/ConnectQuickstart";
 import { readPref, writePref } from "../lib/storage";
@@ -25,20 +27,26 @@ import {
 } from "./firstRun";
 import { SOURCE, useHostedSession } from "./session";
 
-type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoints: Endpoint[]; first: FirstRun | null; projectId: string };
+type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoints: Endpoint[]; first: FirstRun | null; projectId: string; policyNames: Record<string, string>; latest: Record<string, number> };
 
 /**
  * Hosted Connect, "Connect your client" (LAB-1455): the first screen after sign-in. The server
- * provisions a default endpoint once (`/v1/account/first-run`), so a new owner gets a guard key,
+ * provisions a default endpoint once (`/v1/account/first-run`), so a new owner gets a endpoint key,
  * copy-paste blocks for their tool and a test request without creating anything. With sponsored
  * inference unavailable it first asks for one thing: the owner's own Meta API key.
  */
-export function ClientSetup({ call }: { call: Requester }) {
+export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: (id: string) => void }) {
   const session = useHostedSession();
   const sponsoredEnabled = session?.account.limits.sponsored_enabled === true;
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
   const [revision, setRevision] = useState(0);
   const picked = useSelectedEndpoint();
+  // Projects saved a change (a policy applied from Tune, LAB-1629): show the endpoint as it is now.
+  useEffect(() => {
+    const update = () => setRevision((n) => n + 1);
+    window.addEventListener("pii-guard-project-configuration", update);
+    return () => window.removeEventListener("pii-guard-project-configuration", update);
+  }, []);
   useEffect(() => {
     let live = true;
     (async () => {
@@ -46,9 +54,17 @@ export function ClientSetup({ call }: { call: Requester }) {
       const first = await loadFirstRun(call).catch(() => null);
       const list = await call<ProjectList>("/v1/projects");
       const projectId = getSelectedProject() ?? list.default_project_id ?? list.projects[0]?.id;
-      if (!projectId) return { first, endpoints: [], projectId: "" };
-      const data = await call<{ endpoints: Endpoint[] }>(`${projectPath(projectId)}/endpoints`);
-      return { first, endpoints: (data.endpoints ?? []).filter((e) => e.enabled), projectId };
+      if (!projectId) return { first, endpoints: [], projectId: "", policyNames: {}, latest: {} };
+      const [data, policies] = await Promise.all([
+        call<{ endpoints: Endpoint[] }>(`${projectPath(projectId)}/endpoints`),
+        // Only for the card's "Default policy · v1" (LAB-1629): without it, the card says "Policy".
+        call<{ policies?: PolicyVersion[] }>(`${projectPath(projectId)}/policies`).catch(() => ({ policies: [] as PolicyVersion[] })),
+      ]);
+      const versions = Array.isArray(policies.policies) ? policies.policies : [];
+      const policyNames = Object.fromEntries(versions.map((p) => [p.policy_version_id, p.name]));
+      const latest: Record<string, number> = {};
+      for (const p of versions) latest[p.policy_id] = Math.max(latest[p.policy_id] ?? 0, p.version);
+      return { first, endpoints: (data.endpoints ?? []).filter((e) => e.enabled), projectId, policyNames, latest };
     })().then(
       (value) => live && setLoaded({ state: "ok", ...value }),
       () => live && setLoaded({ state: "failed" }),
@@ -74,12 +90,13 @@ export function ClientSetup({ call }: { call: Requester }) {
         </h2>
         <p className="mt-0.5 text-sm text-pretty text-muted">
           {state === "needs_key"
-            ? "One step first: your endpoint needs a model key. Then copy your guard key, paste one block into your tool and send a test request."
-            : "Your client sends real data to your PII Guard endpoint. The model gets placeholders; the answer comes back with the real values. Three steps: copy your guard key, paste one block into your tool, send a test request."}
+            ? "One step first: your endpoint needs a provider key. Then copy your endpoint key, paste one block into your tool and send a test request."
+            : "Your client sends real data to your PII Guard endpoint. The model gets placeholders; the answer comes back with the real values. Three steps: copy your endpoint key, paste one block into your tool, send a test request."}
         </p>
       </div>
       {loaded.state === "loading" ? (
-        <p role="status" className="text-sm text-muted">
+        // Tall while loading, so the card that replaces it doesn't push what's below (CLS, LAB-1626).
+        <p role="status" className="min-h-dvh text-sm text-muted">
           Preparing your endpoint…
         </p>
       ) : loaded.state === "failed" ? (
@@ -102,13 +119,16 @@ export function ClientSetup({ call }: { call: Requester }) {
             </Field>
           )}
           <ConnectEndpoint
-            key={current.id}
+            key={`${current.id}:${current.policy_version_id}`}
             call={call}
             endpoint={current}
+            policyName={ok.policyNames[current.policy_version_id]}
+            newerVersion={(ok.latest[current.policy_id] ?? 0) > current.policy_version ? ok.latest[current.policy_id] : undefined}
             projectId={ok.projectId}
             state={state!}
             isDefault={isDefault}
             first={isDefault ? first : null}
+            onOpenLog={onOpenLog}
             onChanged={() => setRevision((n) => n + 1)}
           />
         </>
@@ -120,14 +140,21 @@ export function ClientSetup({ call }: { call: Requester }) {
 function ConnectEndpoint({
   call,
   endpoint,
+  policyName,
+  newerVersion,
   projectId,
   state,
   isDefault,
   first,
+  onOpenLog,
   onChanged,
 }: {
   call: Requester;
+  onOpenLog?: (id: string) => void;
   endpoint: Endpoint;
+  policyName?: string;
+  /** The policy's latest version, when it is newer than the one this endpoint uses. */
+  newerVersion?: number;
   projectId: string;
   state: FirstRunState;
   isDefault: boolean;
@@ -135,7 +162,7 @@ function ConnectEndpoint({
   onChanged: () => void;
 }) {
   const url = first?.gateway_url || `${globalThis.location?.origin ?? ""}/e/${endpoint.id}/v1`;
-  // The key this page was shown (first sign-in, or "Create a new guard key"): the blocks embed it.
+  // The key this page was shown (first sign-in, or "Create a new endpoint key"): the blocks embed it.
   const [key, setKey] = useState<IssuedKey | null>(() => getShownKey(endpoint.id));
   // After the Meta key is saved its form goes away: focus moves on to step 1, not to <body>.
   const wasNeedsKey = useRef(state === "needs_key");
@@ -155,12 +182,21 @@ function ConnectEndpoint({
             <StateBadge state={state} />
           </p>
           <p className="text-xs text-muted">
-            {upstream} · {endpoint.model ? <>model {mono(endpoint.model)}</> : "your client picks the model"} · policy version {endpoint.policy_version}
+            {upstream} · {endpoint.model ? <>model <code className="font-mono text-xs whitespace-nowrap">{endpoint.model}</code></> : "your client picks the model"} · {policyName ?? "Policy"} · v{endpoint.policy_version}
+            {/* A newer version isn't applied by itself: say so where the test runs (LAB-1640). */}
+            {newerVersion !== undefined && (
+              <>
+                {" · "}
+                <a className="underline underline-offset-4 hover:text-ink" href="#projects">v{newerVersion} available in Projects</a>
+              </>
+            )}
           </p>
         </div>
         <div className="flex min-w-0 max-w-full items-center gap-2">
-          <code className="min-w-0 truncate font-mono text-xs text-ink" title={url}>
-            {url}
+          {/* Cut in the middle on phones: the endpoint id's end and /v1 stay readable (LAB-1626). */}
+          <code className="flex min-w-0 font-mono text-xs text-ink" title={url}>
+            <span className="min-w-0 truncate">{url.slice(0, -URL_TAIL)}</span>
+            <span className="shrink-0">{url.slice(-URL_TAIL)}</span>
           </code>
           <CopyButton text={url} label="Copy the endpoint base URL" />
         </div>
@@ -177,20 +213,23 @@ function ConnectEndpoint({
         <Notice tone="warn">This endpoint is disabled. Re-enable it in Projects to connect a client.</Notice>
       ) : (
         <ol className="space-y-6">
-          <Step n={1} title="Copy your guard key" headingRef={stepOne}>
+          <Step n={1} title="Copy your endpoint key" headingRef={stepOne}>
             <KeyStep call={call} endpoint={endpoint} projectId={projectId} onKey={setKey} />
           </Step>
           <Step n={2} title="Paste one block into your tool">
             <SnippetStep endpointId={endpoint.id} guardKey={key?.key ?? null} />
           </Step>
           <Step n={3} title="Send a test request">
-            <TestStep endpointId={endpoint.id} />
+            <TestStep endpointId={endpoint.id} policyId={endpoint.policy_id} policyVersionId={endpoint.policy_version_id} onOpenLog={onOpenLog} />
           </Step>
         </ol>
       )}
     </div>
   );
 }
+
+/** The end of the endpoint URL that never truncates: the id's last characters and `/v1`. */
+const URL_TAIL = 9;
 
 function StateBadge({ state }: { state: FirstRunState }) {
   const [tone, label] =
@@ -214,7 +253,7 @@ function MetaKeyStep({ call, onAdded }: { call: Requester; onAdded: () => void }
       setValue("");
       onAdded();
     } catch (err) {
-      setError(recovery(err).startsWith("The request was refused") ? "That key could not be saved. Paste the whole key, without spaces or quotes." : recovery(err));
+      setError(metaKeyError(err));
     } finally {
       setBusy(false);
     }
@@ -253,6 +292,13 @@ function MetaKeyStep({ call, onAdded }: { call: Requester; onAdded: () => void }
   );
 }
 
+/** What to fix next to the Meta key field: a malformed key gets its own message, never a generic save error. */
+function metaKeyError(err: unknown): string {
+  if (err instanceof ApiError && err.code === "invalid_provider_key") return "That doesn't look like a Meta API key. Paste the whole key as one line, without spaces, quotes or a URL.";
+  const fallback = recovery(err);
+  return fallback.startsWith("The request was refused") ? "That key could not be saved. Paste the whole key, without spaces or quotes." : fallback;
+}
+
 function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoint: Endpoint; projectId: string; onKey: (key: IssuedKey | null) => void }) {
   const [key, setKeyState] = useState<IssuedKey | null>(() => getShownKey(endpoint.id));
   const [busy, setBusy] = useState(false);
@@ -283,9 +329,9 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
     return (
       <div className="space-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 sm:p-4">
         <p role="status" className="text-sm font-medium text-warn">
-          Copy your guard key now. It is shown only once.
+          Shown only once: store it now.
         </p>
-        <CodeBlock text={`export ${ENDPOINT_KEY_ENV}=${key.key}`} label="Copy the export line with your guard key" />
+        <CodeBlock text={`export ${ENDPOINT_KEY_ENV}=${key.key}`} label="Copy the export line with your endpoint key" />
         <p className="text-xs text-pretty text-muted">
           The blocks below already contain it. PII Guard keeps only a hash, so after you leave or reload this page it can&apos;t be shown again: store it now (for example in a
           password manager). It works only for this endpoint; revoke it in Projects.
@@ -310,7 +356,7 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
   return (
     <div className="space-y-2">
       <p className="text-sm text-pretty text-muted">
-        Your guard key was shown once, when it was created. Use the key you stored, as {mono(`$${ENDPOINT_KEY_ENV}`)}, or create a new one in one click and the blocks below fill it in. Old keys keep working until you revoke them in{" "}
+        Your endpoint key was shown once, when it was created. Use the key you stored, as {mono(`$${ENDPOINT_KEY_ENV}`)}, or create a new one in one click and the blocks below fill it in. Old keys keep working until you revoke them in{" "}
         <a className="text-ink underline underline-offset-4" href="#projects">
           Projects
         </a>
@@ -318,7 +364,7 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
       </p>
       {error && <p className="text-sm text-danger" role="alert">{error}</p>}
       <Button ref={createRef} busy={busy} onClick={() => void create()}>
-        {busy ? "Creating…" : "Create a new guard key"}
+        {busy ? "Creating…" : "Create a new endpoint key"}
       </Button>
     </div>
   );
@@ -340,13 +386,14 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
   }, [endpointId, attempt]);
   const tools: ToolSnippet[] = result.state === "ok" ? ORDER.map((id) => result.snippets.tools.find((t) => t.id === id)).filter((t): t is ToolSnippet => Boolean(t)) : [];
   const tabs = tools.length ? tools.map((t) => ({ id: t.id, label: LABEL[t.id] ?? t.label })) : ORDER.map((id) => ({ id, label: LABEL[id] ?? TOOLS.find((t) => t.id === id)?.label ?? id }));
-  const [tool, setTool] = useState<string>(() => readPref("first-run-tool") ?? "codex");
+  const [tool, setTool] = useState<string>(() => readPref("first-run-tool") ?? "");
   const chosen = tools.find((t) => t.id === tool) ?? tools.find((t) => t.supported) ?? null;
   const pick = (id: string) => {
     setTool(id);
     writePref("first-run-tool", id);
   };
-  const shown = chosen?.id ?? tool;
+  // No pick yet: the first tool in ORDER that works with this endpoint, Muse Code first (LAB-1619).
+  const shown = chosen?.id ?? (tool || ORDER[0]);
   return (
     <div className="space-y-3">
       <ToolTabs tabs={tabs} tool={shown} onTool={pick} />
@@ -362,14 +409,15 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
         ) : !chosen.supported ? (
           <div role="note" className="space-y-1 text-sm">
             <p className="text-pretty text-ink">{chosen.note.replace(/; use another tool\.?$/, ".")}</p>
-            <p className="text-muted">Codex, pi, OpenCode, the OpenAI SDK and cURL work with this endpoint today.</p>
+            <p className="text-muted">{listJoin(tools.filter((t) => t.supported).map((t) => LABEL[t.id] ?? t.label))} work with this endpoint today.</p>
           </div>
         ) : (
           <>
             <CodeBlock text={withKey(chosen, guardKey)} label={`Copy the ${LABEL[chosen.id] ?? chosen.label} block`} />
             <p className="text-xs text-pretty text-muted">
-              {guardKey ? "Your guard key is filled in: paste it as is. " : <>Reads your guard key from {mono(`$${ENDPOINT_KEY_ENV}`)}. </>}
-              {chosen.note}
+              {guardKey ? "Your endpoint key is filled in: paste it as is. " : <>Reads your endpoint key from {mono(`$${ENDPOINT_KEY_ENV}`)}. </>}
+              {/* With the key filled in, the block itself exports it: no "export it first" (LAB-1619). */}
+              {guardKey ? chosen.note.replace(/: export it first\./g, " (the block sets it).") : chosen.note}
               {chosen.id === "pi" && (
                 <>
                   {" "}
@@ -400,6 +448,11 @@ function SnippetStep({ endpointId, guardKey }: { endpointId: string; guardKey: s
   );
 }
 
+/** "A, B and C". */
+function listJoin(items: string[]): string {
+  return items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
 function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[]; tool: string; onTool: (t: string) => void }) {
   const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     const i = tabs.findIndex((t) => t.id === tool);
@@ -411,10 +464,11 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[
     document.getElementById(`first-run-tab-${next.id}`)?.focus();
   };
   return (
+    // Phones wrap the tabs onto a second row: a cut-off "OpenAI" with no scroll cue hid tools (LAB-1629).
     <div
       role="tablist"
       aria-label="Your tool"
-      className="-mx-1 flex gap-1 overflow-x-auto border-b border-line [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:[mask-image:none]"
+      className="-mx-1 flex flex-wrap gap-x-1 border-b border-line sm:flex-nowrap sm:overflow-x-auto"
     >
       {tabs.map((t) => {
         const selected = t.id === tool;
@@ -443,7 +497,7 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[
   );
 }
 
-function TestStep({ endpointId }: { endpointId: string }) {
+function TestStep({ endpointId, policyId, policyVersionId, onOpenLog }: { endpointId: string; policyId: string; policyVersionId?: string; onOpenLog?: (id: string) => void }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<TestRoundTrip | null>(null);
   const [error, setError] = useState("");
@@ -458,7 +512,7 @@ function TestStep({ endpointId }: { endpointId: string }) {
     setError("");
     setResult(null);
     try {
-      setResult(await sendTestRequest(endpointId, undefined, abort.signal));
+      setResult(await sendTestRequest(endpointId, undefined, abort.signal, policyVersionId));
     } catch (e) {
       if (!abort.signal.aborted || e instanceof Error) setError(testRecovery(e));
     } finally {
@@ -474,26 +528,29 @@ function TestStep({ endpointId }: { endpointId: string }) {
       <Button variant="primary" busy={running} onClick={() => void run()} aria-describedby={result ? resultId : undefined}>
         {running ? "Sending…" : result ? "Send again" : "Send a test request"}
       </Button>
-      <div aria-live="polite">
+      {/* Only the status lines are announced, not the three panes (LAB-1626). While sending, it
+          holds about the result's height, so the result doesn't push the page down (CLS, LAB-1629);
+          that growth follows the click, which layout-shift scoring ignores. */}
+      <div className={running ? "min-h-[46rem] sm:min-h-[36rem] lg:min-h-[22rem]" : undefined}>
         {running && (
-          <p className="text-sm text-muted">
+          <p role="status" className="text-sm text-muted">
             Masking, then waiting for the model. Reasoning models can take up to a minute.
           </p>
         )}
         {error && (
-          <Notice tone="danger" className="mt-1">
+          <Notice tone="danger" live className="mt-1">
             {error}
           </Notice>
         )}
         {result && (
           <div id={resultId} className="space-y-3">
-            <p className="text-sm font-medium text-guard-ink">
+            <p role="status" className="text-sm font-medium text-guard-ink">
               ✓ Round trip complete{result.maskedCount !== null ? `: ${result.maskedCount} ${result.maskedCount === 1 ? "value" : "values"} masked before the model saw it` : ""} ·{" "}
               {(result.ms / 1000).toFixed(1)} s
             </p>
             <div className="grid gap-3 lg:grid-cols-3">
               <Pane title="You sent" text={result.original} />
-              <Pane title="The model saw" text={result.masked || "Not reported by the server."} tone="model" />
+              <Pane title="The model saw" text={result.masked || "Not reported by the server."} tone="model" masked={Boolean(result.masked)} />
               <Pane title="You got back" text={result.restored || "The model returned an empty answer. Try again."} tone="restored" />
             </div>
             {result.maskedAnswer && (
@@ -503,8 +560,27 @@ function TestStep({ endpointId }: { endpointId: string }) {
               </details>
             )}
             <p className="text-xs text-muted">
-              Detection can miss values: check the masked request. Every call also shows up in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>, tagged with this endpoint.
+              Detection can miss values: check the masked request. Every call also shows up in Logs, tagged with this endpoint.
             </p>
+            <div role="note" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-guard/40 bg-guard-soft p-3 text-sm">
+              {/* Full width on phones, so the two buttons get their own row (LAB-1626). */}
+              <p className="min-w-0 flex-1 basis-full font-medium text-pretty text-guard-ink sm:basis-auto">
+                Your endpoint works. Paste the block from step 2 and your client&apos;s calls go through it the same way.
+              </p>
+              {result.requestId && onOpenLog ? (
+                <Button size="sm" onClick={() => onOpenLog(result.requestId!)}>
+                  Open this call in Logs
+                </Button>
+              ) : (
+                <ButtonLink size="sm" href="#logs">
+                  Open this call in Logs
+                </ButtonLink>
+              )}
+              {/* Straight to a new version of this endpoint's policy, its form focused (LAB-1626). */}
+              <ButtonLink size="sm" variant="ghost" href="#projects" onClick={() => requestPolicyEdit(policyId, endpointId)}>
+                Tune what is masked
+              </ButtonLink>
+            </div>
           </div>
         )}
       </div>
@@ -512,11 +588,18 @@ function TestStep({ endpointId }: { endpointId: string }) {
   );
 }
 
-function Pane({ title, text, tone }: { title: string; text: string; tone?: "model" | "restored" }) {
+function Pane({ title, text, tone, masked = false }: { title: string; text: string; tone?: "model" | "restored"; masked?: boolean }) {
   return (
     <div className={["min-w-0 rounded-lg border p-3", tone === "model" ? "border-line-strong bg-surface-2" : tone === "restored" ? "border-guard/40 bg-guard-soft" : "border-line bg-surface"].join(" ")}>
       <p className="text-2xs font-medium tracking-wide text-muted uppercase">{title}</p>
-      <p className="mt-1.5 text-sm break-words whitespace-pre-wrap text-ink">{text}</p>
+      {masked ? (
+        // The same sans text as the other two panes, placeholders still chips (LAB-1629).
+        <div className="mt-1.5 text-sm break-words whitespace-pre-wrap [&_.doc]:font-sans! [&_.doc]:text-sm! [&_.doc]:leading-normal!">
+          <MaskedText text={text} />
+        </div>
+      ) : (
+        <p className="mt-1.5 text-sm break-words whitespace-pre-wrap text-ink">{text}</p>
+      )}
     </div>
   );
 }

@@ -17,7 +17,7 @@ A `StrEnum` whose values equal their names, one member per row of
 
 | Group | Members |
 |---|---|
-| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`, `SECRET` |
+| Text | `PERSON`, `ADDRESS`, `EMAIL`, `PHONE`, `DATE_OF_BIRTH`, `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `ID_DOCUMENT`, `BANK_ACCOUNT`, `PAYMENT_CARD`, `COMPANY_ID_HU`, `ORGANIZATION`, `PARCEL_NUMBER_HU`, `VEHICLE_PLATE`, `SECRET` |
 | Visual | `FACE`, `SIGNATURE`, `ID_PHOTO`, `STAMP` |
 
 `TEXT_ENTITY_TYPES` and `VISUAL_ENTITY_TYPES` are `frozenset`s of the two groups;
@@ -160,7 +160,7 @@ label, a consistent postcode and settlement, or valid check digits:
 
 | Scope | Entity types | Scores |
 |---|---|---|
-| all | `BANK_ACCOUNT` (IBAN, mod 97; payment card, issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
+| all | `BANK_ACCOUNT` (IBAN, mod 97), `PAYMENT_CARD` (issuer prefix + Luhn), `EMAIL`, `PHONE` (international `+<country>`) | IBAN 0.99, card 0.95 grouped / 0.9 compact, email 0.99, phone 0.85 |
 | all | `SECRET` (provider key shapes, PEM private keys, `scheme://user:password@host`, values assigned to a secret-ish key, `Authorization: Bearer/Basic`; [entities.md](entities.md#language-independent)) | provider shape 0.9-0.97, private key 0.99, URL password 0.9 / user 0.85, bearer 0.9, assignment 0.85 |
 | `hu`, everywhere | `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ`, `BANK_ACCOUNT` (giro), `PHONE` (`+36`, `06`), `COMPANY_ID_HU` (registration number, tax number), `ID_DOCUMENT` (personal ID, labeled ID card / passport / license / permit numbers, MRZ), `PARCEL_NUMBER_HU` | tax ID 0.99 / 0.95, TAJ 0.95 / 0.8, giro 0.95, phone 0.9, company registration number 0.95 with the `Cg.` prefix, else 0.85, tax number 0.95, personal ID 0.99 / 0.85, ID document 0.95 / 0.85, MRZ 0.99 (check digits agree) / 0.8, parcel 0.9 or 0.95 near a settlement or `belterület` |
 | `hu`, language | `ADDRESS` (postcode, address with settlement and street), `VEHICLE_PLATE`, bare `ID_DOCUMENT` card number, `PERSON` inside a company name with a legal form | postcode 0.75-0.9, address 0.75 / 0.85 / 0.97 (postcode and settlement agree), plate 0.85 / 0.8, bare ID card 0.7, company-name person 0.7-0.9 (`languages/hu/companies.py`) |
@@ -209,12 +209,14 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_DEFAULT_LANGUAGE` | `default_language` | `str` | `hu` |
 | `PII_GUARD_DETECTION_PROFILE` | `detection_profile` | `standard \| local-only` | `standard` |
 | `PII_GUARD_DETECTORS` | `detectors` | `tuple[str, ...] \| None` (comma-separated registry names) | unset (the gateway fast-mode stack: `rules`, plus `ner` when available) |
+| `PII_GUARD_MAX_TEXT_CHARS` | `max_text_chars` | `int` (>= 1, code points) | `200000` |
 | `PII_GUARD_POLICY_OVERRIDES` | `policy_overrides` | `dict[EntityType, Policy]` (`TYPE=mask\|keep\|block,...`) | none |
 | `PII_GUARD_GATEWAY_KEEP_TYPES` | `gateway_keep_types` | `frozenset[EntityType] \| None` (deprecated) | unset |
 | `PII_GUARD_NER_MODEL` | `ner_model` | `str \| None` (hub id or directory) | unset (detector default; a set model makes a missing `ner` extra stop startup) |
 | `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
 | `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
 | `PII_GUARD_NER_WARMUP_TIMEOUT` | `ner_warmup_timeout` | `float` (> 0, seconds): how long a detecting request waits for the background NER load | `120` |
+| `PII_GUARD_BODY_READ_TIMEOUT` | `body_read_timeout` | `float` (> 0, seconds): whole request-body read deadline on the REST API; past it, 408 `request_timeout` and nothing is processed (raise it for large image bodies on slow links) | `30` |
 | `PII_GUARD_UPSTREAM_BASE_URL` | `upstream_base_url` | `str \| None` | unset |
 | `PII_GUARD_UPSTREAM_API_KEY` | `upstream_api_key` | `SecretStr \| None` | unset |
 | `PII_GUARD_TENANT_KEY` | `tenant_key` | `SecretStr \| None` (hex) | unset |
@@ -232,6 +234,8 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_LLM_DETECTOR_MAX_TOKENS` | `llm_detector_max_tokens` | `int \| None` (>= 256) | unset (detector default `4096`) |
 | `PII_GUARD_LLM_DETECTOR_TIMEOUT` | `llm_detector_timeout` | `float \| None` (> 0, seconds) | unset (detector default `60`) |
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
+| `PII_GUARD_SAM_API_KEY` | `sam_api_key` | `SecretStr \| None` | unset (falls back to `META_API_KEY`) |
+| `PII_GUARD_SAM_MODEL` | `sam_model` | `str \| None` | unset (SamClient default `sam-3.1`) |
 | `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
@@ -366,6 +370,8 @@ Every non-2xx response, including validation errors and unknown routes, has this
 
 | Status | `code` | When |
 |---|---|---|
+| 400 | `unsupported_content` | Gateway: the body holds a key or content part outside the [request allow-list](#gateway-request-fields-implemented) (an unknown field, a remote image URL, an audio part). Nothing is forwarded or stored. A malformed gateway body (not JSON, a wrong value type) is `400 invalid_request`. |
+| 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the upstream has no Anthropic Messages API (it answered 404 or 405 on `.../messages`). The message points to an Anthropic-compatible upstream, the OpenAI-compatible routes (`/v1/chat/completions`) and the console's Connect page; the response has `x-should-retry: false`. Only the masked request reached that upstream; the call is one `refused` traffic event. |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
@@ -390,7 +396,12 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 422 | `placeholder_in_input` | The text to mask contains a placeholder this session already issued; restoring it would put a value into text never masked. The message holds a count only. Other placeholder-shaped tokens in the input are left as they are and never issued as a placeholder. |
 | 409 | `session_entry_limit_reached` | An explicit vault session (`X-PII-Guard-Session`, or a path or `prompt_cache_key` id) already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders. Explicit sessions are never rotated, so nothing is masked or sent; start a new session (LAB-1565). |
 | 502 | `upstream_credential_rejected` | Listing a provider's models (`POST /v1/projects/{project_id}/endpoints/models`, a pass-through `/e/{endpoint_id}/v1/models`): the provider answered 401 or 403, so the API key is wrong or lacks access. The message is fixed; the provider's own status text and body are never passed on. |
-| 500 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
+| 501 | `responses_unsupported` | `POST /v1/responses`: the upstream answered 404 or 405, so it has no native Responses API. Nothing is translated or retried. |
+| 502 | `upstream_unavailable` | Gateway: the upstream could not be reached or answered with something unusable. The provider's own error text is never passed on. |
+| 502 | `upstream_did_not_stream` | `POST /v1/chat/completions` with `stream: true`: the upstream answered without `text/event-stream`. The body is not read or forwarded; retry without `stream` (see [Gateway chat streaming](#gateway-chat-streaming-implemented)). |
+| 503 | `upstream_not_configured` | Gateway: the server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). |
+| 503 | `vault_capacity_exhausted` | A new vault session is needed while every session slot is held by an active request, or this client identity already holds `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` in-flight requests (LAB-1584; then even an existing session is refused); nothing is masked or sent. Retry once a request finishes. |
+| 503 | `vault_not_configured` | `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes: `/v1/mask`, `/v1/unmask`, the known-values routes and the gateway fail closed. The message never echoes the key. |
 | 500 | `masking_failed` | `MaskingError` |
 | 503 | `detection_failed` | `DetectionError` (including timeouts) |
 | 503 | `detection_profile_denied` | The selected or cached raw-processing component is not permitted by `PII_GUARD_DETECTION_PROFILE`; nothing is forwarded. |
@@ -403,7 +414,10 @@ Every non-2xx response, including validation errors and unknown routes, has this
 Fail closed: on any error the response carries no masked or partially masked text.
 
 The OpenAPI schema (`/openapi.json`, `/docs`) declares the codes each route can return, with
-the `ErrorResponse` body (`pii_guard.api.errors.ERROR_CODES`).
+the `ErrorResponse` body (`pii_guard.api.errors.ERROR_CODES`). The public subset, with the gateway's
+codes added, is committed as [openapi.json](openapi.json) and rendered at
+[guard.watt-mind.com/#api](https://guard.watt-mind.com/#api); the runtime pages stay off on
+the hosted service. See [api.md](api.md).
 
 ### `POST /v1/analyze`
 
@@ -523,6 +537,13 @@ expired `session_id` → 404 `not_found`. Restoring more than
 `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (default 1 000 000) →
 413 `unmask_output_too_large`, with no text (LAB-1350).
 
+Owner rule (LAB-1580): a session that a gateway request bound to a credential (its
+`Authorization` value) unmasks only for that same value. Any other `Authorization` value, or
+none, gets 404 `not_found`, as if the session did not exist. Sessions no gateway request has
+presented, and anonymous-owned ones, unmask for every caller. Unmask only checks the owner: it
+never binds a session. In hosted mode `Authorization` is stripped before routing, so isolation
+there is the per-owner vault.
+
 ### `POST /v1/mask/image`
 
 Cover faces, signatures, ID photos and text personal data in a PNG or JPEG image
@@ -539,7 +560,7 @@ Options (JSON fields, or query parameters with a raw upload):
 - `render`: `labels` (default, `PII_GUARD_IMAGE_RENDER`) prints each covered region's vault
   placeholder in its box and returns a masked transcript and a document summary; `opaque`
   fills boxes solid black and returns neither. Without a tenant key the default falls back
-  to `opaque`; an explicit `labels` is then `500 vault_not_configured`.
+  to `opaque`; an explicit `labels` is then `503 vault_not_configured`.
 - `session_id`: the vault session to mask in (`labels` only), shared with `/v1/mask` and the
   gateway, so the same person gets the same placeholder in text and in images. Omitted: a new
   session is created and returned. Unknown or expired: `404 not_found`.
@@ -882,6 +903,11 @@ endpoint keys `401`. `endpoint` is required (`422 invalid_request` without it).
 cursor resets it to 0 when `boot` differs from the one it saw last. `GET /v1/traffic/stream`
 sends the same events as server-sent events (`id:` = `seq`).
 
+An event's `outcome` is additive: new values can appear, so a consumer treats an unknown one
+as a failure. `upstream_failed` (LAB-1629) marks a call whose masked request was forwarded and
+then failed upstream (`502 upstream_unavailable`, `upstream_did_not_stream`); such calls were
+`refused` before, and their `error.code` is unchanged.
+
 ### Vault inspector: `/v1/vault/sessions`
 
 For troubleshooting (LAB-1328): which vault sessions exist, where each came from and what it
@@ -924,7 +950,9 @@ row links to its session.
   variants after their value, with `variant_of`), then the known values nothing matched yet
   (`placeholder: null`). Each item has `placeholder`, `entity_type`, `origin` (`detected`, or
   `known` for a pre-loaded value), `count` (occurrences masked), `forms` (how many other written
-  forms matched: inflected stems, split surfaces), `hint`, and on a revealed read `original`
+  forms matched: inflected stems, split surfaces), `hint`, `detector` (the detector of the
+  first span that created the entry), `first_seen` and `last_seen` (vault-clock seconds of
+  the first and latest masked occurrence), and on a revealed read `original`
   and `known_forms`. Every revealed read is logged at `WARNING` with the ref and the counts,
   never a value or the session id.
 
@@ -939,7 +967,7 @@ Unknown or expired ref: 404 `not_found`; a malformed one: 422 `invalid_request`.
 
 ## Gateway sessions (implemented)
 
-Every gateway call (`/v1/chat/completions`, `/v1/responses`) uses one vault session, chosen in
+Every gateway call (`/v1/chat/completions`, `/v1/responses`, `/v1/messages`) uses one vault session, chosen in
 this order (`pii_guard.gateway.sessions`, LAB-1286; details in
 [architecture-gateway.md](architecture-gateway.md#sessions)):
 
@@ -1008,9 +1036,16 @@ Treatments:
   schematic placeholder notation; an
   integral float in its integer form): a number with detected personal data is replaced by
   the placeholder **string** (`"[[NATIONAL_ID_HU_TAX]]"`), because a JSON number can't
-  carry a placeholder; any other number is forwarded as the same number. A restored value
-  comes back as a string: the answer's tool-call arguments hold the original digits as a JSON
-  string, not a number (LAB-1348). If distinct object keys mask to the same key (including
+  carry a placeholder; any other number is forwarded as the same number (LAB-1348). The
+  session records that the placeholder replaced a JSON number and its literal. When the
+  answer's tool-call arguments (chat `function.arguments` and legacy `function_call`,
+  Responses `function_call.arguments`; whole and streamed) hold that placeholder as a whole
+  string value (`"tax_id": "[[NATIONAL_ID_HU_TAX]]"`), it is restored as the original
+  number literal (`<NUMBER>`, or `<NUMBER>.0` for a float), quotes dropped (LAB-1361).
+  It stays a string inside a longer string, as an object key, in message text, and whenever
+  the same placeholder also replaced a whole string or a different number literal
+  (fail closed). The restored value is charged to the restore budget as usual. In a stream
+  the `"` before a possible placeholder is held back with it. If distinct object keys mask to the same key (including
   case or Unicode variants), the request fails closed with `400 invalid_request`, at any
   nesting depth. No values are merged or silently dropped, and nothing is forwarded
   (LAB-1568).
@@ -1019,13 +1054,21 @@ Treatments:
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
   Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
   (`maximum`, `minLength`, ...), are checked the same way.
+  The traffic log keeps a checked `model` only after the check passed (the outbound re-check
+  ran clean): a refused, blocked or failed call records `"[withheld]"` in the event's `model`,
+  and in the `full` original (LAB-1358).
 
 **Chat line-number gutters.** Message content, text/refusal content parts and the string
 fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter handling:
 a leading line number and pipe (e.g. `12|`, including indentation) become same-length spaces
 for detection, preserving offsets. Gutters are restored in masked text when line counts
 match and the replacement spaces survive; when masking spans lines and changes the line
-count, gutters are dropped rather than writing any original text back.
+count, gutters are dropped rather than writing any original text back. A prefix counts as a gutter
+only inside a run of at least two adjacent lines whose numbers go up by exactly one (`11|`,
+`12|`), as `read_file` and `cat -n` print them; a lone `1234567|...` line (a pipe-delimited
+table row with an id), decreasing numbers or numbered lines that aren't adjacent stay visible
+to detection and to the outbound re-check (LAB-1583). Residual: a table whose row ids are
+themselves consecutive integers is still read as numbered lines.
 
 **Declared tool names.** A tool or namespace name the request declares (`tools[].name`,
 `tools[].function.name`, `functions[].name`, ...) is the client's vocabulary: a `PERSON`,
@@ -1109,7 +1152,10 @@ with the treatments of the table above. Any other key, item type or part type is
 
 A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
 Code's `read_file` prints files) is shown to the detectors as spaces of the same length and
-kept in the forwarded text, so the first word of the line is detected on its own.
+kept in the forwarded text, so the first word of the line is detected on its own. The same
+handling, and the same rule for what counts as a gutter (only runs of consecutive line
+numbers, see "Chat line-number gutters"), applies to `instructions` and to reasoning
+`summary_text`/`reasoning_text` parts (LAB-1583).
 
 **Restore.** In a whole `response` object, every string the upstream returns is restored
 (output text, refusals, reasoning summaries, and the request fields it echoes back).
@@ -1181,6 +1227,78 @@ only). With `stream: true` the header is `400 invalid_request`.
 `metadata["muse-code"]` kept per model. On a 404 it is `GET /v1/models` with default client
 settings (`tool_call`, text in and out, a 128k context). Upstream errors keep their status
 (5xx becomes 502), never their message.
+
+## Messages API (implemented)
+
+`POST /v1/messages` is the gateway for clients that speak the Anthropic **Messages API**, such
+as Claude Code (docs/integrations/claude-code.md, LAB-1605). It gives the same guarantees as
+`/v1/chat/completions` and uses the same headers (`X-PII-Guard-Mode`, `-Language`, `-Session`,
+`-Echo`), session resolution (an `x-api-key` alone does not derive an identity: such clients are
+`anonymous`; per-key isolation is a follow-up, LAB-1643), known values, outbound re-check, detectors, cache and vault
+(`pii_guard.gateway.messages`). The masked body goes to the upstream's own
+`{PII_GUARD_UPSTREAM_BASE_URL}/messages` (a `/chat/completions`, `/responses` or `/messages`
+suffix is dropped first; `https://api.anthropic.com/v1` is the Anthropic API). Nothing is
+translated to Chat Completions: an upstream that answers that path with 404 or 405 gets
+**`400 unsupported_api`** (with `x-should-retry: false`). Other upstream errors keep their
+status in the Anthropic error shape (`{"type": "error", "error": {"type", "code":
+"upstream_error", "message"}}`) with only the upstream's error `type` token
+(`overloaded_error`, `rate_limit_error`, ...), never its message.
+`POST /v1/messages/count_tokens` masks the same body the same way, forwards it to
+`.../messages/count_tokens` and answers only `{"input_tokens": n}`.
+
+**Upstream headers.** A configured `PII_GUARD_UPSTREAM_API_KEY` is sent as `x-api-key` (no
+`Authorization`). Without one, the client's own `x-api-key` and `Authorization` are passed
+through. `anthropic-version` (default `2023-06-01`) and the `anthropic-beta` tokens are passed
+on when they are plain tokens (`[A-Za-z0-9._-]`); other client headers are not.
+
+**Request fields.** Walked against an allow-list (`pii_guard.gateway.messages_request`), with
+the treatments of the chat table. Any other key, block type or tool type is
+`400 unsupported_content`, and nothing is forwarded.
+
+| Where | Key | Treatment |
+| --- | --- | --- |
+| body | `model` | check (non-empty string, required) |
+| body | `messages` | non-empty array of `{role: user\|assistant, content}` (required) |
+| body | `system` | string mask, or `text` blocks |
+| body | `max_tokens`, `stream`, `temperature`, `top_k`, `top_p` | pass |
+| body | `thinking`, `tool_choice`, `context_management`, `service_tier`, `output_config` | check |
+| body | `stop_sequences` | mask |
+| body | `metadata` | `user_id` mask (Claude Code sends a JSON string of its ids) |
+| body | `tools` | client tools (no `type`, or `custom`): `name` check, `description` mask, `input_schema` as a JSON Schema (as chat `parameters`), `defer_loading`/`strict` pass, `cache_control` check; server tools (`web_search_*`, `code_execution_*`, ...) `400` |
+| body | `mcp_servers`, `container` | `400`: tools and state kept upstream act on data the gateway never sees |
+| every block | `type`, `cache_control` | check |
+| `text` block | `text` | mask (line-number gutters as for chat); non-empty `citations` `400` |
+| `image` block | `source` | inline `base64` PNG/JPEG: the masked image (and, with placeholder labels, its transcript as a `text` block after it); `url`/`file` sources `400` |
+| `tool_use` block | `id`, `name` check; `input` | mask JSON (every string, keys included, and long numbers), as chat tool-call arguments |
+| `tool_result` block | `tool_use_id` check; `is_error` pass; `content` | string mask, or `text` and `image` blocks as above |
+| `thinking` block | `thinking` mask; `signature` | pass (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
+| `redacted_thinking` block | `data` | pass (opaque) |
+| other blocks (`document`, `search_result`, `server_tool_use`, ...) | | `400` |
+
+**Placeholder note.** When the masked body holds a placeholder, the note goes in front of
+`system` (a first paragraph of a string, or a first `text` block; the client's `cache_control`
+marks stay on its own blocks).
+
+**Restore.** In a whole `message`, every string the upstream returns is restored (`text` and
+`thinking` blocks, `stop_sequence`, ...). A `tool_use` block's `input` is serialised and
+restored like chat tool-call `arguments` (JSON-escaped values, shell quoting in a `command`,
+masked numbers back as numbers), then parsed again; one that no longer parses fails the call
+(`502`, nothing half-restored). `signature` and `data` are left as is.
+`X-PII-Guard-Unresolved` counts unknown placeholders.
+
+**Streaming** (`stream: true`). Events keep their `event:` lines. Each `content_block_delta`
+stream has its own streaming unmasker, keyed by block `index`: `text_delta.text`,
+`thinking_delta.thinking` and `input_json_delta.partial_json` (JSON-escaped). A placeholder
+split across deltas is held back until it is complete; at the block's `content_block_stop`
+(or the end of the stream) what is held back goes out as one more delta just before it.
+`signature_delta` passes through; every other event (`message_start`, `content_block_start`,
+`message_delta`, `message_stop`, `ping`) is restored whole. An upstream `error` event becomes
+`{"type": "error", "error": {"type": "api_error", "message": "upstream stream error"}}`; a
+stream that fails inside the gateway ends with the same shape.
+
+**Echo.** `X-PII-Guard-Echo: masked` works on non-streamed `/v1/messages` calls: the answer
+gets `pii_guard: {masked_input: [{role, content}], masked_output}` (placeholders only). With
+`stream: true` or on `count_tokens` the header is `400 invalid_request`.
 
 ## Vault (implemented)
 
@@ -1303,8 +1421,8 @@ doesn't inflate them).
 |---|---|---|---|
 | `SessionNotFoundError` (`PiiGuardError`) | `not_found` | 404 | The session id is unknown, expired or closed. Raised by `Vault.session` and by every `VaultSession` method (and so by `StreamUnmasker`) once the session is gone; the gateway fails the request instead of forwarding unrestored text. |
 | `MaskingError` | `masking_failed` | 500 | A span is invalid, out of range, overlapping, blank, a visual type or does not match the text; no id could be made unique. Nothing is recorded. |
-| `MaskingError` | `vault_not_configured` | 500 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
-| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased. |
+| `VaultNotConfiguredError` (`PiiGuardError`) | `vault_not_configured` | 503 | `Vault.from_settings` without `PII_GUARD_TENANT_KEY`. |
+| `VaultCapacityError` (`MaskingError`) | `vault_capacity_exhausted` | 503 | Creating a session at capacity while all sessions are leased, or any gateway request (new or existing session) from an identity already at `max_leases_per_identity` leases. |
 | `PlaceholderInInputError` (`MaskingError`) | `placeholder_in_input` | 422 | The text to mask holds a placeholder this session already issued. |
 | `SessionEntryLimitError` (`MaskingError`) | `session_entry_limit_reached` | 409 | An explicit session already holds its `max_entries` placeholders; it is never rotated. |
 
@@ -1336,6 +1454,10 @@ built on it.
   stream cleanup, releasing it on failures and cancellation as well as success.
 - If every capacity slot is leased, creating another session fails closed with HTTP 503
   `vault_capacity_exhausted`; it neither exceeds the cap nor evicts an active session.
+- An identity already holding `max_leases_per_identity` leases
+  (`PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY`) is refused with the same 503 before lookup or
+  creation, for an existing session as well as a new one, so one client can't pin every slot;
+  other identities still acquire (LAB-1584).
   Leases do not suspend sliding TTL or explicit deletion/purge semantics.
 - `VaultSession.commit(fork)` consumes the fork once and validates its entire journal against
   a private snapshot under the parent lock before publishing the state. A replay mismatch
@@ -1523,8 +1645,8 @@ accepts directories (default `eval/fixtures`). Unloadable detectors are skipped 
 warning. Markdown goes to stdout. Exit codes: 0 ok, 1 a detector or the vault failed during the
 run (fail closed, no scorecard), 2 bad arguments, fixtures or no loadable detector.
 
-The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag, version, detectors,
-skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
+The JSON scorecard (`schema_version` 1) has `meta` (commit, dirty flag and `dirty_paths`,
+version, detectors, skipped detectors, language filter, fixture paths with SHA-256), `overall` and `languages`
 (one block per language). A block holds `detection.{exact,overlap}.{per_type,micro,macro}`,
 `leak`, `over_masking` (both with `per_type`), `roundtrip` and `latency_ms`. It never
 contains document text or labeled values.
@@ -1640,7 +1762,12 @@ describes the oldest enabled endpoint. `state` is `ready`, `needs_key` (sponsore
 sponsorship is unavailable) or `disabled`. `issue_key: true` issues one endpoint key, returned
 raw only in that response, while the endpoint has no active key. `meta_api_key` converts a
 `needs_key` sponsored default endpoint, in place, to an own-key `meta` endpoint on
-`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The
+`https://api.meta.ai/v1` (same id, model and policy); any other endpoint gets `422`. The key is
+checked for shape first (LAB-1463): surrounding whitespace is dropped, and anything that is not
+one token of 20 to 4096 printable ASCII characters without spaces, quotes or `://` is refused
+with `422 invalid_provider_key` before anything is saved, so the endpoint stays `needs_key` and
+never falls back to sponsored inference. The message names the expected shape, never the value.
+This is a format check only; no provider call verifies the key on save. The
 operation is one atomic store update (a single conditional write on the Blob store, re-read and
 retried up to three times after a conflict), so repeat sign-ins and concurrent first requests never create a second
 endpoint. It spends no daily request or token budget and takes no runtime.

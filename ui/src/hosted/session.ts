@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { recovery, type Account, type Requester } from "./api";
+import { dateTime } from "../lib/time";
 
 /** The signed-in hosted owner the console runs for; null in the local console. */
 export interface HostedSession { account: Account; error: string; refresh: () => Promise<void>; call: Requester }
@@ -9,8 +10,8 @@ export const useHostedSession = () => useContext(HostedSessionContext);
 /** The project's source repository: the public page's and the console's GitHub and docs links. */
 export const SOURCE = "https://github.com/watt-mind/pii-guard";
 
-/** The public page's section anchors, plus #site for the console's "Visit site"; every other hash is the console's. */
-export const SITE_HASHES: ReadonlySet<string> = new Set(["#image-preview", "#site", "#trust", "#technical", "#demo", "#why", "#for", "#europe", "#how", "#images", "#meta", "#results", "#run", "#data", "#privacy"]);
+/** The public page's section anchors, plus #site for the console's "Visit site" and #api (the API reference); every other hash is the console's. */
+export const SITE_HASHES: ReadonlySet<string> = new Set(["#image-preview", "#site", "#trust", "#technical", "#demo", "#why", "#for", "#europe", "#how", "#images", "#meta", "#results", "#run", "#data", "#privacy", "#api"]);
 
 /** `/v1/account`, kept on a failed refresh so a signed-in owner stays in the console. */
 export function useAccount(call: Requester) {
@@ -67,9 +68,5 @@ export const hostedChatFetch: typeof fetch = (input, init) => {
   return fetch(input, { ...init, credentials: "same-origin", headers });
 };
 
-export function time(value: string | undefined) {
-  if (!value) return "not available";
-  const date = new Date(value);
-  // EU English ("29 Oct 2026, 04:49"), not the browser's US default (LAB-1466).
-  return Number.isNaN(date.getTime()) ? "not available" : date.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
-}
+/** EU English ("29 Oct 2026, 04:49"), not the browser's US default (LAB-1466); lib/time (LAB-1619). */
+export const time = (value: string | undefined) => dateTime(value);

@@ -17,7 +17,7 @@ describe("landing benchmark comparison", () => {
     render(<LandingBenchmarkChart />);
     await user.selectOptions(screen.getByRole("combobox", { name: "Test dataset" }), "0");
     const rows = within(screen.getByRole("list", { name: "Leak rate by tool" })).getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent)).toEqual(["PII GuardRules + NER0.0%", "PrivAiTe12.7%", "Presidio24.3%", "LLM Guard45.1%"]);
-    expect(screen.getByText(/not a guarantee for your documents/)).toHaveTextContent("Hand-written de + en + hu (51)");
+    expect(rows.map((row) => row.textContent)).toEqual(["PII GuardRules + NER0.0%", "PrivAiTe13.0%", "Presidio25.5%", "LLM Guard46.3%"]);
+    expect(screen.getByText(/not a guarantee for your documents/)).toHaveTextContent("Hand-written de + en + hu + pl (62)");
   });
 });

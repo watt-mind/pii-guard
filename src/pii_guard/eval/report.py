@@ -3,20 +3,21 @@
 Layout (``schema_version`` 1)::
 
     {"schema_version": 1,
-     "meta": {"commit", "dirty", "pii_guard_version", "generated_at", "detectors",
-              "skipped_detectors", "languages", "fixtures": [{"path", "sha256", "documents"}]},
+     "meta": {"commit", "dirty", "dirty_paths", "pii_guard_version", "generated_at", "detectors",
+              "skipped_detectors", "languages", "fixtures": [{"path", "sha256", "documents"}],
+              "usage": {...}},  # only when a detector meters requests (the LLM detector)
      "overall": <block>,
      "languages": {"hu": <block>, "en": <block>}}
 
 A ``<block>`` is :func:`pii_guard.eval.scorer.summarize`'s output. Nothing in the scorecard
-contains a labelled value or a document text: only ids, types, counts and ratios.
+contains a labeled value or a document text: only ids, types, counts and ratios.
 """
 
 from __future__ import annotations
 
 import subprocess
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -26,33 +27,71 @@ from pii_guard.eval.fixtures import file_sha256
 from pii_guard.eval.scorer import DocumentResult, summarize
 from pii_guard.eval.stats import fmt_ms, fmt_pct
 
-__all__ = ["SCHEMA_VERSION", "build_scorecard", "git_commit", "render_markdown"]
+__all__ = [
+    "CODE_PATHS",
+    "SCHEMA_VERSION",
+    "build_scorecard",
+    "git_commit",
+    "git_dirty_paths",
+    "price_usage",
+    "render_markdown",
+]
 
 SCHEMA_VERSION = 1
 
 
-def git_commit(cwd: str | Path | None = None) -> tuple[str, bool]:
-    """``(commit hash, dirty)`` of the working tree, or ``("unknown", False)``."""
+#: The tracked paths whose changes make a run unreproducible from its commit: the detection
+#: code, the fixtures, the scripts that drive runs and the dependency pins. Docs, generated
+#: results and the run records themselves are rewritten while runs are recorded, so a change
+#: there does not mark a run dirty (LAB-1496). Untracked files (models, scratch) never do.
+CODE_PATHS: tuple[str, ...] = ("src", "eval/fixtures", "scripts", "pyproject.toml", "uv.lock")
+
+
+def _git(args: Sequence[str], cwd: str | Path | None) -> str:
+    return subprocess.run(  # noqa: S603 - fixed git arguments, no shell
+        ["git", *args],  # noqa: S607 - git from PATH is intended
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    ).stdout
+
+
+def git_dirty_paths(cwd: str | Path | None = None) -> list[str]:
+    """Tracked files under :data:`CODE_PATHS` that differ from ``HEAD``, sorted.
+
+    Empty when the tree is clean there or outside a repository.
+    """
     try:
-        head = subprocess.run(
-            ["git", "rev-parse", "HEAD"],  # noqa: S607 - git from PATH is intended
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout.strip()
-        status = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],  # noqa: S607
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout
+        top = _git(["rev-parse", "--show-toplevel"], cwd).strip()
+        out = _git(
+            ["status", "--porcelain=v1", "-z", "--untracked-files=no", "--", *CODE_PATHS], top
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    paths: set[str] = set()
+    entries = iter(out.split("\0"))
+    for entry in entries:
+        if len(entry) < 4:
+            continue
+        paths.add(entry[3:])
+        if entry[0] in "RC":  # a rename's source path follows; the new path is the one kept
+            next(entries, None)
+    return sorted(paths)
+
+
+def git_commit(cwd: str | Path | None = None) -> tuple[str, bool]:
+    """``(commit hash, dirty)`` of the working tree, or ``("unknown", False)``.
+
+    ``dirty`` is whether :func:`git_dirty_paths` finds a changed file under
+    :data:`CODE_PATHS`.
+    """
+    try:
+        head = _git(["rev-parse", "HEAD"], cwd).strip()
     except (OSError, subprocess.SubprocessError):
         return "unknown", False
-    return head or "unknown", bool(status.strip())
+    return head or "unknown", bool(git_dirty_paths(cwd))
 
 
 def build_scorecard(
@@ -63,9 +102,20 @@ def build_scorecard(
     fixture_paths: Sequence[str | Path] = (),
     languages: Sequence[str] | None = None,
     commit: tuple[str, bool] | None = None,
+    usage: Mapping[str, Mapping[str, int]] | None = None,
+    price: Mapping[str, float | None] | None = None,
 ) -> dict[str, Any]:
-    """The JSON scorecard: metadata, an overall block and one block per language."""
-    commit_hash, dirty = commit if commit is not None else git_commit()
+    """The JSON scorecard: metadata, an overall block and one block per language.
+
+    ``usage`` is :meth:`pii_guard.eval.scorer.DetectorAnalyzer.usage`; when it names a
+    detector, ``meta.usage`` is added, priced with ``price`` (USD per 1M tokens: ``input``,
+    ``cached``, ``output``) when that has an input or output rate.
+    """
+    if commit is None:
+        commit_hash, dirty = git_commit()
+        dirty_paths = git_dirty_paths() if dirty else []
+    else:
+        (commit_hash, dirty), dirty_paths = commit, []
     by_language: dict[str, list[DocumentResult]] = defaultdict(list)
     for r in results:
         by_language[r.document.language].append(r)
@@ -73,11 +123,12 @@ def build_scorecard(
     for path in fixture_paths:
         path = Path(path)
         fixtures.append({"path": str(path), "sha256": file_sha256(path)})
-    return {
+    card: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "meta": {
             "commit": commit_hash,
             "dirty": dirty,
+            "dirty_paths": dirty_paths,
             "pii_guard_version": __version__,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "detectors": list(detectors),
@@ -87,6 +138,58 @@ def build_scorecard(
         },
         "overall": summarize(results),
         "languages": {lang: summarize(by_language[lang]) for lang in sorted(by_language)},
+    }
+    if usage:
+        card["meta"]["usage"] = usage_block(usage, messages=len(results), price=price)
+    return card
+
+
+def usage_block(
+    usage: Mapping[str, Mapping[str, int]],
+    *,
+    messages: int,
+    price: Mapping[str, float | None] | None = None,
+) -> dict[str, Any]:
+    """``meta.usage``: per-detector counters, their total, the refusal rate and the cost."""
+    detectors = {name: dict(counters) for name, counters in usage.items()}
+    total: dict[str, int] = {}
+    for counters in detectors.values():
+        for key, value in counters.items():
+            total[key] = total.get(key, 0) + value
+    requests = total.get("requests", 0)
+    block: dict[str, Any] = {
+        "messages": messages,
+        "detectors": detectors,
+        "total": total,
+        "refusal_rate": total.get("refusals", 0) / requests if requests else None,
+    }
+    if price and (price.get("input") is not None or price.get("output") is not None):
+        block["cost"] = price_usage(total, messages=messages, price=price)
+    return block
+
+
+def price_usage(
+    total: Mapping[str, int], *, messages: int, price: Mapping[str, float | None]
+) -> dict[str, Any]:
+    """Dollar cost of ``total`` token counts at ``price`` (USD per 1M tokens).
+
+    A missing ``cached`` rate falls back to the ``input`` rate; a missing rate is 0.
+    """
+    rate_in = float(price.get("input") or 0.0)
+    cached_rate = price.get("cached")
+    rate_cached = rate_in if cached_rate is None else float(cached_rate)
+    rate_out = float(price.get("output") or 0.0)
+    prompt = total.get("prompt_tokens", 0)
+    cached = min(total.get("cached_tokens", 0), prompt)
+    usd = (
+        (prompt - cached) * rate_in
+        + cached * rate_cached
+        + total.get("completion_tokens", 0) * rate_out
+    ) / 1_000_000
+    return {
+        "usd": usd,
+        "usd_per_1k_messages": usd / messages * 1000 if messages else None,
+        "prices_per_1m_tokens": {"input": rate_in, "cached": rate_cached, "output": rate_out},
     }
 
 
@@ -165,6 +268,54 @@ def _type_rows(block: dict[str, Any]) -> list[str]:
     return rows
 
 
+def _usage_line(block: Mapping[str, Any]) -> str:
+    total = block["total"]
+    parts = [
+        f"{total.get('requests', 0)} requests",
+        f"{total.get('prompt_tokens', 0)} prompt tokens ({total.get('cached_tokens', 0)} cached)",
+        f"{total.get('completion_tokens', 0)} completion tokens "
+        f"({total.get('reasoning_tokens', 0)} reasoning)",
+        f"{total.get('invalid_outputs', 0)} invalid outputs",
+        f"{total.get('refusals', 0)} refusals ({fmt_pct(block.get('refusal_rate'), sign=True)})",
+    ]
+    cost = block.get("cost")
+    if cost:
+        per_1k = cost["usd_per_1k_messages"]
+        parts.append(
+            f"${cost['usd']:.4f} total, "
+            + (f"${per_1k:.4f} per 1k messages" if per_1k is not None else "n/a per 1k messages")
+        )
+    return f"- LLM usage over {block['messages']} messages: " + ", ".join(parts)
+
+
+def _outbound_rows(scorecard: Mapping[str, Any]) -> list[str]:
+    """The outbound re-check replay (``--outbound-check``, LAB-1505): false blocks and time."""
+
+    def row(name: str, ob: Mapping[str, Any]) -> str:
+        ms = ob.get("check_ms") or {}
+        return (
+            f"| {name} | {ob['requests']} | {ob['checked']} | {ob['blocked']} "
+            f"| {fmt_pct(ob['rate'])} | {fmt_ms(ms.get('p50'), 3)} | {fmt_ms(ms.get('p95'), 3)} |"
+        )
+
+    lines = [
+        "",
+        "## Outbound re-check",
+        "",
+        "Each document replayed through the gateway in fast mode, in its own session. Every "
+        "block on these sets is a false block.",
+        "",
+        "| Language | Requests | Re-checked | Blocked | False-block rate | Check p50 ms "
+        "| Check p95 ms |",
+        "|---|" + "---:|" * 6,
+    ]
+    for lang, block in scorecard["languages"].items():
+        if block.get("outbound_check"):
+            lines.append(row(f"`{lang}`", block["outbound_check"]))
+    lines.append(row("**overall**", scorecard["overall"]["outbound_check"]))
+    return lines
+
+
 def render_markdown(scorecard: dict[str, Any]) -> str:
     """The scorecard as Markdown: a summary per language and overall, then per entity type."""
     meta = scorecard["meta"]
@@ -181,10 +332,12 @@ def render_markdown(scorecard: dict[str, Any]) -> str:
         lines.append(f"- fixtures: `{fixture['path']}` sha256 `{fixture['sha256'][:16]}`")
     if meta["languages"]:
         lines.append(f"- language filter: {', '.join(meta['languages'])}")
+    if meta.get("usage"):
+        lines.append(_usage_line(meta["usage"]))
     lines += [
         "",
         "All ratios in %. P/R/F1 are span-level micro averages; macro F1 is over entity types "
-        "(overlap match). Leak = labelled values of mask-policy types surviving the masked "
+        "(overlap match). Leak = labeled values of mask-policy types surviving the masked "
         "text in any surface form; partial = an identifying token survives. Consistency = "
         "gold entities whose occurrences (all surface forms) are masked by one placeholder.",
         "",
@@ -196,6 +349,8 @@ def render_markdown(scorecard: dict[str, Any]) -> str:
     for lang, block in scorecard["languages"].items():
         lines.append(_summary_row(f"`{lang}`", block))
     lines.append(_summary_row("**overall**", scorecard["overall"]))
+    if scorecard["overall"].get("outbound_check"):
+        lines += _outbound_rows(scorecard)
     sections = [*scorecard["languages"].items()]
     if len(sections) > 1:
         sections.append(("overall", scorecard["overall"]))

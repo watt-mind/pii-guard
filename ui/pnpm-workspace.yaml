@@ -1,0 +1,8 @@
+# Scalar (the #api reference, LAB-1586) pulls in vue-demi, whose postinstall only switches
+# Vue 2/3 shims; Vue 3 is the default, so it never needs to run.
+allowBuilds:
+  vue-demi: false
+# @scalar/json-magic pins undici 7.29.1 (GHSA-qrxm-fqhp-jwvm and others, high). The browser bundle
+# never includes it (it is Node's HTTP client), but `pnpm audit --prod` counts it.
+overrides:
+  undici@7.29.1: 7.30.1

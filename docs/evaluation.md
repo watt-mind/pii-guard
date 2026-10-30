@@ -38,6 +38,42 @@ where.
 The corpus is split into **train** (for fine-tuning the LLM detector), **dev** and **test**.
 The test split is never used for training or prompt tuning.
 
+### Generating the corpus
+
+`pii-guard eval generate` (also `python -m pii_guard.eval.generate`) plans each document
+deterministically from `(seed, language, index)`, asks the model to write it, locates the
+values and writes labeled JSONL:
+
+```bash
+# Print the first prompt without calling a model
+uv run pii-guard eval generate --language hu --n 1 --seed 42 --dry-run
+# 200 Hungarian documents, split 70/15/15 into eval/generated/{train,dev,test}
+uv run pii-guard eval generate --language hu --n 200 --seed 42 --out eval/generated/
+# A single file, two templates only, with run statistics
+uv run pii-guard eval generate --language en --n 10 --seed 1 --kinds invoice,letter \
+  --out eval/fixtures/en-synth.jsonl --stats eval/generated/en-stats.json
+```
+
+- **Endpoint.** Any OpenAI-compatible Chat Completions endpoint. `PII_GUARD_CORPUS_URL`
+  (default the Meta Model API), `PII_GUARD_CORPUS_API_KEY` (falls back to `META_API_KEY`) and
+  `PII_GUARD_CORPUS_MODEL` (default `muse-spark-1.3-contributor`, allowed only because the
+  data is fictional: see [models.md](models.md)); `--base-url`, `--api-key-env` and `--model`
+  override them.
+- **Reproducible.** Raw model output is cached under `eval/generated/cache` by a hash of the
+  request, so a rerun with the same seed rebuilds the corpus byte for byte without a model
+  call (`--no-cache` skips the cache). Other flags: `--start`, `--split`, `--workers`,
+  `--reasoning-effort`, `--temperature`, `--max-tokens`.
+- **Consistent documents.** People in one document never share a full name, surname or
+  given name (mothers included), so a name part used alone points at one person. When a
+  template has a property and a land registry office or court, the office sits in the
+  property's own town.
+- **Discards** (a value the model left out, an identifier it invented, empty or truncated
+  output) are counted by reason in the statistics and never hand-fixed.
+- `GENERATOR_VERSION` (in the run metadata as `pii_guard.eval.generate/<n>`) changes whenever
+  the same seed would plan different documents. The committed `*-synth-sample.jsonl`
+  fixtures stay at the version that wrote them: they are a pinned benchmark that the run
+  records and the tables below refer to, so they are regenerated only on purpose.
+
 ## Metrics
 
 | Metric | Definition |
@@ -57,7 +93,8 @@ every date in a public dataset. A prediction that overlaps one and matches no go
 neither credited nor charged: it is left out of precision and over-masking and counted as
 `unscored_predictions`. Recall and leak rate don't change. A sample converted before ignore
 regions existed falls back to a per-type rule (`scorer.LEGACY_UNSCORED_TYPES`:
-`DATE_OF_BIRTH` on Ai4Privacy).
+`DATE_OF_BIRTH` on Ai4Privacy); the committed Ai4Privacy sample carries ignore regions since
+LAB-1222, so the fallback now only applies to records of the earlier sample.
 
 **Corrected labels.** A public set's gold can be plainly wrong: Gretel finance labels German set
 phrases (`Damen`, `Herren`, `Im Rahmen`), common nouns (`Saldo`) and template slots
@@ -175,15 +212,25 @@ Every run worth keeping becomes one **run record**: `eval/results/runs/<YYYY-MM-
 specified by the JSON Schema `eval/results/schema/run.schema.json` (`schema_version` 1) and
 validated in the tests. A record says:
 
-- **what ran**: the system (`family` `pii-guard` or comparison, `tool`, `version`), each
+- **what ran**: the system (`family` `pii-guard` or comparison, `role`, `tool`, `version`), each
   detector with its `model`, `model_ref`, `revision`, `settings` (reasoning strength, mode,
   thresholds) and `serving`, and a derived `system.key` such as `rules+ner:xlmr-base-ft-s7` or
   `rules+llm:muse-glimmer@reasoning_strength=low` that groups runs of the same configuration;
+  `role` is `own` (a PII Guard configuration), `other-model` (another organisation's model run
+  through PII Guard's pipeline, alone or in place of its NER: bardsai, tabularisai,
+  Horizon-Labs, Wismut, Davlan, GLiNER zero-shot) or `tool` (a comparison tool). It is derived
+  from the detectors' models (`pii_guard.eval.record.system_role`), so a "best PII Guard
+  configuration" never picks someone else's model; `python -m pii_guard.eval.rescore`
+  backfills it on older records;
 - **on what**: each fixture file with its SHA-256, language, fixture set (`smoke`,
   `synth-sample` …), `origin` (`hand-written`, `generated` with the generator model, or
   `specimens`) and document count;
-- **where and when**: commit, dirty flag, package version, date, hardware, and cost (tokens,
-  GPU minutes, US dollars, whether estimated, and which runs a shared cost covers);
+- **where and when**: commit, dirty flag (and `dirty_paths`, the changed files), package
+  version, date, hardware, and cost (tokens, GPU minutes, US dollars, whether estimated, and
+  which runs a shared cost covers). A run is dirty only when a tracked file under `src/`,
+  `eval/fixtures/`, `scripts/`, `pyproject.toml` or `uv.lock` differs from the commit: docs and
+  results regenerated while runs are recorded, and untracked models or scratch files, don't
+  count. Records made before LAB-1496 counted any tracked change, so most of them say dirty;
 - **what came out**: per language and overall, P/R/F1 exact and overlap, macro F1, leak and
   partial leak, over-masking, round trip and placeholder consistency when the system has them,
   detection and masking latency p50/p95, and per-entity-type counts. All counts are kept, so
@@ -297,6 +344,27 @@ With the rules detector only, pre-loading takes overall overlap recall on that s
 stay lower for Hungarian because the gold spans include the case suffix, which the placeholder
 leaves outside by design.
 
+## Outbound re-check (false blocks)
+
+`pii-guard eval --outbound-check` also replays every document through the in-process gateway
+in fast mode, with the run's own `--detectors`, against a mock upstream, each document in its
+own vault session (LAB-1505). The gateway's outbound re-check (LAB-1500) refuses a masked
+request that still holds a value the session knows; on the evaluation sets every request should
+be forwarded, so every block is a false block. Each text block of the scorecard and the run
+record gets an optional `outbound_check`: `requests`, `checked` (requests the re-check read;
+refusals before it, such as a block policy, are not), `blocked`, `rate` (`blocked / checked`,
+validated like the other rates) and `check_ms` (p50 / p95 of the re-check's own time). The
+benchmark page adds a "False blocks" column to a set's table once a run of it carries the block.
+
+`pii-guard bench latency` records the re-check's time per cell as `outbound_check_ms` (p50 /
+p95 / p99 / mean of the traffic events' `outbound_check.ms`); the latency table adds a
+"Re-check p50" column once a run carries it. Both fields are optional, so older records still
+validate.
+
+```bash
+uv run pii-guard eval --fixtures eval/fixtures --detectors rules,ner --outbound-check
+```
+
 ## Lexicons: diversity and the address rule
 
 Measured when the lexicons landed ([ADR 0009](decisions/0009-third-party-lexicons.md)).
@@ -401,7 +469,7 @@ default doesn't cover, listed here.
 
 | Tool | How it runs | Configuration | Licenses (tool; models) |
 |---|---|---|---|
-| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default); Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
+| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default) and `de_core_news_lg` for `de`; Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
 | **LLM Guard** 0.3.16 | worker process, own environment | `Anonymize(Vault())` with defaults: the `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` NER model, threshold 0.5, its default entity list, language `en` (it supports only `en` and `zh`, so Hungarian documents also go through `en`). `Deanonymize` restores. A fresh vault per document. | MIT; `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` CC-BY-NC-4.0 (non-commercial) |
 | **PrivAiTe** 0.7.3 | worker process, own environment | The proxy's `PIIEngine` in-process with the `pii` section of its shipped `config/privaite.openai.yaml`: preset `onnx` (Presidio with `fr_core_news_md` + `en_core_web_lg`, plus the ONNX `openai/privacy-filter` model), placeholder anonymization, cards masked, secrets redacted. Each document is one user message through `process_request`, as the proxy does; `process_response` restores. Its detection doesn't take a language: every text goes through its French and English configuration. | BSD-3-Clause; `openai/privacy-filter` Apache-2.0, `en_core_web_lg` MIT, `fr_core_news_md` LGPL-LR |
 
@@ -486,8 +554,13 @@ under another label (a tax number caught as `PHONE_NUMBER`, say).
 ### Reading the numbers
 
 - The **Muse-generated** fixtures (`*-synth-sample.jsonl`) were written by the same model
-  family PII Guard's LLM detector uses, which flatters Muse-based detection. The hand-written
-  smoke sets don't have that bias.
+  family PII Guard's LLM detector uses, which flatters Muse-based detection (`rules,llm`).
+  The hand-written smoke sets and the public Ai4Privacy rows don't have that bias. A
+  non-Muse writer was considered (LAB-1105) and not adopted for now: the generator already
+  takes any OpenAI-compatible endpoint (`--base-url`, `--model`), but the production path is
+  the encoder NER, which this bias doesn't flatter, and the project runs on free credits
+  only. Read `rules,llm` scores on the synth samples as an upper bound; to check the bias,
+  regenerate with another writer and compare.
 - The fixture sets are small (51 smoke, 30 synthetic documents): differences of a few
   points are noise.
 - `pii-guard rules` is the rules-only pass, with no name detection; names come from the NER
@@ -559,14 +632,16 @@ components of the commercial PII-Masking-2M set need a commercial license.
 **Policy-excluded** labels are left out of the gold spans, so they count neither as leaks nor
 as misses; the manifest counts them per language (about 3 per document). The converter keeps
 each as an [ignore region](#metrics), so a prediction on one is neither credited nor charged
-in precision and over-masking. The committed sample predates ignore regions (refreshing it
-needs the 920 MB download and new runs), so for now the scorer applies the per-type fallback:
-`DATE_OF_BIRTH` predictions are not scored on this set, because the set labels every date
-`DATE` (Presidio's and PrivAiTe's `DATE_TIME` maps to `DATE_OF_BIRTH`). A masked title or a
-bare town still counts as over-masking until the sample is refreshed. The stored runs were
-re-scored this way from their counts (LAB-1213; their records say `rescored`): for example
-fast mode's precision went from 83.5 % to 92.8 % and its over-masking from 12.5 % to 2.4 %, a
-change of method, not of the model. There is no `ORGANIZATION` label, so `ORGANIZATION`
+in precision and over-masking: 1,452 regions in the 600 documents (de 452, en 504, hu 496).
+The committed sample has carried them since LAB-1222 (same rows, same gold spans, same
+manifest; only `meta.ignore` was added), so a masked title or bare town no longer counts as
+over-masking. On the same code (`323d859`), fast mode's precision on the refreshed sample is
+98.9 % against 98.1 % on the earlier one and its over-masking 0.3 % against 1.2 % (269
+predictions unscored); rules are unchanged (98.5 %, 0.1 %). Recall and leak can't move with
+this, by construction. Runs on the earlier sample (before LAB-1222, re-scored by the per-type
+fallback: `DATE_OF_BIRTH` only, records marked `rescored`, LAB-1213) are listed under the
+earlier-fixture table in [benchmarks.md](benchmarks.md#ai4privacy); the comparison models and
+the baselines have not been re-run on the refreshed sample yet. There is no `ORGANIZATION` label, so `ORGANIZATION`
 predictions (kept, never masked) still count against precision here.
 
 **Caveats.**
@@ -675,8 +750,8 @@ fetched once into `$PII_GUARD_MODELS_DIR/ner/` (outside the repository) and chec
 
 ```bash
 uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py score --record
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py latency
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency
 ```
 
 **Label mapping** (`LABEL_MAP` in that module; every one of the 42 labels has an entry):
@@ -904,8 +979,36 @@ tables, the Muse Spark 1.3 comparison and cost in
 | rules + LLM | `decoys` | 165 / 421 (39.2 %) | 20.0 % | 39.9 % |
 
 Placeholders hold against reconstruction from the masked text. They don't prevent linkage:
-with a candidate list the attacker does about twice as well as chance, because the context
-that stays readable narrows the candidates. Masking is pseudonymization, not anonymization.
+with a candidate list the attacker does about twice as well as chance. Masking is
+pseudonymization, not anonymization.
+
+Two opt-in contexts help find where the linkage comes from (LAB-1152):
+
+- `decoys-isolated`: the same candidate lists, one request per entity type with candidates
+  for that type only, so the attacker can't pick the candidates that agree with each other
+  (a name and the e-mail address that spells it).
+- any context with a `+generalized` suffix (`decoys+generalized`): the same detections
+  re-masked with the opt-in linkage protection: `ORGANIZATION` and `COMPANY_ID_HU` masked
+  too (`pii_guard.policy.LINKAGE_OVERRIDES`) and the masked text passed through
+  `pii_guard.vault.generalize.generalize_context` (gendered titles dropped, ages coarsened
+  to the decade, Hungarian case endings in one vowel harmony; see
+  [privacy-model.md](privacy-model.md#opt-in-linkage-protection)). The scorecard records how
+  many rewrites each rule made.
+
+**Results** (2026-10-30, same 81 documents, rules + LLM masking; full tables in
+[eval/results/2026-10-30-redteam-generalized](../eval/results/2026-10-30-redteam-generalized/README.md)):
+
+| Context | Re-id | `PERSON` | `EMAIL` | Chance |
+|---|---:|---:|---:|---:|
+| `decoys` | 165 / 420 (39.3 %) | 67 / 140 | 19 / 25 | 20.0 % |
+| `decoys+generalized` | 152 / 416 (36.5 %) | 60 / 139 | 19 / 25 | 20.0 % |
+| `decoys-isolated` | 152 / 420 (36.2 %) | 69 / 140 | 16 / 25 | 20.0 % |
+
+Neither the readable context nor cross-candidate consistency explains most of the linkage:
+both drops are within one run's noise (about ±2.4 points). The precision, recall and leak
+rate of the standard suite are unchanged (generalization reuses the detections and only
+rewrites words outside placeholders). The candidate lists themselves, drawn from a small
+corpus, are the next suspect.
 
 ## Where the specimen images live (visual)
 

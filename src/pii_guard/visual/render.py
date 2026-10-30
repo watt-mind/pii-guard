@@ -18,6 +18,11 @@ if smaller), but only into free space: never past the image edge, another covere
 ``obstacle`` (the OCR words left visible), keeping a small gap. Extending only ever covers
 more. The boxes actually covered are returned, so the response reports them.
 
+A cover strictly inside another cover with the same label (the face inside its ID photo,
+both ``PHOTO · [[PERSON_a1b2c3]]``) is drawn without its own label, mirroring the landing's
+``labelCovers``: the fill and the border still cover every pixel, but the placeholder
+reads once instead of twice.
+
 The label's font size is then fitted to the box: the largest size from the box height down
 to :data:`MIN_FONT_SIZE` at which it fits; if the bracketed placeholder is too wide even then,
 the brackets are dropped (``PERSON_a1b2c3``), then the label is split over two lines
@@ -125,6 +130,39 @@ class LabelledImage:
         return f"LabelledImage(image=<{len(self.image)} bytes>, boxes={len(self.boxes)})"
 
 
+def _inside(inner: tuple[int, int, int, int], outer: tuple[int, int, int, int]) -> bool:
+    """Whether the ``inner`` cover lies within the ``outer`` one (edges may touch)."""
+    return (
+        inner[0] >= outer[0]
+        and inner[1] >= outer[1]
+        and inner[2] <= outer[2]
+        and inner[3] <= outer[3]
+    )
+
+
+def _nested_duplicates(
+    items: list[LabelBox], rects: list[tuple[int, int, int, int] | None]
+) -> set[int]:
+    """Indexes whose label duplicates a strictly larger cover's (LAB-1488).
+
+    The face inside its ID photo carries the same label (``PHOTO · [[PERSON_…]]``); like the
+    landing's ``labelCovers``, the contained cover is drawn without its own label, so the
+    placeholder reads once instead of running through the inner box. Only the label is
+    skipped: the fill and the border still cover every pixel.
+    """
+    out: set[int] = set()
+    for index, (item, rect) in enumerate(zip(items, rects, strict=True)):
+        if rect is None or not item.label:
+            continue
+        for other_index, (other, other_rect) in enumerate(zip(items, rects, strict=True)):
+            if other_index == index or other_rect is None or other.label != item.label:
+                continue
+            if _inside(rect, other_rect) and not _inside(other_rect, rect):
+                out.add(index)
+                break
+    return out
+
+
 def _extend(
     draw: ImageDraw.ImageDraw,
     rect: tuple[int, int, int, int],
@@ -193,14 +231,15 @@ def render_labels(
                 continue
             others = blocked + [r for j, r in enumerate(rects) if r is not None and j != index]
             rects[index] = _extend(draw, rect, item.label, others, width)
+        suppressed = _nested_duplicates(items, rects)
         for rect in rects:
             if rect is not None:
                 draw.rectangle(rect, fill=fill)
-        for item, rect in zip(items, rects, strict=True):
+        for index, (item, rect) in enumerate(zip(items, rects, strict=True)):
             if rect is None:
                 continue
             x1, y1, x2, y2 = rect
-            label = item.label
+            label = None if index in suppressed else item.label
             w, h = x2 - x1 + 1, y2 - y1 + 1
             if w >= 4 and h >= 4:
                 draw.rectangle(rect, outline=ink, width=1)

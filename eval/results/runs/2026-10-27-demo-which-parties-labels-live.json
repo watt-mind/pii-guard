@@ -20,6 +20,7 @@
     "key": "demo-which-parties:labels:live",
     "label": "pii-guard gateway, labels images, Muse Spark Open (Baseten)",
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": null,
     "detectors": [
