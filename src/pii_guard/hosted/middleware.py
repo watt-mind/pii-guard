@@ -49,57 +49,94 @@ BODY_READ_SECONDS = 10
 _CLIENT_TOOL_TYPES = frozenset({"function", "custom"})
 # Responses API only: a ``namespace`` groups client tools under one name (Codex's
 # ``multi_agent_v1``, Muse Code's ``muse``, LAB-1658). It is client-side only when every tool
-# it holds is, at any depth; the upstream (api.meta.ai) takes it as is and calls the tools
-# ``<namespace>.<name>``, so nothing is flattened.
+# it holds is; the upstream (api.meta.ai) takes it as is and calls the tools
+# ``<namespace>.<name>``, so nothing is flattened. Namespaces appear only in the top-level
+# array: masking refuses a nested one after admission, so it is refused here first (LAB-1659).
 _NAMESPACE_TOOL_TYPE = "namespace"
-# Bounds on the tool walk: namespace nesting below the top-level array, and tool definitions
-# counted across every level. Clients send one level and a few dozen tools; past either
-# bound the request is refused rather than walked.
-MAX_TOOL_NAMESPACE_DEPTH = 4
+# ``tool_choice`` strings and object types that only steer client tools; any other object
+# (``{"type": "web_search_preview"}``, ``{"type": "mcp", ...}``) asks for a provider tool.
+_CLIENT_TOOL_CHOICES = frozenset({"auto", "none", "required"})
+_ALLOWED_TOOLS_CHOICE = "allowed_tools"
+# Bound on the tool walk: tool definitions counted across both levels. Clients send a few
+# dozen; past the bound the request is refused rather than walked.
 MAX_TOOL_DEFINITIONS = 512
 
 
 class _ToolWalkLimitError(Exception):
-    """The tool array nests or counts past the walk bounds."""
+    """The tool array counts past the walk bound."""
+
+
+class _NestedNamespaceError(Exception):
+    """A namespace tool holds another namespace."""
+
+
+def _provider_tool_choice(choice: Any) -> bool:
+    """Whether ``tool_choice`` names anything but a client tool or a plain mode."""
+    if isinstance(choice, str):
+        return choice not in _CLIENT_TOOL_CHOICES
+    if not isinstance(choice, dict):
+        return True
+    choice_type = choice.get("type")
+    if not isinstance(choice_type, str):
+        return True
+    if choice_type in _CLIENT_TOOL_TYPES:
+        return False
+    if choice_type != _ALLOWED_TOOLS_CHOICE:
+        return True
+    allowed = choice.get("tools")
+    if not isinstance(allowed, list):
+        return True
+    return not all(
+        isinstance(entry, dict)
+        and isinstance(entry.get("type"), str)
+        and entry["type"] in _CLIENT_TOOL_TYPES
+        for entry in allowed
+    )
 
 
 def _provider_billed_tools(body: dict[str, Any], *, namespaces: bool = False) -> bool:
     """Whether a chat or Responses body asks the provider for separately billed tool work.
 
-    ``namespaces`` (Responses API): accept ``namespace`` tools whose nested tools are all
-    client-side. Raises :class:`_ToolWalkLimitError` past the depth or count bound.
+    ``namespaces`` (Responses API): accept top-level ``namespace`` tools whose tools are all
+    client-side. Raises :class:`_NestedNamespaceError` for a namespace inside a namespace and
+    :class:`_ToolWalkLimitError` past the count bound.
     """
     if "web_search_options" in body:
+        return True
+    if "tool_choice" in body and _provider_tool_choice(body["tool_choice"]):
         return True
     tools = body.get("tools")
     if tools is None:
         return False
     if not isinstance(tools, list):
         return True
-    seen = [0]
+    seen = 0
 
-    def provider_side(entries: list[Any], depth: int) -> bool:
+    def provider_side(entries: list[Any], nested: bool) -> bool:
+        nonlocal seen
         for tool in entries:
-            seen[0] += 1
-            if seen[0] > MAX_TOOL_DEFINITIONS:
+            seen += 1
+            if seen > MAX_TOOL_DEFINITIONS:
                 raise _ToolWalkLimitError
             if not isinstance(tool, dict):
                 return True
             tool_type = tool.get("type", "function")
+            if not isinstance(tool_type, str):
+                return True
             if tool_type in _CLIENT_TOOL_TYPES:
                 continue
             if not namespaces or tool_type != _NAMESPACE_TOOL_TYPE:
                 return True
+            if nested:
+                raise _NestedNamespaceError
             inner = tool.get("tools")
             if not isinstance(inner, list):
                 return True
-            if depth >= MAX_TOOL_NAMESPACE_DEPTH:
-                raise _ToolWalkLimitError
-            if provider_side(inner, depth + 1):
+            if provider_side(inner, True):
                 return True
         return False
 
-    return provider_side(tools, 0)
+    return provider_side(tools, False)
 
 
 class HostedRequestError(PiiGuardError):
@@ -428,9 +465,11 @@ class HostedMiddleware:
                     )
                 except _ToolWalkLimitError:
                     raise HostedRequestError(
-                        "Hosted requests allow at most "
-                        f"{MAX_TOOL_DEFINITIONS} tool definitions, nested at most "
-                        f"{MAX_TOOL_NAMESPACE_DEPTH} namespaces deep"
+                        f"Hosted requests allow at most {MAX_TOOL_DEFINITIONS} tool definitions"
+                    ) from None
+                except _NestedNamespaceError:
+                    raise HostedRequestError(
+                        "Namespace tools cannot hold other namespaces in sponsored requests"
                     ) from None
                 if provider_tools:
                     # Provider-side tools (Meta web search grounding: USD 2.50 per 1,000
