@@ -199,6 +199,18 @@ describe("Vault", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /s_3333cccc4444dddd/ })).toBeNull());
   });
 
+  it("opens on the most recently used session, without moving focus, like Logs (LAB-1626)", async () => {
+    const client = fakeClient("masked");
+    const older = new Date(Date.now() - 60_000).toISOString();
+    client.list.mockImplementation(() => Promise.resolve({ mode: "masked", ttl_seconds: 3600, sessions: [{ ...SESSIONS[0]!, last_used: older }, { ...SESSIONS[1]!, ttl_left_seconds: 3600 }] }));
+    client.detail.mockImplementation((ref: string) => Promise.resolve({ ...detailOf(ref, false, "masked"), ttl_left_seconds: 3600 }));
+    render(<Vault status={statusOf("masked")} live active client={client} />);
+    expect(await screen.findByRole("heading", { name: /Session s_3333cccc4444dddd/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Session s_3333cccc4444dddd/ })).not.toHaveFocus();
+    // Whole hours read "1 h", not "1 h 0 min".
+    expect(screen.getByText("1 h unless used")).toBeInTheDocument();
+  });
+
   it("opens the session a Logs row links to", async () => {
     const client = fakeClient("masked");
     render(<Vault status={statusOf("masked")} live active client={client} focus={{ ref: "s_3333cccc4444dddd", nonce: 1 }} />);

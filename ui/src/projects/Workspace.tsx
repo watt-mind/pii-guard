@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type TextEntityType, type VisualEntityType } from "../api/types";
 import { ENTITY_META, type Policy } from "../lib/entities";
 import { ApiError } from "../api/http";
@@ -8,7 +8,7 @@ import { request, recovery, type Requester } from "../hosted/api";
 import { useHostedSession } from "../hosted/session";
 import { dateTime, relativeTime } from "../lib/time";
 import { setSelectedEndpoint } from "./selection";
-import { exampleModel, projectPath, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
+import { exampleModel, projectPath, pendingPolicyEdit, requestPolicyEdit, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
 
@@ -70,6 +70,23 @@ function latestVersions(policies: PolicyVersion[]): Map<string, number> {
   for (const p of policies) latest.set(p.policy_id, Math.max(latest.get(p.policy_id) ?? 0, p.version));
   return latest;
 }
+
+/** One row per policy family (LAB-1626): its latest version first, older versions behind it. */
+function policyFamilies(policies: PolicyVersion[]): { latest: PolicyVersion; older: PolicyVersion[] }[] {
+  const families = new Map<string, PolicyVersion[]>();
+  for (const p of policies) families.set(p.policy_id, [...(families.get(p.policy_id) ?? []), p]);
+  return [...families.values()].map((versions) => {
+    const sorted = [...versions].sort((a, b) => b.version - a.version);
+    return { latest: sorted[0]!, older: sorted.slice(1) };
+  });
+}
+
+/** Escape closes an inline form like Cancel (a confirmation inside it handles its own Escape first). */
+const escapeTo = (onCancel: () => void, busy: boolean) => (e: { key: string; defaultPrevented: boolean; preventDefault: () => void }) => {
+  if (e.key !== "Escape" || e.defaultPrevented || busy) return;
+  e.preventDefault();
+  onCancel();
+};
 
 /** A panel opened from a row (edit, new version, keys) renders inside that row, below it (LAB-1619). */
 const INLINE = "w-full basis-full pt-1";
@@ -211,6 +228,15 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
   };
   const inspected = endpoints.find((e) => e.id === inspect);
   const latest = latestVersions(policies);
+  // Opened from Connect's "Tune what is masked": a new version of that policy, its form focused.
+  const [wantedEdit] = useState(pendingPolicyEdit);
+  const [openedWanted, setOpenedWanted] = useState(false);
+  if (wantedEdit && loaded && !openedWanted) {
+    setOpenedWanted(true);
+    requestPolicyEdit(null);
+    const family = policyFamilies(policies).find((f) => f.latest.policy_id === wantedEdit);
+    if (family) { setPolicyEdit(family.latest); setEndpointEdit(null); }
+  }
   const policyForm = policyEdit && (
     <PolicyForm
       template={policies.find((p) => p.policy_id === project.default_policy_id) ?? policies[0]}
@@ -262,7 +288,7 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted">Configuration is saved by the guard. Restoration mappings and activity remain temporary.{loaded && !policies.length ? " Create a policy first: every endpoint pins one policy version." : ""}</p>
+      <p className="text-sm text-muted">Configuration is saved {hosted ? "on the PII Guard server" : "by the guard"}. Restoration mappings and activity remain temporary.{loaded && !policies.length ? " Create a policy first: every endpoint pins one policy version." : ""}</p>
       {error && (
         <Notice tone="danger" live action={<Button size="sm" busy={busy} onClick={() => void action(reload)}>Reload configuration</Button>}>
           {error}
@@ -281,27 +307,46 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
         {loaded && !policies.length && <p className="text-sm text-muted">No policies yet. Create one to choose what each endpoint masks, keeps or blocks.</p>}
         {policies.length > 0 && (
           <ul className={LIST}>
-            {policies.map((policy) => (
-              <li key={policy.policy_version_id} className={ROW}>
+            {policyFamilies(policies).map(({ latest: policy, older }) => {
+              const pinned = (version: PolicyVersion) => endpoints.filter((e) => e.enabled && e.policy_version_id === version.policy_version_id).length;
+              const family = endpoints.filter((e) => e.enabled && e.policy_id === policy.policy_id).length;
+              return (
+              <li key={policy.policy_id} className={ROW}>
                 <div className="min-w-0">
                   <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
                     {policy.name} · v{policy.version}
-                    {latest.get(policy.policy_id) === policy.version && <Badge tone="live">Latest</Badge>}
+                    {older.length > 0 && <Badge tone="live">Latest</Badge>}
                   </h3>
-                  <p className="mt-0.5 text-sm text-muted">{describePolicy(policy)} · {plural(endpoints.filter((e) => e.enabled && e.policy_version_id === policy.policy_version_id).length, "endpoint")}</p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {describePolicy(policy)} · {plural(family, "endpoint")}
+                    {older.length > 0 && <> · {plural(older.length + 1, "version")}</>}
+                  </p>
                 </div>
                 <Button
                   size="sm"
                   busy={busy}
-                  aria-label={`New version of ${policy.name} v${policy.version}`}
+                  aria-label={`New version of ${policy.name}`}
                   ref={(el) => { if (el) versionRefs.current.set(policy.policy_version_id, el); else versionRefs.current.delete(policy.policy_version_id); }}
                   onClick={() => openPolicyForm(policy)}
                 >
                   New version
                 </Button>
-                {policyEdit !== "new" && policyEdit?.policy_version_id === policy.policy_version_id && <div className={INLINE}>{policyForm}</div>}
+                {policyEdit !== "new" && policyEdit?.policy_id === policy.policy_id && <div className={INLINE}>{policyForm}</div>}
+                {older.length > 0 && (
+                  <details className="w-full basis-full text-sm">
+                    <summary className="cursor-pointer text-muted hover:text-ink">Older versions ({older.length})</summary>
+                    <ul className="mt-2 space-y-1 border-l border-line pl-3">
+                      {older.map((v) => (
+                        <li key={v.policy_version_id} className="text-muted">
+                          <span className="text-ink">v{v.version}</span> · {describePolicy(v)} · {plural(pinned(v), "endpoint")}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </Card>
@@ -332,12 +377,12 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
         {loaded && !endpoints.length && <p className="text-sm text-muted">No endpoints yet. Create one, then create an endpoint key to connect your application.</p>}
         {endpoints.length > 0 && (
           <ul className={LIST}>
-            {endpoints.map((endpoint) => (
+            {[...endpoints.filter((e) => e.enabled), ...endpoints.filter((e) => !e.enabled)].map((endpoint) => (
               <li key={endpoint.id} className={ROW}>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-medium text-ink break-words">
+                  <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
                     {endpoint.name}
-                    {!endpoint.enabled && <span className="ml-1.5 font-normal text-muted">· Disabled</span>}
+                    {!endpoint.enabled && <Badge>Disabled</Badge>}
                   </h3>
                   <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · {endpoint.model ? <span className="font-mono text-xs">{endpoint.model}</span> : "Client chooses the model"}</p>
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
@@ -346,9 +391,11 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
-                    Connect & keys
-                  </Button>
+                  {endpoint.enabled && (
+                    <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
+                      Connect & keys
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     busy={busy}
@@ -447,6 +494,8 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
   const keyLabel = requiresCredential ? "Provider API key" : "Replace provider API key (optional)";
   const blockedReason = isSponsored && !model ? "Choose a model to save." : !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
   return (
+    // Escape anywhere in the form, its focused heading included, is Cancel (LAB-1626).
+    <div onKeyDown={escapeTo(onCancel, busy)}>
     <Card
       title={endpoint ? `Edit ${endpoint.name}` : "Create endpoint"}
       titleId={titleId}
@@ -554,6 +603,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
         </div>
       </form>
     </Card>
+    </div>
   );
 }
 
@@ -574,6 +624,7 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
   useFocusOnOpen(titleId);
   const affected = endpoints.filter((e) => e.enabled && e.policy_id === policy?.policy_id);
   return (
+    <div onKeyDown={escapeTo(onCancel, busy)}>
     <Card title={policy ? `New version of ${policy.name}` : "Create policy"} titleId={titleId} subtitle="Mask replaces detected values with reversible placeholders. Keep sends them unchanged. Block refuses the entire request when that type is detected.">
       <form aria-labelledby={titleId} className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSave({ name, entity_policies: { ...entities, ...visual }, language, mode, visual_detection: detection }); }}>
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -636,7 +687,7 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
             ))}
           </div>
           {detection === "local" && visual.STAMP === "mask" && (
-            <p role="alert" className="mt-2 text-sm text-warn">On-device detection cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.</p>
+            <p role="alert" className="mt-2 text-sm text-warn">{hosted ? "Detection on the PII Guard server" : "On-device detection"} cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.</p>
           )}
         </fieldset>
         <div className={REVIEW}>
@@ -654,6 +705,7 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
         </div>
       </form>
     </Card>
+    </div>
   );
 }
 
@@ -679,6 +731,8 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
   const keyPath = `${base}/endpoints/${encodeURIComponent(endpoint.id)}/keys`;
   useEffect(() => { let active = true; call<{ keys: EndpointKey[] }>(keyPath).then((data) => { if (!Array.isArray(data.keys)) throw new Error("Invalid keys"); if (active) { setKeys(data.keys); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [call, keyPath, hosted]);
   async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(configurationRecovery(e, hosted)); } finally { setBusy(false); } }
+  const active = keys.filter((k) => !k.revoked_at).sort(newestFirst);
+  const revoked = keys.filter((k) => k.revoked_at).sort(newestFirst);
   const url = `${globalThis.location.origin}${endpoint.base_path}`;
   const snippet = `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url=${JSON.stringify(url)},\n    api_key=os.environ["PII_GUARD_ENDPOINT_KEY"],\n)\nresponse = client.chat.completions.create(\n    model=${JSON.stringify(endpoint.model ?? "<model-id>")},\n    messages=[{"role": "user", "content": "Hello, Robin Example."}],\n)`;
   function copy(value: string, label: string) { void navigator.clipboard.writeText(value).then(() => setCopied(`${label} copied`)).catch(() => setCopied("Copy failed. Select the text and copy it manually.")); }
@@ -751,33 +805,56 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
         {secret && <SecretReveal label={`endpoint key '${secret.name}'`} secret={secret.key} envName="PII_GUARD_ENDPOINT_KEY" onDismiss={() => setSecret(null)} />}
         <Announcer message={announce} />
         {loaded && !keys.length && <p className="text-sm text-muted">No endpoint keys yet. Create one to connect an application to this endpoint.</p>}
-        {keys.length > 0 && (
+        {active.length > 0 && (
           <ul className={LIST} aria-labelledby={keysTitle}>
-            {keys.map((key) => (
-              <li key={key.id} className={ROW}>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink break-words">{key.name}</p>
-                  <p className="mt-0.5 text-sm text-muted">
-                    <span className={key.revoked_at ? "text-danger" : "text-guard"}>{key.revoked_at ? "Revoked" : "Active"}</span> · created <time dateTime={key.created_at} title={dateTime(key.created_at)}>{relativeTime(key.created_at)}</time>
-                  </p>
-                </div>
-                {!key.revoked_at && (
-                  <ConfirmAction
-                    size="sm"
-                    trigger="Revoke"
-                    triggerLabel={`Revoke key ${key.name}`}
-                    title={`Revoke key '${key.name}'?`}
-                    body="Apps using it stop working."
-                    confirm="Revoke key"
-                    busy={busy}
-                    onConfirm={() => revoke(key)}
-                  />
-                )}
-              </li>
+            {active.map((key) => (
+              <KeyRow key={key.id} item={key}>
+                <ConfirmAction
+                  size="sm"
+                  trigger="Revoke"
+                  triggerLabel={`Revoke key ${key.name}`}
+                  title={`Revoke key '${key.name}'?`}
+                  body="Apps using it stop working."
+                  confirm="Revoke key"
+                  busy={busy}
+                  onConfirm={() => revoke(key)}
+                />
+              </KeyRow>
             ))}
           </ul>
+        )}
+        {loaded && keys.length > 0 && !active.length && <p className="text-sm text-muted">No active endpoint keys. Create one to connect an application to this endpoint.</p>}
+        {revoked.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted hover:text-ink">Show {plural(revoked.length, "revoked key")}</summary>
+            <ul className={`${LIST} mt-3`} aria-label="Revoked endpoint keys">
+              {revoked.map((key) => <KeyRow key={key.id} item={key} />)}
+            </ul>
+          </details>
         )}
       </div>
     </Card>
   );
 }
+
+/** Newest first; created_at is ISO 8601, so it sorts as text. */
+const newestFirst = (a: EndpointKey, b: EndpointKey) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
+
+function KeyRow({ item, children }: { item: EndpointKey; children?: ReactNode }) {
+  return (
+    <li className={ROW}>
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
+          {item.name}
+          <Badge tone={item.revoked_at ? "failed" : "live"}>{item.revoked_at ? "Revoked" : "Active"}</Badge>
+        </p>
+        <p className="mt-0.5 text-sm text-muted">
+          Created <time dateTime={item.created_at} title={dateTime(item.created_at)}>{relativeTime(item.created_at)}</time>
+          {item.revoked_at && <>, revoked <time dateTime={item.revoked_at} title={dateTime(item.revoked_at)}>{relativeTime(item.revoked_at)}</time></>}
+        </p>
+      </div>
+      {children}
+    </li>
+  );
+}
+

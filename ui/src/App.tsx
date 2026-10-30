@@ -8,6 +8,8 @@ import { useSetupPending } from "./hosted/setup";
 import { ClientSetup } from "./hosted/ClientSetup";
 import { loadFirstRun } from "./hosted/firstRun";
 import { HostedSessionContext, SITE_HASHES, hostedChatFetch, useHostedSession, type HostedSession } from "./hosted/session";
+import { ApiReference } from "./hosted/ApiReference";
+import { isApiHash } from "./hosted/apiConfig";
 import { chatModesOf, offersDemoTraffic, offersSection, offersTab, useCapabilities, type Capabilities } from "./lib/capabilities";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createHttpChat, createMockChat, type ChatClient } from "./api/chat";
@@ -151,7 +153,10 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   const opened = (key: string) => key === routeKey || visited.has(key);
   const sectionOpened = (key: string) => key === route.section || [...visited].some((visitedKey) => visitedKey.split("/")[0] === key);
   const [textView, setTextView] = useState<"mask" | "roundtrip">("mask");
+  // Hosted, #api shows the API reference in the console's main area (LAB-1626); any navigation leaves it.
+  const [apiOpen, setApiOpen] = useState(() => hosted !== null && isApiHash(globalThis.location?.hash ?? ""));
   const navigate = useCallback((next: Route, how: "push" | "replace" | "none" = "push") => {
+    setApiOpen(false);
     setRouteState((prev) => (sameRoute(prev, next) ? prev : next));
     if (how !== "none") writeHash(next, how);
   }, []);
@@ -181,11 +186,13 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
   useEffect(() => {
     // An old tab link (#traffic, #benchmarks …) lands on its new place, with the URL rewritten.
     const initial = parseHash(globalThis.location?.hash ?? "");
-    if (initial?.redirect) writeHash(initial.route, "replace");
+    // Hosted, #api is the API reference inside the console (LAB-1626): not a section to rewrite.
+    if (initial?.redirect && !(hosted && isApiHash(globalThis.location?.hash ?? ""))) writeHash(initial.route, "replace");
     // Only route hashes switch sections (the skip link's #main must not). Back and forward
     // fire popstate, a typed or linked hash fires hashchange: both land here.
     const onHash = () => {
       // The public page's anchors belong to the hosted page around the console.
+      if (hosted && isApiHash(globalThis.location.hash)) return setApiOpen(true);
       if (hosted && SITE_HASHES.has(globalThis.location.hash)) return;
       const parsed = parseHash(globalThis.location.hash);
       if (parsed) navigate(parsed.route, parsed.redirect ? "replace" : "none");
@@ -319,10 +326,11 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
         onTheme={setTheme}
         statusDetail={server ? statusDetailOf(server) : null}
         caps={caps}
+        apiOpen={apiOpen}
       />
 
       <div className={["min-w-0", settled ? "" : "invisible"].join(" ")} data-settled={settled || undefined}>
-        <HeaderBar route={route} caps={caps} />
+        <HeaderBar route={route} caps={caps} apiOpen={apiOpen} />
         {engine.engine === "mock" && (
           <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
             <p className="mx-auto max-w-[1280px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
@@ -354,6 +362,8 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
         )}
 
         <main id="main" tabIndex={-1} className="mx-auto min-h-dvh max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
+          {apiOpen && <ApiReference embedded />}
+          <div hidden={apiOpen}>
           <section id="section-overview" aria-label="Overview" hidden={section !== "overview"}>
             {sectionOpened("overview") && <PageLoadBoundary><Suspense fallback={<p role="status" className="text-sm text-muted">Loading overview…</p>}>
             {trafficOpened && (
@@ -486,7 +496,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
               loadSnippets={hostedSnippets}
               gatewayLine={!caps.accounts}
               accounts={caps.accounts ? <ProviderConnections /> : undefined}
-              clientSetup={caps.accounts && hosted ? () => <ClientSetup call={hosted.call} /> : undefined}
+              clientSetup={caps.accounts && hosted ? () => <ClientSetup call={hosted.call} onOpenLog={(id) => { setLogFocus({ id, nonce: Date.now() }); openSection("logs"); }} /> : undefined}
               traffic={trafficOpened ? trafficHandle : undefined}
               onOpenLog={(id) => {
                 setLogFocus({ id, nonce: Date.now() });
@@ -515,6 +525,7 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
             {opened("evaluation") && <Benchmarks load={loadBenchmarks} initial={route.section === "evaluation" ? (route.evaluation ?? null) : undefined} onParams={route.section === "evaluation" ? reportEvaluation : undefined} />}
             </Suspense></PageLoadBoundary>}
           </section>
+          </div>
         </main>
 
         <footer className="mx-auto max-w-[1280px] px-4 pb-10 text-xs text-faint sm:px-6">
@@ -550,7 +561,7 @@ function statusDetailOf(s: ServerStatus): string {
 /** The bar above every section, over the accent hairline: where you are on the left (from
  *  1024 px; below it the menu's top bar names the section) and, on the right, the project
  *  switcher and, for a signed-in hosted owner, the profile menu. */
-function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
+function HeaderBar({ route, caps, apiOpen = false }: { route: Route; caps: Capabilities; apiOpen?: boolean }) {
   const section = SECTIONS.find((s) => s.id === route.section)!;
   const tab = route.section === "playground" ? PLAYGROUND_TABS.find((t) => t.id === route.tab) : undefined;
   const session = useHostedSession();
@@ -559,8 +570,8 @@ function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
       {/* Below 1024 px the row shows only when it holds a switcher or an avatar. */}
       <div className="hidden h-12 items-center gap-3 px-4 has-[[data-header-item]]:flex sm:px-6 lg:flex">
         <p className="hidden min-w-0 items-center gap-2 text-base text-ink lg:flex">
-          <span>{section.label}</span>
-          {tab && (
+          <span>{apiOpen ? "API reference" : section.label}</span>
+          {tab && !apiOpen && (
             <>
               <span aria-hidden="true" className="text-faint">
                 /
@@ -571,7 +582,7 @@ function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
         </p>
         <div className="ml-auto flex min-w-0 items-center gap-2.5">
           {caps.accounts && (
-            <a data-header-item href="#api" aria-label="API reference" title="API reference" className="inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:bg-surface-2 hover:text-ink pointer-coarse:min-h-11">
+            <a data-header-item href="#api" aria-label="API reference" title="API reference" aria-current={apiOpen ? "page" : undefined} className="inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:bg-surface-2 hover:text-ink pointer-coarse:min-h-11">
               API
             </a>
           )}

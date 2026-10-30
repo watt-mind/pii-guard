@@ -86,7 +86,8 @@ function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   if (s < 60) return `${s} s`;
   if (s < 3600) return `${Math.floor(s / 60)} min`;
-  return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
+  const minutes = Math.floor((s % 3600) / 60);
+  return minutes ? `${Math.floor(s / 3600)} h ${minutes} min` : `${Math.floor(s / 3600)} h`;
 }
 
 const typeLabel = (t: string) => metaFor(t as EntityType).label ?? t;
@@ -108,6 +109,7 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
   const [dropping, setDropping] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [handledFocus, setHandledFocus] = useState<number | null>(null);
+  const [autoPicked, setAutoPicked] = useState(false);
   // The detail to load: a new object (nonce) refetches, e.g. after a drop or a reveal.
   const [want, setWant] = useState<{ ref: string; reveal: boolean; nonce: number } | null>(null);
   // What the open detail was loaded at (generation, counts): when the list shows the session
@@ -208,6 +210,16 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
   }
   const current = detail.state === "ok" && detail.detail.ref === selected ? detail.detail : null;
 
+  // Like Logs, the screen opens on a session (LAB-1626): the most recently used one, once, without
+  // moving focus or the page. Not after a drop, whose confirmation sits where the detail goes.
+  if (!autoPicked && selected === null && notice === null && want === null && shown.length > 0) {
+    setAutoPicked(true);
+    const recent = shown.reduce((a, b) => (b.last_used > a.last_used ? b : a));
+    setSelected(recent.ref);
+    setDetail({ state: "loading" });
+    setWant((w) => ({ ref: recent.ref, reveal: false, nonce: (w?.nonce ?? 0) + 1 }));
+  }
+
   const latest = sessions.find((s) => s.ref === selected);
   const latestKey = latest ? `${latest.generation}|${latest.entries}|${latest.occurrences}|${latest.known_values}` : null;
   if (current && latestKey !== null && latestKey !== syncedAt) {
@@ -272,7 +284,7 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
         </Notice>
       ) : (
         <>
-          <ModeNote mode={mode === "full" ? "full" : "masked"} />
+          {hosted ? <p className="text-xs text-muted">Original values are never sent to this page.</p> : <ModeNote mode={mode === "full" ? "full" : "masked"} />}
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
             <Card
               title="Sessions"
@@ -319,7 +331,8 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
                     </p>
                   ))}
                 {list.state === "ok" && sessions.length > 0 && shown.length === 0 && <p className="py-6 text-center text-sm text-muted">No session matches.</p>}
-                <ul className="space-y-1" aria-label="Vault sessions">
+                {/* Capped like the Logs list, so the detail stays beside it (LAB-1626). */}
+                <ul className="max-h-[26rem] space-y-1 overflow-y-auto overscroll-contain lg:max-h-[calc(100dvh-16rem)]" aria-label="Vault sessions">
                   {shown.map((s) => (
                     <li key={s.ref}>
                       <SessionRow s={s} now={now} selected={s.ref === selected} onOpen={() => open(s.ref)} />
@@ -426,7 +439,7 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
           )}
           <ConfirmAction
             size="sm"
-            trigger="Drop…"
+            trigger="Drop session…"
             triggerLabel={`Drop session ${d.ref}`}
             title={<>Drop session {mono(d.ref)}?</>}
             body={

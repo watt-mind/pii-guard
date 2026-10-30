@@ -76,8 +76,9 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
   const [wasSignedIn, setWasSignedIn] = useState(false);
   if (account?.authenticated && !wasSignedIn) setWasSignedIn(true);
   // The API reference is static and the same for everyone, signed in or not (LAB-1586).
-  if (isApiHash(hash)) return <ApiReference consoleHref={account?.authenticated && renderConsole ? "#overview" : account?.login_url || LOGIN} />;
-  if (renderConsole && account?.authenticated && !SITE_HASHES.has(hash)) return renderConsole({ account, error, refresh, call });
+  // A signed-in owner reads it inside the console, with its sidebar and switcher (LAB-1626).
+  if (isApiHash(hash) && !(renderConsole && account?.authenticated)) return <ApiReference consoleHref={account?.login_url || LOGIN} />;
+  if (renderConsole && account?.authenticated && (!SITE_HASHES.has(hash) || isApiHash(hash))) return renderConsole({ account, error, refresh, call });
   // A console deep link without a session: say what the screen is and how to get there (LAB-1519).
   const section = renderConsole && account && !account.authenticated ? consoleSectionOf(hash) : null;
   // Evaluation shows only the published benchmarks bundled with the page, so it needs no sign-in

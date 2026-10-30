@@ -67,6 +67,23 @@ describe("Live traffic", () => {
     );
   });
 
+  it("selects the call it is asked to open, and moves focus to it once it arrives (LAB-1626)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" focus={{ id: huStream.id, nonce: 1 }} />);
+    f.push([huChat]);
+    // Not here yet: the latest call shows, focus stays put.
+    await screen.findByTestId("original-request");
+    expect(screen.getByRole("heading", { name: /^Call at/ })).not.toHaveFocus();
+    f.push([huStream, deTools]);
+    // The test request's call, even with a newer one after it.
+    await waitFor(() => expect(screen.getByRole("heading", { name: /^Call at/ })).toHaveFocus());
+    const rows = document.querySelectorAll("button[aria-current]");
+    expect(rows).toHaveLength(1);
+    // The middle of the three calls, not the newest.
+    const all = [...document.querySelectorAll("button")].filter((b) => b.className.includes("text-left"));
+    expect(all.indexOf(rows[0] as HTMLButtonElement)).toBe(all.length - 2);
+  });
+
   it("labels the NER-only demo call as an expected miss in rules-only mode", async () => {
     const replay = (fixture.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
     const nerOnly = replay.find((e) => JSON.stringify(e.request).includes("Gipsz Jakab"))!;

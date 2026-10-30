@@ -105,7 +105,7 @@ function Showcase({ card }: { card: ShowcaseCard }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane headingLevel={3} id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
+        <Pane headingLevel={3} id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the face detector on the PII Guard server. Dashed: text found by OCR and the rules.">
           <div className="space-y-3">
             <YourText text={card.message} masked={message.masked} />
             <Figure card={card} alt={card.sample.alt} compact>

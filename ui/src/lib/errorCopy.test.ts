@@ -12,6 +12,15 @@ describe("error copy per code (LAB-1335)", () => {
     expect(`${c.title} ${c.body}`).not.toMatch(/Nothing was sent|fails closed/);
   });
 
+  it("says an unusable model answer was sent masked, never that detection failed (LAB-1626)", () => {
+    const c = errorCopy("upstream_did_not_stream");
+    expect(c.kind).toBe("upstream");
+    expect(c.title).toBe("The model didn't answer as expected.");
+    expect(c.body).toContain("The masked request was sent");
+    expect(c.title + c.body).not.toMatch(/Nothing was sent|detection or masking fails/);
+    expect(errorCopy("detection_failed").kind).toBe("fail_closed");
+  });
+
   it("gives a hint per upstream status", () => {
     expect(upstreamHint(401)).toMatch(/API key/);
     expect(upstreamHint(429)).toMatch(/rate limited/);
