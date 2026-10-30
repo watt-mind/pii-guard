@@ -347,6 +347,15 @@ _TOP_WALKED = frozenset(
 #: Field names and enum values the API itself defines: never personal data, so not checked.
 _STRUCTURAL_WORDS = frozenset(
     {
+        # JSON Schema's type names (``"type": "boolean"``): the published NER reads a lone
+        # "boolean" as a PERSON, which refused every tool schema with a flag (LAB-1605).
+        "array",
+        "boolean",
+        "integer",
+        "null",
+        "number",
+        "object",
+        "string",
         "allowed_tools",
         "approximate",
         "auto",
@@ -802,6 +811,22 @@ def _collect_arguments(function: dict[str, Any], where: str, out: CollectedTexts
     out.finalizers.append(reserialize)
 
 
+#: Integer type limits a JSON Schema bound can carry (int32, uint32, JS safe integer, int64,
+#: uint64): exact technical constants, never personal data, so a schema bound equal to one is
+#: not checked.
+_INTEGER_LIMITS = frozenset(
+    {
+        2**31 - 1,
+        -(2**31),
+        2**32 - 1,
+        2**53 - 1,
+        -(2**53 - 1),
+        2**63 - 1,
+        -(2**63),
+        2**64 - 1,
+    }
+)
+
 #: A bare number with fewer digits than this is never personal data on its own (the shortest
 #: numeric types, TAJ and tax IDs, have 9 and 10 digits; phone and account numbers more).
 _MIN_NUMBER_DIGITS = 6
@@ -982,7 +1007,10 @@ def _collect_schema(
         out.slots.append(TextSlot(value, _setter(container, key), "tools"))
     elif (number := _number_text(value)) is not None:
         # A keyword number (maximum, minLength, ...) is structure: checked, never rewritten.
-        _check_text(number, where, out)
+        # Integer limits (zod's ``.int()`` writes +-(2**53 - 1)) are the platform's, not data:
+        # the published NER reads 9007199254740991 as a bank account (LAB-1605).
+        if value not in _INTEGER_LIMITS:
+            _check_text(number, where, out)
     elif isinstance(value, list):
         for i in range(len(value)):
             _collect_schema(value, i, f"{where}.{i}", out)

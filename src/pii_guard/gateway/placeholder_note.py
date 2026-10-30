@@ -24,6 +24,7 @@ __all__ = [
     "NOTE_HEADER",
     "PLACEHOLDER_NOTE",
     "add_chat_note",
+    "add_messages_note",
     "add_responses_note",
     "needs_note",
 ]
@@ -66,3 +67,20 @@ def add_responses_note(body: dict[str, Any]) -> None:
         body["instructions"] = f"{PLACEHOLDER_NOTE}\n\n{instructions}"
     elif instructions is None or instructions == "":
         body["instructions"] = PLACEHOLDER_NOTE
+
+
+def add_messages_note(body: dict[str, Any]) -> None:
+    """Put the note in front of a Messages API request's ``system`` (LAB-1605).
+
+    A string ``system`` gets the note as a first paragraph; a list of text blocks gets it as
+    a first block (the client's ``cache_control`` marks stay on its own blocks); an absent or
+    empty one becomes the note alone. ``messages`` is left as sent, so indexes in errors stay
+    right.
+    """
+    system = body.get("system")
+    if isinstance(system, str) and system:
+        body["system"] = f"{PLACEHOLDER_NOTE}\n\n{system}"
+    elif isinstance(system, list) and system:
+        system.insert(0, {"type": "text", "text": PLACEHOLDER_NOTE})
+    elif system is None or system == "" or system == []:
+        body["system"] = PLACEHOLDER_NOTE

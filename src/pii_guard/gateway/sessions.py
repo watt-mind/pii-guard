@@ -21,10 +21,11 @@ match wins:
 4. ``default``: one session per client identity, ``HMAC(tenant key, "default:" + identity)``.
    Created on first use.
 
-The client identity is the SHA-256 of the request's ``Authorization`` value, or ``anonymous``
-without one: two bearer tokens never share a derived session, and every id is keyed with the
-tenant key, so ids never collide across deployments. Derived ids leave the process only in
-the ``X-PII-Guard-Session`` response header (a client may send it back, step 1);
+The client identity is the SHA-256 of the request's ``Authorization`` value (else of its
+``x-api-key``, as Anthropic clients send it), or ``anonymous`` without either: two bearer
+tokens never share a derived session, and every id is keyed with the tenant key, so ids never
+collide across deployments. Derived ids leave the process only in the
+``X-PII-Guard-Session`` response header (a client may send it back, step 1);
 ``X-PII-Guard-Session-Source`` says which step matched. Steps 2-4 use
 :meth:`~pii_guard.vault.Vault.session_or_create`, whose entry cap rotates a full session to a
 new generation (``PII_GUARD_VAULT_MAX_ENTRIES``).
@@ -100,11 +101,16 @@ class SessionSource(StrEnum):
 
 
 def client_identity(headers: Mapping[str, str]) -> str:
-    """SHA-256 (hex) of the ``Authorization`` value, or ``anonymous`` without one."""
+    """SHA-256 (hex) of the ``Authorization`` value; without one, of the ``x-api-key`` value
+    (Anthropic clients, LAB-1605), so two keys never share a derived session; ``anonymous``
+    without either."""
     raw = headers.get("authorization")
-    if raw is None or not raw.strip():
-        return "anonymous"
-    return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()
+    if raw is not None and raw.strip():
+        return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()
+    key = headers.get("x-api-key")
+    if key is not None and key.strip():
+        return hashlib.sha256(b"x-api-key:" + key.strip().encode("utf-8")).hexdigest()
+    return "anonymous"
 
 
 class _Conversations:

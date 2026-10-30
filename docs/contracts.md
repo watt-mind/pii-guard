@@ -371,7 +371,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | Status | `code` | When |
 |---|---|---|
 | 400 | `unsupported_content` | Gateway: the body holds a key or content part outside the [request allow-list](#gateway-request-fields-implemented) (an unknown field, a remote image URL, an audio part). Nothing is forwarded or stored. A malformed gateway body (not JSON, a wrong value type) is `400 invalid_request`. |
-| 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the Anthropic Messages API, which Claude Code speaks, is not served yet. The message points to the OpenAI-compatible routes (`/v1/chat/completions`, `/v1/responses`) and the console's Connect page; the response has `x-should-retry: false`. Nothing is detected, stored or forwarded; the attempt is one `refused` traffic event (model and `stream` only, never the body). |
+| 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the upstream has no Anthropic Messages API (it answered 404 or 405 on `.../messages`). The message points to an Anthropic-compatible upstream, the OpenAI-compatible routes (`/v1/chat/completions`) and the console's Connect page; the response has `x-should-retry: false`. Only the masked request reached that upstream; the call is one `refused` traffic event. |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
@@ -962,7 +962,7 @@ Unknown or expired ref: 404 `not_found`; a malformed one: 422 `invalid_request`.
 
 ## Gateway sessions (implemented)
 
-Every gateway call (`/v1/chat/completions`, `/v1/responses`) uses one vault session, chosen in
+Every gateway call (`/v1/chat/completions`, `/v1/responses`, `/v1/messages`) uses one vault session, chosen in
 this order (`pii_guard.gateway.sessions`, LAB-1286; details in
 [architecture-gateway.md](architecture-gateway.md#sessions)):
 
@@ -973,7 +973,8 @@ this order (`pii_guard.gateway.sessions`, LAB-1286; details in
 | 3 | `prompt_cache_key` | `HMAC(tenant key, "pck:" + identity + ":" + prompt_cache_key)` | created |
 | 4 | `default` | `HMAC(tenant key, "default:" + identity)` | created |
 
-`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous` (a single
+`identity` is the SHA-256 of the request's `Authorization` value (without one, of its
+`x-api-key`, as Anthropic clients send it; LAB-1605), or `anonymous` (a single
 local principal by construction: see `gateway/sessions.py`). Every
 response carries `X-PII-Guard-Session` (the id used, including a derived `d_…` one) and
 `X-PII-Guard-Session-Source`; the traffic record has `session_source` next to `session_ref`.
@@ -1222,6 +1223,78 @@ only). With `stream: true` the header is `400 invalid_request`.
 `metadata["muse-code"]` kept per model. On a 404 it is `GET /v1/models` with default client
 settings (`tool_call`, text in and out, a 128k context). Upstream errors keep their status
 (5xx becomes 502), never their message.
+
+## Messages API (implemented)
+
+`POST /v1/messages` is the gateway for clients that speak the Anthropic **Messages API**, such
+as Claude Code (docs/integrations/claude-code.md, LAB-1605). It gives the same guarantees as
+`/v1/chat/completions` and uses the same headers (`X-PII-Guard-Mode`, `-Language`, `-Session`,
+`-Echo`), session resolution (an `x-api-key` counts as the client identity when there is no
+`Authorization`), known values, outbound re-check, detectors, cache and vault
+(`pii_guard.gateway.messages`). The masked body goes to the upstream's own
+`{PII_GUARD_UPSTREAM_BASE_URL}/messages` (a `/chat/completions`, `/responses` or `/messages`
+suffix is dropped first; `https://api.anthropic.com/v1` is the Anthropic API). Nothing is
+translated to Chat Completions: an upstream that answers that path with 404 or 405 gets
+**`400 unsupported_api`** (with `x-should-retry: false`). Other upstream errors keep their
+status in the Anthropic error shape (`{"type": "error", "error": {"type", "code":
+"upstream_error", "message"}}`) with only the upstream's error `type` token
+(`overloaded_error`, `rate_limit_error`, ...), never its message.
+`POST /v1/messages/count_tokens` masks the same body the same way, forwards it to
+`.../messages/count_tokens` and answers only `{"input_tokens": n}`.
+
+**Upstream headers.** A configured `PII_GUARD_UPSTREAM_API_KEY` is sent as `x-api-key` (no
+`Authorization`). Without one, the client's own `x-api-key` and `Authorization` are passed
+through. `anthropic-version` (default `2023-06-01`) and the `anthropic-beta` tokens are passed
+on when they are plain tokens (`[A-Za-z0-9._-]`); other client headers are not.
+
+**Request fields.** Walked against an allow-list (`pii_guard.gateway.messages_request`), with
+the treatments of the chat table. Any other key, block type or tool type is
+`400 unsupported_content`, and nothing is forwarded.
+
+| Where | Key | Treatment |
+| --- | --- | --- |
+| body | `model` | check (non-empty string, required) |
+| body | `messages` | non-empty array of `{role: user\|assistant, content}` (required) |
+| body | `system` | string mask, or `text` blocks |
+| body | `max_tokens`, `stream`, `temperature`, `top_k`, `top_p` | pass |
+| body | `thinking`, `tool_choice`, `context_management`, `service_tier`, `output_config` | check |
+| body | `stop_sequences` | mask |
+| body | `metadata` | `user_id` mask (Claude Code sends a JSON string of its ids) |
+| body | `tools` | client tools (no `type`, or `custom`): `name` check, `description` mask, `input_schema` as a JSON Schema (as chat `parameters`), `defer_loading`/`strict` pass, `cache_control` check; server tools (`web_search_*`, `code_execution_*`, ...) `400` |
+| body | `mcp_servers`, `container` | `400`: tools and state kept upstream act on data the gateway never sees |
+| every block | `type`, `cache_control` | check |
+| `text` block | `text` | mask (line-number gutters as for chat); non-empty `citations` `400` |
+| `image` block | `source` | inline `base64` PNG/JPEG: the masked image (and, with placeholder labels, its transcript as a `text` block after it); `url`/`file` sources `400` |
+| `tool_use` block | `id`, `name` check; `input` | mask JSON (every string, keys included, and long numbers), as chat tool-call arguments |
+| `tool_result` block | `tool_use_id` check; `is_error` pass; `content` | string mask, or `text` and `image` blocks as above |
+| `thinking` block | `thinking` mask; `signature` | pass (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
+| `redacted_thinking` block | `data` | pass (opaque) |
+| other blocks (`document`, `search_result`, `server_tool_use`, ...) | | `400` |
+
+**Placeholder note.** When the masked body holds a placeholder, the note goes in front of
+`system` (a first paragraph of a string, or a first `text` block; the client's `cache_control`
+marks stay on its own blocks).
+
+**Restore.** In a whole `message`, every string the upstream returns is restored (`text` and
+`thinking` blocks, `stop_sequence`, ...). A `tool_use` block's `input` is serialised and
+restored like chat tool-call `arguments` (JSON-escaped values, shell quoting in a `command`,
+masked numbers back as numbers), then parsed again; one that no longer parses fails the call
+(`502`, nothing half-restored). `signature` and `data` are left as is.
+`X-PII-Guard-Unresolved` counts unknown placeholders.
+
+**Streaming** (`stream: true`). Events keep their `event:` lines. Each `content_block_delta`
+stream has its own streaming unmasker, keyed by block `index`: `text_delta.text`,
+`thinking_delta.thinking` and `input_json_delta.partial_json` (JSON-escaped). A placeholder
+split across deltas is held back until it is complete; at the block's `content_block_stop`
+(or the end of the stream) what is held back goes out as one more delta just before it.
+`signature_delta` passes through; every other event (`message_start`, `content_block_start`,
+`message_delta`, `message_stop`, `ping`) is restored whole. An upstream `error` event becomes
+`{"type": "error", "error": {"type": "api_error", "message": "upstream stream error"}}`; a
+stream that fails inside the gateway ends with the same shape.
+
+**Echo.** `X-PII-Guard-Echo: masked` works on non-streamed `/v1/messages` calls: the answer
+gets `pii_guard: {masked_input: [{role, content}], masked_output}` (placeholders only). With
+`stream: true` or on `count_tokens` the header is `400 invalid_request`.
 
 ## Vault (implemented)
 

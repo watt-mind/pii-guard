@@ -76,8 +76,8 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
     ),
     "unsupported_api": (
         400,
-        "`POST /v1/messages`: the Anthropic Messages API is not served; use the "
-        "OpenAI-compatible routes. Nothing is forwarded.",
+        "`POST /v1/messages`: the upstream has no Anthropic Messages API (404/405 on "
+        "`.../messages`). Only the masked request reached it.",
     ),
     "unauthorized": (401, "`PII_GUARD_API_TOKEN` is set and the request has no valid token."),
     "traffic_log_not_local": (

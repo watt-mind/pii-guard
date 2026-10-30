@@ -1,7 +1,8 @@
 # Integrations: putting a client behind PII Guard
 
 The gateway is an OpenAI-compatible endpoint: `POST /v1/chat/completions`,
-`POST /v1/responses` (the Responses API) and `GET /v1/models` at `http://127.0.0.1:8787/v1`. A
+`POST /v1/responses` (the Responses API) and `GET /v1/models` at `http://127.0.0.1:8787/v1`,
+plus the Anthropic Messages API (`POST /v1/messages`) for Claude Code. A
 client that lets you set a base URL for either API works through it. The client sends real data, the model gets placeholders, and the
 answer (tool-call arguments included) comes back restored.
 
@@ -14,7 +15,7 @@ For a plain OpenAI-compatible client (cURL, Python SDK), see [integrations.md](.
 | [Codex](codex.md) (OpenAI's coding agent) | Responses (`/v1/responses`) | a launch command with `-c` flags, no config file | 0.163.0 | [`test_codex_e2e.py`](../../tests/integrations/test_codex_e2e.py) |
 | [OpenCode](opencode.md) | Chat Completions | one variable, `OPENCODE_CONFIG_CONTENT`, no config file | 1.19.3 | [`test_opencode_e2e.py`](../../tests/integrations/test_opencode_e2e.py) |
 | cURL, Python (OpenAI SDK), LangChain, LiteLLM, Open WebUI, ... | Chat Completions or Responses | base URL `http://127.0.0.1:8787/v1`, see below | | |
-| Claude Code | Anthropic Messages (`/v1/messages`) | not supported yet: the gateway serves the OpenAI APIs only, and answers `/v1/messages` with `501 unsupported_api` (the attempt shows in Logs) | | |
+| [Claude Code](claude-code.md) | Anthropic Messages (`/v1/messages`) | `ANTHROPIC_BASE_URL` on the launch command, no config file; the upstream must serve the Messages API too | 2.1.312 | checked by hand ([claude-code.md](claude-code.md#what-was-checked)) |
 
 The versions installed on a developer Mac (Codex 0.163.0, pi 1.3.0, OpenCode 1.18.26, Muse Code
 1.4.14, Claude Code 2.1.289) were also run by hand against the Meta Model API, with the

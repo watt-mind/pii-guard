@@ -65,8 +65,13 @@ def test_every_tool_gets_the_session_url_and_the_preset_model() -> None:
     assert [t["id"] for t in body["tools"]] == list(snippets.TOOL_IDS)
     for tool in body["tools"]:
         if tool["supported"]:
-            assert url in tool["code"], tool["id"]
-    assert not _tool(body, "claude-code")["supported"]
+            # Claude Code's base URL is the session root: its SDK appends /v1/messages.
+            expected = url.removesuffix("/v1") if tool["id"] == "claude-code" else url
+            assert expected in tool["code"], tool["id"]
+    claude = _tool(body, "claude-code")
+    assert claude["supported"] and claude["kind"] == "launch"
+    assert f"ANTHROPIC_BASE_URL={url.removesuffix('/v1')} " in claude["code"]
+    assert claude["tested_version"] == snippets.CLAUDE_CODE_VERSION
     assert _tool(body, "codex")["tested_version"] == snippets.CODEX_VERSION
     assert "muse-spark-1.3" in _tool(body, "codex")["code"]
 
@@ -239,6 +244,7 @@ def test_endpoint_blocks_use_the_endpoint_url_model_and_key(tmp_path: Path) -> N
     assert "$PII_GUARD_ENDPOINT_KEY" in _tool(body, "curl")["code"]
     assert 'env_key="PII_GUARD_ENDPOINT_KEY"' in _tool(body, "codex")["code"]
     assert "{env:PII_GUARD_ENDPOINT_KEY}" in _tool(body, "opencode")["code"]
+    assert not _tool(body, "claude-code")["supported"]  # endpoint upstreams are OpenAI-only
     assert "--no-session-path" in _tool(body, "pi")["code"]
     assert "--api-key '$PII_GUARD_ENDPOINT_KEY'" in _tool(body, "pi")["code"]
     # Muse Code reads its catalog at the root; the endpoint key gets its own there (LAB-1462).
