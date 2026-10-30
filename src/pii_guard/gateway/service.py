@@ -59,6 +59,7 @@ from pii_guard.detect.known import KNOWN_DETECTOR, WIDENED_TYPES, merge_known, w
 from pii_guard.gateway.cache import DetectionCache
 from pii_guard.gateway.config import DEPRECATED_MODE_ALIASES, GatewayConfig, Mode, parse_mode
 from pii_guard.gateway.detection import ModeDetector, build_mode_detectors, detector_timings
+from pii_guard.gateway.meter import meter_response, record_payload, record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import IssuedIds, upstream_ids, without_opaque_ids
 from pii_guard.gateway.outbound import (
     OUTBOUND_CHECK_HEADER,
@@ -160,6 +161,8 @@ def check_upstream_payload(payload: bytes, image_bytes: int = 0) -> None:
     limit = UPSTREAM_PAYLOAD_LIMIT.get()
     if limit is not None and len(payload) - max(0, image_bytes) > limit:
         raise PayloadTooLargeError("the masked request is larger than its admitted size bound")
+    # Passed: this payload goes upstream, and settlement estimates its input from it.
+    record_payload(len(payload) - max(0, image_bytes))
 
 
 class UpstreamNotConfiguredError(PiiGuardError):
@@ -467,6 +470,7 @@ class Gateway:
                 raise UpstreamError("Upstream response exceeds hosted size limit")
         else:
             response.stream = BoundedResponseStream(response.stream)
+        meter_response(response)
 
     @property
     def detectors(self) -> dict[Mode, ModeDetector]:
@@ -1199,6 +1203,7 @@ class Gateway:
                 trace.answer = answer
             elif trace.recording and isinstance(answer.get("usage"), dict):
                 trace.usage = answer["usage"]
+            record_usage(answer.get("usage"))
             result = JSONResponse(answer, headers=out_headers)
             timer.add("response", time.perf_counter() - building)
             timer.finish()
@@ -1274,6 +1279,7 @@ class Gateway:
                 outs = restorer.process(data)
                 timer.add("unmask", time.perf_counter() - unmasking)
                 trace.scan_usage(data)
+                scan_usage(data)
                 for out in outs:
                     timer.mark_first_event()
                     if out == DONE and echo and not echoed_answer:

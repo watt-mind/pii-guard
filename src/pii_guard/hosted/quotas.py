@@ -1,8 +1,10 @@
 """Atomic, conservative admission for the single-process hosted deployment.
 
-Reservations are charged in full before work starts. Finishing, cancelling and retrying do
-not refund requests, tokens or money: missing provider usage cannot replenish a budget.
-Only concurrency is released, after the complete response stream has closed.
+Reservations are charged in full before work starts. Once the response stream has closed,
+a paid reservation may be settled down (never up) to what the request actually used
+(LAB-1662): its upstream's reported usage, otherwise a conservative estimate, and nothing
+when no upstream call happened. Settlement returns tokens and money, never the request
+count, and happens at most once. Concurrency is released after the stream has closed.
 
 The ledger is ephemeral. Sponsored authority therefore requires a one-time external claim
 of a reconciled allocation. A successful claim must survive process/container restarts.
@@ -156,10 +158,50 @@ class _Usage:
 class Reservation:
     """One admitted operation, retained until streaming and cleanup are complete."""
 
-    def __init__(self, ledger: QuotaLedger, usage: _Usage) -> None:
+    def __init__(
+        self,
+        ledger: QuotaLedger,
+        usage: _Usage,
+        *,
+        day: int = 0,
+        tokens: int = 0,
+        spend: int = 0,
+    ) -> None:
         self._ledger = ledger
         self._usage = usage
         self._released = False
+        self._settled = False
+        self._day, self.tokens, self.spend = day, tokens, spend
+
+    def settle(self, tokens: int, spend: int) -> tuple[int, int]:
+        """Lower this reservation to ``tokens`` and ``spend`` (microdollars), at most once.
+
+        Returns the (tokens, spend) refunded. Never raises the charge: values above the
+        reservation, or that are not nonnegative integers, refund nothing. A reservation
+        from a previous day refunds only the allocation, never today's fresh counters.
+        """
+        ledger = self._ledger
+        with ledger._lock:
+            if self._settled:
+                return 0, 0
+            self._settled = True
+            if type(tokens) is not int or type(spend) is not int or tokens < 0 or spend < 0:
+                return 0, 0
+            refund_tokens = self.tokens - min(tokens, self.tokens)
+            refund_spend = self.spend - min(spend, self.spend)
+            try:
+                same_day = ledger._rollover() == self._day
+            except QuotaUnavailableError:
+                same_day = False
+            if same_day:
+                usage = self._usage
+                usage.tokens -= min(refund_tokens, usage.tokens)
+                ledger._tokens -= min(refund_tokens, ledger._tokens)
+                ledger._spent_today -= min(refund_spend, ledger._spent_today)
+            else:
+                refund_tokens = 0
+            ledger._spent_allocation -= min(refund_spend, ledger._spent_allocation)
+            return refund_tokens, refund_spend
 
     def release(self) -> None:
         """Idempotent, thread-safe concurrency release; never refunds budget."""
@@ -345,7 +387,9 @@ class QuotaLedger:
                 raise QuotaExceededError(resets_at=self._reset_at())
             # Construct the permit before committing, so allocation failure cannot consume
             # capacity without giving the caller its corresponding release handle.
-            reservation = Reservation(self, usage)
+            reservation = Reservation(
+                self, usage, day=day, tokens=tokens, spend=spend if sponsored else 0
+            )
             self._users[principal] = usage
             usage.requests += 1
             usage.tokens += tokens

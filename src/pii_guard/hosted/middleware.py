@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
+import logging
 import re
+import secrets
+from dataclasses import dataclass
 from http.cookies import SimpleCookie
 from typing import Any
 
@@ -15,6 +19,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from pii_guard.api.errors import error_headers, error_response
 from pii_guard.api.routes._common import ClientDisconnectedError
 from pii_guard.api.security import looks_like_endpoint_key
+from pii_guard.gateway.meter import UPSTREAM_METER, UpstreamMeter
 from pii_guard.gateway.service import UPSTREAM_PAYLOAD_LIMIT
 from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
@@ -28,7 +33,7 @@ from pii_guard.hosted.images import (
     image_body_limit,
     require_image_capacity,
 )
-from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, upstream_payload_bound
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, Reservation, upstream_payload_bound
 from pii_guard.hosted.runtime import HostedService
 from pii_guard.projects.middleware import (
     MUSE_CATALOG,
@@ -42,6 +47,47 @@ from pii_guard.types import PiiGuardError
 # The whole body (endpoint and hosted reads together) must arrive within this many seconds
 # of taking an ingress slot, however it is trickled.
 BODY_READ_SECONDS = 10
+
+settlement_logger = logging.getLogger("pii_guard.hosted.settlement")
+
+
+@dataclass(slots=True)
+class _Settlement:
+    """One paid admission, settled once its response has closed (LAB-1662)."""
+
+    request_id: str
+    route: str
+    user: str
+    reservation: Reservation
+    input_tokens: int
+    output_tokens: int
+    #: The durable sponsored ledger holds a charge for this request.
+    durable: bool
+    #: Inline images: the input reservation is a fixed provider price, not payload bytes.
+    fixed_input: bool
+    meter: UpstreamMeter
+
+
+def settled_tokens(
+    reserved_input: int, reserved_output: int, meter: UpstreamMeter, *, fixed_input: bool
+) -> tuple[int, int, str]:
+    """The (input, output) tokens a finished request is settled to, and how they were found.
+
+    Never above the reservation. No upstream call: nothing. Reported usage: that usage.
+    Otherwise (an aborted stream, an error answer): the masked payload's bytes as input (a
+    byte-level tokenizer never emits more tokens than bytes, so this never underestimates
+    the real input) and every byte the upstream returned as output, which bounds the output
+    tokens it streamed.
+    """
+    if not meter.forwarded:
+        return 0, 0, "no_upstream"
+    if meter.input_tokens is not None and meter.output_tokens is not None:
+        tokens_in, tokens_out, outcome = meter.input_tokens, meter.output_tokens, "usage"
+    else:
+        tokens_in, tokens_out, outcome = meter.payload_bytes, meter.received_bytes, "estimated"
+    if fixed_input:
+        tokens_in = reserved_input
+    return min(tokens_in, reserved_input), min(tokens_out, reserved_output), outcome
 
 
 # Tool types a client executes itself; any other type (web search, file search, code
@@ -172,6 +218,7 @@ class HostedMiddleware:
         ingress: Principal | None = None
         streaming: str | None = None
         payload_limit = None
+        settlement: _Settlement | None = None
         state: dict[str, Any] = dict(scope.get("state", {}))
 
         async def tracked_send(message: Message) -> None:
@@ -563,8 +610,36 @@ class HostedMiddleware:
                     sponsored=sponsored and self.service.spend is None,
                     images=1 if image else (image_charge.images if image_charge else 0),
                 )
+                if paid:
+                    # From here on the reservation is settled once the response has closed:
+                    # to the upstream's real usage, or nothing if no upstream call happened.
+                    settlement = _Settlement(
+                        request_id=secrets.token_hex(16),
+                        route=canonical,
+                        user=hmac.digest(
+                            self.service.master_key,
+                            b"settlement\0" + principal.id.encode(),
+                            "sha256",
+                        ).hex()[:16],
+                        reservation=reservation,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        durable=sponsored and self.service.spend is not None,
+                        fixed_input=bool(inline_images),
+                        meter=UpstreamMeter(),
+                    )
                 if sponsored and self.service.spend is not None:
-                    await self.service.charge_spend(input_tokens, output_tokens)
+                    try:
+                        await self.service.charge_spend(
+                            input_tokens,
+                            output_tokens,
+                            settlement.request_id if settlement else None,
+                        )
+                    except BaseException:
+                        # Nothing ran: give the in-memory tokens back now (settlement in
+                        # ``finally`` then refunds a durable charge that committed late).
+                        reservation.settle(0, 0)
+                        raise
             # What the gateway may mask: only the images this admission charged for.
             state["hosted_chat_images"] = image_charge.images if image_charge else 0
             if needs_runtime and canonical == "/v1/traffic/stream":
@@ -625,12 +700,14 @@ class HostedMiddleware:
                 return await receive()
 
             limit_token = UPSTREAM_PAYLOAD_LIMIT.set(payload_limit)
+            meter_token = UPSTREAM_METER.set(settlement.meter if settlement else None)
             try:
                 async with asyncio.timeout(self.service.settings.hosted_request_timeout):
                     await self.app(
                         {**scope, "headers": filtered, "state": state}, body_receive, tracked_send
                     )
             finally:
+                UPSTREAM_METER.reset(meter_token)
                 UPSTREAM_PAYLOAD_LIMIT.reset(limit_token)
         except PiiGuardError as exc:
             if not started:
@@ -652,11 +729,53 @@ class HostedMiddleware:
                     async with asyncio.timeout(5):
                         await gateway.aclose()
             finally:
-                if runtime is not None:
-                    self.service.release(runtime)
-                if reservation is not None:
-                    reservation.release()
-                if ingress is not None:
-                    self.service.leave_ingress(ingress)
-                if streaming is not None:
-                    self.service.leave_stream(streaming)
+                try:
+                    if settlement is not None:
+                        await self._settle(settlement)
+                finally:
+                    if runtime is not None:
+                        self.service.release(runtime)
+                    if reservation is not None:
+                        reservation.release()
+                    if ingress is not None:
+                        self.service.leave_ingress(ingress)
+                    if streaming is not None:
+                        self.service.leave_stream(streaming)
+
+    async def _settle(self, settlement: _Settlement) -> None:
+        """Settle one paid reservation down to its usage and log one line. Never raises."""
+        tokens_in, tokens_out, outcome = settled_tokens(
+            settlement.input_tokens,
+            settlement.output_tokens,
+            settlement.meter,
+            fixed_input=settlement.fixed_input,
+        )
+        reservation = settlement.reservation
+        refunded_tokens, refunded_spend = reservation.settle(
+            tokens_in + tokens_out,
+            self.service.spend_cost(tokens_in, tokens_out) if reservation.spend else 0,
+        )
+        reserved = reservation.spend
+        settled = reservation.spend - refunded_spend
+        if settlement.durable:
+            reserved = self.service.spend_cost(settlement.input_tokens, settlement.output_tokens)
+            refunded_spend = await self.service.refund_spend(
+                settlement.request_id, tokens_in, tokens_out
+            )
+            settled = reserved - refunded_spend
+        # Counts and an opaque per-user digest only: no payload text, identity or key.
+        settlement_logger.info(
+            "settlement route=%s user=%s outcome=%s sponsored=%s reserved_tokens=%d "
+            "settled_tokens=%d refunded_tokens=%d reserved_microdollars=%d "
+            "settled_microdollars=%d refunded_microdollars=%d",
+            settlement.route,
+            settlement.user,
+            outcome,
+            "durable" if settlement.durable else ("memory" if reservation.spend else "no"),
+            settlement.input_tokens + settlement.output_tokens,
+            tokens_in + tokens_out,
+            refunded_tokens,
+            reserved,
+            settled,
+            refunded_spend,
+        )

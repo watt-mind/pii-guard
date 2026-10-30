@@ -1932,8 +1932,12 @@ bounds, so they are refused with `403 hosted_request_denied` before any work. On
 when every tool it holds, at any depth, is a `function` or `custom` tool; it goes upstream as
 is (LAB-1658). A provider-side tool inside a namespace is refused like one at the top level,
 and so is a `tools` array holding more than 512 definitions or nesting namespaces more than 4
-deep. Completion, cancellation, invalid provider responses and client retries never refund
-requests, tokens or money. Concurrency releases only after the response stream and cleanup.
+deep. Once the response stream has closed, a paid reservation is settled down, never up, to
+what it used (LAB-1662): the upstream's reported usage; without one (an aborted stream, an
+error answer) the masked payload's bytes as input plus every byte the upstream returned as
+output; nothing when no upstream call happened (a refusal, a timeout or a disconnect before
+it). Settlement refunds tokens and money once per request, never the request count.
+Concurrency releases only after the response stream and cleanup.
 There are no automatic upstream retries. Monetary units are integer microdollars, and configured
 per-token rates must upper-bound every permitted model and all reasoning charges. The rate
 defaults have one source (`hosted/quotas.py`): 5 input and 30 output microdollars per token
@@ -2004,8 +2008,12 @@ Each sponsored call first holds local admission, then reads and atomically charg
 conservative input/output cost to both lifetime and UTC-day totals using the GET's ETag as
 `If-Match`. Detector/provider work starts only after a confirmed write and an expiry/day
 recheck. The daily ceiling remains the configured quota limit ($10 by default); daily
-rollover changes only the daily counter, never the lifetime total. Completion, cancellation,
-retry, missing usage and duplicate completion never refund or perform a monetary update.
+rollover changes only the daily counter, never the lifetime total. After the request, the
+process that charged it settles the charge down to actual usage with one refund, through the
+same ETag compare-and-swap, at most once per request id (an unknown write outcome is never
+retried). Refunds are their own monotonic totals (`refunded_total`, `daily_refunded`, absent
+until the first refund), so the ceilings apply to charged minus refunded and rollback detection
+is unchanged. A failed refund leaves the full charge.
 
 Only a known HTTP 412 precondition conflict may retry, at most three attempts. SDK retries
 are disabled. Connection/read timeouts and a ten-second admission deadline bound I/O; a

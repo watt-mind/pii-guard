@@ -356,22 +356,49 @@ class HostedService:
             return False
         return self.spend.available if self.spend is not None else self.quotas.sponsored_enabled
 
-    async def charge_spend(self, input_tokens: int, output_tokens: int) -> None:
-        if self.spend is None or self.quotas.sponsored_killed:
-            raise SponsoredUnavailableError
+    def spend_cost(self, input_tokens: int, output_tokens: int) -> int:
+        """Microdollars for these token counts at the sponsored (upper-bound) rates."""
         limits = self.quotas.limits
-        cost = (
+        return (
             input_tokens * limits.input_microdollars_per_token
             + output_tokens * limits.output_microdollars_per_token
         )
+
+    async def charge_spend(
+        self, input_tokens: int, output_tokens: int, request_id: str | None = None
+    ) -> None:
+        if self.spend is None or self.quotas.sponsored_killed:
+            raise SponsoredUnavailableError
+        cost = self.spend_cost(input_tokens, output_tokens)
         cancelled = threading.Event()
         try:
             async with asyncio.timeout(10):
-                await self._spend_workers.run(self.spend.charge, cost, cancelled)
+                await self._spend_workers.run(self.spend.charge, cost, cancelled, request_id)
             if self.quotas.sponsored_killed:
                 raise SponsoredUnavailableError
         except TimeoutError:
             raise SponsoredUnavailableError from None
+        finally:
+            cancelled.set()
+
+    async def refund_spend(self, request_id: str, input_tokens: int, output_tokens: int) -> int:
+        """Settle one durable charge down to these token counts; 0 when nothing refunded.
+
+        Runs even after the kill switch (a refund only lowers spend). Any failure, timeout
+        included, leaves the charge in full and returns 0: settlement is best effort.
+        """
+        if self.spend is None:
+            return 0
+        settled = self.spend_cost(input_tokens, output_tokens)
+        cancelled = threading.Event()
+        try:
+            async with asyncio.timeout(10):
+                return await self._spend_workers.run(
+                    self.spend.refund, request_id, settled, cancelled
+                )
+        except Exception:
+            # Timeout, a closed worker pool, or the ledger's own sanitized refusal.
+            return 0
         finally:
             cancelled.set()
 

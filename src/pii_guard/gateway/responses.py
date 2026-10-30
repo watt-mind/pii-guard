@@ -39,6 +39,7 @@ import httpx
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
+from pii_guard.gateway.meter import record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
 from pii_guard.gateway.placeholder_note import add_responses_note
 from pii_guard.gateway.request import InvalidChatRequestError
@@ -406,6 +407,7 @@ class ResponsesGateway:
             trace.answer = answer
         elif trace.recording and isinstance(answer.get("usage"), dict):
             trace.usage = answer["usage"]
+        record_usage(answer.get("usage"))
         result = JSONResponse(answer, headers=out_headers)
         timer.add("response", time.perf_counter() - building)
         timer.finish()
@@ -453,6 +455,7 @@ class ResponsesGateway:
                 outs = restorer.process(event, data)
                 timer.add("unmask", time.perf_counter() - unmasking)
                 _scan_usage(trace, data)
+                scan_usage(data, nested=True)
                 for name, out in outs:
                     timer.mark_first_event()
                     yield sse_message(out, name)
