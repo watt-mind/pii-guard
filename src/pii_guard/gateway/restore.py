@@ -466,7 +466,7 @@ class JsonEscapingSession:
         for item in _restorations(self._session, text, budget, _ENCODED_RE):
             self._context.feed(text[cursor : item.start])
             if item.start > cursor and (literal := self._number(text, item)) is not None:
-                # ``"[[NATIONAL_ID_HU_TAX_x]]"`` -> ``8123456786``: drop both quotes.
+                # ``"[[NATIONAL_ID_HU_TAX_x]]"`` -> ``<NUMBER>``: drop both quotes.
                 parts.append(text[cursor : item.start - 1])
                 parts.append(literal)
                 self._context.feed(text[item.start : item.end + 1])

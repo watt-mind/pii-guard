@@ -147,7 +147,10 @@ class TextSlot:
     text: str
     write: Callable[[str], None] = field(repr=False)
     kind: str = "content"
-    #: A JSON number leaf's literal (``8123456786``, ``8123456786.0``); ``None``: a string.
+    #: The index of the chat message whose whole ``content`` string this is, else ``None``
+    #: (the echo's kept spans are offsets into it, LAB-1180).
+    message: int | None = None
+    #: A JSON number leaf's literal (``<NUMBER>``, ``<NUMBER>.0``); ``None``: a string.
     #: The vault records it when the leaf masks to one placeholder, so a tool call that echoes
     #: that placeholder as a whole string gets the number back (LAB-1361).
     number: str | None = field(default=None, repr=False)
@@ -562,7 +565,9 @@ def _collect_message(message: dict[str, Any], index: int, out: CollectedTexts) -
         raise InvalidChatRequestError(f"{where}.role must be one of {', '.join(sorted(_ROLES))}")
     content = message.get("content")
     if isinstance(content, str):
-        out.slots.append(_text_slot(message, "content", "content"))
+        slot = _text_slot(message, "content", "content")
+        slot.message = index
+        out.slots.append(slot)
     elif isinstance(content, list):
         for part_index, part in enumerate(content):
             _collect_part(part, f"{where}.content.{part_index}", out, content)
@@ -837,7 +842,7 @@ def _collect_json(
     elif (number := _number_text(value)) is not None:
         # Numeric JSON fields can hold identifiers; a masked number becomes a string.
         literal = json.dumps(value)
-        out.slots.append(TextSlot(number, _number_setter(container, key), kind, literal))
+        out.slots.append(TextSlot(number, _number_setter(container, key), kind, number=literal))
     elif isinstance(value, list):
         for i in range(len(value)):
             _collect_json(value, i, out, kind)

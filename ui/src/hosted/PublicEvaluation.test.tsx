@@ -32,10 +32,11 @@ describe("the Evaluation page while signed out (LAB-1533)", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Evaluation" }, { timeout: 10_000 })).toBeInTheDocument();
     expect(screen.queryByText(/Sign in to see/)).not.toBeInTheDocument();
     expect(consoleStub).not.toHaveBeenCalled();
-    // Console signs in and comes back to Evaluation.
-    const nav = screen.getByRole("navigation", { name: "Main navigation" });
-    expect(within(nav).getByRole("link", { name: "Console" })).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23evaluation");
-    expect(within(nav).getByRole("link", { name: "API" })).toHaveAttribute("href", "#api");
+    // Sign-in comes back to Evaluation.
+    const nav = screen.getByRole("navigation", { name: "Main navigation" }).closest("header")!;
+    expect(within(nav).getByRole("link", { name: "Sign in to console" })).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23evaluation");
+    // The wide nav and the phone menu both list it.
+    for (const link of within(nav).getAllByRole("link", { name: "API" })) expect(link).toHaveAttribute("href", "#api");
     expect(screen.getByRole("link", { name: "API reference" })).toHaveAttribute("href", "#api");
     // Only the account check goes to the API; the benchmarks are static bundled files.
     await vi.waitFor(() => expect(fetched.length).toBeGreaterThan(0));

@@ -942,7 +942,9 @@ row links to its session.
   variants after their value, with `variant_of`), then the known values nothing matched yet
   (`placeholder: null`). Each item has `placeholder`, `entity_type`, `origin` (`detected`, or
   `known` for a pre-loaded value), `count` (occurrences masked), `forms` (how many other written
-  forms matched: inflected stems, split surfaces), `hint`, and on a revealed read `original`
+  forms matched: inflected stems, split surfaces), `hint`, `detector` (the detector of the
+  first span that created the entry), `first_seen` and `last_seen` (vault-clock seconds of
+  the first and latest masked occurrence), and on a revealed read `original`
   and `known_forms`. Every revealed read is logged at `WARNING` with the ref and the counts,
   never a value or the session id.
 
@@ -1031,7 +1033,7 @@ Treatments:
   answer's tool-call arguments (chat `function.arguments` and legacy `function_call`,
   Responses `function_call.arguments`; whole and streamed) hold that placeholder as a whole
   string value (`"tax_id": "[[NATIONAL_ID_HU_TAX]]"`), it is restored as the original
-  number literal (`8123456786`, or `8123456786.0` for a float), quotes dropped (LAB-1361).
+  number literal (`<NUMBER>`, or `<NUMBER>.0` for a float), quotes dropped (LAB-1361).
   It stays a string inside a longer string, as an object key, in message text, and whenever
   the same placeholder also replaced a whole string or a different number literal
   (fail closed). The restored value is charged to the restore budget as usual. In a stream

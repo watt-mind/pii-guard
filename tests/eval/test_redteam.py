@@ -83,6 +83,15 @@ def test_targets_split_leaked_and_masked_values() -> None:
     assert "jane" not in repr(email).casefold()
 
 
+def test_targets_without_replacements_have_no_placeholders() -> None:
+    """A result that recorded no replacements (``None``) yields targets, not a TypeError."""
+    import dataclasses
+
+    result = dataclasses.replace(_results()[0], replacements=None)
+    targets = build_targets(result)
+    assert targets and all(t.placeholders == () for t in targets)
+
+
 def test_candidate_lists_hold_the_truth_plus_decoys_and_are_deterministic() -> None:
     results = _results()
     by_doc = {r.document.id: build_targets(r) for r in results}

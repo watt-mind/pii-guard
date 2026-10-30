@@ -174,7 +174,11 @@ def test_a_float_number_restores_as_the_float_literal(api: str, stream: bool) ->
 
 @pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
 @pytest.mark.parametrize("api", ["chat", "responses"])
-@pytest.mark.parametrize("other", [str(TAX_ID), float(TAX_ID)], ids=["string", "float"])
+@pytest.mark.parametrize(
+    "other",
+    [str(TAX_ID), float(TAX_ID), f"adószám: {TAX_ID}."],
+    ids=["string", "float", "inside_text"],
+)
 def test_a_value_also_sent_in_another_type_restores_as_a_string(
     api: str, stream: bool, other: Any
 ) -> None:
