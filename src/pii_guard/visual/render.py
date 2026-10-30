@@ -19,9 +19,9 @@ if smaller), but only into free space: never past the image edge, another covere
 more. The boxes actually covered are returned, so the response reports them.
 
 A cover inside another cover with the same label (the face inside its ID photo, both
-``PHOTO · [[PERSON_a1b2c3]]``) is drawn without its own label, mirroring the landing's
-``labelCovers``: the fill and the border still cover every pixel, but the placeholder
-reads once instead of twice. Covers with the same label that mostly overlap on one row (two
+``PHOTO · [[PERSON_a1b2c3]]``) has no separate label or border: the outer cover already masks
+every inner pixel and prints the shared placeholder. Every input cover is still filled and
+reported. Covers with the same label that mostly overlap on one row (two
 detectors' reads of one date, a few pixels apart) are drawn as their union box with the
 label once (LAB-1672). Coverage never shrinks below the padded detected boxes; a
 suppressed duplicate is not extended for its label, so a pixel only an old label extension
@@ -153,13 +153,14 @@ def _duplicate_labels(
     inside the other, or mostly overlapping on one row) print it once:
 
     - **nested** (the face inside its ID photo, both ``PHOTO · [[PERSON_…]]``): like the
-      landing's ``labelCovers``, the outer cover prints the label and the inner one is drawn
-      (fill and border) without it;
+      outer cover prints the label and border; the inner cover is still filled and reported
+      without its redundant outline;
     - **overlapping** (a caption read and an NER read of one date, a few pixels apart): every
       cover of the group is widened in ``rects`` to the group's union box, which holds every
       padded detected box, so coverage never shrinks below them; the first prints the label.
 
-    Only labels are skipped: every cover is still filled.
+    Suppressed labels also omit their redundant outline: every cover is still filled,
+    and another cover in the group encloses it.
     """
     out: set[int] = set()
     group_of = list(range(len(items)))
@@ -280,7 +281,7 @@ def render_labels(
             x1, y1, x2, y2 = rect
             label = None if index in suppressed else item.label
             w, h = x2 - x1 + 1, y2 - y1 + 1
-            if w >= 4 and h >= 4:
+            if index not in suppressed and w >= 4 and h >= 4:
                 draw.rectangle(rect, outline=ink, width=1)
             if not label:
                 continue
