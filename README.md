@@ -1,7 +1,9 @@
 # PII Guard
 
-**Mask personal data before it reaches the LLM. Put it back in the answer.**
-Open source (Apache-2.0), runs on your machine, built on Meta's open models.
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/assets/banner-narrow.svg">
+  <img src="docs/assets/banner.svg" alt="PII Guard, a privacy gateway for AI agents: personal data becomes reversible placeholders before it leaves your network and comes back in the answer. You send 'Email Jane Placeholder: jane@example.net', the model sees 'Email [[PERSON_7f3a]]: [[EMAIL_20c2]]', you get back 'Done: e-mailed Jane Placeholder.' Built on Meta's open models, runs on your machine, Apache-2.0." width="100%">
+</picture>
 
 [![Try it live](https://img.shields.io/badge/try%20it%20live-guard.watt--mind.com-b6f36b)](https://guard.watt-mind.com)
 [![CI](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml)
