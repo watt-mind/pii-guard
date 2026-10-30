@@ -145,3 +145,104 @@ def test_committed_readme_block_matches_the_config() -> None:
     parse_spec(config["readme"], "docs/benchmarks/config.json")
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     assert text.count(START) == 1 and text.count(END) == 1
+
+
+def _partial_index() -> dict[str, Any]:
+    """The fast row complete on de + en; the other row run on de only (an older fixture)."""
+    index = _index()
+    fast, other = index["snapshots"]
+    fast["languages"] = {"de": {"leak": 0.0}, "en": {"leak": 0.0331}}
+    fast["missing_languages"] = []
+    other["missing_languages"] = ["en"]
+    other["all"]["leak"] = 0.0
+    return index
+
+
+def test_a_cell_missing_languages_is_marked_and_never_bold() -> None:
+    """LAB-1656: a tool run on fewer languages is not pooled silently with complete rows."""
+    spec = {"columns": [SPEC["columns"][0]], "rows": SPEC["rows"][:2]}
+    block = render_block(_partial_index(), [], parse_spec(spec, "config"))
+    # Both are 0.0 %, but the winner set includes a marked cell, so nothing is bold.
+    assert "| **Fast** | 0.0 % |" in block
+    assert "| Other | 0.0 % § |" in block
+    assert "§ Run on fewer languages than the set has" in block
+    assert "Other on Hand-written (no en)" in block
+
+
+def test_over_masking_table_and_per_language_line() -> None:
+    spec = parse_spec({**SPEC, "over_masking_table": True, "per_language": True}, "config")
+    block = render_block(_partial_index(), [_counts("fast", 0.02, "new-fast")], spec)
+    assert "Leak per language of the fast row on `smoke`: de 0.0 %, en 3.3 %." in block
+    assert "| Over-masking | Hand-written (de+en, 3 docs) | Public (7) |" in block
+    assert "| **Fast** | **1.1 %** | **27.9 %** |" in block  # the only number is the lowest
+    assert "| Other | 30.0 % § | — |" in block
+    assert "Over-masking of the fast row" not in block  # the table replaces the one-liner
+    with pytest.raises(RecordError, match="per_language"):
+        parse_spec({**SPEC, "per_language": "yes"}, "config")
+
+
+def test_records_line_names_dataset_results_only_with_a_dataset_column() -> None:
+    only_runs = {"columns": [SPEC["columns"][0]], "rows": SPEC["rows"]}
+    block = render_block(_index(), [], parse_spec(only_runs, "config"))
+    assert "every other cell is in the [run log](docs/benchmarks.md#run-log)." in block
+    assert "eval/datasets/results/" not in block
+
+
+def test_latency_line_quotes_one_cell_of_one_latency_record() -> None:
+    index = {
+        **_index(),
+        "latency": [
+            {
+                "run_id": "lat-cpu",
+                "hardware": "Test CPU",
+                "cells": [
+                    {
+                        "concurrency": 1,
+                        "stream": False,
+                        "requests": 200,
+                        "overhead_ms": {"p50": 33.6, "p95": 40.2},
+                    },
+                    {
+                        "concurrency": 8,
+                        "stream": False,
+                        "requests": 200,
+                        "overhead_ms": {"p50": 144.0, "p95": 178.0},
+                    },
+                ],
+            }
+        ],
+    }
+    lat = {"run": "lat-cpu", "concurrency": 1, "stream": False, "label": "Added on CPU"}
+    block = render_block(index, [], parse_spec({**SPEC, "latency": lat}, "config"))
+    assert "Added on CPU: p50 34 ms, p95 40 ms (200 requests, Test CPU; " in block
+    assert "[record](eval/results/runs/lat-cpu.json))." in block
+    with pytest.raises(RecordError, match="not a latency record"):
+        render_block(index, [], parse_spec({**SPEC, "latency": {**lat, "run": "x"}}, "c"))
+    with pytest.raises(RecordError, match="no cell"):
+        render_block(index, [], parse_spec({**SPEC, "latency": {**lat, "concurrency": 4}}, "c"))
+
+
+def test_model_latency_line_quotes_one_model_of_a_measurement() -> None:
+    data = {
+        "machine": "Test CPU",
+        "torch_threads": 8,
+        "messages": 122,
+        "mean_chars": 382.5,
+        "results": {
+            "v20": {"p50_ms": 42.3, "p95_ms": 48.8},
+            "new": {"p50_ms": 42.8, "p95_ms": 49.6},
+        },
+    }
+    ml = {"file": "eval/results/x/latency.json", "model": "new", "label": "NER per message"}
+    spec = parse_spec({**SPEC, "model_latency": ml}, "config")
+    spec["model_latency"]["data"] = data
+    block = render_block(_index(), [], spec)
+    assert (
+        "NER per message: p50 43 ms, p95 50 ms (122 messages of about 382 characters, Test CPU, "
+        "8 threads; [measurement](eval/results/x/latency.json))." in block
+    )
+    spec["model_latency"]["model"] = "missing"
+    with pytest.raises(RecordError, match="has no result"):
+        render_block(_index(), [], spec)
+    with pytest.raises(RecordError, match="model_latency"):
+        parse_spec({**SPEC, "model_latency": {"file": "x"}}, "config")

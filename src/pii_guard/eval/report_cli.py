@@ -818,6 +818,13 @@ def build_outputs(
     raw_readme = _read_config(config).get("readme")
     if raw_readme is not None:
         spec = parse_readme_spec(raw_readme, str(config))
+        if "model_latency" in spec:
+            ml = spec["model_latency"]
+            path = Path(config).resolve().parents[2] / ml["file"]
+            try:
+                ml["data"] = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise RecordError(f"{config}: model_latency {ml['file']!r}: {exc}") from exc
         try:
             doc = readme.read_text(encoding="utf-8")
         except OSError as exc:

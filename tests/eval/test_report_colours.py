@@ -42,7 +42,12 @@ def _copy_repo(tmp_path: Path) -> Path:
     ):
         shutil.copytree(REPO_ROOT / rel, tmp_path / rel)
     # the index is a build output, not committed; README.md carries the results block
-    for rel in ("docs/benchmarks.md", "README.md"):
+    # the README's latency line reads one model-latency measurement (config readme.model_latency)
+    for rel in (
+        "docs/benchmarks.md",
+        "README.md",
+        "eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json",
+    ):
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / rel, tmp_path / rel)
     return tmp_path

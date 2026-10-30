@@ -8,7 +8,7 @@ describe("landing benchmark comparison", () => {
     render(<LandingBenchmarkChart />);
     expect(screen.getByRole("combobox", { name: "Test dataset" })).toHaveValue("1");
     const rows = within(screen.getByRole("list", { name: "Leak rate by tool" })).getAllByRole("listitem");
-    expect(rows.map((row) => row.textContent)).toEqual(["PII GuardRules + NER0.4%", "PrivAiTe4.4%", "Presidio36.5%", "LLM Guard75.8%"]);
+    expect(rows.map((row) => row.textContent)).toEqual(["PII GuardRules + NER0.8%", "PrivAiTe4.4%", "Presidio36.5%", "LLM Guard75.8%"]);
     expect(screen.getByText(/not a guarantee for your documents/)).toHaveTextContent("CEE-PII (451)");
   });
 

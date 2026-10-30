@@ -262,9 +262,9 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
   it("names the production system briefly and marks it in the chart", async () => {
     const { panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });
-    expect(rowNames(resultsTable(panel))).toContain("rules + NER v2.0");
+    expect(rowNames(resultsTable(panel))).toContain("rules + NER v4.2");
     const chart = within(panel).getByRole("region", { name: "Leak rate vs latency" });
-    const legend = within(chart).getAllByRole("listitem").find((li) => /^rules \+ NER v2\.0/.test(li.textContent ?? ""));
+    const legend = within(chart).getAllByRole("listitem").find((li) => /^rules \+ NER v4\.2/.test(li.textContent ?? ""));
     expect(legend).toHaveTextContent(/fast mode/);
     expect(within(chart).getByText(/p50 to p95/)).toBeInTheDocument();
   });

@@ -15,10 +15,11 @@ import { request, recovery, type Account, type DemoResult, type Requester } from
 import { Limits } from "./AccountPanels";
 import { YourText } from "./Highlight";
 import { friendlyModel, modelName, placeholderCounts, providerLabel, restoredSegments, resetsIn, runsLeft } from "./landing";
-import { COMPARED, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, PROOF, RUNS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
+import { COMPARED, HARNESS, IMAGE_LIMITS, IMAGE_PROOF, LATENCY, MEASURED, POLISH, PROOF, RUNS, VISUAL_PLACEHOLDERS, WEAKER } from "./proof";
 import AgentReplay from "./AgentReplay";
 import { ImageMaskingPreview } from "./ImageMaskingPreview";
 import { LandingBenchmarkChart } from "./LandingBenchmarkChart";
+import { AgentTrafficTable, OpenModelsTable, ProofFacts } from "./LandingProof";
 import { DemoVideo } from "./DemoVideo";
 import { SITE_HASHES, SOURCE, useAccount, useHash, type HostedSession } from "./session";
 import { PublicPageContent, type PublicSections } from "./PublicPages";
@@ -234,7 +235,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
         <SectionHead id="why-heading" eyebrow="Why PII Guard" title="Made for agents, measured in the open." />
         <ul aria-label="What makes it different" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-5 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-3">
           <Differentiator href="#how" title="Agents, not just chat">Prompts, tool calls and streamed answers. Tested on the coding agents {HARNESS.agents.join(", ").replace(/, (?=[^,]*$)/, " and ")}: {HARNESS.requests} requests, {HARNESS.leaked} values leaked, {HARNESS.refused} turns refused.</Differentiator>
-          <Differentiator href="#how" title="No LLM, no GPU to mask">Validated rules and our open NER on the CPU, adding {LATENCY.value} per request (p50). Nothing is sent out to find personal data.</Differentiator>
+          <Differentiator href="#how" title="No LLM, no GPU to mask">Validated rules and our open NER on the CPU; the NER takes {LATENCY.value} per message (p50). Nothing is sent out to find personal data.</Differentiator>
           <Differentiator href="#how" title="Inflected EU languages">Hungarian names change with every case; the ending stays outside the placeholder, so the model still writes correct sentences.</Differentiator>
           <Differentiator href="#images" title="One person, one placeholder">The same placeholder in the text and on a scanned ID: {VISUAL_PLACEHOLDERS.recall}&nbsp;% of image values matched, no false merges.</Differentiator>
           <Differentiator href="#results" title="Measured in the open">Public test sets, {COMPARED.tools} other tools and {COMPARED.openModels} other open NER models, {RUNS.label} committed runs. Our NER is published.</Differentiator>
@@ -348,13 +349,18 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     results: (
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-20 space-y-5">
         <SectionHead id="results-heading" eyebrow="Benchmarks" title="The lowest leak rate on each test set below." lead="Committed runs on fictional and public data. Leak rate measures personal values left unmasked; lower is better. These are specific test sets, so small differences should be treated with care." />
-        <p className="max-w-3xl text-muted">{RUNS.label} committed benchmark runs. {MEASURED}. Detection adds {LATENCY.value} per request (p50) in the published measurement.</p>
+        <p className="max-w-3xl text-muted">{RUNS.label} committed benchmark runs. {MEASURED}. The NER takes {LATENCY.value} per message on CPU (p50, the model alone).</p>
         <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <Card title="Leak rate against detection time" headingLevel={3} subtitle="Hand-written German, English, Hungarian and Polish set (62 docs). Down and left is better. Time is detection per document, measured where each tool ran.">
             <DeferredSection anchor="results" className="min-h-[340px]"><ResultsChart /></DeferredSection>
           </Card>
           <LandingBenchmarkChart />
         </div>
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+          <AgentTrafficTable />
+          <OpenModelsTable />
+        </div>
+        <ProofFacts />
         <div className="flex flex-wrap gap-3"><ButtonLink href="#evaluation">Explore the benchmarks</ButtonLink><a className="inline-flex min-h-11 items-center rounded-sm underline underline-offset-4" href="#trust">Read the limits</a></div>
       </section>
     ),
@@ -403,7 +409,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <span className="grid gap-1.5">
               <Point title="Finance text.">{WEAKER.gretel}&nbsp;% leak on Gretel finance, level with Presidio ({WEAKER.gretelPresidio}&nbsp;%).</Point>
               <Point title="Over-masking.">Reference numbers without a cue word can be masked as IDs ({WEAKER.ceeOverMasking}&nbsp;% on CEE-PII).</Point>
-              <Point title="Other EU languages.">Trained on Hungarian, German and English; on EU legal text in 21 languages it leaks {WEAKER.mapaLeak}&nbsp;%.</Point>
+              <Point title="Two sets slightly worse than v2.0.">The current NER (v4.2) leaks {WEAKER.cee}&nbsp;% on CEE-PII and {POLISH.leak}&nbsp;% on Polish, against {WEAKER.ceeV20}&nbsp;% and {WEAKER.polishV20}&nbsp;% for v2.0.</Point>
+              <Point title="Other EU languages.">Measured on German, English, Hungarian and Polish; other EU languages are less tested, so check the masked request.</Point>
             </span>
           </LimitItem>
           <LimitItem title="Printed text on ID scans">On {IMAGE_LIMITS.ids} official specimen IDs, {IMAGE_LIMITS.all}&nbsp;% of all labeled regions are covered (Presidio Image Redactor: {IMAGE_LIMITS.presidio}&nbsp;%). Printed text alone: {IMAGE_LIMITS.text}&nbsp;%. Faces and ID photos are the strong part; read the masked transcript before you rely on it.</LimitItem>
