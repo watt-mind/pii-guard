@@ -222,7 +222,7 @@ the last gateway request as sent upstream, with placeholders (`pii-guard up` kee
 </p>
 
 <p align="center"><sub>Console tour, recorded in fast mode (rules + NER) with fictional data.
-More screens: <a href="ui/README.md#screens">ui/README.md</a>.</sub></p>
+<a href="ui/README.md#screens">More screens</a>.</sub></p>
 
 Run the console locally: [`make demo` from a checkout](docs/operations.md#the-demo-stack).
 
