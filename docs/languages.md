@@ -31,6 +31,7 @@ LAB-1400) was built the same way, from the skeleton below.
 | Lexicons | `lexicons` (`LexiconSpec`) | `pii_guard.lang`, the corpus generator, rules | `LexiconUnavailable` |
 | Document field captions | `captions` (`captions.tsv`) | `visual/captions.py`: the value next to `Név` / `Date of birth` on an ID card is masked | captions in this language not recognized in images |
 | Cue words for numbers | `cues` (`cues.tsv`) | `RuleDetector` via `languages/cues.py`: a number right after `TAJ` or `passport` is masked even when its checksum fails | only the other packs' cues |
+| Reference words | `references` (`references.tsv`) | `reference_or_amount_before` (`detect/rules/_base.py`) and `detect/ner_numbers.py`: a validated number right after `order` or `Rechnung` is a business number, an NER number right after one is dropped | the built-in fallback lists (`_REFERENCE_WORD`/`_NEGATIVE`) |
 | Brand names | `brands` (`brands.tsv`) | `NerDetector` via `detect/ner_orgs.py`: an NER `PERSON` span that is only a company or product name (`OTP Bank`, `Deutsche Bahn`) becomes `ORGANIZATION`, which policy keeps | the shared list (`languages/brands.tsv`) and the other packs' names |
 | Synthetic corpus | `identity_generator`, `corpus_templates` (`corpus.toml`) | `pii-guard eval generate`, `eval/identities.py`: fictional people, companies and institutions, and the document templates the corpus model writes from (`<code>-synth-*.jsonl`) | no synthetic corpus: the language is measured on its smoke set only |
 
@@ -148,12 +149,16 @@ und	-
 - Cues run for every text, like `EVERYWHERE` rules: a form in your language may carry
   English labels and the other way round. Pick words that are unambiguous next to a number;
   when two packs map one cue to different types, the text's own language wins.
-- Two shared word lists are not read from `cues.tsv` yet, so add your language's order,
-  invoice, shipment and amount words to them by hand: `_REFERENCE_WORD` in
-  `detect/rules/_base.py` (`reference_or_amount_before`: a validated number right after such a
-  label is a business number) and `_NEGATIVE` in `detect/ner_numbers.py` (an NER number right
-  after one is dropped). List the generic "number" word of your language in `_GENERIC` and
-  `_FILLER` there too (`Nummer`, `numer`), or every cue containing it makes it a positive cue.
+- Reference words (`references.tsv`, one label per line, `*` for suffixes) work the other
+  way: a validated number right after such a label is a business number
+  (`reference_or_amount_before` in `detect/rules/_base.py`), and an NER number right after
+  one is dropped (`detect/ner_numbers.py`). The second column scopes the entry (`both`,
+  `rules`, `ner`, `weak` for a poor negative cue such as an amount word, honored by the
+  rules check only). Like cues, they run for every text; unlike cues, they are required:
+  a language without them falls back to the built-in lists, so its labels never reach the
+  checks first. List the generic "number" word of your language in `_GENERIC` and
+  `_FILLER` in `detect/ner_numbers.py` too (`Nummer`, `numer`), or every cue containing it
+  makes it a positive cue.
 - Check them against `eval/fixtures/negative/` (order numbers, amounts, dates, postcodes and
   references without a cue: nothing may be masked) and add a `<code>-uncued-numbers.jsonl`
   there; `PII_GUARD_RULES_CUED_NUMBERS=false` turns the rule off for comparison.

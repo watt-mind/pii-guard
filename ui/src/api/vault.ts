@@ -37,6 +37,11 @@ export interface VaultItem {
   forms: number;
   variant_of: string | null;
   hint: string;
+  /** The detector of the first span that created the entry; null when unknown. */
+  detector: string | null;
+  /** Vault-clock seconds of the first and latest masked occurrence. */
+  first_seen: number | null;
+  last_seen: number | null;
   /** Revealed reads only. */
   original?: string | null;
   known_forms?: string[] | null;
