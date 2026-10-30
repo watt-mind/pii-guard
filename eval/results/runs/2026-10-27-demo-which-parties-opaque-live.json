@@ -20,6 +20,7 @@
     "key": "demo-which-parties:opaque:live",
     "label": "pii-guard gateway, opaque images, Muse Spark Open (Baseten)",
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": null,
     "detectors": [

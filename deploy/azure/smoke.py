@@ -3,7 +3,11 @@
 import http.client
 import json
 import sys
+import time
 from urllib.parse import urlsplit
+
+#: Seconds to wait for the NER model after the revision is Ready (it loads in ~30 s).
+READY_WAIT_SECONDS = 180
 
 origin = urlsplit(sys.argv[1])
 if (
@@ -18,12 +22,23 @@ if (
     raise SystemExit("A canonical HTTPS origin is required")
 connection = http.client.HTTPSConnection(origin.hostname, origin.port or 443, timeout=30)
 try:
-    for path in ("/", "/readyz"):
-        connection.request("GET", path)
+    connection.request("GET", "/")
+    response = connection.getresponse()
+    response.read()
+    if response.status != 200:
+        raise SystemExit("public landing failed")
+    # The revision is Ready while the bundled NER model still loads (LAB-1548): wait, bounded,
+    # for full readiness (503 while it loads; a failed load stays 503 until the deadline).
+    deadline = time.monotonic() + READY_WAIT_SECONDS
+    while True:
+        connection.request("GET", "/readyz")
         response = connection.getresponse()
         response.read()
-        if response.status != 200:
+        if response.status == 200:
+            break
+        if response.status != 503 or time.monotonic() >= deadline:
             raise SystemExit("public readiness failed")
+        time.sleep(5)
     connection.request("GET", "/healthz")
     response = connection.getresponse()
     health = json.loads(response.read())

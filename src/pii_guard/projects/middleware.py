@@ -18,8 +18,12 @@ from pii_guard.projects.runtime import ProjectAccessError, ProjectService
 from pii_guard.types import PiiGuardError
 
 ENDPOINT_PATH = re.compile(
-    r"^/e/([A-Za-z0-9_-]{1,128})(/v1/(?:chat/completions|responses|models))$"
+    r"^/e/([A-Za-z0-9_-]{1,128})(/v1/(?:chat/completions|responses|models)|/muse-code/models)$"
 )
+#: Muse Code reads its catalog at the root of its base URL, so an endpoint base URL
+#: (``/e/<id>/v1``) sends the endpoint key here; it is served as ``/e/<id>/muse-code/models``
+#: (LAB-1462). No other root route takes an endpoint key.
+MUSE_CATALOG = "/muse-code/models"
 
 
 class EndpointModelRequiredError(PiiGuardError):
@@ -32,6 +36,12 @@ class EndpointModelRequiredError(PiiGuardError):
 def endpoint_path(path: str) -> tuple[str, str] | None:
     match = ENDPOINT_PATH.fullmatch(path)
     return (match[1], match[2]) if match else None
+
+
+def route_to_endpoint(scope: Scope, endpoint: str) -> Scope:
+    """``scope`` for the root Muse catalog, rerouted to its endpoint's own catalog path."""
+    path = f"/e/{endpoint}{MUSE_CATALOG}"
+    return {**scope, "path": path, "raw_path": path.encode()}
 
 
 def prepare_project(
@@ -192,6 +202,20 @@ class ProjectMiddleware:
             if looks_like_endpoint_key(credential) or looks_like_endpoint_key(
                 headers.get("x-pii-guard-token", "")
             ):
+                if (
+                    routed is None
+                    and path == MUSE_CATALOG
+                    and scheme.lower() == "bearer"
+                    and not headers.get("x-pii-guard-token")
+                ):
+                    owner = await anyio.to_thread.run_sync(
+                        self.service.store.key_endpoint, credential
+                    )
+                    if owner is None:
+                        raise ProjectAccessError("Invalid or revoked endpoint key")
+                    scope = route_to_endpoint(scope, owner)
+                    path = scope["path"]
+                    routed = endpoint_path(path)
                 if routed is None or scheme.lower() != "bearer" or headers.get("x-pii-guard-token"):
                     raise ProjectAccessError(
                         "Endpoint keys are accepted only on their endpoint path"

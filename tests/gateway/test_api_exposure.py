@@ -158,6 +158,17 @@ def test_token_accepted_as_bearer_or_header_and_healthz_stays_open() -> None:
     assert header.status_code == 200
 
 
+@pytest.mark.parametrize("token", [" ", "\t", "  \n "])
+def test_whitespace_token_refuses_to_build_the_app(token: str) -> None:
+    with pytest.raises(ValueError, match="PII_GUARD_API_TOKEN is set but empty"):
+        create_app(Settings(api_token=token))
+
+
+def test_empty_token_env_means_no_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PII_GUARD_API_TOKEN", "")
+    assert Settings().api_token is None
+
+
 def test_no_token_by_default() -> None:
     with TestClient(create_app(Settings())) as client:
         assert client.post("/v1/analyze", json={"text": "Szia!"}).status_code == 200

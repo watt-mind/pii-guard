@@ -29,6 +29,13 @@ Decontamination (LAB-1392): train and dev files are loaded through ``decontam.py
 every document that is an exact or near duplicate (word 5-gram Jaccard >= 0.8) of an evaluation
 text, and the counts go into ``training_meta.json``. It is on by default; ``decontam = false``
 or ``--no-decontam`` turns it off, and the run then records that it was off.
+
+Report-only dev (LAB-1417): ``report_dev`` files (``--report-dev``, e.g. the smoke-style split
+from ``smoke_style_dev.py``) are scored every epoch and written to the history as ``report``
+(span F1 plus ``leak``, the share of gold values no prediction of any type overlaps, and the
+missed count per type), but never pick the saved checkpoint: the ``dev`` files do that, as
+before. They pass the same gate, and are then added to the index under ``report-dev`` so no
+train or dev document may copy one.
 """
 
 # Seeded shuffling, not cryptography.
@@ -44,6 +51,7 @@ import random
 import sys
 import time
 import tomllib
+from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -124,6 +132,8 @@ DEFAULTS: dict[str, Any] = {
     "save_epochs": False,
     # LAB-1392: drop train/dev documents that duplicate an evaluation text (decontam.py).
     "decontam": True,
+    # LAB-1417: dev files reported every epoch but never used to pick the checkpoint.
+    "report_dev": [],
 }
 
 
@@ -253,12 +263,24 @@ def batches(features, batch_size: int, pad_id: int, rng: random.Random | None, p
         }
 
 
+def leak_counts(pred: set[tuple[int, int, str]], gold: set[tuple[int, int, str]]) -> Counter[str]:
+    """Gold values no prediction overlaps, by type: what would reach the model unmasked."""
+    return Counter(g[2] for g in gold if not any(p[0] < g[1] and g[0] < p[1] for p in pred))
+
+
+def index_report_docs(index: decontam.EvalIndex, docs: Sequence[Document]) -> None:
+    """Add the report-only dev documents to the gate's index, so training never copies one."""
+    for doc in docs:
+        index.add("report-dev", doc)
+
+
 def span_f1(
     model, tokenizer, docs: Sequence[Document], device: str, cfg: dict[str, Any]
 ) -> dict[str, Any]:
     """Exact and overlap span P/R/F1 over the dev documents (every type in ``TYPES``)."""
     tp_exact = tp_overlap_pred = tp_overlap_gold = n_pred = n_gold = 0
     per_type: dict[str, list[int]] = {t: [0, 0, 0, 0] for t in TYPES}  # pred, gold, tp_p, tp_g
+    missed: Counter[str] = Counter()
     model.eval()
     with torch.inference_mode():
         for doc in docs:
@@ -294,6 +316,7 @@ def span_f1(
                 for s in doc.spans
                 if s.entity_type.value in TYPES
             }
+            missed.update(leak_counts(pred, gold))
             n_pred += len(pred)
             n_gold += len(gold)
             tp_exact += len(pred & gold)
@@ -325,6 +348,8 @@ def span_f1(
         "p_overlap": round(po, 4),
         "r_overlap": round(ro, 4),
         "f1_overlap": round(f1(po, ro), 4),
+        "leak": round(sum(missed.values()) / max(n_gold, 1), 4),
+        "missed": dict(sorted(missed.items())),
         "per_type_f1_overlap": {
             t: round(f1(r[2] / max(r[0], 1), r[3] / max(r[1], 1)), 4)
             for t, r in per_type.items()
@@ -340,6 +365,9 @@ def load_config(argv: Sequence[str] | None) -> dict[str, Any]:
     parser.add_argument("--out")
     parser.add_argument("--train", action="append")
     parser.add_argument("--dev", action="append")
+    parser.add_argument(
+        "--report-dev", action="append", help="dev file reported per epoch, never for selection"
+    )
     parser.add_argument("--teacher", help="teacher model id, or 'none'")
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--batch-size", type=int)
@@ -375,13 +403,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     # ``data:<corpus>/<file>`` is read from the data root (PII_GUARD_DATA_DIR, LAB-1542).
     train_paths = [data_sync.resolve(p) for p in cfg["train"]]
     dev_paths = [data_sync.resolve(p) for p in cfg["dev"]]
+    report_paths = [data_sync.resolve(p) for p in cfg["report_dev"]]
     index = decontam.eval_corpus() if cfg["decontam"] else None
     gate_report = decontam.Report()
+    report_docs = decontam.load_training_docs(report_paths, index, gate_report)
+    if index is not None:
+        index_report_docs(index, report_docs)
     train_docs = decontam.load_training_docs(train_paths, index, gate_report)
     dev_docs = decontam.load_training_docs(dev_paths, index, gate_report)
     if index is not None:
         print(decontam.summary_line(gate_report), flush=True)
-    print(f"train docs {len(train_docs)}, dev docs {len(dev_docs)}, device {device}", flush=True)
+    print(
+        f"train docs {len(train_docs)}, dev docs {len(dev_docs)}, "
+        f"report-only dev docs {len(report_docs)}, device {device}",
+        flush=True,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(
         cfg["base_model"], revision=cfg["base_revision"], use_fast=True
@@ -449,6 +485,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             loss=round(total / max(n, 1), 4),
             minutes=round((time.perf_counter() - started) / 60, 1),
         )
+        if report_docs:  # reported only: the selection below reads the dev scores
+            scores["report"] = span_f1(model, tokenizer, report_docs, device, cfg)
         history.append(scores)
         print(json.dumps(scores), flush=True)
         model.config.pii_guard_aggregation = "token"
@@ -491,6 +529,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "device": device,
         "train": {str(p): sha256(p) for p in train_paths},
         "dev": {str(p): sha256(p) for p in dev_paths},
+        "report_dev": {str(p): sha256(p) for p in report_paths},
         "train_docs": len(train_docs),
         "decontam": gate_report.to_dict(index=index) if index is not None else "off",
         "train_windows": len(train_features),

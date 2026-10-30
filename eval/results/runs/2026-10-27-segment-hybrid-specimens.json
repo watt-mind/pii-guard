@@ -23,6 +23,7 @@
   },
   "system": {
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": null,
     "detectors": [

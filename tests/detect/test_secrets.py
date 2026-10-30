@@ -509,6 +509,55 @@ def test_bracket_negatives_stay_unmasked(detector: RuleDetector, text: str) -> N
     assert secrets_in(detector, text) == []
 
 
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ('password="Fake{0000}pw"', "Fake{0000}pw"),
+        ("password='pre{fix}0000x'", "pre{fix}0000x"),
+        ("db_password = 'pre{fix}0000x'", "pre{fix}0000x"),
+        ('"passphrase": "Synth9-{bakery}-pass"', "Synth9-{bakery}-pass"),
+        ("MYSQL_PWD=`{fake}0pw0000`", "{fake}0pw0000"),
+        ('ADMIN_PASSWORD: "fake0pw{0000}"', "fake0pw{0000}"),
+        ('password := "Fake{x}{0000}pw"', None),  # two fields: a template, see negatives
+    ],
+)
+def test_literal_password_with_brace_group_is_masked(
+    detector: RuleDetector, text: str, value: str | None
+) -> None:
+    """LAB-1383: a ``{word}`` group inside a literal password is not a format field."""
+    assert values(detector, text) == ([value] if value else [])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "{password}",
+        "{0}",
+        "{}",
+        "%(pw)s",
+        "pw-{db_password}",
+        "{cfg.db.password}",
+        "{creds[pw]}",
+        "{secrets.token}",
+        "Synth{0}pass",
+        "pw{}",
+        "{user}:{password}@{host}",
+        "{prefix}-{suffix}",
+        "x%(passwd)s",
+    ],
+)
+def test_template_fields_after_password_key_stay_templates(value: str) -> None:
+    assert not looks_like_secret_value(value, password_key=True, quoted=True)
+
+
+@pytest.mark.parametrize("value", ["Fake{0000}pw", "pre{fix}0000x", "{fake}0pw0000", "a{bc}de"])
+def test_brace_literal_is_a_password_value(value: str) -> None:
+    assert looks_like_secret_value(value, password_key=True, quoted=True)
+    # Unquoted or after a non-password key, braces still mean code.
+    assert not looks_like_secret_value(value, password_key=True, quoted=False)
+    assert not looks_like_secret_value(value, password_key=False, quoted=True)
+
+
 _PAD = st.text(alphabet=" \t", max_size=3)
 _BODY = st.text(alphabet="abcXYZ0189!#*+-_[]()~^", min_size=4, max_size=24)
 

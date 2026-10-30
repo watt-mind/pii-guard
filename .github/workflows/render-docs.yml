@@ -1,6 +1,6 @@
 # Render the generated docs on develop after each merge (LAB-1269): docs/benchmarks.md, its
-# charts and colour registry, and the milestones block of docs/journey.md, from the run records
-# and docs/journey/*.md. Pull requests then commit only those inputs, so two of them can't
+# charts and colour registry, the README results block (LAB-1239) and the milestones block of
+# docs/journey.md, from the run records and docs/journey/*.md. Pull requests then commit only those inputs, so two of them can't
 # conflict on the outputs. CONTRIBUTING.md, "Generated files".
 #
 # Off until the repository variable RENDER_DOCS_ON_MERGE is "true". Before setting it, an admin
@@ -64,7 +64,7 @@ jobs:
             git reset -q --hard FETCH_HEAD
             uv run --no-sync pii-guard eval report --journey
             uv run --no-sync pii-guard eval report --check --journey
-            git add -- docs/benchmarks.md docs/benchmarks docs/journey.md
+            git add -- docs/benchmarks.md docs/benchmarks docs/journey.md README.md
             if git diff --cached --quiet; then
               echo "generated docs already current at $(git rev-parse --short HEAD)"
               exit 0
