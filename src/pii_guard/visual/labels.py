@@ -41,7 +41,7 @@ from pii_guard.vault import PLACEHOLDER_RE, VaultSession, normalize_value
 from pii_guard.visual.fuzzy import CONFUSION_GROUPS, Candidate, Match, match_value, name_tokens
 from pii_guard.visual.mrz import MrzData, check_digit, parse_mrz
 from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
-from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.regions import Box, Region, same_value
 from pii_guard.visual.summary import (
     ID_DOCUMENTS,
     ExpiryPolicy,
@@ -124,6 +124,8 @@ class VaultMatcher:
         self.language = language
         self._candidates: list[Candidate] = []
         self._known: dict[str, tuple[str, EntityType]] = {}
+        #: Placeholders the session held before this request: the conversation's values.
+        self.prior: frozenset[str] = frozenset(p for p, _t, _c in session.entities())
         for placeholder, entity_type, _count in session.entities():
             value = session.unmask(placeholder)
             if value != placeholder:
@@ -367,6 +369,58 @@ def _best_finding(region: Region, labelled: Sequence[tuple[TextFinding, RegionLa
     return best
 
 
+def _unify(
+    covered: Sequence[tuple[Region, Policy]],
+    labels: list[RegionLabel],
+    origins: dict[int, str],
+    prior: frozenset[str],
+) -> list[RegionLabel]:
+    """One label for masked text regions of one type that cover the same value (LAB-1672).
+
+    Two detectors often read one printed value: the caption read is tight
+    (``[319,264,429,294]``), an NER read runs along the row (``[321,266,695,292]``), and each
+    got its own placeholder. Printed as two labels in overlapping covers, neither is
+    readable, and the transcript names the value twice. Regions of one type that are
+    :func:`~pii_guard.visual.regions.same_value` with every other region of their group
+    take one label: the placeholder the session already held before this request (the
+    conversation's value), else a reused one (``exact``/``fuzzy``), else the caption read's,
+    else the tightest box's. A region that only touches another (adjacent values) keeps its
+    own. Only labels change: every region is still covered with its own box.
+    """
+    groups: list[list[int]] = []
+    for index, (region, policy) in enumerate(covered):
+        if policy is not Policy.MASK or region.entity_type.is_visual:
+            continue
+        for group in groups:
+            first = covered[group[0]][0]
+            if first.entity_type is region.entity_type and all(
+                same_value(covered[j][0].box, region.box) for j in group
+            ):
+                group.append(index)
+                break
+        else:
+            groups.append([index])
+    out = list(labels)
+    for group in groups:
+        if len({labels[i].label for i in group}) < 2:
+            continue
+
+        def rank(i: int) -> tuple[bool, bool, bool, bool, int]:
+            label, box = labels[i], covered[i][0].box
+            return (
+                label.placeholder is not None,
+                label.placeholder in prior,
+                label.match in ("exact", "fuzzy"),
+                origins.get(i) == "caption",
+                -box.width * box.height,
+            )
+
+        best = labels[max(group, key=rank)]
+        for i in group:
+            out[i] = best
+    return out
+
+
 def _kind_label(entity_type: EntityType, holder: _Holder | None) -> RegionLabel:
     kind = KIND_LABELS.get(entity_type, entity_type.value)
     if holder is None or holder.label.placeholder is None:
@@ -584,8 +638,8 @@ def label_image(
         summary_fields.append(SummaryField("document_number", mrz_document, "new"))
 
     region_labels: list[RegionLabel] = []
-    covered_boxes: list[tuple[Box, RegionLabel]] = []
-    for region, policy in covered:
+    origins: dict[int, str] = {}
+    for position, (region, policy) in enumerate(covered):
         if policy is not Policy.MASK:
             region_labels.append(RegionLabel(None, None))
             continue
@@ -596,8 +650,15 @@ def label_image(
             label = (
                 labelled[index][1] if index >= 0 else RegionLabel(region.entity_type.value, None)
             )
+            if index >= 0:
+                origins[position] = labelled[index][0].origin
         region_labels.append(label)
-        covered_boxes.append((region.box, label))
+    region_labels = _unify(covered, region_labels, origins, getattr(matcher, "prior", frozenset()))
+    covered_boxes = [
+        (region.box, label)
+        for (region, policy), label in zip(covered, region_labels, strict=True)
+        if policy is Policy.MASK
+    ]
 
     transcript = _transcript(words, covered_boxes, _expiry_redactions(ocr, expiry))
     transcript = matcher.sweep(transcript, masked_types)

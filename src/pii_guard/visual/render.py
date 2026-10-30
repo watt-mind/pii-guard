@@ -18,10 +18,12 @@ if smaller), but only into free space: never past the image edge, another covere
 ``obstacle`` (the OCR words left visible), keeping a small gap. Extending only ever covers
 more. The boxes actually covered are returned, so the response reports them.
 
-A cover strictly inside another cover with the same label (the face inside its ID photo,
-both ``PHOTO · [[PERSON_a1b2c3]]``) is drawn without its own label, mirroring the landing's
+A cover inside another cover with the same label (the face inside its ID photo, both
+``PHOTO · [[PERSON_a1b2c3]]``) is drawn without its own label, mirroring the landing's
 ``labelCovers``: the fill and the border still cover every pixel, but the placeholder
-reads once instead of twice.
+reads once instead of twice. Covers with the same label that mostly overlap on one row (two
+detectors' reads of one date, a few pixels apart) are drawn as their union box with the
+label once (LAB-1672); coverage only grows.
 
 The label's font size is then fitted to the box: the largest size from the box height down
 to :data:`MIN_FONT_SIZE` at which it fits; if the bracketed placeholder is too wide even then,
@@ -40,7 +42,7 @@ from PIL import ImageDraw, ImageFont
 
 from pii_guard.types import MaskingError
 from pii_guard.visual.image import encode_image, load_image
-from pii_guard.visual.regions import Box
+from pii_guard.visual.regions import Box, same_value
 
 __all__ = [
     "LABEL_FILL",
@@ -140,26 +142,61 @@ def _inside(inner: tuple[int, int, int, int], outer: tuple[int, int, int, int]) 
     )
 
 
-def _nested_duplicates(
+def _duplicate_labels(
     items: list[LabelBox], rects: list[tuple[int, int, int, int] | None]
 ) -> set[int]:
-    """Indexes whose label duplicates a strictly larger cover's (LAB-1488).
+    """Indexes whose label another cover of the same value already prints (LAB-1488, LAB-1672).
 
-    The face inside its ID photo carries the same label (``PHOTO · [[PERSON_…]]``); like the
-    landing's ``labelCovers``, the contained cover is drawn without its own label, so the
-    placeholder reads once instead of running through the inner box. Only the label is
-    skipped: the fill and the border still cover every pixel.
+    Covers with the same label that are :func:`~pii_guard.visual.regions.same_value` (one
+    inside the other, or mostly overlapping on one row) print it once:
+
+    - **nested** (the face inside its ID photo, both ``PHOTO · [[PERSON_…]]``): like the
+      landing's ``labelCovers``, the outer cover prints the label and the inner one is drawn
+      (fill and border) without it;
+    - **overlapping** (a caption read and an NER read of one date, a few pixels apart): every
+      cover of the group is widened in ``rects`` to the group's union box, which holds every
+      original cover, so no pixel covered before shows; the first prints the label.
+
+    Only labels are skipped: every cover is still filled.
     """
     out: set[int] = set()
-    for index, (item, rect) in enumerate(zip(items, rects, strict=True)):
+    group_of = list(range(len(items)))
+
+    def root(i: int) -> int:
+        while group_of[i] != i:
+            group_of[i] = group_of[group_of[i]]
+            i = group_of[i]
+        return i
+
+    for i, (item, rect) in enumerate(zip(items, rects, strict=True)):
         if rect is None or not item.label:
             continue
-        for other_index, (other, other_rect) in enumerate(zip(items, rects, strict=True)):
-            if other_index == index or other_rect is None or other.label != item.label:
+        for j in range(i):
+            other = rects[j]
+            if other is None or items[j].label != item.label:
                 continue
-            if _inside(rect, other_rect) and not _inside(other_rect, rect):
-                out.add(index)
-                break
+            if same_value(Box(*rect), Box(*other)):
+                group_of[root(i)] = root(j)
+    groups: dict[int, list[int]] = {}
+    for i in range(len(items)):
+        if rects[i] is not None and items[i].label:
+            groups.setdefault(root(i), []).append(i)
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        member_rects = [r for i in members if (r := rects[i]) is not None]
+        union = (
+            min(r[0] for r in member_rects),
+            min(r[1] for r in member_rects),
+            max(r[2] for r in member_rects),
+            max(r[3] for r in member_rects),
+        )
+        outer = [i for i in members if rects[i] == union]
+        if not outer:
+            for i in members:
+                rects[i] = union
+            outer = members
+        out.update(i for i in members if i != outer[0])
     return out
 
 
@@ -226,12 +263,12 @@ def render_labels(
             x2, y2 = min(width - 1, box.x2 + padding), min(height - 1, box.y2 + padding)
             rects.append((x1, y1, x2, y2) if x1 <= x2 and y1 <= y2 else None)
         blocked = [(b.x1, b.y1, b.x2, b.y2) for b in obstacles]
+        suppressed = _duplicate_labels(items, rects)
         for index, (item, rect) in enumerate(zip(items, rects, strict=True)):
-            if rect is None or not item.label:
+            if rect is None or not item.label or index in suppressed:
                 continue
             others = blocked + [r for j, r in enumerate(rects) if r is not None and j != index]
             rects[index] = _extend(draw, rect, item.label, others, width)
-        suppressed = _nested_duplicates(items, rects)
         for rect in rects:
             if rect is not None:
                 draw.rectangle(rect, fill=fill)
