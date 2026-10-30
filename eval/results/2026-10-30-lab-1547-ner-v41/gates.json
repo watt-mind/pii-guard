@@ -1,0 +1,405 @@
+{
+  "v20": {
+    "metrics": {
+      "smoke": {
+        "leak": 0.0,
+        "over": 1.08,
+        "leaked": 0,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 2.0,
+        "over": 0.0,
+        "leaked": 1,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.13,
+        "over": 1.66,
+        "leaked": 2,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.55,
+        "over": 2.06,
+        "leaked": 1,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 1.65,
+        "over": 1.64,
+        "leaked": 2,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 8.24,
+        "over": 55.32,
+        "leaked": 61,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 4.0,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 12.9,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 4.0,
+          "over": 7.69,
+          "leaked": 1,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.95,
+        "over": 1.82,
+        "leaked": 3,
+        "values": 315
+      }
+    }
+  },
+  "v41-a1": {
+    "metrics": {
+      "smoke": {
+        "leak": 0.58,
+        "over": 2.16,
+        "leaked": 1,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.0,
+        "over": 3.21,
+        "leaked": 0,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.0,
+        "over": 0.53,
+        "leaked": 0,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 0.83,
+        "over": 0.81,
+        "leaked": 1,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 5.95,
+        "over": 46.74,
+        "leaked": 44,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 3.57,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 0.0,
+          "over": 3.85,
+          "leaked": 0,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.32,
+        "over": 0.61,
+        "leaked": 1,
+        "values": 315
+      }
+    },
+    "gates": {
+      "smoke_leak": false,
+      "smoke_over": false,
+      "inflection_leak": true,
+      "latency": null,
+      "eu_per_language": true,
+      "eu_failed_languages": [],
+      "eu_total_lower": true,
+      "beats_v20": false,
+      "all_gates": false
+    },
+    "p95_ratio": null
+  },
+  "v41-a2": {
+    "metrics": {
+      "smoke": {
+        "leak": 1.16,
+        "over": 2.2,
+        "leaked": 2,
+        "values": 173
+      },
+      "inflection": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 50
+      },
+      "agent-traffic-dev": {
+        "leak": 0.0,
+        "over": 2.7,
+        "leaked": 0,
+        "values": 1555
+      },
+      "eu-smoke": {
+        "leak": 0.0,
+        "over": 0.53,
+        "leaked": 0,
+        "values": 181
+      },
+      "eu-inflection": {
+        "leak": 1.65,
+        "over": 0.82,
+        "leaked": 2,
+        "values": 121
+      },
+      "en-court": {
+        "leak": 0.0,
+        "over": 0.0,
+        "leaked": 0,
+        "values": 13
+      },
+      "mapa-eur-lex": {
+        "leak": 5.27,
+        "over": 46.21,
+        "leaked": 39,
+        "values": 740
+      },
+      "eu": {
+        "lv": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "lt": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "hr": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 32
+        },
+        "sl": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 31
+        },
+        "fr": {
+          "leak": 3.85,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 26
+        },
+        "es": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "it": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 26
+        },
+        "nl": {
+          "leak": 4.0,
+          "over": 0.0,
+          "leaked": 1,
+          "values": 25
+        },
+        "ro": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 23
+        },
+        "mt": {
+          "leak": 0.0,
+          "over": 3.57,
+          "leaked": 0,
+          "values": 26
+        },
+        "ga": {
+          "leak": 0.0,
+          "over": 3.7,
+          "leaked": 0,
+          "values": 25
+        },
+        "en-court": {
+          "leak": 0.0,
+          "over": 0.0,
+          "leaked": 0,
+          "values": 13
+        }
+      },
+      "eu-total": {
+        "leak": 0.63,
+        "over": 0.62,
+        "leaked": 2,
+        "values": 315
+      }
+    },
+    "gates": {
+      "smoke_leak": false,
+      "smoke_over": false,
+      "inflection_leak": true,
+      "latency": null,
+      "eu_per_language": true,
+      "eu_failed_languages": [],
+      "eu_total_lower": true,
+      "beats_v20": false,
+      "all_gates": false
+    },
+    "p95_ratio": null
+  },
+  "selected": "v20 (stays)"
+}

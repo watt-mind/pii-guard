@@ -345,7 +345,8 @@ def _address_mode(lines: Sequence[str], mode: str) -> tuple[list[str], int]:
     out, moved = [], 0
     for ln in lines:
         doc = json.loads(ln)
-        keep, gone = [], []
+        keep: list[dict[str, Any]] = []
+        gone: list[dict[str, Any]] = []
         for s in doc.get("spans", ()):
             (gone if s.get("entity_type") == "ADDRESS" else keep).append(s)
         if gone:
