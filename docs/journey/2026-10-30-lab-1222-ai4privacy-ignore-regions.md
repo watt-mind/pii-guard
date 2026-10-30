@@ -16,7 +16,7 @@ refreshed one ([rules](../../eval/results/runs/2026-10-30-lab-1222-ai4privacy-ru
 
 | system | precision (overlap) | over-masking | unscored predictions | recall / leak |
 | -- | -- | -- | -- | -- |
-| rules | 98.5 % → 98.5 % | 0.1 % → 0.1 % | 0 → 0 | 36.5 % / 62.9 %, unchanged (63.0 % once re-recorded on later `develop` rules) |
+| rules | 98.5 % → 98.5 % | 0.1 % → 0.1 % | 0 → 0 | 36.5 % / 62.9 %, unchanged (62.3 % once re-recorded on later `develop` rules, LAB-1199 cues) |
 | fast (rules + NER v2.0) | 98.1 % → **98.9 %** | 1.2 % → **0.3 %** (26 → 7 spans) | 250 → 269 | 96.9 % / 2.4 %, unchanged |
 
 A change of method, not of the model: recall and leak can't move with ignore regions. The

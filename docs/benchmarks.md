@@ -387,7 +387,7 @@ mixed; documents: de 200 + en 200 + hu 200.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 600 | 98.5% | 36.5% | 53.2% | 63.0% | 1.6% | 0.1% | 100.0% | 0.77 ms | 2026-10-30 | `fec3c35` |
+| **pii-guard rules** | 600 | 98.5% | 37.1% | 53.9% | 62.3% | 1.6% | 0.1% | 100.0% | 0.60 ms | 2026-10-30 | `879b0f7` |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 600 | 98.9% | 96.9% | 97.9% | 2.4% | 0.1% | 0.3% | 100.0% | 56 ms | 2026-10-29 | `323d859` |
 
 
@@ -395,7 +395,7 @@ By language:
 
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard rules** | 59.2% | 50.1% | 51.4% | 57.3% | 65.1% | 65.4% |
+| **pii-guard rules** | 59.2% | 50.1% | 53.4% | 57.3% | 65.1% | 63.6% |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 99.0% | 96.9% | 98.0% | 1.0% | 2.5% | 3.6% |
 
 
@@ -405,7 +405,7 @@ By language:
 
 | System | Leak | Recall, valid numbers | Leak, valid numbers | Recall, invalid numbers | Leak, invalid numbers | Leak, other values |
 |---|---:|---:|---:|---:|---:|---:|
-| **pii-guard rules** | 63.0% | 100.0% (166/166) | 0.0% (0/166) | 35.5% (264/743) | 63.0% (468/743) | 71.2% (908/1276) |
+| **pii-guard rules** | 62.3% | 100.0% (166/166) | 0.0% (0/166) | 37.4% (278/743) | 61.1% (454/743) | 71.2% (908/1276) |
 | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 2.4% | 100.0% (166/166) | 0.0% (0/166) | 98.0% (728/743) | 0.0% (0/743) | 4.2% (53/1276) |
 
 
@@ -1876,7 +1876,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
-| 2026-10-30 | `2026-10-30-lab-1222-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `fec3c35` | — | — |
+| 2026-10-30 | `2026-10-30-lab-1222-ai4privacy-rules` | pii-guard rules | ai4privacy | de, en, hu | recorded | `879b0f7` | — | — |
 | 2026-10-30 | `2026-10-30-lab-1199-post-value-cues-ai4privacy-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | ai4privacy | de, en, hu | recorded | `4cd1181` (dirty) | — | — |
 | 2026-10-30 | `2026-10-30-lab-1199-post-value-cues-company-names-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | company-names | hu | recorded | `4cd1181` (dirty) | — | — |
 | 2026-10-30 | `2026-10-30-lab-1199-post-value-cues-synth-sample-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | synth-sample | en, hu | recorded | `4cd1181` (dirty) | — | — |
