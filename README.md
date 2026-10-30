@@ -52,7 +52,7 @@ will do it without a clone: `uvx --from wattmind-pii-guard pii-guard up`.
 | **Teaches it, and audits:** labels 4,964 fictional documents for distillation; the optional audit mode and upper bound | **Muse Glimmer 30B** (open weights, Apache-2.0); **Muse Spark Open** (open weights) on Baseten partner inference | [Glimmer run](eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [audit runs](docs/benchmarks.md#smoke) |
 | **Sees images:** faces, ID photos and signatures, filled before the image leaves | **SAM 3.1** (Meta Model API) for signatures; faces and ID photos on-device (YuNet); OCR for printed text | [specimen results](eval/results/visual/specimens.md) |
 
-SAM 3.1 output is decoded with Meta's official `meta_sam_parser`.
+SAM 3.1 output is decoded with Meta's official `meta_sam_parser` (optional `sam` extra; included in the Docker image).
 
 **Muse** (Wonder, Spark 1.3) also writes the fictional benchmark ([models](docs/models.md#which-model-does-what)),
 **Muse Spark Open** red-teams the masking ([red team](eval/results/2026-10-27-redteam/README.md)), and

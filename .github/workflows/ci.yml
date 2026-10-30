@@ -81,7 +81,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --extra sam
       - name: mypy (no errors beyond scripts/ci/mypy-baseline.txt)
         run: uv run python scripts/ci/mypy_baseline.py
 
@@ -105,8 +105,9 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      # Exercise the real Azure SDK conditional-write boundary, not only mocks/skips.
-      - run: uv sync --extra hosted-azure
+      # Exercise the real Azure SDK conditional-write boundary, not only mocks/skips; `sam` so
+      # SAM output goes through Meta's parser (LAB-1665).
+      - run: uv sync --extra hosted-azure --extra sam
       - name: Hosted Azure SDK wire boundary (offline)
         run: |
           uv run --no-sync python -c "import azure.identity, azure.storage.blob"
@@ -388,9 +389,9 @@ jobs:
         env:
           UV_LOCKED: "false"
         run: uv audit --frozen --preview-features audit
-      - name: Install the runtime set only (no dev group, the image's ocr extra)
+      - name: Install the runtime set only (no dev group, the image's ocr and sam extras)
         if: ${{ !cancelled() }}
-        run: uv sync --no-dev --extra ocr
+        run: uv sync --no-dev --extra ocr --extra sam
       - name: Python licences (no GPL/AGPL at runtime)
         if: ${{ !cancelled() }}
         run: uv run --no-sync python scripts/ci/licenses.py

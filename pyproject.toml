@@ -20,8 +20,6 @@ dependencies = [
     "cryptography>=46.0.0",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
-    # Meta's official SAM 3.1 output parser (LAB-1665); SAM License, pure Python, no deps.
-    "meta-sam-parser==0.1.0",
     "pillow>=13.0.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
@@ -53,6 +51,12 @@ baselines = [
     "presidio-analyzer==2.2.365",
     "presidio-anonymizer==2.2.365",
     "spacy>=3.8.7,<3.9",
+]
+# Meta's official SAM 3.1 output parser (pii_guard.visual.sam, LAB-1665); pure Python, no deps,
+# under the SAM License (licenses/meta-sam-parser-SAM-LICENSE.txt). Without it SAM output is read
+# by pii-guard's own decoder. The Docker images install it.
+sam = [
+    "meta-sam-parser==0.1.0",
 ]
 # On-device face and ID-photo segmentation (pii_guard.visual.segment, LAB-1229): YuNet on
 # OpenCV's CPU DNN. The model file is fetched separately (python -m pii_guard.visual.segment fetch).

@@ -17,7 +17,10 @@
 | Synthetic corpus generation | **Muse** (Wonder for documents, Spark for variations) | Meta Model API | **no**: fictional data only |
 | The downstream model in the demo | **Muse Spark** | Meta Model API | **no**: only masked data |
 
-SAM 3.1 output is decoded with Meta's official `meta_sam_parser`.
+SAM 3.1 output is decoded with Meta's official `meta_sam_parser` (PyPI `meta-sam-parser==0.1.0`,
+the optional `sam` extra: `uv sync --extra sam`; the Docker images include it). It is under
+Meta's SAM License (`licenses/meta-sam-parser-SAM-LICENSE.txt`). Without the extra, pii-guard's
+own decoder reads the output, with the same size limits and fail-closed checks.
 
 The rule behind this table: **anything that sees real personal data is an open-weights model
 you can host yourself.** Hosted Meta models only ever see fictional data or masked data.

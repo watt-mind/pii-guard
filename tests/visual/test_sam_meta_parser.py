@@ -2,13 +2,19 @@
 
 The recorded responses in ``tests/fixtures/visual/`` are live SAM 3.1 answers for the synthetic
 ID card in ``visual_helpers.py``; here they go through the official parser and must give the
-same regions as the pre-LAB-1665 decoder (kept as the tolerant fallback).
+same regions as the pre-LAB-1665 decoder (kept as the tolerant fallback). The parser is the
+optional ``sam`` extra; without it the tests that need it are skipped and the fallback is used.
 """
 
 from __future__ import annotations
 
 import builtins
+import importlib.util
 import json
+import logging
+import sys
+import tomllib
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +26,11 @@ from pii_guard.visual import sam
 from pii_guard.visual.sam import parse_sam_output
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "visual"
+PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
+needs_parser = pytest.mark.skipif(
+    importlib.util.find_spec("meta_sam_parser") is None,
+    reason="the `sam` extra (meta-sam-parser) is not installed",
+)
 
 
 def fixture_text(name: str) -> str:
@@ -27,6 +38,7 @@ def fixture_text(name: str) -> str:
     return str(data["output"][0]["content"][0]["text"])
 
 
+@needs_parser
 @pytest.mark.parametrize("name", ["sam_face", "sam_eye"])
 def test_recorded_output_decodes_with_meta_parser_like_the_old_decoder(name: str) -> None:
     text = fixture_text(name)
@@ -37,6 +49,7 @@ def test_recorded_output_decodes_with_meta_parser_like_the_old_decoder(name: str
     assert all(r.mask is not None and r.mask.encoding == "meta-sam-b85" for r in meta)
 
 
+@needs_parser
 def test_meta_parser_path_rescales_like_the_old_decoder() -> None:
     text = fixture_text("sam_face")
     size = (WIDTH * 2, HEIGHT // 2)
@@ -107,7 +120,17 @@ def test_parser_crash_falls_back_and_never_passes_output_unchecked(
         parse_sam_output("<0f>not a SAM object", EntityType.FACE, (WIDTH, HEIGHT))
 
 
-def test_missing_parser_package_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+@needs_parser
+def test_sam_extra_installs_the_pinned_parser() -> None:
+    extra = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["project"]["optional-dependencies"]
+    assert extra["sam"] == ["meta-sam-parser==0.1.0"]
+    assert metadata.version("meta-sam-parser") == "0.1.0"
+    assert sam._meta_parser() is sys.modules["meta_sam_parser"]
+
+
+def test_missing_parser_falls_back_to_own_decoder_and_logs_once(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     real_import = builtins.__import__
 
     def no_meta(name: str, *args: Any, **kwargs: Any) -> Any:
@@ -115,9 +138,21 @@ def test_missing_parser_package_fails_closed(monkeypatch: pytest.MonkeyPatch) ->
             raise ImportError("not installed")
         return real_import(name, *args, **kwargs)
 
-    monkeypatch.delitem(__import__("sys").modules, "meta_sam_parser", raising=False)
+    monkeypatch.delitem(sys.modules, "meta_sam_parser", raising=False)
     monkeypatch.setattr(builtins, "__import__", no_meta)
-    with pytest.raises(DetectionError, match="meta-sam-parser"):
-        parse_sam_output(fixture_text("sam_face"), EntityType.FACE, (WIDTH, HEIGHT))
-    # Empty output still means nothing found, parser or not.
+    monkeypatch.setattr(sam, "_meta_parser_missing_logged", False)
+    caplog.set_level(logging.INFO, logger=sam.logger.name)
+
+    text = fixture_text("sam_face")
+    assert sam._meta_parser() is None
+    regions = parse_sam_output(text, EntityType.FACE, (WIDTH, HEIGHT))
+    assert regions == sam._parse_tolerant(text, EntityType.FACE, (WIDTH, HEIGHT))
+    assert parse_sam_output(fixture_text("sam_eye"), EntityType.FACE, (WIDTH, HEIGHT))
+    missing = [r for r in caplog.records if "meta-sam-parser is not installed" in r.message]
+    assert len(missing) == 1 and missing[0].levelno == logging.INFO
+    # The limits and fail-closed checks hold without the parser too.
+    with pytest.raises(DetectionError):
+        parse_sam_output("<0f>not a SAM object", EntityType.FACE, (WIDTH, HEIGHT))
+    with pytest.raises(DetectionError, match="size limits"):
+        parse_sam_output("x" * (sam.MAX_OUTPUT_CHARS + 1), EntityType.FACE, (WIDTH, HEIGHT))
     assert parse_sam_output("", EntityType.FACE, (WIDTH, HEIGHT)) == []

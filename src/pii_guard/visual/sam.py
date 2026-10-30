@@ -16,8 +16,8 @@ normal Responses API object whose single ``output_text`` is a token string::
 - ``mask``: ``data=H,W,~<base-85 payload>``, an entropy-coded bitmap kept opaquely in
   :class:`~pii_guard.visual.regions.SamMask`.
 
-The output is decoded with Meta's official parser, ``meta_sam_parser`` (see
-:func:`parse_sam_output`), inside our own size and count limits.
+The output is decoded with Meta's official parser, ``meta_sam_parser`` (the optional ``sam``
+extra; see :func:`parse_sam_output`), inside our own size and count limits.
 
 No object found → empty ``output_text``. The API returns no confidence scores.
 
@@ -111,14 +111,23 @@ _BOX_TOKEN_RE = re.compile(r"<\|box(?:;([^|]*))?\|>")
 _MASK_DIMS_RE = re.compile(r"([0-9]+),([0-9]+),[!~]")
 
 
-def _meta_parser() -> Any:
-    """Meta's official SAM 3.1 output parser, ``meta_sam_parser`` (a base dependency)."""
+_meta_parser_missing_logged = False
+
+
+def _meta_parser() -> Any | None:
+    """Meta's official SAM 3.1 output parser, ``meta_sam_parser`` (the optional ``sam`` extra),
+    or ``None`` when it is not installed (logged once; our own decoder is used instead)."""
+    global _meta_parser_missing_logged
     try:
         import meta_sam_parser
-    except ImportError as exc:
-        raise DetectionError(
-            "SAM output parser is not installed: pip install meta-sam-parser==0.1.0"
-        ) from exc
+    except ImportError:
+        if not _meta_parser_missing_logged:
+            _meta_parser_missing_logged = True
+            logger.info(
+                "sam: meta-sam-parser is not installed (the `sam` extra); SAM 3.1 output is "
+                "read by pii-guard's own decoder"
+            )
+        return None
     return meta_sam_parser
 
 
@@ -173,8 +182,9 @@ def parse_sam_output(
 ) -> list[Region]:
     """Parse a SAM 3.1 ``output_text`` into regions in an image of ``image_size`` (w, h).
 
-    Decoded with Meta's official parser, ``meta_sam_parser`` (LAB-1665), which also checks
-    every mask payload. Output outside its grammar that this function has always accepted
+    Decoded with Meta's official parser, ``meta_sam_parser`` (LAB-1665, the optional ``sam``
+    extra), which also checks every mask payload; without the extra the tolerant decoder
+    below reads everything. Output outside its grammar that this function has always accepted
     (boxes without a mask, as a self-hosted endpoint or a test double may send; boxes past
     the image edge) goes to the tolerant decoder, so the result is the same as before.
 
@@ -195,9 +205,11 @@ def _parse_with_meta(
     text: str, entity_type: EntityType, image_size: tuple[int, int]
 ) -> list[Region] | None:
     """Regions from ``meta_sam_parser``, or ``None`` when the output is not entirely in its
-    grammar (any diagnostic, a text line, a box without its mask, a non-lossless mask) or its
-    masks exceed :data:`MAX_DECODED_MASK_PIXELS`."""
+    grammar (any diagnostic, a text line, a box without its mask, a non-lossless mask), its
+    masks exceed :data:`MAX_DECODED_MASK_PIXELS`, or the ``sam`` extra is not installed."""
     msp = _meta_parser()
+    if msp is None:
+        return None
     pixels = 0
     for match in _MASK_DIMS_RE.finditer(text):
         if len(match.group(1)) > 9 or len(match.group(2)) > 9:
