@@ -12,13 +12,14 @@ code a ``/v1`` route can return, with its status and when (the wording of
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ExceptionHandler
 
 from pii_guard.types import PiiGuardError
 
@@ -250,7 +251,9 @@ async def _unhandled_error(_: Request, exc: Exception) -> JSONResponse:
 
 
 def install_error_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(PiiGuardError, _pii_guard_error)
-    app.add_exception_handler(StarletteHTTPException, _http_error)
-    app.add_exception_handler(RequestValidationError, _validation_error)
+    # Starlette types every handler as taking ``Exception`` but dispatches by the class it is
+    # registered for, so a handler for a subclass is sound; the cast says so to mypy.
+    app.add_exception_handler(PiiGuardError, cast(ExceptionHandler, _pii_guard_error))
+    app.add_exception_handler(StarletteHTTPException, cast(ExceptionHandler, _http_error))
+    app.add_exception_handler(RequestValidationError, cast(ExceptionHandler, _validation_error))
     app.add_exception_handler(Exception, _unhandled_error)

@@ -417,7 +417,7 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
         )
     ]
     # Legend for languages.
-    lx = 56
+    lx: float = 56
     info = index["fixture_sets"].get(fixture_set, {})
     for lang in langs:
         body.append(f'<rect x="{lx}" y="140" width="22" height="22" fill="{colors[lang]}"/>')
@@ -528,7 +528,7 @@ def number_validity(index: Mapping[str, Any], *, fixture_set: str) -> str:
             fill=MUTED,
         )
     ]
-    lx = 56
+    lx: float = 56
     for _, name, color in VALIDITY_BARS:
         body.append(f'<rect x="{lx}" y="140" width="22" height="22" fill="{color}"/>')
         body.append(_text(lx + 30, 159, name, size=21))
@@ -907,7 +907,8 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
             fill=MUTED,
         )
     ]
-    lx, ly = 56, 140
+    lx: float = 56
+    ly = 140
     for sk in systems:
         txt = short(sk)
         width = 30 + text_width(txt, 21) + 36

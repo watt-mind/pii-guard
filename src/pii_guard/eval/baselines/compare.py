@@ -80,7 +80,7 @@ def _type_table(rows: list[tuple[str, dict[str, Any], bool]]) -> list[str]:
     types = [t.value for t in EntityType if t.value in present]
     if not types:
         return []
-    gold = {}
+    gold: dict[str, int | None] = {}
     for _, block, _ in rows:
         for t in types:
             gold.setdefault(t, block["detection"]["overlap"]["per_type"].get(t, {}).get("gold"))
