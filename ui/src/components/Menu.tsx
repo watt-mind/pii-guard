@@ -7,7 +7,7 @@ export function MenuPanel({ menuProps, label, children }: { menuProps: ReturnTyp
     <div
       {...menuProps}
       aria-label={label}
-      className="absolute top-full right-0 z-40 mt-2 max-h-[min(70dvh,32rem)] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-control border border-line-strong bg-surface py-1.5 text-sm text-ink shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)]"
+      className="menu-enter absolute top-full right-0 z-40 mt-2 max-h-[min(70dvh,32rem)] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-control border border-line-strong bg-surface py-1.5 text-sm text-ink shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)]"
     >
       {children}
     </div>

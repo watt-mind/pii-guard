@@ -5,7 +5,7 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ControlSize = "sm" | "md";
 
 export const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-normal whitespace-nowrap transition-colors active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-progress aria-disabled:opacity-60";
+  "button-feedback inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-normal whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-progress aria-disabled:opacity-60";
 export const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary: "bg-primary text-on-primary not-disabled:hover:bg-primary-hover",
   secondary: "border border-line-strong bg-surface text-ink not-disabled:hover:border-field not-disabled:hover:bg-surface-2",

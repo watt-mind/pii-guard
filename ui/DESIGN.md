@@ -259,8 +259,14 @@ merged.
 
 ## Motion
 
-120 ms colour transitions on controls, `--ease-out`. Restored values flash once. Everything
-collapses under `prefers-reduced-motion`.
+120 ms colour transitions on controls, `--ease-out`. Buttons ease into a 1 px press in
+100 ms and release in 150 ms; disabled and busy buttons stay still. Header menus enter over
+180 ms with a 4 px translation and opacity, and public disclosure chevrons turn over 150 ms.
+Console sections and Playground tab panels use a 180 ms opacity-only entrance, without
+remounting views or losing drafts. Focus rings and keyboard focus remain immediate. The
+landing's agent replay provides its main explanatory motion; copy, metrics and cards stay
+still. Restored values flash once. New motion runs only with
+`prefers-reduced-motion: no-preference`; reduced motion keeps state changes immediate.
 
 ## Screenshots
 
