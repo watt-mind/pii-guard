@@ -3,8 +3,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Hallmark · design system: ui/DESIGN.md · genre: modern-minimal · theme: custom (warm console)
- * paper: warm off-white canvas, white cards (light, primary) / warm near-black (dark) · primary: plum
- * accent family: magenta-plum (badges, the header hairline) · protected: green
+ * paper: warm off-white canvas, white cards (light, primary) / warm near-black (dark) · primary: teal / mint
+ * accent family: teal (badges, the header hairline) · protected: green
  * interface: Geist · values and placeholders: Geist Mono
  */
 
@@ -24,17 +24,17 @@
   --line: #e6e1dc;
   --line-strong: #d6cfc8;
   --field: #8f8780;
-  /* The primary action: a visible plum with white text. The coral-to-plum gradient is for the
+  /* The primary action: deep teal with white text. The teal gradient is for the
      hero and the header hairline only, never a button. */
-  --primary: #5c0a3f;
-  --primary-hover: #741552;
+  --primary: #006b64;
+  --primary-hover: #00564f;
   --on-primary: #ffffff;
-  /* The magenta-plum family: badges and the header hairline. Never a state. */
-  --accent: #a71e7e;
-  --accent-soft: #fbeaf5;
-  --accent-ink: #7d1460;
-  --accent-gradient: linear-gradient(92deg, #ff7c57 0%, #a71e7e 29%, #610a45 100%);
-  --accent-wash: linear-gradient(90deg, #ffd9cc 0%, #f3c4e4 40%, #ead2e2 100%);
+  /* The teal family: badges and the header hairline. Never a state. */
+  --accent: #007d73;
+  --accent-soft: #e0f3ef;
+  --accent-ink: #005c54;
+  --accent-gradient: linear-gradient(92deg, #14b8a6, #006b64);
+  --accent-wash: linear-gradient(90deg, #d4f1e9, #e0f3ef);
   /* Protected: the boundary, a live connection, values put back. */
   --guard: #047a56;
   --guard-soft: #e3f6ef;
@@ -107,13 +107,13 @@
   --line: #33302d;
   --line-strong: #45403c;
   --field: #807973;
-  --primary: #b8468f;
-  --primary-hover: #a83d82;
-  --on-primary: #ffffff;
-  --accent: #ec7fc4;
-  --accent-soft: #3a1530;
-  --accent-ink: #f7b8df;
-  --accent-wash: linear-gradient(90deg, #5a2a22 0%, #5a1d47 40%, #3a1530 100%);
+  --primary: #4fdbc8;
+  --primary-hover: #73e4d4;
+  --on-primary: #003731;
+  --accent: #4fdbc8;
+  --accent-soft: #10332e;
+  --accent-ink: #9de9dd;
+  --accent-wash: linear-gradient(90deg, #10332e, #143c36);
   --guard: #3fd6a0;
   --guard-soft: #0f2a20;
   --guard-ink: #8eeac6;

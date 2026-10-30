@@ -89,6 +89,7 @@ describe.each(["light", "dark"] as const)("palette contrast (%s)", (theme) => {
     ["faint", "surface", 4.5],
     ["faint", "surface-2", 4.5],
     ["on-primary", "primary", 4.5],
+    ["on-primary", "primary-hover", 4.5],
     ["accent", "surface", 4.5],
     ["guard", "surface", 4.5],
     ["model", "model-soft", 4.5],
@@ -127,7 +128,7 @@ describe.each(["light", "dark"] as const)("palette contrast (%s)", (theme) => {
     expect(contrast(theme, "line-strong", "surface")).toBeGreaterThanOrEqual(line + 0.15);
   });
 
-  it("danger is orange-red, apart from the brand magenta", () => {
+  it("danger is orange-red, apart from the teal brand", () => {
     const danger = hsl(color(theme, "danger")).h;
     expect(hueGap(danger, hsl(color(theme, "accent")).h)).toBeGreaterThanOrEqual(40);
     expect(danger <= 20 || danger >= 355).toBe(true);
@@ -140,11 +141,13 @@ describe("palette (light)", () => {
     expect(contrast("light", "muted", "canvas")).toBeGreaterThanOrEqual(7);
   });
 
-  it("the primary is a visible plum with white text at 10:1", () => {
+  it("the primary is deep teal with readable white text", () => {
     expect(token("light", "on-primary")).toBe("#ffffff");
-    expect(contrast("light", "on-primary", "primary")).toBeGreaterThanOrEqual(10);
-    expect(contrast("light", "on-primary", "primary-hover")).toBeGreaterThanOrEqual(10);
-    // Visible plum, not near-black.
+    expect(contrast("light", "on-primary", "primary")).toBeGreaterThanOrEqual(4.5);
+    expect(contrast("light", "on-primary", "primary-hover")).toBeGreaterThanOrEqual(4.5);
+    const { h, s } = hsl(color("light", "primary"));
+    expect(hueGap(h, 176)).toBeLessThanOrEqual(10);
+    expect(s).toBeGreaterThan(0.3);
     expect(luminance(color("light", "primary"))).toBeGreaterThan(0.015);
   });
 
@@ -165,12 +168,12 @@ describe("palette (light)", () => {
 });
 
 describe("palette (dark)", () => {
-  it("the primary is a plum button with white text", () => {
-    expect(token("dark", "on-primary")).toBe("#ffffff");
+  it("the primary is mint with readable dark teal text", () => {
+    expect(token("dark", "on-primary")).toBe("#003731");
     expect(contrast("dark", "on-primary", "primary")).toBeGreaterThanOrEqual(4.5);
     expect(contrast("dark", "on-primary", "primary-hover")).toBeGreaterThanOrEqual(4.5);
     const { h, s } = hsl(color("dark", "primary"));
-    expect(hueGap(h, 320)).toBeLessThanOrEqual(20);
+    expect(hueGap(h, 172)).toBeLessThanOrEqual(10);
     expect(s).toBeGreaterThan(0.3);
   });
 });
