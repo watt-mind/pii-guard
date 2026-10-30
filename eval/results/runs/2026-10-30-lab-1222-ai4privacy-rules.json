@@ -1,23 +1,24 @@
 {
   "schema_version": 1,
-  "run_id": "2026-10-29-lab-1222-ai4privacy-rules",
+  "run_id": "2026-10-30-lab-1222-ai4privacy-rules",
   "kind": "text",
-  "date": "2026-10-29",
-  "recorded_at": "2026-10-29T23:49:15+00:00",
+  "date": "2026-10-30",
+  "recorded_at": "2026-10-30T01:15:04+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules on ai4privacy",
   "notes": [
-    "LAB-1222: re-run on the refreshed Ai4Privacy sample with ignore regions (meta.ignore) for policy-excluded labels (DATE, AGE, GENDER, SEX, TITLE, bare CITY); predictions on them are left out of precision and over-masking."
+    "LAB-1222: re-run on the refreshed Ai4Privacy sample with ignore regions (meta.ignore) for policy-excluded labels (DATE, AGE, GENDER, SEX, TITLE, bare CITY); predictions on them are left out of precision and over-masking. Re-recorded after merging develop (rules changes moved leak 62.93% -> 62.97%)."
   ],
   "code": {
-    "commit": "323d8591150b0e8bf7cc9ebce9d91de4fa729a4d",
-    "dirty": true,
+    "commit": "fec3c3504863b1a613a53b8cf952124dc140ba1d",
+    "dirty": false,
     "pii_guard_version": "0.1.0",
     "note": null
   },
   "system": {
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": "0.1.0",
     "detectors": [
@@ -36,19 +37,19 @@
   "fixture_set": "ai4privacy",
   "fixtures": [
     {
-      "path": "eval/fixtures/public/de-ai4privacy.jsonl",
-      "sha256": "2ad2850cd94cbbe5acad80b4afbee62d706952d5bcabce55f3a1e21d94fb1e3f",
+      "path": "eval/fixtures/public/en-ai4privacy.jsonl",
+      "sha256": "b3063862846fb2711481ad1d56f573d7931dfc56fb693f1b3f1102a126f7325b",
       "set": "ai4privacy",
-      "language": "de",
+      "language": "en",
       "origin": "hand-written",
       "generator": null,
       "documents": 200
     },
     {
-      "path": "eval/fixtures/public/en-ai4privacy.jsonl",
-      "sha256": "b3063862846fb2711481ad1d56f573d7931dfc56fb693f1b3f1102a126f7325b",
+      "path": "eval/fixtures/public/de-ai4privacy.jsonl",
+      "sha256": "2ad2850cd94cbbe5acad80b4afbee62d706952d5bcabce55f3a1e21d94fb1e3f",
       "set": "ai4privacy",
-      "language": "en",
+      "language": "de",
       "origin": "hand-written",
       "generator": null,
       "documents": 200
@@ -104,9 +105,9 @@
       "macro_f1_overlap": 0.483051,
       "leak": {
         "values": 2185,
-        "leaked": 1375,
+        "leaked": 1376,
         "partial": 34,
-        "rate": 0.629291,
+        "rate": 0.629748,
         "partial_rate": 0.015561
       },
       "over_masking": {
@@ -129,12 +130,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 0.596,
-          "p95": 1.856
+          "p50": 0.769,
+          "p95": 5.585
         },
         "mask": {
-          "p50": 0.284,
-          "p95": 1.519
+          "p50": 0.337,
+          "p95": 4.114
         }
       },
       "per_type": {
@@ -147,7 +148,7 @@
           "overlap_tp_pred": 0,
           "leak": {
             "values": 582,
-            "leaked": 580,
+            "leaked": 581,
             "partial": 1
           },
           "over_masking": null
@@ -289,7 +290,7 @@
           "gold": 1276,
           "found": 367,
           "values": 1276,
-          "leaked": 907
+          "leaked": 908
         },
         "per_type": {
           "PHONE": {
@@ -418,12 +419,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 0.57,
-            "p95": 1.657
+            "p50": 0.703,
+            "p95": 4.129
           },
           "mask": {
-            "p50": 0.243,
-            "p95": 0.616
+            "p50": 0.276,
+            "p95": 1.254
           }
         },
         "per_type": {
@@ -619,9 +620,9 @@
         "macro_f1_overlap": 0.41649,
         "leak": {
           "values": 805,
-          "leaked": 523,
+          "leaked": 524,
           "partial": 3,
-          "rate": 0.649689,
+          "rate": 0.650932,
           "partial_rate": 0.003727
         },
         "over_masking": {
@@ -644,12 +645,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 0.725,
-            "p95": 2.03
+            "p50": 0.833,
+            "p95": 6.608
           },
           "mask": {
-            "p50": 0.233,
-            "p95": 0.698
+            "p50": 0.27,
+            "p95": 2.314
           }
         },
         "per_type": {
@@ -662,7 +663,7 @@
             "overlap_tp_pred": 0,
             "leak": {
               "values": 205,
-              "leaked": 203,
+              "leaked": 204,
               "partial": 1
             },
             "over_masking": null
@@ -783,7 +784,7 @@
             "gold": 492,
             "found": 120,
             "values": 492,
-            "leaked": 370
+            "leaked": 371
           },
           "per_type": {
             "PHONE": {
@@ -883,12 +884,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 0.591,
-            "p95": 1.84
+            "p50": 0.768,
+            "p95": 4.918
           },
           "mask": {
-            "p50": 0.704,
-            "p95": 2.631
+            "p50": 0.861,
+            "p95": 6.738
           }
         },
         "per_type": {
