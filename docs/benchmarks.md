@@ -1827,6 +1827,7 @@ Portraits and signatures only, no OCR (`python -m pii_guard.visual.segment_eval`
 | `2026-10-27-segment-sam-api-specimens` | `specimens` | 65 | 90.8% | 72.3% | 83.8% | 64.9% | 2.1% | 5.5 s | 8.6 s |
 | `2026-10-27-segment-small-detectors-fictional` | `fictional-specimens` | 24 | 100.0% | 100.0% | 100.0% | 93.3% | 10.0% | 1.1 s | 1.6 s |
 | `2026-10-27-segment-small-detectors-specimens` | `specimens` | 65 | 93.8% | 93.8% | 51.3% | 59.5% | 18.9% | 727 ms | 1.6 s |
+| `2026-10-30-segment-sam-api-prompt-set` | `prompt-set` | 24 | 100.0% | 66.7% | 50.0% | 50.0% | 0.2% | 4.0 s | 5.6 s |
 
 ## Gateway latency
 
@@ -1869,6 +1870,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-30 | `2026-10-30-segment-sam-api-prompt-set` | segmenter sam-3.1 (no OCR) | prompt-set | — | recorded | `d16b9ec` (dirty) | arm64 CPU, one process; host load average 19 (shared with other jobs) | ≈ $0.24 |
 | 2026-10-29 | `2026-10-29-lab-1535-eu-inflection-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | eu-inflection | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `4c4ad56` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1535-en-court-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | en-court-smoke | en | recorded | `4c4ad56` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1535-eu-smoke-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | eu-smoke | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `4c4ad56` (dirty) | — | — |
