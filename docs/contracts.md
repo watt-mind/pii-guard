@@ -532,6 +532,13 @@ expired `session_id` → 404 `not_found`. Restoring more than
 `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (default 1 000 000) →
 413 `unmask_output_too_large`, with no text (LAB-1350).
 
+Owner rule (LAB-1580): a session that a gateway request bound to a credential (its
+`Authorization` value) unmasks only for that same value. Any other `Authorization` value, or
+none, gets 404 `not_found`, as if the session did not exist. Sessions no gateway request has
+presented, and anonymous-owned ones, unmask for every caller. Unmask only checks the owner: it
+never binds a session. In hosted mode `Authorization` is stripped before routing, so isolation
+there is the per-owner vault.
+
 ### `POST /v1/mask/image`
 
 Cover faces, signatures, ID photos and text personal data in a PNG or JPEG image
@@ -1028,6 +1035,9 @@ Treatments:
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
   Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
   (`maximum`, `minLength`, ...), are checked the same way.
+  The traffic log keeps a checked `model` only after the check passed (the outbound re-check
+  ran clean): a refused, blocked or failed call records `"[withheld]"` in the event's `model`,
+  and in the `full` original (LAB-1358).
 
 **Chat line-number gutters.** Message content, text/refusal content parts and the string
 fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter handling:

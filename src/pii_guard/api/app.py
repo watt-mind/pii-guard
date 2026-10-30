@@ -24,7 +24,12 @@ from pii_guard.api.routes.vault import (
 from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect import stack
-from pii_guard.detect.stack import DetectorLoadingError, NerWarmup, rest_detector_names
+from pii_guard.detect.stack import (
+    DetectionUnavailableError,
+    DetectorLoadingError,
+    NerWarmup,
+    rest_detector_names,
+)
 from pii_guard.gateway.sessions import SessionPathMiddleware
 from pii_guard.observability import (
     Observability,
@@ -117,7 +122,11 @@ def create_app(
 
     With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
     (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
-    race to load it; a model that can't be loaded stops startup. Without it, when the stack
+    race to load it; a model that can't be loaded stops startup. Hosted mode is the exception
+    (LAB-1548, scale to zero): it loads the configured model in the background like below, so
+    a cold start serves the landing page at once; a model that can't be loaded fails detecting
+    requests closed (503 ``detection_unavailable``) and keeps ``/readyz`` refusing. Without
+    it, when the stack
     has ``ner`` (the resolved published model or fallback), the lifespan starts loading it in
     the background (:class:`~pii_guard.detect.stack.NerWarmup`, ``app.state.ner_warmup``,
     LAB-1303): the server answers at once, ``/healthz`` and ``/v1/status`` say ``loading``,
@@ -129,7 +138,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        if await anyio.to_thread.run_sync(stack.warm_up, settings):
+        if settings.hosted and warmup.start():
+            # Hosted scales to zero (LAB-1548): a cold start serves the landing page, the UI and
+            # serving readiness at once while the bundled model loads; detecting requests wait.
+            logger.info("bundled ner model loading in the background; detecting requests wait")
+        elif await anyio.to_thread.run_sync(stack.warm_up, settings):
             warmup.mark_ready()
             logger.info("ner model warmed up before serving")
         elif warmup.start():
@@ -226,9 +239,11 @@ def create_app(
         app.state.max_image_bytes = settings.hosted_max_image_bytes
         app.state.image_workers = app.state.hosted.image_workers
 
-        @app.get("/readyz", include_in_schema=False)
-        def readyz() -> dict[str, str]:
-            if warmup.state not in {"ready", "off"}:
+        def require_ready(*, serving: bool) -> dict[str, str]:
+            if warmup.state == "failed":
+                # Status only: the load error stays in the log (ADR 0006).
+                raise DetectionUnavailableError("ner model unavailable")
+            if warmup.state not in {"ready", "off"} and not (serving and warmup.state == "loading"):
                 raise DetectorLoadingError("Detectors are not ready")
             if settings.hosted_images:
                 from pii_guard.hosted.images import require_image_pipeline
@@ -237,6 +252,18 @@ def create_app(
                 # them and to find faces on the CPU, or it is not ready at all.
                 require_image_pipeline(app.state)
             return {"status": "ready"}
+
+        @app.get("/readyz", include_in_schema=False)
+        def readyz() -> dict[str, str]:
+            """Full readiness (deploy smoke): the NER model is loaded."""
+            return require_ready(serving=False)
+
+        @app.get("/readyz/serving", include_in_schema=False)
+        def readyz_serving() -> dict[str, str]:
+            """Serving readiness (the platform's Readiness probe, LAB-1548): also ready while
+            the NER model loads, since detecting requests wait for it; a failed load is never
+            ready. A plain path: Container Apps documents no query string in probe paths."""
+            return require_ready(serving=True)
 
     # Innermost: detecting requests wait for a loading NER model (LAB-1303), on the rewritten
     # path. Then /s/<session>/v1/... reaches the /v1 routes with that vault session

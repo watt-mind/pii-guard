@@ -266,7 +266,7 @@ def test_stream_releases_long_runs_after_a_placeholder(vault: Vault) -> None:
     (placeholder,) = placeholders(session.mask("Elek.", [span_of("Elek.", "Elek", PERSON)]))
     unmasker = StreamUnmasker(session)
     assert unmasker.feed(placeholder + "nak") == ""
-    assert unmasker.feed(" ") == "Eleknak "
+    assert unmasker.feed(" ") == "Eleknek "  # re-harmonized (LAB-1152)
     assert unmasker.feed(placeholder + "x" * (MAX_SUFFIX_LENGTH + 1)) == (
         "Elek" + "x" * (MAX_SUFFIX_LENGTH + 1)
     )

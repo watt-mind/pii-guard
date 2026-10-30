@@ -907,8 +907,36 @@ tables, the Muse Spark 1.3 comparison and cost in
 | rules + LLM | `decoys` | 165 / 421 (39.2 %) | 20.0 % | 39.9 % |
 
 Placeholders hold against reconstruction from the masked text. They don't prevent linkage:
-with a candidate list the attacker does about twice as well as chance, because the context
-that stays readable narrows the candidates. Masking is pseudonymization, not anonymization.
+with a candidate list the attacker does about twice as well as chance. Masking is
+pseudonymization, not anonymization.
+
+Two opt-in contexts help find where the linkage comes from (LAB-1152):
+
+- `decoys-isolated`: the same candidate lists, one request per entity type with candidates
+  for that type only, so the attacker can't pick the candidates that agree with each other
+  (a name and the e-mail address that spells it).
+- any context with a `+generalized` suffix (`decoys+generalized`): the same detections
+  re-masked with the opt-in linkage protection: `ORGANIZATION` and `COMPANY_ID_HU` masked
+  too (`pii_guard.policy.LINKAGE_OVERRIDES`) and the masked text passed through
+  `pii_guard.vault.generalize.generalize_context` (gendered titles dropped, ages coarsened
+  to the decade, Hungarian case endings in one vowel harmony; see
+  [privacy-model.md](privacy-model.md#opt-in-linkage-protection)). The scorecard records how
+  many rewrites each rule made.
+
+**Results** (2026-10-30, same 81 documents, rules + LLM masking; full tables in
+[eval/results/2026-10-30-redteam-generalized](../eval/results/2026-10-30-redteam-generalized/README.md)):
+
+| Context | Re-id | `PERSON` | `EMAIL` | Chance |
+|---|---:|---:|---:|---:|
+| `decoys` | 165 / 420 (39.3 %) | 67 / 140 | 19 / 25 | 20.0 % |
+| `decoys+generalized` | 152 / 416 (36.5 %) | 60 / 139 | 19 / 25 | 20.0 % |
+| `decoys-isolated` | 152 / 420 (36.2 %) | 69 / 140 | 16 / 25 | 20.0 % |
+
+Neither the readable context nor cross-candidate consistency explains most of the linkage:
+both drops are within one run's noise (about ±2.4 points). The precision, recall and leak
+rate of the standard suite are unchanged (generalization reuses the detections and only
+rewrites words outside placeholders). The candidate lists themselves, drawn from a small
+corpus, are the next suspect.
 
 ## Where the specimen images live (visual)
 

@@ -586,6 +586,14 @@ class VaultSession:
         entry_limit: int | None = None,
     ) -> None:
         self.session_id = session_id
+        #: The gateway client identity this session is bound to (LAB-1565, LAB-1580), set by
+        #: :func:`pii_guard.gateway.sessions.check_and_bind`; ``None``: not presented yet.
+        #: On the session itself, so the binding lives exactly as long as the session.
+        self.owner: str | None = None
+        #: Random per session object (LAB-1580): a dropped/expired/rotated id re-created as a
+        #: new session gets a new one, so per-session state keyed by it (the gateway's
+        #: detection cache) starts clean in every runtime that shares that state.
+        self.incarnation = secrets.token_hex(8)
         self._case_sensitive = case_sensitive_placeholders
         self._max_restored = max_restored_chars
         #: Explicit-session placeholder cap enforced at mask time (LAB-1565); ``None``:
@@ -712,6 +720,7 @@ class VaultSession:
             fork._known = self._known
             fork._journal = []
             fork._parent = self
+            fork.owner, fork.incarnation = self.owner, self.incarnation
             return fork
 
     def commit(self, fork: VaultSession) -> None:
@@ -729,7 +738,10 @@ class VaultSession:
         with self._lock:
             # Copy all mutable mask state together: entries, variants, memo references and
             # generation indexes must continue to refer to the same copied objects.
-            excluded = {"_lock", "_clock", "_known", "_parent", "_journal"}
+            # ``owner`` and ``incarnation`` are identity, not mask state: a concurrent
+            # ``check_and_bind`` (which does not take this lock) must not be reverted to the
+            # value the session had when the commit started (LAB-1580).
+            excluded = {"_lock", "_clock", "_known", "_parent", "_journal", "owner", "incarnation"}
             state = copy.deepcopy({k: v for k, v in vars(self).items() if k not in excluded})
             staged = copy.copy(self)
             staged.__dict__.update(state)
