@@ -1448,11 +1448,11 @@ By language:
 
 ### `secrets`
 
-hand-written; documents: en 21.
+hand-written; documents: en 22.
 
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| **pii-guard rules** | 21 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 0.45 ms | 2026-10-28 | `cfb78ba` |
+| **pii-guard rules** | 22 | 100.0% | 100.0% | 100.0% | 0.0% | 0.0% | 0.0% | 100.0% | 1.7 ms | 2026-10-30 | `4e4bc20` |
 
 
 By language:
@@ -1870,6 +1870,7 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
+| 2026-10-30 | `2026-10-30-secrets-case-sensitive` | pii-guard rules | secrets | en | recorded | `4e4bc20` | — | — |
 | 2026-10-30 | `2026-10-30-segment-sam-api-prompt-set` | segmenter sam-3.1 (no OCR) | prompt-set | — | recorded | `d16b9ec` (dirty) | arm64 CPU, one process; host load average 19 (shared with other jobs) | ≈ $0.24 |
 | 2026-10-29 | `2026-10-29-lab-1535-eu-inflection-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | eu-inflection | es, fr, ga, hr, it, lt, lv, mt, nl, ro, sl | recorded | `4c4ad56` (dirty) | — | — |
 | 2026-10-29 | `2026-10-29-lab-1535-en-court-v4-braw` | pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535) | en-court-smoke | en | recorded | `4c4ad56` (dirty) | — | — |
