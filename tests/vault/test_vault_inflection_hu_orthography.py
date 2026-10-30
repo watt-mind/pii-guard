@@ -8,8 +8,9 @@ from __future__ import annotations
 import pytest
 from vault_helpers import TEST_KEY, span_of
 
+from pii_guard.languages.hu.inflection import HungarianSuffixMatcher
 from pii_guard.types import EntityType
-from pii_guard.vault import PLACEHOLDER_RE, HungarianSuffixMatcher, StreamUnmasker, Vault
+from pii_guard.vault import PLACEHOLDER_RE, StreamUnmasker, Vault
 from pii_guard.vault.inflection import Split, restore
 
 PERSON = EntityType.PERSON
