@@ -35,11 +35,13 @@ import re
 import shlex
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from pii_guard.integrations.muse_code import MUSE_VERSION_CHECKED
 from pii_guard.upstreams import PRESETS, Upstream
 
 __all__ = [
+    "ANTHROPIC_HOSTS",
     "CLAUDE_CODE_VERSION",
     "CODEX_VERSION",
     "ENDPOINT_KEY_ENV",
@@ -50,6 +52,7 @@ __all__ = [
     "build",
     "build_endpoint",
     "chat_models",
+    "messages_upstream",
     "pick_model",
     "printable",
     "safe_model",
@@ -91,6 +94,21 @@ class _Tool:
     #: request by hand) or ``unsupported``.
     kind: str
     docs: str | None = None
+    #: The upstream API the tool needs besides the gateway's: ``"messages"`` (an Anthropic
+    #: Messages upstream; the gateway forwards natively and never translates), else ``None``.
+    needs: str | None = None
+
+
+#: Upstream hosts that serve the Anthropic Messages API (``POST .../messages``).
+ANTHROPIC_HOSTS = frozenset({"api.anthropic.com"})
+
+
+def messages_upstream(origin: str | None) -> bool:
+    """Whether an upstream origin (``https://api.anthropic.com``) serves the Messages API."""
+    if not origin:
+        return False
+    host = urlsplit(origin if "//" in origin else f"//{origin}").hostname
+    return host in ANTHROPIC_HOSTS
 
 
 _TOOLS = (
@@ -100,7 +118,7 @@ _TOOLS = (
     _Tool("opencode", "OpenCode", "chat", "launch", "opencode.md"),
     _Tool("curl", "cURL", "chat", "request"),
     _Tool("python", "Python", "chat", "request"),
-    _Tool("claude-code", "Claude Code", "messages", "launch", "claude-code.md"),
+    _Tool("claude-code", "Claude Code", "messages", "launch", "claude-code.md", needs="messages"),
 )
 TOOL_IDS = tuple(t.id for t in _TOOLS)
 
@@ -319,9 +337,12 @@ def tool_snippet(
     token: bool,
     key_env: str = TOKEN_ENV,
     endpoint: bool = False,
+    messages: bool = True,
 ) -> dict[str, Any]:
     """One tool's block for the session URL ``url``, or with ``endpoint`` for an endpoint URL
-    (``/e/<endpoint>/v1``). ``key_env`` names the variable holding the key when ``token``."""
+    (``/e/<endpoint>/v1``). ``key_env`` names the variable holding the key when ``token``.
+    ``messages``: the upstream serves the Anthropic Messages API; without it a tool that
+    needs that API is ``unsupported`` (its block is kept, with a note saying why)."""
     tool = next(t for t in _TOOLS if t.id == tool_id)
     url = url.rstrip("/")
     name = safe_model(model) or MODEL_PLACEHOLDER
@@ -329,6 +350,13 @@ def tool_snippet(
     render_main = (_RENDER_ENDPOINT if endpoint else {}).get(tool.id, _RENDER[tool.id])
     code, note = render_main(url, name, key)
     kind = tool.kind if code else "unsupported"
+    if tool.needs == "messages" and not messages and code:
+        kind = "unsupported"
+        note = (
+            "Needs an Anthropic Messages upstream: this gateway forwards to an OpenAI-compatible "
+            "provider, which answers Claude Code's POST /v1/messages with unsupported_api. Point "
+            "PII_GUARD_UPSTREAM_BASE_URL at https://api.anthropic.com/v1 to use this block."
+        )
     more = [
         {"title": title, "code": render(url, name, key)} for title, render in _MORE.get(tool.id, ())
     ]
@@ -424,7 +452,12 @@ def build(
             "label": preset.label if preset is not None else None,
         },
         "presets": [p.public() for p in PRESETS.values()],
-        "tools": [tool_snippet(t, session_url, model, token=token) for t in TOOL_IDS],
+        "tools": [
+            tool_snippet(
+                t, session_url, model, token=token, messages=not mock and messages_upstream(origin)
+            )
+            for t in TOOL_IDS
+        ],
     }
 
 

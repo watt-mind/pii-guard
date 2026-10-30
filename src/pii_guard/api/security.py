@@ -118,7 +118,8 @@ class BearerTokenMiddleware:
     The token is accepted as ``X-PII-Guard-Token: <token>`` or ``Authorization: Bearer <token>``.
     An ``Authorization`` header carrying the token in any shape (another scheme, a tab or extra
     padding as separator, no scheme at all) authenticates too, and is removed from the request
-    after the check, so the gateway never forwards it upstream (LAB-1570). Clients that bring
+    after the check, so the gateway never forwards it upstream (LAB-1570). So is an
+    ``x-api-key`` carrying it (Anthropic clients, LAB-1605). Clients that bring
     their own upstream key (no ``PII_GUARD_UPSTREAM_API_KEY``) send it in ``Authorization`` and
     the token in the header.
     """
@@ -186,7 +187,9 @@ class BearerTokenMiddleware:
         # (LAB-1562, LAB-1570).
         kept: list[tuple[bytes, bytes]] = []
         for name, value in headers:
-            if name.lower() == b"authorization" and self._carries_token(value):
+            # ``x-api-key`` too: Anthropic clients send their key there, and /v1/messages
+            # passes it upstream as a "bring your own key" (LAB-1605).
+            if name.lower() in (b"authorization", b"x-api-key") and self._carries_token(value):
                 ok = True
                 continue  # never forwarded upstream as a "bring your own key"
             kept.append((name, value))

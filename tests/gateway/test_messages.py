@@ -674,3 +674,25 @@ def test_session_path_base_url_as_the_connect_block_writes_it() -> None:
     assert r.status_code == 200, r.text
     assert r.headers["X-PII-Guard-Session-Source"] == "path"
     assert "Jane Placeholder" in r.json()["content"][0]["text"]
+
+
+def test_guard_token_in_x_api_key_is_never_forwarded_upstream() -> None:
+    """With ``PII_GUARD_API_TOKEN`` set and no upstream key, an ``x-api-key`` carrying the
+    token authenticates and is stripped: the BYOK pass-through never sees it (LAB-1605)."""
+    token = "1" * 32
+    upstream = MessagesUpstream()
+    settings = Settings(tenant_key=TEST_TENANT_KEY, upstream_base_url=UPSTREAM_URL, api_token=token)
+    app = make_app(upstream, llm=FakeLlm(), settings=settings)  # type: ignore[arg-type]
+    simple = {
+        "model": "claude-test-model",
+        "max_tokens": 64,
+        "messages": [{"role": "user", "content": "Mail Jane Placeholder."}],
+    }
+    with TestClient(app, base_url="http://127.0.0.1") as http:
+        r = http.post("/v1/messages", json=simple, headers={"x-api-key": token})
+        refused = http.post("/v1/messages", json=simple, headers={"x-api-key": "2" * 32})
+    assert r.status_code == 200, r.text
+    (request,) = upstream.requests
+    assert "x-api-key" not in request.headers
+    assert token not in str(request.headers)
+    assert refused.status_code == 401

@@ -100,6 +100,11 @@ class SessionSource(StrEnum):
     DEFAULT = "default"
 
 
+#: The HMAC key of an ``x-api-key`` identity: a domain label, so it never equals the
+#: identity of the same value sent as ``Authorization``.
+_X_API_KEY_LABEL = b"pii-guard:client-identity:x-api-key"
+
+
 def client_identity(headers: Mapping[str, str]) -> str:
     """SHA-256 (hex) of the ``Authorization`` value; without one, of the ``x-api-key`` value
     (Anthropic clients, LAB-1605), so two keys never share a derived session; ``anonymous``
@@ -109,7 +114,8 @@ def client_identity(headers: Mapping[str, str]) -> str:
         return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()
     key = headers.get("x-api-key")
     if key is not None and key.strip():
-        return hashlib.sha256(b"x-api-key:" + key.strip().encode("utf-8")).hexdigest()
+        # Keyed (HMAC, as the session ids derived from it), with its own domain label.
+        return hmac.new(_X_API_KEY_LABEL, key.strip().encode("utf-8"), hashlib.sha256).hexdigest()
     return "anonymous"
 
 
