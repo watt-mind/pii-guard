@@ -1,50 +1,53 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type TextEntityType, type VisualEntityType } from "../api/types";
-import { ENTITY_META, type Policy } from "../lib/entities";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { ApiError } from "../api/http";
-import { Announcer, Badge, Button, Card, Checkbox, ConfirmAction, Field, Input, Notice, PageHeader, SecretReveal, Select } from "../components/ui";
-import { localRequest } from "./request";
-import { request, recovery, type Requester } from "../hosted/api";
-import { useHostedSession } from "../hosted/session";
-import { dateTime, relativeTime } from "../lib/time";
-import { setSelectedEndpoint } from "./selection";
-import { exampleModel, projectPath, pendingPolicyEdit, pendingPolicyEndpoint, requestPolicyEdit, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
+import { Button, Card, Field, Input, Notice, PageHeader, Select } from "../components/ui";
+import { recovery, request, type Requester } from "../hosted/api";
 import OwnerAccessPanel from "./OwnerAccess";
+import {
+  pendingPolicyEdit,
+  pendingPolicyEndpoint,
+  projectPath,
+  requestPolicyEdit,
+  type Endpoint,
+  type EndpointModels,
+  type EndpointModelsQuery,
+  type PolicyVersion,
+  type Project,
+  type ProjectList,
+} from "./api";
+import { localRequest } from "./request";
+import { EndpointConnection, EndpointForm, EndpointsSection, type EndpointBody, type Notified } from "./WorkspaceEndpoints";
+import { PoliciesSection, PolicyForm, type PolicyBody } from "./WorkspacePolicy";
+
+export { EndpointConnection, EndpointForm, EndpointsSection, PoliciesSection, PolicyForm };
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : OwnerAccessPanel;
 
-const configurationRecovery = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? (error: unknown) => recovery(error) : (error: unknown, hosted: boolean) => {
-  if (hosted) return recovery(error);
-  if (error instanceof ApiError) {
-    if (error.status === 401 || error.status === 403) return "The guard refused owner access. Open Local guard access and enter the owner API token configured on this server, then retry. Check that you are using the guard’s current address.";
-    if (error.status === 400 || error.status === 422) return "The guard refused these settings. Check the form and try again.";
-    if (error.status === 404) return "This project or endpoint is unavailable. Reload the project list and check that the guard supports project configuration.";
-    if (error.status === 503 && error.code === "project_storage_unavailable") return "The guard is up, but its project storage is not configured or not reachable. Check the server's project storage settings, then retry.";
-  }
-  return "The guard could not complete this request. Check its connection and retry.";
-};
+const configurationRecovery =
+  import.meta.env.VITE_PII_GUARD_HOSTED === "true"
+    ? (error: unknown) => recovery(error)
+    : (error: unknown, hosted: boolean) => {
+        if (hosted) return recovery(error);
+        if (error instanceof ApiError) {
+          if (error.status === 401 || error.status === 403)
+            return "The guard refused owner access. Open Local guard access and enter the owner API token configured on this server, then retry. Check that you are using the guard’s current address.";
+          if (error.status === 400 || error.status === 422) return "The guard refused these settings. Check the form and try again.";
+          if (error.status === 404) return "This project or endpoint is unavailable. Reload the project list and check that the guard supports project configuration.";
+          if (error.status === 503 && error.code === "project_storage_unavailable")
+            return "The guard is up, but its project storage is not configured or not reachable. Check the server's project storage settings, then retry.";
+        }
+        return "The guard could not complete this request. Check its connection and retry.";
+      };
 
 /** The confirmation of a project just created, across the console's remount on the new scope. */
 let carried: string | null = null;
 
-interface Props { call?: Requester; hosted?: boolean; projectId?: string; onProject?: (project: Project) => void }
-const defaults = Object.fromEntries(TEXT_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy])) as Record<TextEntityType, Policy>;
-const visualDefaults = Object.fromEntries(VISUAL_ENTITY_TYPES.map((type) => [type, ENTITY_META[type].policy === "keep" ? "keep" : "mask"])) as Record<VisualEntityType, "mask" | "keep">;
-
-/* ---------- Words for codes ---------- */
-
-const PROVIDER_LABEL: Record<string, string> = {
-  meta: "Meta",
-  openai: "OpenAI",
-  fireworks: "Fireworks",
-  openrouter: "OpenRouter",
-  custom: "Custom HTTPS endpoint",
-  sponsored: "Meta Muse Spark (no key needed)",
-};
-const providerLabel = (provider: string) => PROVIDER_LABEL[provider] ?? provider;
-const LANGUAGE_LABEL: Record<string, string> = { hu: "Hungarian", en: "English", de: "German" };
-const describePolicy = (policy: { language: string; mode: string }) => `${LANGUAGE_LABEL[policy.language] ?? policy.language} · ${policy.mode} mode`;
-const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+interface Props {
+  call?: Requester;
+  hosted?: boolean;
+  projectId?: string;
+  onProject?: (project: Project) => void;
+}
 
 const ENDPOINTS_TITLE = "pw-endpoints-title";
 const POLICIES_TITLE = "pw-policies-title";
@@ -82,82 +85,113 @@ function policyFamilies(policies: PolicyVersion[]): { latest: PolicyVersion; old
   });
 }
 
-/**
- * Escape closes an inline form like Cancel (a confirmation inside it handles its own Escape first).
- * Once something in the form was changed, Escape asks before discarding it (LAB-1629).
- */
-function useEscapeGuard(onCancel: () => void, busy: boolean) {
-  const [touched, setTouched] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const keepRef = useRef<HTMLButtonElement>(null);
-  const returnTo = useRef<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    if (asking) keepRef.current?.focus();
-  }, [asking]);
-  const keep = () => {
-    setAsking(false);
-    const back = returnTo.current;
-    requestAnimationFrame(() => back?.focus());
-  };
-  const onKeyDown = (e: { key: string; defaultPrevented: boolean; preventDefault: () => void }) => {
-    if (e.key !== "Escape" || e.defaultPrevented || busy) return;
-    e.preventDefault();
-    if (asking) return keep();
-    if (!touched) return onCancel();
-    returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setAsking(true);
-  };
-  const prompt = asking ? (
-    <div role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm">
-      <p className="w-full font-medium text-warn sm:w-auto sm:flex-1">Discard your changes?</p>
-      <Button size="sm" variant="danger" onClick={onCancel}>Discard changes</Button>
-      <Button size="sm" ref={keepRef} onClick={keep}>Keep editing</Button>
-    </div>
-  ) : null;
-  return { onKeyDown, onChange: () => setTouched(true), prompt };
+function pickDefaultProject(data: ProjectList, projectId?: string): Project | undefined {
+  return data.projects.find((p) => p.id === projectId) ?? data.projects.find((p) => p.id === data.default_project_id) ?? data.projects[0];
 }
 
-/** A panel opened from a row (edit, new version, keys) renders inside that row, below it (LAB-1619). */
-const INLINE = "w-full basis-full pt-1";
-// Below an endpoint row's summary line (a block, not a flex item: LAB-1652).
-const PANEL = "mt-3 min-w-0";
+interface ProjectSelectorCardProps {
+  projects: Project[];
+  selected: string;
+  busy: boolean;
+  name: string;
+  created: string;
+  projectSelect: RefObject<HTMLSelectElement | null>;
+  onSelectProject: (next: Project) => void;
+  onName: (v: string) => void;
+  onCreateProject: () => void;
+}
 
-const LIST = "divide-y divide-line";
-const ITEM = "py-3 first:pt-0 last:pb-0";
-const ROW_LINE = "flex flex-wrap items-center justify-between gap-x-4 gap-y-2";
-const ROW = `${ROW_LINE} ${ITEM}`;
-const REVIEW = "rounded-lg bg-surface-2 p-3 text-sm text-ink sm:p-4";
+function ProjectSelectorCard({ projects, selected, busy, name, created, projectSelect, onSelectProject, onName, onCreateProject }: ProjectSelectorCardProps) {
+  return (
+    <Card title="Project" subtitle="Endpoints, keys and policies below belong to the current project.">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {projects.length > 0 ? (
+          <Field label="Current project">
+            <Select
+              ref={projectSelect}
+              value={selected}
+              disabled={busy}
+              onChange={(e) => {
+                const next = projects.find((p) => p.id === e.target.value)!;
+                onSelectProject(next);
+              }}
+            >
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </Select>
+          </Field>
+        ) : (
+          <p className="text-sm text-muted">No projects yet. Create a project to configure policies and endpoints.</p>
+        )}
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) onCreateProject();
+          }}
+        >
+          <Field label="New project name" className="min-w-40 flex-1">
+            <Input maxLength={64} value={name} onChange={(e) => onName(e.target.value)} />
+          </Field>
+          <Button type="submit" busy={busy} disabled={!busy && !name.trim()}>{busy ? "Creating…" : "Create project"}</Button>
+        </form>
+      </div>
+      {created && <Notice tone="success" live className="mt-4">{created}</Notice>}
+    </Card>
+  );
+}
 
-/** Project configuration only. Secrets live in component memory, never browser storage. */
-export function Workspace({ call: suppliedCall, hosted = false, projectId, onProject }: Props) {
-  const call = suppliedCall ?? (hosted ? request : localRequest);
+function resolveRequester(suppliedCall: Requester | undefined, hosted: boolean): Requester {
+  if (suppliedCall) return suppliedCall;
+  return hosted ? request : localRequest;
+}
+
+function useProjectsList(call: Requester, hosted: boolean, projectId: string | undefined, onProject: ((project: Project) => void) | undefined) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState(projectId ?? "");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    call<ProjectList>("/v1/projects")
+      .then((data) => {
+        if (!Array.isArray(data.projects)) throw new Error("Invalid projects");
+        if (!active) return;
+        setProjects(data.projects);
+        setLoaded(true);
+        const project = pickDefaultProject(data, projectId);
+        if (project) {
+          setSelected(project.id);
+          if (project.id !== projectId) onProject?.(project);
+        }
+        setError("");
+      })
+      .catch((e: unknown) => {
+        if (active) setError(configurationRecovery(e, hosted));
+      });
+    return () => {
+      active = false;
+    };
+  }, [call, projectId, onProject, retry, hosted]);
+
+  return { projects, setProjects, loaded, selected, setSelected, error, setError, retryProjects: () => setRetry((n) => n + 1) };
+}
+
+/** Project configuration only. Secrets live in component memory, never browser storage. */
+export function Workspace({ call: suppliedCall, hosted = false, projectId, onProject }: Props) {
+  const call = resolveRequester(suppliedCall, hosted);
+  const { projects, setProjects, loaded, selected, setSelected, error, setError, retryProjects } = useProjectsList(call, hosted, projectId, onProject);
+  const [name, setName] = useState("");
   // A new project becomes the console's scope, which remounts the console: its confirmation and
   // the focus move are carried across that remount.
   const [created, setCreated] = useState(() => carried ?? "");
   const [refocus] = useState(() => carried !== null);
   const [busy, setBusy] = useState(false);
-  const [retry, setRetry] = useState(0);
   const focusLater = useFocusLater();
   const projectSelect = useRef<HTMLSelectElement>(null);
-  useEffect(() => {
-    let active = true;
-    call<ProjectList>("/v1/projects").then((data) => {
-      if (!Array.isArray(data.projects)) throw new Error("Invalid projects");
-      if (!active) return;
-      setProjects(data.projects);
-      setLoaded(true);
-      const project = data.projects.find((p) => p.id === projectId) ?? data.projects.find((p) => p.id === data.default_project_id) ?? data.projects[0];
-      if (project) { setSelected(project.id); if (project.id !== projectId) onProject?.(project); }
-      setError("");
-    }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); });
-    return () => { active = false; };
-  }, [call, projectId, onProject, retry, hosted]);
   const project = projects.find((p) => p.id === selected);
+
   // Read once, at mount (above); cleared when this instance goes, so it never reaches a later mount.
   useEffect(() => () => {
     carried = null;
@@ -165,49 +199,56 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
   useLayoutEffect(() => {
     if (refocus && projects.length) projectSelect.current?.focus();
   }, [refocus, projects.length]);
+
+  const createProject = () => {
+    const wanted = name.trim();
+    setBusy(true);
+    setError("");
+    setCreated("");
+    void call<Project>("/v1/projects", { name })
+      .then((next) => {
+        const message = `Project '${next.name || wanted}' created.`;
+        carried = message;
+        setProjects((prev) => [...prev, next]);
+        setSelected(next.id);
+        setName("");
+        setCreated(message);
+        // The submit button is disabled again (empty name): focus moves to the new project.
+        focusLater(() => projectSelect.current);
+        onProject?.(next);
+      })
+      .catch((e: unknown) => setError(configurationRecovery(e, hosted)))
+      .finally(() => setBusy(false));
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Projects" lead="Keep each application’s endpoints, endpoint keys and policies together. Every endpoint pins one upstream and one policy version, and can pin one model." />
+      <PageHeader
+        title="Projects"
+        lead="Keep each application’s endpoints, endpoint keys and policies together. Every endpoint pins one upstream and one policy version, and can pin one model."
+      />
       {!hosted && OwnerAccess && <OwnerAccess />}
       {error && (
-        <Notice tone="danger" live action={<Button size="sm" onClick={() => setRetry((n) => n + 1)}>Retry projects</Button>}>
+        <Notice tone="danger" live action={<Button size="sm" onClick={retryProjects}>Retry projects</Button>}>
           {error}
         </Notice>
       )}
       {loaded && (
-        <Card title="Project" subtitle="Endpoints, keys and policies below belong to the current project.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {projects.length > 0 && <Field label="Current project">
-              <Select ref={projectSelect} value={selected} disabled={busy} onChange={(e) => { const next = projects.find((p) => p.id === e.target.value)!; setSelected(next.id); setCreated(""); onProject?.(next); }}>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </Select>
-            </Field>}
-            {!projects.length && <p className="text-sm text-muted">No projects yet. Create a project to configure policies and endpoints.</p>}
-            <form
-              className="flex flex-wrap items-end gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const wanted = name.trim();
-                if (!wanted) return;
-                setBusy(true); setError(""); setCreated("");
-                void call<Project>("/v1/projects", { name }).then((next) => {
-                  const message = `Project '${next.name || wanted}' created.`;
-                  carried = message;
-                  setProjects((prev) => [...prev, next]); setSelected(next.id); setName(""); setCreated(message);
-                  // The submit button is disabled again (empty name): focus moves to the new project.
-                  focusLater(() => projectSelect.current);
-                  onProject?.(next);
-                }).catch((e: unknown) => setError(configurationRecovery(e, hosted))).finally(() => setBusy(false));
-              }}
-            >
-              <Field label="New project name" className="min-w-40 flex-1">
-                <Input maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
-              </Field>
-              <Button type="submit" busy={busy} disabled={!busy && !name.trim()}>{busy ? "Creating…" : "Create project"}</Button>
-            </form>
-          </div>
-          {created && <Notice tone="success" live className="mt-4">{created}</Notice>}
-        </Card>
+        <ProjectSelectorCard
+          projects={projects}
+          selected={selected}
+          busy={busy}
+          name={name}
+          created={created}
+          projectSelect={projectSelect}
+          onSelectProject={(next) => {
+            setSelected(next.id);
+            setCreated("");
+            onProject?.(next);
+          }}
+          onName={setName}
+          onCreateProject={createProject}
+        />
       )}
       {/* A tall placeholder, so the cards that replace it don't push anything on screen (CLS, LAB-1619). */}
       {!loaded && !error && <p role="status" className="min-h-dvh text-sm text-muted">Loading your default project…</p>}
@@ -216,20 +257,196 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
   );
 }
 
-type Notified = { area: "endpoints" | "policies"; text: string; endpointId?: string } | null;
-interface EndpointBody { name: string; provider: string; model: string | null; policy_version_id: string; enabled: boolean; base_url?: string; api_key?: string }
-interface PolicyBody { name: string; entity_policies: Record<TextEntityType, Policy> & Record<VisualEntityType, "mask" | "keep">; language: string; mode: string; visual_detection: VisualDetection }
-
 /** The endpoint as saved, with another policy version or enabled state; the stored credential stays (omitted). */
 function endpointBody(endpoint: Endpoint, change: Partial<Pick<EndpointBody, "policy_version_id" | "enabled">>): EndpointBody {
-  return { name: endpoint.name, provider: endpoint.provider, model: endpoint.model, policy_version_id: endpoint.policy_version_id, enabled: endpoint.enabled, ...(endpoint.provider === "custom" ? { base_url: endpoint.base_url } : {}), ...change };
+  return {
+    name: endpoint.name,
+    provider: endpoint.provider,
+    model: endpoint.model,
+    policy_version_id: endpoint.policy_version_id,
+    enabled: endpoint.enabled,
+    ...(endpoint.provider === "custom" ? { base_url: endpoint.base_url } : {}),
+    ...change,
+  };
 }
 
-function ProjectConfiguration({ project, call, hosted }: { project: Project; call: Requester; hosted: boolean }) {
+function findWantedPolicyStart(policies: PolicyVersion[], endpoints: Endpoint[], wantedEdit: string, wantedEndpoint: string | null): PolicyVersion | undefined {
+  const family = policyFamilies(policies).find((f) => f.latest.policy_id === wantedEdit);
+  // Start from the version the endpoint uses, not the latest (LAB-1640): Tune changes what that
+  // endpoint masks, so a newer version's other changes must not ride along unseen.
+  const pinned = endpoints.find((e) => e.id === wantedEndpoint && e.policy_id === wantedEdit);
+  return (pinned && policies.find((p) => p.policy_version_id === pinned.policy_version_id)) ?? family?.latest;
+}
+
+function usePendingPolicyTune(loaded: boolean, policies: PolicyVersion[], endpoints: Endpoint[], onStartTune: (policy: PolicyVersion) => void) {
+  const [wantedEdit] = useState(pendingPolicyEdit);
+  const [wantedEndpoint] = useState(pendingPolicyEndpoint);
+  const [openedWanted, setOpenedWanted] = useState(false);
+  if (wantedEdit && loaded && !openedWanted) {
+    setOpenedWanted(true);
+    requestPolicyEdit(null);
+    const start = findWantedPolicyStart(policies, endpoints, wantedEdit, wantedEndpoint);
+    if (start) onStartTune(start);
+  }
+  return { wantedEdit, wantedEndpoint };
+}
+
+/** "A", "A and B", "3 endpoints". */
+function listNames(items: { name: string }[]): string {
+  if (items.length > 2) return `${items.length} endpoints`;
+  return items.map((e) => `'${e.name}'`).join(" and ");
+}
+
+function buildPolicySavedNotice(name: string, saved: Partial<PolicyVersion> | undefined, applyTo: Endpoint[]): Notified {
+  const version = saved?.version ? ` v${saved.version}` : "";
+  const applied = Boolean(applyTo.length && saved?.policy_version_id);
+  return {
+    area: "policies",
+    text: applied
+      ? `Policy '${name}'${version} saved and applied to ${listNames(applyTo)}. The next request uses it.`
+      : `Policy '${name}'${version} saved.`,
+  };
+}
+
+function buildEndpointSavedNotice(name: string, creating: boolean, saved: Partial<Endpoint> | undefined): Notified {
+  if (creating) {
+    return {
+      area: "endpoints",
+      text: `Endpoint '${name}' created. Next, create an endpoint key so your application can use it.`,
+      endpointId: saved?.id,
+    };
+  }
+  return { area: "endpoints", text: `Endpoint '${name}' saved.` };
+}
+
+function useProjectConfigData(base: string, call: Requester, hosted: boolean) {
   const [policies, setPolicies] = useState<PolicyVersion[]>([]);
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
+  async function reload() {
+    const [policyData, endpointData] = await Promise.all([call<{ policies: PolicyVersion[] }>(`${base}/policies`), call<{ endpoints: Endpoint[] }>(`${base}/endpoints`)]);
+    if (!Array.isArray(policyData.policies) || !Array.isArray(endpointData.endpoints)) throw new Error("Invalid configuration");
+    setPolicies(policyData.policies);
+    setEndpoints(endpointData.endpoints);
+    setLoaded(true);
+    window.dispatchEvent(new Event("pii-guard-project-configuration"));
+  }
+  useEffect(() => {
+    let active = true;
+    void Promise.all([call<{ policies: PolicyVersion[] }>(`${base}/policies`), call<{ endpoints: Endpoint[] }>(`${base}/endpoints`)])
+      .then(([p, e]) => {
+        if (!Array.isArray(p.policies) || !Array.isArray(e.endpoints)) throw new Error("Invalid configuration");
+        if (active) {
+          setPolicies(p.policies);
+          setEndpoints(e.endpoints);
+          setLoaded(true);
+        }
+      })
+      .catch((e: unknown) => {
+        if (active) setError(configurationRecovery(e, hosted));
+      });
+    return () => {
+      active = false;
+    };
+  }, [base, call, hosted]);
+  return { policies, endpoints, loaded, error, setError, reload };
+}
+
+function findNextApplicablePolicyVersion(endpoint: Endpoint, policies: PolicyVersion[], latest: Map<string, number>): PolicyVersion | undefined {
+  const v = latest.get(endpoint.policy_id) ?? 0;
+  return v > endpoint.policy_version ? policies.find((p) => p.policy_id === endpoint.policy_id && p.version === v) : undefined;
+}
+
+async function applySavedPolicyToEndpoints(call: Requester, base: string, applyTo: Endpoint[], versionId: string | undefined) {
+  if (!applyTo.length || !versionId) return;
+  for (const target of applyTo) {
+    await call(`${base}/endpoints/${encodeURIComponent(target.id)}`, endpointBody(target, { policy_version_id: versionId }), "PUT");
+  }
+}
+
+function ActivePolicyForm({
+  policyEdit,
+  policies,
+  defaultPolicyId,
+  endpoints,
+  wantedEdit,
+  wantedEndpoint,
+  latest,
+  hosted,
+  busy,
+  onCancel,
+  onSave,
+}: {
+  policyEdit: PolicyVersion | "new" | null;
+  policies: PolicyVersion[];
+  defaultPolicyId?: string | null;
+  endpoints: Endpoint[];
+  wantedEdit: string | null;
+  wantedEndpoint: string | null;
+  latest: Map<string, number>;
+  hosted: boolean;
+  busy: boolean;
+  onCancel: () => void;
+  onSave: (targetEdit: PolicyVersion | "new", body: PolicyBody, applyTo: Endpoint[]) => Promise<void>;
+}) {
+  if (!policyEdit) return null;
+  const target = policyEdit === "new" ? undefined : policyEdit;
+  return (
+    <PolicyForm
+      template={policies.find((p) => p.policy_id === defaultPolicyId) ?? policies[0]}
+      key={`policy-form-${target ? target.policy_version_id : "new"}`}
+      policy={target}
+      endpoints={endpoints}
+      preferred={target && target.policy_id === wantedEdit ? wantedEndpoint : null}
+      latest={target ? latest.get(target.policy_id) : undefined}
+      hosted={hosted}
+      busy={busy}
+      onCancel={onCancel}
+      onSave={(body, applyTo) => onSave(policyEdit, body, applyTo)}
+    />
+  );
+}
+
+function ActiveEndpointForm({
+  endpointEdit,
+  policies,
+  busy,
+  hosted,
+  catalog,
+  onCancel,
+  onSave,
+  onDisable,
+}: {
+  endpointEdit: Endpoint | "new" | null;
+  policies: PolicyVersion[];
+  busy: boolean;
+  hosted: boolean;
+  catalog: (query: EndpointModelsQuery) => Promise<EndpointModels>;
+  onCancel: () => void;
+  onSave: (targetEdit: Endpoint | "new", body: EndpointBody) => Promise<void>;
+  onDisable: (target: Endpoint) => Promise<void>;
+}) {
+  if (!endpointEdit) return null;
+  const target = endpointEdit === "new" ? undefined : endpointEdit;
+  return (
+    <EndpointForm
+      key={`endpoint-form-${target ? target.id : "new"}`}
+      endpoint={target}
+      policies={policies}
+      busy={busy}
+      hosted={hosted}
+      catalog={catalog}
+      onCancel={onCancel}
+      onSave={(body) => onSave(endpointEdit, body)}
+      onDisable={target ? () => onDisable(target) : undefined}
+    />
+  );
+}
+
+function ProjectConfiguration({ project, call, hosted }: { project: Project; call: Requester; hosted: boolean }) {
+  const base = projectPath(project.id);
+  const { policies, endpoints, loaded, error, setError, reload } = useProjectConfigData(base, call, hosted);
   const [notice, setNotice] = useState<Notified>(null);
   const [busy, setBusy] = useState(false);
   const [endpointEdit, setEndpointEdit] = useState<Endpoint | "new" | null>(null);
@@ -240,764 +457,184 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
   const createPolicyRef = useRef<HTMLButtonElement>(null);
   const editRefs = useRef(new Map<string, HTMLButtonElement>());
   const versionRefs = useRef(new Map<string, HTMLButtonElement>());
-  const noPolicyHint = useId();
-  const base = projectPath(project.id);
   const catalog = useCallback((query: EndpointModelsQuery) => call<EndpointModels>(`${base}/endpoints/models`, query, "POST"), [call, base]);
-  async function reload() {
-    const [policyData, endpointData] = await Promise.all([call<{ policies: PolicyVersion[] }>(`${base}/policies`), call<{ endpoints: Endpoint[] }>(`${base}/endpoints`)]);
-    if (!Array.isArray(policyData.policies) || !Array.isArray(endpointData.endpoints)) throw new Error("Invalid configuration");
-    setPolicies(policyData.policies); setEndpoints(endpointData.endpoints); setLoaded(true);
-    window.dispatchEvent(new Event("pii-guard-project-configuration"));
-  }
-  useEffect(() => { let active = true; void Promise.all([call<{ policies: PolicyVersion[] }>(`${base}/policies`), call<{ endpoints: Endpoint[] }>(`${base}/endpoints`)]).then(([p, e]) => { if (!Array.isArray(p.policies) || !Array.isArray(e.endpoints)) throw new Error("Invalid configuration"); if (active) { setPolicies(p.policies); setEndpoints(e.endpoints); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [base, call, hosted]);
-  async function action(work: () => Promise<void>) { setBusy(true); setError(""); setNotice(null); try { await work(); } catch (e) { setError(configurationRecovery(e, hosted)); } finally { setBusy(false); } }
 
-  const openEndpointForm = (next: Endpoint | "new") => { setEndpointEdit(next); setPolicyEdit(null); setInspect(""); setNotice(null); };
-  const openPolicyForm = (next: PolicyVersion | "new") => { setPolicyEdit(next); setEndpointEdit(null); setNotice(null); };
+  async function action(work: () => Promise<void>) {
+    setBusy(true);
+    setError("");
+    setNotice(null);
+    try {
+      await work();
+    } catch (e) {
+      setError(configurationRecovery(e, hosted));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const openEndpointForm = (next: Endpoint | "new") => {
+    setEndpointEdit(next);
+    setPolicyEdit(null);
+    setInspect("");
+    setNotice(null);
+  };
+  const openPolicyForm = (next: PolicyVersion | "new") => {
+    setPolicyEdit(next);
+    setEndpointEdit(null);
+    setNotice(null);
+  };
   const closeEndpointForm = () => {
     const was = endpointEdit;
     setEndpointEdit(null);
-    focusLater(() => (was === "new" || !was ? createEndpointRef.current : editRefs.current.get(was.id)));
+    focusLater(() => (!was || was === "new" ? createEndpointRef.current : editRefs.current.get(was.id)));
   };
   const closePolicyForm = () => {
     const was = policyEdit;
     setPolicyEdit(null);
-    focusLater(() => (was === "new" || !was ? createPolicyRef.current : versionRefs.current.get(was.policy_version_id)));
+    focusLater(() => (!was || was === "new" ? createPolicyRef.current : versionRefs.current.get(was.policy_version_id)));
   };
-  const inspected = endpoints.find((e) => e.id === inspect);
   const latest = latestVersions(policies);
-  /** The family's latest version when it is newer than the one this endpoint pins. */
-  const newerVersion = (endpoint: Endpoint): PolicyVersion | undefined => {
-    const v = latest.get(endpoint.policy_id) ?? 0;
-    return v > endpoint.policy_version ? policies.find((p) => p.policy_id === endpoint.policy_id && p.version === v) : undefined;
-  };
-  const applyLatest = (endpoint: Endpoint) => action(async () => {
-    const next = newerVersion(endpoint);
-    if (!next) return;
-    await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, endpointBody(endpoint, { policy_version_id: next.policy_version_id }), "PUT");
-    await reload();
-    setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' now uses ${next.name} v${next.version}. The next request uses it.` });
-    focusLater(byId(ENDPOINTS_TITLE));
-  });
-  const deleteEndpoint = (endpoint: Endpoint) => action(async () => {
-    await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, undefined, "DELETE");
-    await reload();
-    setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' deleted.` });
-    focusLater(byId(ENDPOINTS_TITLE));
-  });
+  const applyLatest = (endpoint: Endpoint) =>
+    action(async () => {
+      const next = findNextApplicablePolicyVersion(endpoint, policies, latest);
+      if (!next) return;
+      await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, endpointBody(endpoint, { policy_version_id: next.policy_version_id }), "PUT");
+      await reload();
+      setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' now uses ${next.name} v${next.version}. The next request uses it.` });
+      focusLater(byId(ENDPOINTS_TITLE));
+    });
+  const deleteEndpoint = (endpoint: Endpoint) =>
+    action(async () => {
+      await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, undefined, "DELETE");
+      await reload();
+      setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' deleted.` });
+      focusLater(byId(ENDPOINTS_TITLE));
+    });
+
   // Opened from Connect's "Tune what is masked": a new version of that policy, its form focused.
-  const [wantedEdit] = useState(pendingPolicyEdit);
-  const [wantedEndpoint] = useState(pendingPolicyEndpoint);
-  const [openedWanted, setOpenedWanted] = useState(false);
-  if (wantedEdit && loaded && !openedWanted) {
-    setOpenedWanted(true);
-    requestPolicyEdit(null);
-    const family = policyFamilies(policies).find((f) => f.latest.policy_id === wantedEdit);
-    // Start from the version the endpoint uses, not the latest (LAB-1640): Tune changes what that
-    // endpoint masks, so a newer version's other changes must not ride along unseen.
-    const pinned = endpoints.find((e) => e.id === wantedEndpoint && e.policy_id === wantedEdit);
-    const start = (pinned && policies.find((p) => p.policy_version_id === pinned.policy_version_id)) ?? family?.latest;
-    if (start) { setPolicyEdit(start); setEndpointEdit(null); }
-  }
-  const policyForm = policyEdit && (
-    <PolicyForm
-      template={policies.find((p) => p.policy_id === project.default_policy_id) ?? policies[0]}
-      key={`policy-form-${policyEdit === "new" ? "new" : policyEdit.policy_version_id}`}
-      policy={policyEdit === "new" ? undefined : policyEdit}
+  const { wantedEdit, wantedEndpoint } = usePendingPolicyTune(loaded, policies, endpoints, (start) => {
+    setPolicyEdit(start);
+    setEndpointEdit(null);
+  });
+
+  const savePolicy = (targetEdit: PolicyVersion | "new", body: PolicyBody, applyTo: Endpoint[]) =>
+    action(async () => {
+      const isNew = targetEdit === "new";
+      const path = isNew ? `${base}/policies` : `${base}/policies/${encodeURIComponent(targetEdit.policy_id)}`;
+      const saved = await call<Partial<PolicyVersion> | undefined>(path, body, isNew ? "POST" : "PUT");
+      await applySavedPolicyToEndpoints(call, base, applyTo, saved?.policy_version_id);
+      await reload();
+      setPolicyEdit(null);
+      setNotice(buildPolicySavedNotice(body.name, saved, applyTo));
+      focusLater(byId(POLICIES_TITLE));
+    });
+
+  const saveEndpoint = (targetEdit: Endpoint | "new", body: EndpointBody) =>
+    action(async () => {
+      const creating = targetEdit === "new";
+      const path = creating ? `${base}/endpoints` : `${base}/endpoints/${encodeURIComponent(targetEdit.id)}`;
+      const saved = await call<Partial<Endpoint> | undefined>(path, body, creating ? "POST" : "PUT");
+      await reload();
+      setEndpointEdit(null);
+      setNotice(buildEndpointSavedNotice(body.name, creating, saved));
+      focusLater(byId(ENDPOINTS_TITLE));
+    });
+
+  const disableEndpoint = (target: Endpoint) =>
+    action(async () => {
+      await call(`${base}/endpoints/${encodeURIComponent(target.id)}`, endpointBody(target, { enabled: false }), "PUT");
+      await reload();
+      setEndpointEdit(null);
+      setInspect("");
+      setNotice({ area: "endpoints", text: `Endpoint '${target.name}' disabled. Its endpoint keys are revoked.` });
+      focusLater(byId(ENDPOINTS_TITLE));
+    });
+
+  const policyForm = (
+    <ActivePolicyForm
+      policyEdit={policyEdit}
+      policies={policies}
+      defaultPolicyId={project.default_policy_id}
       endpoints={endpoints}
-      preferred={policyEdit !== "new" && policyEdit.policy_id === wantedEdit ? wantedEndpoint : null}
-      latest={policyEdit === "new" ? undefined : latest.get(policyEdit.policy_id)}
+      wantedEdit={wantedEdit}
+      wantedEndpoint={wantedEndpoint}
+      latest={latest}
       hosted={hosted}
       busy={busy}
       onCancel={closePolicyForm}
-      onSave={(body, applyTo) => action(async () => {
-        const saved = await call<Partial<PolicyVersion> | undefined>(policyEdit === "new" ? `${base}/policies` : `${base}/policies/${encodeURIComponent(policyEdit.policy_id)}`, body, policyEdit === "new" ? "POST" : "PUT");
-        // "Save and apply": the endpoints move to the version just saved (LAB-1629).
-        const versionId = saved?.policy_version_id;
-        if (applyTo.length && versionId) {
-          for (const target of applyTo) await call(`${base}/endpoints/${encodeURIComponent(target.id)}`, endpointBody(target, { policy_version_id: versionId }), "PUT");
-        }
-        await reload();
-        setPolicyEdit(null);
-        const version = saved?.version ? ` v${saved.version}` : "";
-        setNotice({
-          area: "policies",
-          text: applyTo.length && versionId
-            ? `Policy '${body.name}'${version} saved and applied to ${listNames(applyTo)}. The next request uses it.`
-            : `Policy '${body.name}'${version} saved.`,
-        });
-        focusLater(byId(POLICIES_TITLE));
-      })}
+      onSave={savePolicy}
     />
   );
-  const endpointForm = endpointEdit && (
-    <EndpointForm
-      key={`endpoint-form-${typeof endpointEdit === "string" ? "new" : endpointEdit.id}`}
-      endpoint={endpointEdit === "new" ? undefined : endpointEdit}
+
+  const endpointForm = (
+    <ActiveEndpointForm
+      endpointEdit={endpointEdit}
       policies={policies}
       busy={busy}
       hosted={hosted}
       catalog={catalog}
       onCancel={closeEndpointForm}
-      onSave={(body) => action(async () => {
-        const creating = endpointEdit === "new";
-        const saved = await call<Partial<Endpoint> | undefined>(creating ? `${base}/endpoints` : `${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, body, creating ? "POST" : "PUT");
-        await reload();
-        setEndpointEdit(null);
-        setNotice(
-          creating
-            ? { area: "endpoints", text: `Endpoint '${body.name}' created. Next, create an endpoint key so your application can use it.`, endpointId: saved?.id }
-            : { area: "endpoints", text: `Endpoint '${body.name}' saved.` },
-        );
-        focusLater(byId(ENDPOINTS_TITLE));
-      })}
-      onDisable={endpointEdit === "new" ? undefined : () => action(async () => {
-        await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, endpointBody(endpointEdit, { enabled: false }), "PUT");
-        await reload();
-        setEndpointEdit(null); setInspect("");
-        setNotice({ area: "endpoints", text: `Endpoint '${endpointEdit.name}' disabled. Its endpoint keys are revoked.` });
-        focusLater(byId(ENDPOINTS_TITLE));
-      })}
+      onSave={saveEndpoint}
+      onDisable={disableEndpoint}
     />
   );
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted">Configuration is saved {hosted ? "on the PII Guard server" : "by the guard"}. Restoration mappings and activity remain temporary.{loaded && !policies.length ? " Create a policy first: every endpoint pins one policy version." : ""}</p>
+      <p className="text-sm text-muted">
+        Configuration is saved {hosted ? "on the PII Guard server" : "by the guard"}. Restoration mappings and activity remain temporary.
+        {loaded && !policies.length ? " Create a policy first: every endpoint pins one policy version." : ""}
+      </p>
       {error && (
         <Notice tone="danger" live action={<Button size="sm" busy={busy} onClick={() => void action(reload)}>Reload configuration</Button>}>
           {error}
         </Notice>
       )}
-      {/* The cards wait for the data: rendered empty, they'd jump up from below a tall placeholder (CLS, LAB-1619). */}
-      {!loaded && !error ? <p role="status" className="min-h-dvh text-sm text-muted">Loading endpoints and policies…</p> : <>
-
-      <Card
-        title="Reusable policies"
-        titleId={POLICIES_TITLE}
-        subtitle="Each saved version is immutable. Endpoints keep their assigned version until you explicitly reassign them."
-        actions={<Button ref={createPolicyRef} busy={busy} disabled={!loaded || policyEdit === "new"} onClick={() => openPolicyForm("new")}>Create policy</Button>}
-      >
-        {notice?.area === "policies" && <Notice tone="success" live className="mb-4">{notice.text}</Notice>}
-        {loaded && !policies.length && <p className="text-sm text-muted">No policies yet. Create one to choose what each endpoint masks, keeps or blocks.</p>}
-        {policies.length > 0 && (
-          <ul className={LIST}>
-            {policyFamilies(policies).map(({ latest: policy, older }) => {
-              const pinned = (version: PolicyVersion) => endpoints.filter((e) => e.enabled && e.policy_version_id === version.policy_version_id).length;
-              const family = endpoints.filter((e) => e.enabled && e.policy_id === policy.policy_id).length;
-              return (
-              <li key={policy.policy_id} className={ROW}>
-                <div className="min-w-0">
-                  <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
-                    {policy.name} · v{policy.version}
-                    {older.length > 0 && <Badge tone="live">Latest</Badge>}
-                  </h3>
-                  <p className="mt-0.5 text-sm text-muted">
-                    {describePolicy(policy)} · {plural(family, "endpoint")}
-                    {older.length > 0 && <> · {plural(older.length + 1, "version")}</>}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  busy={busy}
-                  aria-label={`New version of ${policy.name}`}
-                  ref={(el) => { if (el) versionRefs.current.set(policy.policy_version_id, el); else versionRefs.current.delete(policy.policy_version_id); }}
-                  onClick={() => openPolicyForm(policy)}
-                >
-                  New version
-                </Button>
-                {policyEdit !== "new" && policyEdit?.policy_id === policy.policy_id && <div className={INLINE}>{policyForm}</div>}
-                {older.length > 0 && (
-                  <details className="w-full basis-full text-sm">
-                    <summary className="cursor-pointer text-muted hover:text-ink">Older versions ({older.length})</summary>
-                    <ul className="mt-2 space-y-1 border-l border-line pl-3">
-                      {older.map((v) => (
-                        <li key={v.policy_version_id} className="text-muted">
-                          <span className="text-ink">v{v.version}</span> · {describePolicy(v)} · {plural(pinned(v), "endpoint")}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
-
-      {policyEdit === "new" && policyForm}
-
-      <Card
-        title="Gateway endpoints"
-        titleId={ENDPOINTS_TITLE}
-        subtitle="One upstream and pinned policy version per endpoint, with a pinned model or the client’s own."
-        actions={
-          <Button ref={createEndpointRef} busy={busy} disabled={!loaded || !policies.length || endpointEdit === "new"} aria-describedby={loaded && !policies.length ? noPolicyHint : undefined} onClick={() => openEndpointForm("new")}>
-            Create endpoint
-          </Button>
-        }
-      >
-        {loaded && !policies.length && <p id={noPolicyHint} className="mb-3 text-xs text-muted">Create a policy first: every endpoint pins one policy version.</p>}
-        {notice?.area === "endpoints" && (
-          <Notice
-            tone="success"
-            live
-            className="mb-4"
-            action={notice.endpointId && endpoints.some((e) => e.id === notice.endpointId) ? <Button size="sm" variant="primary" onClick={() => { setInspect(notice.endpointId!); setNotice(null); }}>Create an endpoint key</Button> : undefined}
-          >
-            {notice.text}
-          </Notice>
-        )}
-        {loaded && !endpoints.length && <p className="text-sm text-muted">No endpoints yet. Create one, then create an endpoint key to connect your application.</p>}
-        {endpoints.length > 0 && (
-          <ul className={LIST}>
-            {[...endpoints.filter((e) => e.enabled), ...endpoints.filter((e) => !e.enabled)].map((endpoint) => (
-              // The summary and its actions share one line; the inline Edit and Connect & keys panels
-              // sit below it at full width. Inside one no-wrap flex line, a full-width panel squeezed
-              // the summary to one character per line (LAB-1652).
-              <li key={endpoint.id} className={ITEM}>
-                <div className={`${ROW_LINE} sm:flex-nowrap`}>
-                  <div className="min-w-0 sm:flex-1">
-                    <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
-                      {endpoint.name}
-                      {!endpoint.enabled && <Badge>Disabled</Badge>}
-                    </h3>
-                    <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · {endpoint.model ? <span className="font-mono text-xs">{endpoint.model}</span> : "Client chooses the model"}</p>
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-                      {policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}
-                      {endpoint.enabled && newerVersion(endpoint) && <Badge>v{newerVersion(endpoint)!.version} available</Badge>}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:shrink-0 sm:justify-end">
-                    {endpoint.enabled && newerVersion(endpoint) && (
-                      // Asks first (LAB-1640): the endpoint may carry production traffic.
-                      <ConfirmAction
-                        size="sm"
-                        trigger={`Apply v${newerVersion(endpoint)!.version}`}
-                        triggerLabel={`Apply v${newerVersion(endpoint)!.version} to ${endpoint.name}`}
-                        title={`Apply ${newerVersion(endpoint)!.name} v${newerVersion(endpoint)!.version} to '${endpoint.name}'?`}
-                        body={`The next request through it uses v${newerVersion(endpoint)!.version} instead of v${endpoint.policy_version}. Other endpoints keep their versions.`}
-                        confirm={`Apply v${newerVersion(endpoint)!.version}`}
-                        busy={busy}
-                        onConfirm={() => applyLatest(endpoint)}
-                      />
-                    )}
-                    {!endpoint.enabled && (
-                      <ConfirmAction
-                        size="sm"
-                        trigger="Delete"
-                        triggerLabel={`Delete ${endpoint.name}`}
-                        title={`Delete endpoint '${endpoint.name}'?`}
-                        body="Its configuration is removed; its endpoint keys are already revoked."
-                        confirm="Delete endpoint"
-                        busy={busy}
-                        onConfirm={() => deleteEndpoint(endpoint)}
-                      />
-                    )}
-                    {endpoint.enabled && (
-                      <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
-                        Connect & keys
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      busy={busy}
-                      aria-label={`Edit ${endpoint.name}`}
-                      ref={(el) => { if (el) editRefs.current.set(endpoint.id, el); else editRefs.current.delete(endpoint.id); }}
-                      onClick={() => openEndpointForm(endpoint)}
-                    >
-                      Edit
-                    </Button>
-                  </div>
-                </div>
-                {endpointEdit !== "new" && endpointEdit?.id === endpoint.id && <div className={PANEL}>{endpointForm}</div>}
-                {inspected?.id === endpoint.id && (
-                  <div className={PANEL}>
-                    <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={inspected} base={base} call={call} hosted={hosted} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {endpointEdit === "new" && endpointForm}
-      </>}
+      {!loaded && !error ? (
+        <p role="status" className="min-h-dvh text-sm text-muted">Loading endpoints and policies…</p>
+      ) : (
+        <>
+          <PoliciesSection
+            policies={policies}
+            endpoints={endpoints}
+            loaded={loaded}
+            busy={busy}
+            notice={notice}
+            policyEdit={policyEdit}
+            policyForm={policyForm}
+            createPolicyRef={createPolicyRef}
+            versionRefs={versionRefs}
+            onOpenPolicyForm={openPolicyForm}
+          />
+          <EndpointsSection
+            endpoints={endpoints}
+            policies={policies}
+            loaded={loaded}
+            busy={busy}
+            hosted={hosted}
+            base={base}
+            call={call}
+            notice={notice}
+            endpointEdit={endpointEdit}
+            inspect={inspect}
+            createEndpointRef={createEndpointRef}
+            editRefs={editRefs}
+            endpointForm={endpointForm}
+            onOpenNew={() => openEndpointForm("new")}
+            onOpenEdit={openEndpointForm}
+            onToggleInspect={(id) => {
+              setInspect(inspect === id ? "" : id);
+              setEndpointEdit(null);
+            }}
+            onInspectFromNotice={(id) => {
+              setInspect(id);
+              setNotice(null);
+            }}
+            onApplyLatest={(endpoint) => void applyLatest(endpoint)}
+            onDelete={(endpoint) => void deleteEndpoint(endpoint)}
+          />
+        </>
+      )}
     </div>
-  );
-}
-
-/** Focus a form's heading when it opens, so keyboard users land where the form appeared. */
-function useFocusOnOpen(id: string) {
-  useLayoutEffect(() => {
-    const heading = document.getElementById(id);
-    heading?.focus({ preventScroll: true });
-    heading?.scrollIntoView?.({ block: "nearest" });
-  }, [id]);
-}
-
-/** The model select's "type another id" choice; never a provider model id (it has a space). */
-const OTHER_MODEL = "other model";
-
-function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCancel, onDisable }: { endpoint?: Endpoint; policies: PolicyVersion[]; busy: boolean; hosted: boolean; catalog: (query: EndpointModelsQuery) => Promise<EndpointModels>; onSave: (body: EndpointBody) => Promise<void>; onCancel: () => void; onDisable?: () => Promise<void> }) {
-  const [name, setName] = useState(endpoint?.name ?? "");
-  const session = useHostedSession();
-  const sponsored = hosted && session?.account.limits.sponsored_enabled !== false;
-  // Hosted: Sponsored Meta needs no key, so it comes first and is the default for a new endpoint.
-  const [provider, setProvider] = useState(endpoint?.provider ?? (sponsored ? "sponsored" : "openai"));
-  const connected = session?.account.connections.filter((c) => c.provider === provider) ?? [];
-  const [model, setModel] = useState(endpoint?.model ?? "");
-  const [baseUrl, setBaseUrl] = useState(endpoint?.base_url ?? "");
-  const [secret, setSecret] = useState("");
-  // Model choices: the provider's catalog (asked on request) or the sponsored allow-list.
-  const [models, setModels] = useState<string[] | null>(null);
-  const [modelsState, setModelsState] = useState<"idle" | "loading" | "failed" | "rejected">("idle");
-  const [typing, setTyping] = useState(false);
-  const isSponsored = provider === "sponsored";
-  const storedKey = Boolean(endpoint?.credential_configured && endpoint.provider === provider && (provider !== "custom" || endpoint.base_url === baseUrl));
-  const canLoadModels = !isSponsored && (Boolean(secret) || storedKey) && (provider !== "custom" || Boolean(baseUrl));
-  const loadBlocked = provider === "custom" && !baseUrl ? "Enter the base URL and provider API key to load models." : "Enter the provider API key to load models.";
-  const loadLabel = provider === "custom" ? "Load models from this endpoint" : `Load models from ${providerLabel(provider)}`;
-  const listing = Boolean(models && models.length && !typing);
-  async function loadModels() {
-    setModelsState("loading");
-    try {
-      const query: EndpointModelsQuery = { provider, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(secret ? { api_key: secret } : endpoint ? { endpoint_id: endpoint.id } : {}) };
-      setModels((await catalog(query)).models);
-      setModelsState("idle");
-    } catch (e) {
-      setModels(null);
-      setModelsState(e instanceof ApiError && e.code === "upstream_credential_rejected" ? "rejected" : "failed");
-    }
-  }
-  // Sponsored needs no key: its allow-list loads as soon as it is the provider.
-  const [allowed, setAllowed] = useState<string[] | "failed" | null>(null);
-  useEffect(() => {
-    if (!isSponsored) return;
-    let active = true;
-    catalog({ provider: "sponsored" }).then((data) => {
-      if (!active) return;
-      const list = Array.isArray(data.models) ? data.models : [];
-      setAllowed(list);
-      setModel((current) => (current && list.includes(current) ? current : list[0] ?? ""));
-    }).catch(() => { if (active) setAllowed("failed"); });
-    return () => { active = false; };
-  }, [isSponsored, catalog]);
-  const chooseProvider = (next: string) => { setProvider(next); setSecret(""); setModels(null); setModelsState("idle"); setTyping(false); if (next === "sponsored" || provider === "sponsored") setModel(""); };
-  // One policy version: nothing to choose, so it is preselected.
-  const [policyId, setPolicyId] = useState(endpoint?.policy_version_id ?? (policies.length === 1 ? policies[0]!.policy_version_id : ""));
-  const [reviewed, setReviewed] = useState(false);
-  const [reenable, setReenable] = useState(false);
-  const titleId = useId();
-  useFocusOnOpen(titleId);
-  const changed = Boolean(endpoint && endpoint.policy_version_id !== policyId);
-  const latestOf = latestVersions(policies);
-  const selected = policies.find((p) => p.policy_version_id === policyId);
-  const requiresCredential = provider !== "sponsored" && (!endpoint?.credential_configured || endpoint.provider !== provider);
-  const keyLabel = requiresCredential ? "Provider API key" : "Replace provider API key (optional)";
-  const guard = useEscapeGuard(onCancel, busy);
-  const blockedReason = isSponsored && !model ? "Choose a model to save." : !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
-  return (
-    // Escape anywhere in the form, its focused heading included, is Cancel (LAB-1626), asking first once edited.
-    <div onKeyDown={guard.onKeyDown}>
-    <Card
-      title={endpoint ? `Edit ${endpoint.name}` : "Create endpoint"}
-      titleId={titleId}
-      subtitle={endpoint ? "Changes apply to future requests through this endpoint." : "Clients reach the model through this endpoint with an endpoint key."}
-    >
-      <form
-        aria-labelledby={titleId}
-        className="space-y-4"
-        onChange={guard.onChange}
-        onSubmit={(e) => { e.preventDefault(); const apiKey = secret; setSecret(""); void onSave({ name, provider, model: model.trim() || null, policy_version_id: policyId, enabled: endpoint ? endpoint.enabled || reenable : true, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(apiKey ? { api_key: apiKey } : {}) }); }}
-      >
-        <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
-          <Field label="Endpoint name" required hint="Shown in logs and in the project switcher.">
-            <Input maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="Provider" required>
-            <Select value={provider} onChange={(e) => chooseProvider(e.target.value)}>
-              {[...(hosted ? ["sponsored"] : []), "meta", "openai", "fireworks", "openrouter", "custom"].map((value) => <option key={value} value={value}>{providerLabel(value)}</option>)}
-            </Select>
-          </Field>
-          {provider === "custom" && (
-            <Field label="Upstream base URL" required hint="Use a public HTTPS endpoint for hosted deployments.">
-              <Input type="url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" />
-            </Field>
-          )}
-          {isSponsored ? (
-            <Field label="Model" required hint={allowed === "failed" ? "The allowed models could not be loaded. Enter one the operator allows." : "Requests without your own key use one of the allowed models."}>
-              {Array.isArray(allowed) && allowed.length ? (
-                <Select value={model} onChange={(e) => setModel(e.target.value)}>
-                  {allowed.map((m) => <option key={m} value={m}>{m}</option>)}
-                </Select>
-              ) : (
-                <Input maxLength={256} value={model} onChange={(e) => setModel(e.target.value)} placeholder={allowed === null ? "Loading allowed models…" : "muse-spark-1.3"} />
-              )}
-            </Field>
-          ) : (
-            <Field label="Model (optional)" hint={
-                modelsState === "rejected" ? `${providerLabel(provider)} refused the API key. Check the API key, then load again, or type a model ID.`
-                  : modelsState === "failed" ? `${providerLabel(provider)} did not list its models. Type a model ID, or leave it empty.`
-                    : models && !models.length ? `${providerLabel(provider)} listed no models. Type a model ID, or leave it empty.`
-                      : listing ? "Pick ‘Client chooses’ to let Codex or Muse Code send their own model."
-                        : "Leave empty to let your client choose, e.g. Codex or Muse Code."
-              }>
-              {listing && models ? (
-                <Select value={model} onChange={(e) => { if (e.target.value === OTHER_MODEL) setTyping(true); else setModel(e.target.value); }}>
-                  <option value="">Client chooses (no pinned model)</option>
-                  {[...(model && !models.includes(model) ? [model] : []), ...models].map((m) => <option key={m} value={m}>{m}</option>)}
-                  <option value={OTHER_MODEL}>Other model ID…</option>
-                </Select>
-              ) : (
-                <Input maxLength={256} value={model} onChange={(e) => setModel(e.target.value)} placeholder="Client chooses" />
-              )}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Button size="sm" className="max-sm:h-11" busy={modelsState === "loading"} disabled={!canLoadModels} onClick={() => { setTyping(false); void loadModels(); }}>{modelsState === "loading" ? "Loading models…" : models ? "Reload models" : loadLabel}</Button>
-                {models && models.length > 0 && typing && <Button size="sm" variant="ghost" className="max-sm:h-11" onClick={() => setTyping(false)}>Choose from the list</Button>}
-                {!canLoadModels && <p className="text-xs text-muted">{loadBlocked}</p>}
-              </div>
-            </Field>
-          )}
-          {provider !== "sponsored" && (
-            <Field label={keyLabel} required={requiresCredential} hint={
-                endpoint?.credential_configured
-                  ? "A credential is configured. Its value cannot be retrieved."
-                  : connected.length
-                    ? `An endpoint keeps its own key: your ${providerLabel(provider)} connection on Connect is for the Playground only, so enter the key here too. Never saved in browser storage.`
-                    : "The credential is sent to the guard and never saved in browser storage."
-              }>
-              <Input type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} />
-            </Field>
-          )}
-          <Field label="Policy version" required hint={policies.length === 1 && !endpoint ? "The project’s only policy version is selected." : "The endpoint keeps this version until you reassign it."}>
-            <Select value={policyId} onChange={(e) => { setPolicyId(e.target.value); setReviewed(false); }}>
-              <option value="" disabled>Choose a policy version</option>
-              {policies.map((policy) => <option key={policy.policy_version_id} value={policy.policy_version_id}>{policy.name} · v{policy.version}{latestOf.get(policy.policy_id) === policy.version ? " (latest)" : ""}</option>)}
-            </Select>
-          </Field>
-        </fieldset>
-        {selected && <p className="text-sm text-muted">{describePolicy(selected)}. {plural(Object.values(selected.entity_policies).filter((p) => p === "keep").length, "entity type")} kept in place. Fail-closed processing is always enforced.</p>}
-        {endpoint && !endpoint.enabled && (
-          <div className={REVIEW}>
-            <p>This endpoint is disabled. Its revoked endpoint keys stay revoked.</p>
-            <Checkbox className="mt-3" checked={reenable} disabled={busy} onChange={(e) => setReenable(e.target.checked)} label="Re-enable this endpoint; create a new endpoint key afterward" />
-          </div>
-        )}
-        {changed && (
-          <div className={REVIEW}>
-            <p>Applying this version changes future requests through <strong className="font-medium">{endpoint!.name}</strong>. Other endpoints keep their versions. Already admitted requests finish with their original policy.</p>
-            <Checkbox className="mt-3" checked={reviewed} disabled={busy} onChange={(e) => setReviewed(e.target.checked)} label={`Apply ${selected?.name} v${selected?.version} to this endpoint`} />
-          </div>
-        )}
-        {guard.prompt}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" type="submit" busy={busy} disabled={!busy && Boolean(blockedReason)}>{busy ? "Saving…" : endpoint ? "Save endpoint" : "Create endpoint"}</Button>
-          <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
-          {onDisable && endpoint?.enabled && (
-            <ConfirmAction
-              trigger="Disable endpoint…"
-              triggerVariant="danger"
-              title={`Disable endpoint '${endpoint.name}'?`}
-              body="All its endpoint keys are revoked and future requests through it are refused."
-              confirm="Disable and revoke keys"
-              busy={busy}
-              onConfirm={onDisable}
-            />
-          )}
-          {blockedReason && !busy && <p className="w-full text-xs text-muted">{blockedReason}</p>}
-        </div>
-      </form>
-    </Card>
-    </div>
-  );
-}
-
-/** "A", "A and B", "3 endpoints". */
-function listNames(items: { name: string }[]): string {
-  if (items.length > 2) return `${items.length} endpoints`;
-  return items.map((e) => `'${e.name}'`).join(" and ");
-}
-
-function PolicyForm({ policy, template, endpoints, preferred = null, latest, hosted, busy, onSave, onCancel }: { policy?: PolicyVersion; template?: PolicyVersion; endpoints: Endpoint[]; /** The endpoint Connect's "Tune" came from: the one "Save and apply" moves. */ preferred?: string | null; /** The family's latest version number. */ latest?: number; hosted: boolean; busy: boolean; onSave: (body: PolicyBody, applyTo: Endpoint[]) => Promise<void>; onCancel: () => void }) {
-  const [name, setName] = useState(policy?.name ?? "");
-  const [entities, setEntities] = useState({ ...(policy?.entity_policies ?? template?.entity_policies ?? defaults) });
-  const [language, setLanguage] = useState(policy?.language ?? template?.language ?? "hu");
-  const [mode, setMode] = useState(hosted ? "fast" : policy?.mode ?? template?.mode ?? "fast");
-  const start = policy ?? template;
-  // A version saved before visual types existed shows the defaults (the server's, LAB-1444).
-  const [visual, setVisual] = useState(() => Object.fromEntries(VISUAL_ENTITY_TYPES.map((type) => {
-    const saved = start?.entity_policies[type];
-    return [type, saved === "keep" || saved === "mask" ? saved : visualDefaults[type]];
-  })) as Record<VisualEntityType, "mask" | "keep">);
-  // Hosted images are on-device only until SAM has its own spend reservation.
-  const [detection, setDetection] = useState<VisualDetection>(hosted ? "local" : start?.visual_detection ?? "local");
-  const titleId = useId();
-  useFocusOnOpen(titleId);
-  const affected = endpoints.filter((e) => e.enabled && e.policy_id === policy?.policy_id);
-  // "Save and apply" (LAB-1629): the endpoint Tune came from, else every endpoint on this policy.
-  const fromTune = affected.filter((e) => e.id === preferred);
-  const applyTo = fromTune.length ? fromTune : affected;
-  const guard = useEscapeGuard(onCancel, busy);
-  const body = (): PolicyBody => ({ name, entity_policies: { ...entities, ...visual }, language, mode, visual_detection: detection });
-  return (
-    <div onKeyDown={guard.onKeyDown}>
-    <Card title={policy ? `New version of ${policy.name}` : "Create policy"} titleId={titleId} subtitle="Mask replaces detected values with reversible placeholders. Keep sends them unchanged. Block refuses the entire request when that type is detected.">
-      <form aria-labelledby={titleId} className="space-y-4" onChange={guard.onChange} onSubmit={(e) => { e.preventDefault(); void onSave(body(), policy && fromTune.length ? applyTo : []); }}>
-        <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Policy name" required={!policy}>
-            <Input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="Language">
-            <Select value={language} onChange={(e) => setLanguage(e.target.value)}>
-              <option value="hu">Hungarian</option>
-              <option value="en">English</option>
-              <option value="de">German</option>
-            </Select>
-          </Field>
-          {!hosted && (
-            <Field label="Detection mode" hint="Audit mode needs a server with the audit detectors.">
-              <Select value={mode} onChange={(e) => setMode(e.target.value)}>
-                <option value="fast">Fast</option>
-                <option value="audit">Audit</option>
-              </Select>
-            </Field>
-          )}
-        </fieldset>
-        <fieldset disabled={busy} className="min-w-0">
-          <legend className="mb-3 text-sm font-medium text-ink">What happens to each type</legend>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {TEXT_ENTITY_TYPES.map((type) => (
-              <Field key={type} label={ENTITY_META[type].label}>
-                <Select value={entities[type]} onChange={(e) => setEntities((prev) => ({ ...prev, [type]: e.target.value as Policy }))}>
-                  <option value="mask">Mask</option>
-                  <option value="keep">Keep</option>
-                  <option value="block">Block request</option>
-                </Select>
-              </Field>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset disabled={busy} className="min-w-0">
-          <legend className="mb-3 text-sm font-medium text-ink">Images</legend>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field
-              label="Detection"
-              hint={hosted
-                ? "The hosted service detects on its own CPU only; SAM 3.1 needs a self-hosted install."
-                : detection === "sam"
-                  ? "The original image is sent to Meta's API for signatures and stamps. Needs a SAM key on the server; a server set to on-device detection stays on-device."
-                  : "Faces, ID photos and signatures are found on the guard's CPU. Stamps cannot be detected on-device, so they can only be kept."}
-            >
-              <Select value={detection} onChange={(e) => setDetection(e.target.value as VisualDetection)}>
-                <option value="local">{VISUAL_DETECTION_LABEL.local}</option>
-                <option value="sam" disabled={hosted}>{VISUAL_DETECTION_LABEL.sam}</option>
-              </Select>
-            </Field>
-            {VISUAL_ENTITY_TYPES.map((type) => (
-              <Field key={type} label={ENTITY_META[type].label}>
-                <Select value={visual[type]} onChange={(e) => setVisual((prev) => ({ ...prev, [type]: e.target.value as "mask" | "keep" }))}>
-                  <option value="mask">Mask</option>
-                  <option value="keep">Keep</option>
-                </Select>
-              </Field>
-            ))}
-          </div>
-          {detection === "local" && visual.STAMP === "mask" && (
-            <p role="alert" className="mt-2 text-sm text-warn">{hosted ? "Detection on the PII Guard server" : "On-device detection"} cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.</p>
-          )}
-        </fieldset>
-        <div className={REVIEW}>
-          <p>
-            {policy ? "Saving creates a new version." : "The new policy is available to endpoints in this project."}
-            {policy && latest !== undefined && latest > policy.version && (
-              <> It starts from v{policy.version}{fromTune[0] ? `, the version '${fromTune[0].name}' uses` : ""}, not the latest v{latest}; v{latest + 1} gets these settings.</>
-            )}
-          </p>
-          {policy && (
-            <p className="mt-1">
-              Endpoints using this policy: {affected.length ? affected.map((e) => `${e.name} (v${e.policy_version})`).join(", ") : "none"}.
-              {applyTo.length > 0 && (fromTune.length
-                ? <> Save and apply moves {listNames(applyTo)} to the new version; Save only keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version.</>
-                : <> Save new version keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version; Save and apply asks before moving {applyTo.length === 1 ? "it" : "them"}.</>)}
-            </p>
-          )}
-        </div>
-        {guard.prompt}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Enter saves. It applies only to the one endpoint Tune came from; moving endpoints
-              opened from Projects (production among them) is a confirmed second step (LAB-1640). */}
-          <Button variant="primary" type="submit" busy={busy}>
-            {busy ? "Saving…" : !policy ? "Save policy" : fromTune.length ? `Save and apply to ${listNames(applyTo)}` : "Save new version"}
-          </Button>
-          {policy && fromTune.length > 0 && (
-            <Button disabled={busy} onClick={() => void onSave(body(), [])}>Save only</Button>
-          )}
-          {policy && !fromTune.length && applyTo.length > 0 && (
-            <ConfirmAction
-              trigger="Save and apply…"
-              title={`Save and apply the new version to ${applyTo.length === 1 && applyTo[0] ? `'${applyTo[0].name}'` : `${applyTo.length} endpoints`}?`}
-              body={`The next request through ${applyTo.map((e) => `'${e.name}'`).join(", ")} uses it. Other endpoints keep their versions.`}
-              confirm={applyTo.length === 1 ? "Save and apply" : `Save and apply to ${applyTo.length}`}
-              busy={busy}
-              onConfirm={() => onSave(body(), applyTo)}
-            />
-          )}
-          <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
-        </div>
-      </form>
-    </Card>
-    </div>
-  );
-}
-
-function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoint; base: string; call: Requester; hosted: boolean }) {
-  const panel = useRef<HTMLElement>(null);
-  // This component mounts only after an explicit Connect & keys expansion.
-  useLayoutEffect(() => {
-    panel.current?.focus({ preventScroll: true });
-    panel.current?.scrollIntoView({ block: "start", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  }, []);
-  const [keys, setKeys] = useState<EndpointKey[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [secret, setSecret] = useState<{ id: string; name: string; key: string } | null>(null);
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState("");
-  const [announce, setAnnounce] = useState("");
-  const keysTitle = useId();
-  const disabledHint = useId();
-  const keyHint = useId();
-  const focusLater = useFocusLater();
-  const keyPath = `${base}/endpoints/${encodeURIComponent(endpoint.id)}/keys`;
-  useEffect(() => { let active = true; call<{ keys: EndpointKey[] }>(keyPath).then((data) => { if (!Array.isArray(data.keys)) throw new Error("Invalid keys"); if (active) { setKeys(data.keys); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [call, keyPath, hosted]);
-  async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(configurationRecovery(e, hosted)); } finally { setBusy(false); } }
-  const active = keys.filter((k) => !k.revoked_at).sort(newestFirst);
-  const revoked = keys.filter((k) => k.revoked_at).sort(newestFirst);
-  const url = `${globalThis.location.origin}${endpoint.base_path}`;
-  const snippet = `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url=${JSON.stringify(url)},\n    api_key=os.environ["PII_GUARD_ENDPOINT_KEY"],\n)\nresponse = client.chat.completions.create(\n    model=${JSON.stringify(endpoint.model ?? "<model-id>")},\n    messages=[{"role": "user", "content": "Hello, Robin Example."}],\n)`;
-  function copy(value: string, label: string) { void navigator.clipboard.writeText(value).then(() => setCopied(`${label} copied`)).catch(() => setCopied("Copy failed. Select the text and copy it manually.")); }
-  const revoke = (key: EndpointKey) => action(async () => {
-    await call(`${keyPath}/${encodeURIComponent(key.id)}`, undefined, "DELETE");
-    const at = new Date().toISOString();
-    setKeys((prev) => prev.map((k) => (k.id === key.id ? { ...k, revoked_at: at } : k)));
-    if (secret?.id === key.id) setSecret(null);
-    setAnnounce(`Key '${key.name}' revoked.`);
-    focusLater(byId(keysTitle));
-  });
-  return (
-    <Card ref={panel} tabIndex={-1} aria-label={`Connect ${endpoint.name}`} title={`Connect ${endpoint.name}`} subtitle={`Endpoint keys authorize only this endpoint. Your provider key stays ${hosted ? "on the PII Guard server" : "in the guard"}; apps never see it.`} className="focus:outline-none">
-      <div className="space-y-4">
-        <Field label="OpenAI-compatible base URL">
-          <Input readOnly value={url} className="font-mono" />
-        </Field>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => copy(url, "URL")}>Copy URL</Button>
-          <Button size="sm" onClick={() => copy(snippet, "Snippet")}>Copy Python snippet</Button>
-          {hosted && (
-            <a
-              href="#connect"
-              className="text-sm text-ink underline underline-offset-4"
-              onClick={(e) => {
-                // Open Connect first, then pick this endpoint (the console remounts on the new scope).
-                e.preventDefault();
-                globalThis.location.hash = "#connect";
-                setSelectedEndpoint(endpoint.id);
-              }}
-            >
-              Client setup for this endpoint
-            </a>
-          )}
-          <p role="status" className="text-xs text-muted">{copied}</p>
-        </div>
-        <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-ui whitespace-pre text-ink sm:p-4">{snippet}</pre>
-        {!endpoint.model && <p className="text-xs text-muted">This endpoint has no pinned model: replace <span className="font-mono">&lt;model-id&gt;</span> with the model your client uses{exampleModel(endpoint.provider) ? <>, for example <span className="font-mono">{exampleModel(endpoint.provider)}</span></> : " (a model ID this endpoint serves)"}.</p>}
-      </div>
-
-      <div className="mt-6 space-y-4 border-t border-line pt-5">
-        <h3 id={keysTitle} tabIndex={-1} className="text-lg font-normal text-ink focus:outline-none">Endpoint keys</h3>
-        {error && <Notice tone="danger" live>{error}</Notice>}
-        <form
-          className="flex flex-wrap items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!name.trim() || !endpoint.enabled) return;
-            setSecret(null);
-            void action(async () => {
-              const created = await call<EndpointKey & { key: string }>(keyPath, { name });
-              setSecret({ id: created.id, name: created.name, key: created.key });
-              setKeys((prev) => [...prev, { id: created.id, name: created.name, created_at: created.created_at }]);
-              setName("");
-            });
-          }}
-        >
-          <Field label="Endpoint key name" required className="min-w-40 flex-1">
-            <Input maxLength={64} value={name} disabled={!endpoint.enabled} onChange={(e) => setName(e.target.value)} aria-describedby={endpoint.enabled ? keyHint : disabledHint} />
-          </Field>
-          <Button variant="primary" type="submit" busy={busy} disabled={!busy && (!name.trim() || !endpoint.enabled)} aria-describedby={endpoint.enabled ? undefined : disabledHint}>
-            {busy ? "Working…" : "Create endpoint key"}
-          </Button>
-          {endpoint.enabled ? (
-            <p id={keyHint} className="w-full text-xs text-muted">Name it after the app that uses it.</p>
-          ) : (
-            <p id={disabledHint} className="w-full text-xs text-muted">This endpoint is disabled. Re-enable it to create endpoint keys.</p>
-          )}
-        </form>
-        {secret && <SecretReveal label={`endpoint key '${secret.name}'`} secret={secret.key} envName="PII_GUARD_ENDPOINT_KEY" onDismiss={() => setSecret(null)} />}
-        <Announcer message={announce} />
-        {loaded && !keys.length && <p className="text-sm text-muted">No endpoint keys yet. Create one to connect an application to this endpoint.</p>}
-        {active.length > 0 && (
-          <ul className={LIST} aria-labelledby={keysTitle}>
-            {active.map((key) => (
-              <KeyRow key={key.id} item={key}>
-                <ConfirmAction
-                  size="sm"
-                  trigger="Revoke"
-                  triggerLabel={`Revoke key ${key.name}`}
-                  title={`Revoke key '${key.name}'?`}
-                  body="Apps using it stop working."
-                  confirm="Revoke key"
-                  busy={busy}
-                  onConfirm={() => revoke(key)}
-                />
-              </KeyRow>
-            ))}
-          </ul>
-        )}
-        {loaded && keys.length > 0 && !active.length && <p className="text-sm text-muted">No active endpoint keys. Create one to connect an application to this endpoint.</p>}
-        {revoked.length > 0 && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted hover:text-ink">Show {plural(revoked.length, "revoked key")}</summary>
-            <ul className={`${LIST} mt-3`} aria-label="Revoked endpoint keys">
-              {revoked.map((key) => <KeyRow key={key.id} item={key} />)}
-            </ul>
-          </details>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-/** Newest first; created_at is ISO 8601, so it sorts as text. */
-const newestFirst = (a: EndpointKey, b: EndpointKey) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
-
-function KeyRow({ item, children }: { item: EndpointKey; children?: ReactNode }) {
-  return (
-    <li className={ROW}>
-      <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
-          {item.name}
-          <Badge tone={item.revoked_at ? "failed" : "live"}>{item.revoked_at ? "Revoked" : "Active"}</Badge>
-        </p>
-        <p className="mt-0.5 text-sm text-muted">
-          Created <time dateTime={item.created_at} title={dateTime(item.created_at)}>{relativeTime(item.created_at)}</time>
-          {item.revoked_at && <>, revoked <time dateTime={item.revoked_at} title={dateTime(item.revoked_at)}>{relativeTime(item.revoked_at)}</time></>}
-        </p>
-      </div>
-      {children}
-    </li>
   );
 }
