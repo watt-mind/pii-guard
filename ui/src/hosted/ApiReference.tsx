@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent } from "react";
 import specUrl from "../../../docs/openapi.json?url";
-import { ButtonLink, Logo, ThemeToggle } from "../components/ui";
-import { useTheme } from "../hooks/useTheme";
+import { ButtonLink } from "../components/ui";
 import type { Endpoint, ProjectList } from "../projects/api";
 import { localRequest } from "../projects/request";
 import { getSelectedProject, useSelectedEndpoint } from "../projects/selection";
 import { hostedServers } from "./apiConfig";
 import { SOURCE } from "./session";
+import { PublicHeader } from "./PublicHeader";
 
 // The renderer is heavy and only this page needs it: the landing never downloads it, and only
 // the hosted build has it (the local build, bundled into the wheel, links to the hosted page).
@@ -56,7 +56,6 @@ function useFallbackEndpoint(enabled: boolean): string | null {
  * visitor, signed in or not. The server's own /docs and /openapi.json stay off in production.
  */
 export function ApiReference(props: { consoleHref: string; embedded?: false } | { embedded: true; consoleHref?: undefined }) {
-  const [theme, setTheme] = useTheme();
   const dark = useSyncExternalStore(subscribeDark, isDark, () => false);
   // In the console the examples default to this service, then the endpoint the header picked (LAB-1626).
   const picked = useSelectedEndpoint();
@@ -74,10 +73,7 @@ export function ApiReference(props: { consoleHref: string; embedded?: false } | 
   const intro = (
     <section aria-labelledby="api-title" className={props.embedded ? "" : "mx-auto max-w-[1280px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10"}>
       {!props.embedded && (
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="inline-flex items-center gap-2 font-mono text-xs text-muted">Developer docs · Read-only reference</p>
-          <ThemeToggle theme={theme} onTheme={setTheme} />
-        </div>
+        <p className="font-mono text-xs text-muted">Developer docs · Read-only reference</p>
       )}
       <h1 id="api-title" className={props.embedded ? "text-2xl font-medium text-balance text-ink" : "mt-4 text-3xl font-medium tracking-tight sm:text-4xl"}>API reference</h1>
       <p className={props.embedded ? "mt-2 max-w-3xl text-sm text-pretty text-muted sm:text-base" : "mt-3 max-w-[68ch] leading-relaxed text-muted"}>
@@ -123,34 +119,25 @@ export function ApiReference(props: { consoleHref: string; embedded?: false } | 
   }
 
   return (
-    <div className="pii-guard-api min-h-dvh bg-canvas text-sm text-ink">
+    <div className="pii-guard-api public-teal-theme min-h-dvh bg-canvas text-sm text-ink">
       <a href="#main" onClick={skip} className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-40 focus:rounded focus:bg-surface focus:px-3 focus:py-1">
         Skip to content
       </a>
-      <header className="sticky top-0 z-30 bg-canvas">
-        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12 lg:px-10">
-          <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink">
-            <Logo />
-            PII Guard
-          </a>
-          <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-3 sm:gap-5">
-            <a className="hidden text-muted hover:text-ink sm:inline" href="#demo">Demo</a>
-            <a className="hidden text-muted hover:text-ink sm:inline" href="#evaluation">Evaluation</a>
-            <a href="#api" aria-current="page" className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap text-ink underline decoration-accent decoration-2 underline-offset-[6px] pointer-coarse:min-h-11">API</a>
-            <ButtonLink href={props.consoleHref}>Console</ButtonLink>
-          </nav>
-        </div>
-        <div aria-hidden="true" className="header-hairline" />
-      </header>
+      <PublicHeader current="api" accountHref={props.consoleHref} />
       {/* With Scalar, its own <main> is the page's main; a nested one fails axe (LAB-1640). */}
       <div id="main" role={ScalarReference ? undefined : "main"} tabIndex={-1} className="focus:outline-none">
         {intro}
         {reference}
       </div>
-      <footer className="border-t border-line">
+      <footer className="public-footer border-t border-line">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-10">
           <p className="text-xs text-muted">Generated from the code and checked in CI. Every example is fictional.</p>
-          <ThemeToggle theme={theme} onTheme={setTheme} />
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
+            <a href="#site">Home</a>
+            <a href="#evaluation">Benchmarks</a>
+            <a href="#api" aria-current="page">API reference</a>
+            <a href={GUIDE}>API guide ↗</a>
+          </nav>
         </div>
       </footer>
     </div>

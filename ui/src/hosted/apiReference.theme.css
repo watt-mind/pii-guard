@@ -127,3 +127,11 @@
     padding-inline: 16px;
   }
 }
+
+/* The standalone public header is 64px plus its 2px divider at every width.
+ * Keep console offsets above: an embedded reference has no public header. */
+.pii-guard-api.public-teal-theme,
+.pii-guard-api.public-teal-theme .light-mode,
+.pii-guard-api.public-teal-theme .dark-mode {
+  --scalar-custom-header-height: 66px;
+}
