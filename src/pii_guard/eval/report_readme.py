@@ -52,6 +52,11 @@ placeholders filled from the records (:func:`fill`): ``{leak:<set>:<system>}``,
 ``{langs:<set>}`` / ``{codes:<set>}`` (its languages); a system is a run-record key or an
 alias from ``aliases``.
 
+LAB-1675, ``"table_image": {"image": "results-table", "alt": "...", "summary": "..."}``: the
+compact table is shown as the generated image (light and dark, :mod:`pii_guard.eval.report_share`
+draws it from the same records), and the markdown table follows in a collapsed
+``<details>`` block for screen readers and copy-paste. ``alt`` takes the same placeholders.
+
 A fixture-set cell whose snapshot is missing some of the set's languages (a tool run on an
 earlier fixture version, say) is marked ``§`` and explained under the table, never silently
 pooled with the complete rows; a marked best cell is not bold.
@@ -115,7 +120,7 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
         ):
             raise RecordError(f"{where}: each readme row needs 'system' and 'label': {row!r}")
     spec: dict[str, Any] = {"columns": columns, "rows": rows}
-    for key in ("layout", "aliases", "intro", "notes", "caveats", "details"):
+    for key in ("layout", "aliases", "intro", "notes", "caveats", "details", "table_image"):
         if key in raw:
             spec[key] = raw[key]
     if spec.get("layout", "wide") not in ("wide", "compact"):
@@ -132,6 +137,12 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
         or not all(isinstance(intro.get(k), str) for k in ("image", "alt", "caption"))
     ):
         raise RecordError(f"{where}: readme 'intro' needs 'bullets', 'image', 'alt', 'caption'")
+    image = spec.get("table_image")
+    if image is not None and (
+        not isinstance(image, dict)
+        or not all(isinstance(image.get(k), str) for k in ("image", "alt", "summary"))
+    ):
+        raise RecordError(f"{where}: readme 'table_image' needs 'image', 'alt' and 'summary'")
     for flag in ("over_masking_table", "per_language"):
         if flag in raw:
             if not isinstance(raw[flag], bool):
@@ -512,6 +523,16 @@ def render_compact(
     """The compact results block: one ``set x system`` table, notes, caveats, details."""
     columns, rows = spec["columns"], spec["rows"]
     out = [_NOTE, ""]
+    image = spec.get("table_image")
+    if image:
+        out.extend(
+            [
+                *_picture(image["image"], fill(image["alt"], index, spec, where)),
+                "",
+                f"<details><summary>{image['summary']}</summary>",
+                "",
+            ]
+        )
     head = ["Leak · over-masking", *(str(r.get("short", r["label"])) for r in rows)]
     out.append("| " + " | ".join(_escape(h) for h in head) + " |")
     out.append("|---|" + "---:|" * len(rows))
@@ -534,6 +555,8 @@ def render_compact(
         ]
         out.append("| " + " | ".join(_escape(c) for c in [label, *body]) + " |")
     out.append("")
+    if image:
+        out.extend(["</details>", ""])
     for note in spec.get("notes") or []:
         out.extend([fill(note, index, spec, where), ""])
     caveats = spec.get("caveats") or []
@@ -574,6 +597,17 @@ def render_compact(
             out.extend([line, ""])
         out.append("</details>")
     return "\n".join(out) + "\n"
+
+
+def _picture(image: str, alt: str) -> list[str]:
+    """A generated image in light and dark (``docs/benchmarks/<image>[-dark].svg``)."""
+    img = f"docs/benchmarks/{image}"
+    return [
+        "<picture>",
+        f'  <source media="(prefers-color-scheme: dark)" srcset="{img}-dark.svg">',
+        f'  <img src="{img}.svg" alt="{alt.replace(chr(34), "&quot;")}" width="100%">',
+        "</picture>",
+    ]
 
 
 def render_intro(

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-labelledby="t d" font-family="Inter, &#x27;Helvetica Neue&#x27;, Helvetica, Arial, sans-serif">
+<title id="t">How PII Guard works</title>
+<desc id="d">Diagram. Your app or agent sends a request to PII Guard, on your side. On the way out PII Guard: 1. Extract text, tool calls, image regions; 2. Detect: rules → NER → optional audit LLM; 3. Apply policies, pseudonymize (keyed); 4. Mask image regions (faces, SAM 3.1, OCR). Only the masked request, with placeholders in place of personal data, crosses to the LLM provider. The response streams back to PII Guard, which does: 5. Restore placeholders, chunk by chunk, and your app gets the answer with the real values back. The placeholder-to-value mapping never leaves PII Guard.</desc>
+<rect x="0" y="0" width="1600" height="900" fill="#FFFFFF"/>
+<text x="64" y="99.2" font-size="44" fill="#16171B" font-weight="700">How it works</text>
+<text x="64" y="140" font-size="24" fill="#55565F">Personal data is swapped for keyed placeholders before a request leaves your side, and put back in the streamed answer</text>
+<text x="64" y="852" font-size="19" fill="#55565F">Speaks the OpenAI Chat Completions and Responses APIs · fails closed on anything it cannot mask · the name is fictional</text>
+<text x="1536" y="852" font-size="19" fill="#16171B" text-anchor="end" font-weight="600">github.com/watt-mind/pii-guard</text>
+<rect x="40" y="190" width="1058" height="616" rx="24" fill="#F4F5F7"/>
+<line x1="1098" y1="180" x2="1098" y2="816" stroke="#8A8B94" stroke-width="2.5" stroke-dasharray="10 8"/>
+<text x="64" y="224" font-size="18" fill="#55565F" font-weight="700">YOUR SIDE · personal data stays here</text>
+<text x="1122" y="224" font-size="18" fill="#55565F" font-weight="700">PROVIDER SIDE</text>
+<text x="1122" y="248" font-size="18" fill="#55565F">sees placeholders only</text>
+<rect x="64" y="270" width="180" height="512" rx="20" fill="#FFFFFF" stroke="#8A8B94" stroke-width="2"/>
+<rect x="434" y="270" width="640" height="512" rx="20" fill="#FFFFFF" stroke="#3D7A0C" stroke-width="3.5"/>
+<rect x="1336" y="270" width="200" height="512" rx="20" fill="#FFFFFF" stroke="#8A8B94" stroke-width="2"/>
+<text x="154" y="520" font-size="28" fill="#16171B" text-anchor="middle" font-weight="700">Your app</text>
+<text x="154" y="556" font-size="28" fill="#16171B" text-anchor="middle" font-weight="700">or agent</text>
+<text x="1436" y="520" font-size="28" fill="#16171B" text-anchor="middle" font-weight="700">LLM</text>
+<text x="1436" y="556" font-size="28" fill="#16171B" text-anchor="middle" font-weight="700">provider</text>
+<text x="464" y="320" font-size="32" fill="#2F6108" font-weight="700">PII Guard</text>
+<text x="620" y="320" font-size="21" fill="#55565F">gateway on your machine</text>
+<text x="464" y="368" font-size="18" fill="#55565F" font-weight="700">ON THE WAY OUT</text>
+<text x="464" y="652" font-size="18" fill="#55565F" font-weight="700">ON THE WAY BACK</text>
+<line x1="464" y1="610" x2="1044" y2="610" stroke="#E3E4E9" stroke-width="2"/>
+<circle cx="481" cy="408" r="17" fill="#3D7A0C"/>
+<text x="481" y="415" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="700">1</text>
+<text x="514" y="416" font-size="23" fill="#16171B">Extract text, tool calls, image regions</text>
+<circle cx="481" cy="460" r="17" fill="#3D7A0C"/>
+<text x="481" y="467" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="700">2</text>
+<text x="514" y="468" font-size="23" fill="#16171B">Detect: rules → NER → optional audit LLM</text>
+<circle cx="481" cy="512" r="17" fill="#3D7A0C"/>
+<text x="481" y="519" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="700">3</text>
+<text x="514" y="520" font-size="23" fill="#16171B">Apply policies, pseudonymize (keyed)</text>
+<circle cx="481" cy="564" r="17" fill="#3D7A0C"/>
+<text x="481" y="571" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="700">4</text>
+<text x="514" y="572" font-size="23" fill="#16171B">Mask image regions (faces, SAM 3.1, OCR)</text>
+<circle cx="481" cy="694" r="17" fill="#3D7A0C"/>
+<text x="481" y="701" font-size="19" fill="#FFFFFF" text-anchor="middle" font-weight="700">5</text>
+<text x="514" y="702" font-size="23" fill="#16171B">Restore placeholders, chunk by chunk</text>
+<text x="514" y="752" font-size="19" fill="#55565F">The placeholder ↔ value mapping stays here, never sent.</text>
+<line x1="244" y1="486" x2="420" y2="486" stroke="#16171B" stroke-width="3"/>
+<polygon points="434,486 420,478 420,494" fill="#16171B"/>
+<rect x="284.8" y="435.4" width="108.5" height="33.2" rx="16.6" fill="#FFFFFF" stroke="#B44400" stroke-width="2.5"/>
+<text x="339" y="458.8" font-size="19" fill="#B44400" text-anchor="middle" font-weight="600">Jane Doe</text>
+<text x="339" y="518" font-size="18" fill="#55565F" text-anchor="middle">request</text>
+<line x1="1074" y1="486" x2="1322" y2="486" stroke="#16171B" stroke-width="3"/>
+<polygon points="1336,486 1322,478 1322,494" fill="#16171B"/>
+<rect x="1111.9" y="435.4" width="210.2" height="33.2" rx="16.6" fill="#FFFFFF" stroke="#2F6108" stroke-width="2.5"/>
+<text x="1217" y="458.8" font-size="19" fill="#2F6108" text-anchor="middle" font-weight="600">[[PERSON_968e29]]</text>
+<text x="1217" y="518" font-size="18" fill="#55565F" text-anchor="middle">masked request</text>
+<line x1="1336" y1="694" x2="1088" y2="694" stroke="#16171B" stroke-width="3"/>
+<polygon points="1074,694 1088,686 1088,702" fill="#16171B"/>
+<rect x="1111.9" y="643.4" width="210.2" height="33.2" rx="16.6" fill="#FFFFFF" stroke="#2F6108" stroke-width="2.5"/>
+<text x="1217" y="666.8" font-size="19" fill="#2F6108" text-anchor="middle" font-weight="600">[[PERSON_968e29]]</text>
+<text x="1217" y="726" font-size="18" fill="#55565F" text-anchor="middle">streamed answer</text>
+<line x1="434" y1="694" x2="258" y2="694" stroke="#16171B" stroke-width="3"/>
+<polygon points="244,694 258,686 258,702" fill="#16171B"/>
+<rect x="284.8" y="643.4" width="108.5" height="33.2" rx="16.6" fill="#FFFFFF" stroke="#B44400" stroke-width="2.5"/>
+<text x="339" y="666.8" font-size="19" fill="#B44400" text-anchor="middle" font-weight="600">Jane Doe</text>
+<text x="339" y="726" font-size="18" fill="#55565F" text-anchor="middle">restored answer</text>
+</svg>

@@ -9,7 +9,12 @@ section of ``docs/benchmarks/config.json``; every number comes from the benchmar
 - :func:`card`: a stat card that reads with no context (the headline number, the comparison
   bars, the one-line claim and the repository URL);
 - :func:`by_set`: leak and over-masking per fixture set as grouped bars;
-- :func:`open_ner`: open NER models dropped into the same rules, head to head.
+- :func:`open_ner`: open NER models dropped into the same rules, head to head;
+- :func:`results_table`: the README's results table as a card, a row per fixture set and a
+  column per system, each cell ``leak · over-masking``, the lowest per metric in bold (LAB-1675);
+- :func:`how_it_works`: the README's request/response diagram (no numbers; LAB-1675).
+
+Most images come in every size of :data:`SIZES`; :data:`IMAGES` names the sizes of the others.
 
 The SVGs are byte-stable functions of the index. The PNGs are rasterized from them with
 resvg (:mod:`pii_guard.eval.report_raster`) using the Inter files in ``docs/benchmarks/fonts``,
@@ -34,9 +39,11 @@ __all__ = [
     "by_set",
     "card",
     "hero",
+    "how_it_works",
     "open_ner",
     "parse_spec",
     "render_all",
+    "results_table",
     "text_width",
 ]
 
@@ -76,6 +83,8 @@ class Theme:
     own_ink: str
     rules: str
     tools: tuple[str, ...]
+    own_tint: str  # the own system's column in the results table
+    real: str  # personal data in the how-it-works diagram (placeholders use ``own``)
 
 
 LIGHT = Theme(
@@ -90,6 +99,8 @@ LIGHT = Theme(
     own_ink="#2F6108",
     rules="#8A8B94",
     tools=("#0072B2", "#C84E00", "#A0558A", "#6A5ACD", "#00796B", "#8D6E00"),
+    own_tint="#EBF4E2",
+    real="#B44400",
 )
 DARK = Theme(
     suffix="-dark",
@@ -103,6 +114,8 @@ DARK = Theme(
     own_ink="#C9F78F",
     rules="#9A9CA6",
     tools=("#56B4E9", "#F0884A", "#E09BC8", "#A99BFF", "#4DB6AC", "#E3C454"),
+    own_tint="#1D2716",
+    real="#F0884A",
 )
 
 # Inter advance widths in thousandths of an em, U+0020..U+007E (docs/benchmarks/fonts).
@@ -314,6 +327,9 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
     for key in [*headline["systems"], *raw.get("set_systems", [])]:
         if key not in names:
             raise RecordError(f"{where}: share 'names' has no display name for {key!r}")
+    table = raw.get("table_names", {})
+    if not isinstance(table, dict) or not all(isinstance(v, str) for v in table.values()):
+        raise RecordError(f"{where}: share 'table_names' must map system keys to names")
     return dict(raw)
 
 
@@ -962,14 +978,353 @@ def open_ner(
     return _svg(w, h, theme, title, desc, body)
 
 
+# --- (e) the README results table ---------------------------------------------------------
+
+
+def _one_decimal(rate: float) -> float:
+    """The rate as the table prints it, so "lowest" means lowest as shown (as in the README)."""
+    return float(f"{rate * 100:.1f}")
+
+
+def _lowest(values: Sequence[float]) -> set[int]:
+    shown = [_one_decimal(v) for v in values]
+    return {i for i, v in enumerate(shown) if v == min(shown)}
+
+
+def _short_pct(rate: float) -> str:
+    return pct(rate).replace(" %", "%")
+
+
+def results_table(
+    index: Mapping[str, Any], spec: Mapping[str, Any], size: tuple[int, int], theme: Theme
+) -> str:
+    """A row per fixture set, a column per system, each cell ``leak · over-masking``.
+
+    The same sets, systems, rounding and bolding as the README's compact table: the own
+    system's column is tinted, and the lowest leak and the lowest over-masking in each row
+    are bold.
+    """
+    w, h = size
+    t = _type(w, h)
+    systems = list(spec["set_systems"])
+    sets = spec["sets"]
+    own = spec["own"]
+    names = {k: str(spec.get("table_names", {}).get(k, _name(spec, k))) for k in systems}
+    data = {
+        (s["fixture_set"], k): (
+            _metric(index, s["fixture_set"], k, "leak"),
+            _metric(index, s["fixture_set"], k, "over_masking"),
+        )
+        for s in sets
+        for k in systems
+    }
+    title = "Leak and over-masking, set by set"
+    subtitle = (
+        "Each cell: leak · over-masking · lower is better · bold: the lowest in its row, per metric"
+    )
+    body, top = _header(w, theme, t, title, subtitle)
+    footer, foot_top = _footer(
+        w,
+        h,
+        theme,
+        t,
+        [
+            "Leak: labeled personal values left readable. Over-masking: masks on text that "
+            "was not personal data. All documents are fictional.",
+            _provenance(index, [(s["fixture_set"], k) for s in sets for k in systems]),
+        ],
+        spec["url"],
+    )
+    body.extend(footer)
+
+    title_s, sub_s = t(25), t(19)
+    subs = {
+        s["fixture_set"]: (
+            f"{set_docs(index, s['fixture_set'])} docs · "
+            f"{set_languages(index, s['fixture_set'], codes=True)}"
+        )
+        for s in sets
+    }
+    label_w = max(
+        max(text_width(str(s["title"]), title_s, weight=700) for s in sets),
+        max(text_width(v, sub_s) for v in subs.values()),
+    ) + t(32)
+    x0, x1 = t.m, w - t.m
+    cw = (x1 - x0 - label_w) / len(systems)
+    y0 = top + t(34)
+    head_h = t(84)
+    y1 = foot_top - t(22)
+    row_h = (y1 - y0 - head_h) / len(sets)
+    cell_s = _fit("88.8% · 88.8%", t(31), cw - t(30), weight=700)
+
+    def cx(j: int) -> float:
+        return x0 + label_w + cw * (j + 0.5)
+
+    # The own column, tinted from the header to the last row.
+    for j, k in enumerate(systems):
+        if k == own:
+            left = x0 + label_w + cw * j
+            body.append(_rect(left, y0, cw, y1 - y0, theme.own_tint, rx=t(16)))
+            body.append(_rect(left, y0, cw, t(6), theme.own, rx=t(3)))
+    # Header: system name, then what the two numbers are.
+    name_s = min(t(25), min(_fit(names[k], t(25), cw - t(20), weight=700) for k in systems))
+    for j, k in enumerate(systems):
+        is_own = k == own
+        body.append(
+            _text(
+                cx(j),
+                y0 + head_h * 0.46,
+                names[k],
+                size=name_s,
+                fill=theme.own_ink if is_own else theme.ink,
+                anchor="middle",
+                weight=700,
+            )
+        )
+        body.append(
+            _text(
+                cx(j),
+                y0 + head_h * 0.46 + t(28),
+                "leak · over-masking",
+                size=t(18),
+                fill=theme.muted,
+                anchor="middle",
+            )
+        )
+    body.append(_line(x0, y0 + head_h, x1, y0 + head_h, theme.axis, 1.5))
+
+    for i, s in enumerate(sets):
+        fs = s["fixture_set"]
+        ry = y0 + head_h + row_h * i
+        if i:
+            body.append(_line(x0, ry, x1, ry, theme.grid, 1.5))
+        mid = ry + row_h / 2
+        body.append(
+            _text(x0 + t(4), mid - t(3), str(s["title"]), size=title_s, fill=theme.ink, weight=700)
+        )
+        body.append(_text(x0 + t(4), mid + sub_s * 1.15, subs[fs], size=sub_s, fill=theme.muted))
+        leaks = [data[(fs, k)][0] for k in systems]
+        overs = [data[(fs, k)][1] for k in systems]
+        best_leak, best_over = _lowest(leaks), _lowest(overs)
+        for j, k in enumerate(systems):
+            strong = theme.own_ink if k == own else theme.ink
+
+            def span(value: float, best: bool, strong: str = strong) -> str:
+                weight = ' font-weight="700"' if best else ""
+                fill = strong if best else theme.muted
+                return f'<tspan fill="{fill}"{weight}>{escape(_short_pct(value))}</tspan>'
+
+            body.append(
+                f'<text x="{_n(cx(j))}" y="{_n(mid + cell_s * 0.36)}" font-size="{_n(cell_s)}" '
+                f'text-anchor="middle">{span(leaks[j], j in best_leak)}'
+                f'<tspan fill="{theme.axis}"> · </tspan>{span(overs[j], j in best_over)}</text>'
+            )
+    desc = (
+        "Table of leak and over-masking per fixture set; lower is better, the lowest per "
+        "metric in each row in bold. "
+        + " ".join(
+            f"{s['title']} ({subs[s['fixture_set']]}): "
+            + "; ".join(
+                f"{names[k]} leak {pct(data[(s['fixture_set'], k)][0])}, over-masking "
+                f"{pct(data[(s['fixture_set'], k)][1])}"
+                for k in systems
+            )
+            + "."
+            for s in sets
+        )
+    )
+    return _svg(w, h, theme, title, desc, body)
+
+
+# --- (f) how it works ---------------------------------------------------------------------
+
+#: The gateway's steps, in the order a request meets them; the last one is on the way back.
+STEPS = (
+    "Extract text, tool calls, image regions",
+    "Detect: rules → NER → optional audit LLM",
+    "Apply policies, pseudonymize (keyed)",
+    "Mask image regions (faces, SAM 3.1, OCR)",
+    "Restore placeholders, chunk by chunk",
+)
+#: What crosses each arrow: a fictional name, and the placeholder that stands for it.
+_REAL, _PLACEHOLDER = "Jane Doe", "[[PERSON_968e29]]"
+
+
+def _arrow(x1: float, x2: float, y: float, color: str, width: float = 3) -> list[str]:
+    """A horizontal arrow from ``x1`` to ``x2`` (either direction), head at ``x2``."""
+    d = 1 if x2 > x1 else -1
+    head = 14
+    return [
+        _line(x1, y, x2 - d * head, y, color, width),
+        f'<polygon points="{_n(x2)},{_n(y)} {_n(x2 - d * head)},{_n(y - 8)} '
+        f'{_n(x2 - d * head)},{_n(y + 8)}" fill="{color}"/>',
+    ]
+
+
+def _chip(x: float, y: float, text: str, color: str, theme: Theme, size: float) -> list[str]:
+    """``text`` in an outlined pill centered on (x, y)."""
+    tw = text_width(text, size, weight=600)
+    pw, ph = tw + 22, size * 1.75
+    return [
+        f'<rect x="{_n(x - pw / 2)}" y="{_n(y - ph / 2)}" width="{_n(pw)}" height="{_n(ph)}" '
+        f'rx="{_n(ph / 2)}" fill="{theme.bg}" stroke="{color}" stroke-width="2.5"/>',
+        _text(x, y + size * 0.36, text, size=size, fill=color, anchor="middle", weight=600),
+    ]
+
+
+def _box(x: float, y: float, w: float, h: float, theme: Theme, stroke: str, sw: float) -> str:
+    return (
+        f'<rect x="{_n(x)}" y="{_n(y)}" width="{_n(w)}" height="{_n(h)}" rx="20" '
+        f'fill="{theme.bg}" stroke="{stroke}" stroke-width="{_n(sw)}"/>'
+    )
+
+
+def how_it_works(
+    index: Mapping[str, Any], spec: Mapping[str, Any], size: tuple[int, int], theme: Theme
+) -> str:
+    """Your app, the gateway's five steps and the LLM provider; only placeholders cross."""
+    del index  # no numbers: the same signature as the other images
+    w, h = size
+    if (w, h) != (1600, 900):
+        raise RecordError("share: how-it-works is drawn at 1600 x 900 only")
+    m = 64
+    body, _ = _header(
+        w,
+        theme,
+        _type(w, h),
+        "How it works",
+        "Personal data is swapped for keyed placeholders before a request leaves your side, "
+        "and put back in the streamed answer",
+    )
+    t = _type(w, h)
+    footer, _ = _footer(
+        w,
+        h,
+        theme,
+        t,
+        [
+            "Speaks the OpenAI Chat Completions and Responses APIs · fails closed on anything "
+            "it cannot mask · the name is fictional"
+        ],
+        spec["url"],
+    )
+    body.extend(footer)
+
+    top, bottom, edge = 190, 806, 1098
+    # Your side: a tinted region; the provider's side is the bare card.
+    body.append(_rect(m - 24, top, edge - (m - 24), bottom - top, theme.panel, rx=24))
+    body.append(
+        f'<line x1="{edge}" y1="{top - 10}" x2="{edge}" y2="{bottom + 10}" stroke="{theme.axis}" '
+        'stroke-width="2.5" stroke-dasharray="10 8"/>'
+    )
+    tag = t(18)
+    body.append(
+        _text(
+            m,
+            top + 34,
+            "YOUR SIDE · personal data stays here",
+            size=tag,
+            fill=theme.muted,
+            weight=700,
+        )
+    )
+    body.append(_text(edge + 24, top + 34, "PROVIDER SIDE", size=tag, fill=theme.muted, weight=700))
+    body.append(_text(edge + 24, top + 58, "sees placeholders only", size=tag, fill=theme.muted))
+
+    by0, by1 = 270, 782
+    app = (m, 180)
+    guard = (434, 640)
+    prov = (1336, w - m - 1336)
+    body.append(_box(app[0], by0, app[1], by1 - by0, theme, theme.axis, 2))
+    body.append(_box(guard[0], by0, guard[1], by1 - by0, theme, theme.own, 3.5))
+    body.append(_box(prov[0], by0, prov[1], by1 - by0, theme, theme.axis, 2))
+    mid = (by0 + by1) / 2
+    for (x, bw), lines in ((app, ("Your app", "or agent")), (prov, ("LLM", "provider"))):
+        for k, line in enumerate(lines):
+            body.append(
+                _text(
+                    x + bw / 2,
+                    mid - 6 + k * 36,
+                    line,
+                    size=28,
+                    fill=theme.ink,
+                    anchor="middle",
+                    weight=700,
+                )
+            )
+
+    gx = guard[0] + 30
+    body.append(_text(gx, by0 + 50, "PII Guard", size=32, fill=theme.own_ink, weight=700))
+    body.append(
+        _text(
+            gx + text_width("PII Guard", 32, weight=700) + 14,
+            by0 + 50,
+            "gateway on your machine",
+            size=21,
+            fill=theme.muted,
+        )
+    )
+    out_y, back_y = by0 + 98, by0 + 382
+    body.append(_text(gx, out_y, "ON THE WAY OUT", size=tag, fill=theme.muted, weight=700))
+    body.append(_text(gx, back_y, "ON THE WAY BACK", size=tag, fill=theme.muted, weight=700))
+    body.append(_line(gx, back_y - 42, guard[0] + guard[1] - 30, back_y - 42, theme.grid, 2))
+    step_ys = [out_y + 48 + 52 * i for i in range(4)] + [back_y + 50]
+    for n, (sy, step) in enumerate(zip(step_ys, STEPS, strict=True), 1):
+        body.append(f'<circle cx="{_n(gx + 17)}" cy="{_n(sy - 8)}" r="17" fill="{theme.own}"/>')
+        body.append(
+            _text(gx + 17, sy - 8 + 7, str(n), size=19, fill=theme.bg, anchor="middle", weight=700)
+        )
+        body.append(_text(gx + 50, sy, step, size=23, fill=theme.ink))
+    body.append(
+        _text(
+            gx + 50,
+            back_y + 100,
+            "The placeholder ↔ value mapping stays here, never sent.",
+            size=19,
+            fill=theme.muted,
+        )
+    )
+
+    # Request lane level with steps 1-4, response lane level with step 5.
+    req_y, res_y = step_ys[1] + 18, step_ys[4] - 8
+    chip_s = 19
+    lanes = (
+        (app[0] + app[1], guard[0], req_y, _REAL, theme.real, "request"),
+        (guard[0] + guard[1], prov[0], req_y, _PLACEHOLDER, theme.own_ink, "masked request"),
+        (prov[0], guard[0] + guard[1], res_y, _PLACEHOLDER, theme.own_ink, "streamed answer"),
+        (guard[0], app[0] + app[1], res_y, _REAL, theme.real, "restored answer"),
+    )
+    for a, b, y, chip, color, label in lanes:
+        body.extend(_arrow(a, b, y, theme.ink))
+        # Right of the boundary, the placeholder chips sit wholly on the provider's side.
+        cxm = (edge + prov[0]) / 2 if min(a, b) >= edge - 30 else (a + b) / 2
+        body.extend(_chip(cxm, y - 34, chip, color, theme, chip_s))
+        body.append(_text(cxm, y + 32, label, size=18, fill=theme.muted, anchor="middle"))
+
+    title = "How PII Guard works"
+    desc = (
+        "Diagram. Your app or agent sends a request to PII Guard, on your side. On the way "
+        "out PII Guard: "
+        + "; ".join(f"{i}. {s}" for i, s in enumerate(STEPS[:4], 1))
+        + ". Only the masked request, with placeholders in place of personal data, crosses to "
+        "the LLM provider. The response streams back to PII Guard, which does: 5. "
+        + STEPS[4]
+        + ", and your app gets the answer with the real values back. The placeholder-to-value "
+        "mapping never leaves PII Guard."
+    )
+    return _svg(w, h, theme, title, desc, body)
+
+
 Render = Callable[[Mapping[str, Any], Mapping[str, Any], tuple[int, int], Theme], str]
 
-#: File stem -> renderer. Each is written for every size in :data:`SIZES` and both themes.
-IMAGES: dict[str, Render] = {
-    "leak-vs-overmasking": hero,
-    "results-card": card,
-    "results-by-set": by_set,
-    "open-ner-models": open_ner,
+#: File stem -> (renderer, size keys of :data:`SIZES`), each size in both themes.
+IMAGES: dict[str, tuple[Render, tuple[str, ...]]] = {
+    "leak-vs-overmasking": (hero, tuple(SIZES)),
+    "results-card": (card, tuple(SIZES)),
+    "results-by-set": (by_set, tuple(SIZES)),
+    "open-ner-models": (open_ner, tuple(SIZES)),
+    "results-table": (results_table, ("", "1200x630")),
+    "how-it-works": (how_it_works, ("",)),
 }
 
 
@@ -981,8 +1336,8 @@ def file_stem(name: str, size_key: str, theme: Theme) -> str:
 def render_all(index: Mapping[str, Any], spec: Mapping[str, Any]) -> dict[str, str]:
     """Every image's SVG by file stem (no extension)."""
     out: dict[str, str] = {}
-    for name, render in IMAGES.items():
-        for size_key, size in SIZES.items():
+    for name, (render, size_keys) in IMAGES.items():
+        for size_key in size_keys:
             for theme in (LIGHT, DARK):
-                out[file_stem(name, size_key, theme)] = render(index, spec, size, theme)
+                out[file_stem(name, size_key, theme)] = render(index, spec, SIZES[size_key], theme)
     return out
