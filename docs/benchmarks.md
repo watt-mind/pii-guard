@@ -337,7 +337,7 @@ generated; documents: de 330 + en 330 + hu 330.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 990 | 99.8% | 56.3% | 72.0% | 38.8% | 10.9% | 0.0% | 100.0% | 0.90 ms | 2026-10-30 | `87ea986` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 96.1% | 97.9% | 97.0% | 0.3% | 0.0% | 1.4% | 100.0% | 17 ms | 2026-10-30 | `87ea986` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 96.3% | 98.0% | 97.1% | 0.2% | 0.0% | 1.3% | 100.0% | 16 ms | 2026-10-30 | `e2f5480` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) † | 660 | 75.1% | 46.1% | 57.1% | 31.3% | 26.6% | 3.2% | 91.5% | 162 ms* | 2026-10-28 | `36a78e3` |
 | pii-guard NER v2.0 alone (no rules) † | 660 | 96.6% | 96.5% | 96.6% | 0.4% | 0.0% | 1.1% | 100.0% | 52 ms* | 2026-10-28 | `36a78e3` |
 | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) † | 660 | 91.5% | 78.1% | 84.3% | 10.0% | 14.4% | 2.5% | 92.7% | 168 ms* | 2026-10-28 | `36a78e3` |
@@ -368,7 +368,7 @@ By language:
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 74.2% | 68.1% | 73.6% | 35.2% | 43.7% | 37.6% |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 97.8% | 95.9% | 97.3% | 0.1% | 0.8% | 0.0% |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 98.0% | 96.0% | 97.4% | 0.1% | 0.7% | 0.0% |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 59.2% | 55.1% | — | 31.5% | 31.1% | — |
 | pii-guard NER v2.0 alone (no rules) | 96.5% | 96.7% | — | 0.1% | 0.7% | — |
 | rules + tabularisai/eu-pii-safeguard in place of pii-guard NER (comparison, LAB-1386) | 85.4% | 83.1% | — | 8.3% | 11.7% | — |
@@ -426,7 +426,7 @@ generated; documents: de 100 + en 100 + hu 100.
 | System | Docs | Precision | Recall | F1 | Leak | Partial leak | Over-masking | Round trip | Detect p50 | Run | Commit |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
 | **pii-guard rules** | 300 | 99.9% | 57.3% | 72.8% | 37.8% | 11.2% | 0.0% | 100.0% | 0.90 ms | 2026-10-30 | `87ea986` |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 96.4% | 98.5% | 97.4% | 0.1% | 0.0% | 1.7% | 100.0% | 17 ms | 2026-10-30 | `87ea986` |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 96.4% | 98.5% | 97.4% | 0.1% | 0.0% | 1.6% | 100.0% | 16 ms | 2026-10-30 | `e2f5480` |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) † | 200 | 92.3% | 91.7% | 92.0% | 5.9% | 4.3% | 2.8% | 99.0% | 94 ms* | 2026-10-28 | `97ee284` |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) † | 200 | 77.8% | 47.3% | 58.9% | 31.8% | 26.6% | 2.7% | 90.0% | 157 ms* | 2026-10-28 | `36a78e3` |
 | Horizon-Labs/pii-redactor-base alone (comparison) † | 200 | 94.5% | 78.8% | 85.9% | 16.8% | 19.1% | 2.5% | 98.5% | 86 ms* | 2026-10-28 | `97ee284` |
@@ -474,7 +474,7 @@ By language:
 | System | de F1 | en F1 | hu F1 | de leak | en leak | hu leak |
 |---|---:|---:|---:|---:|---:|---:|
 | **pii-guard rules** | 74.4% | 69.6% | 74.2% | 35.3% | 41.6% | 36.7% |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 97.4% | 97.5% | 97.4% | 0.0% | 0.4% | 0.0% |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 97.4% | 97.1% | 97.7% | 0.0% | 0.4% | 0.0% |
 | bardsai/eu-pii-anonimization-multilang-v3 alone (comparison) | 93.0% | 91.0% | — | 5.5% | 6.4% | — |
 | tabularisai/eu-pii-safeguard alone (comparison, LAB-1386) | 59.5% | 58.2% | — | 33.6% | 29.9% | — |
 | Horizon-Labs/pii-redactor-base alone (comparison) | 86.5% | 85.4% | — | 14.7% | 18.9% | — |
@@ -1947,7 +1947,7 @@ Every registered dataset ([datasets.md](datasets.md): licences, splits, label ma
 | System | Docs | Leak | Precision | Recall | F1 | Over-masking | p50 ms | p95 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | pii-guard rules | 990 | 38.8 (38.0-39.7) | 99.8 (99.6-99.9) | 56.3 (55.4-57.2) | 72.0 (71.2-72.7) | 0.0 (0.0-0.0) | 0.9 | 1.8 |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 0.3 (0.1-0.5) | 96.1 (95.6-96.7) | 97.9 (97.5-98.3) | 97.0 (96.6-97.4) | 1.4 (1.1-1.7) | 16.7 | 30.4 |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 990 | 0.3 (0.1-0.5) | 96.3 (95.8-96.8) | 98.0 (97.6-98.4) | 97.1 (96.7-97.6) | 1.3 (1.1-1.6) | 16.1 | 29.5 |
 | pii-guard audit (rules + NER v2 + LLM) | 30 | 0.0 (0.0-0.0) | 82.0 (77.0-86.8) | 100.0 (100.0-100.0) | 90.1 (87.0-92.9) | 11.2 (7.5-14.9) | 1,938 | 2,603 |
 | Presidio | 990 | 12.4 (11.4-13.4) | 52.1 (50.8-53.4) | 71.8 (70.4-73.1) | 60.4 (59.2-61.5) | 36.8 (35.4-38.3) | 15.4 | 203 |
 | LLM Guard | 990 | 20.2 (18.8-21.6) | 74.7 (73.1-76.3) | 67.6 (66.2-69.0) | 71.0 (69.9-72.1) | 16.9 (15.3-18.6) | 58.9 | 98.3 |
@@ -1958,7 +1958,7 @@ Leak by construction (values in brackets): identifiers whose checksum passes, th
 | System | Valid checksum | Invalid checksum | Perturbed |
 |---|---:|---:|---:|
 | pii-guard rules | 0.5 (781) | 77.5 (129) | 45.9 (859) |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 0.1 (781) | 0.8 (129) | 0.5 (859) |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 0.1 (781) | 0.0 (129) | 0.3 (859) |
 | pii-guard audit (rules + NER v2 + LLM) | 0.0 (27) | 0.0 (1) | 0.0 (23) |
 | Presidio | 15.2 (781) | 37.2 (129) | 31.5 (859) |
 | LLM Guard | 27.3 (781) | 41.1 (129) | 26.7 (859) |
@@ -1969,7 +1969,7 @@ Leak by construction (values in brackets): identifiers whose checksum passes, th
 | System | Docs | Leak | Precision | Recall | F1 | Over-masking | p50 ms | p95 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | pii-guard rules | 300 | 37.8 (36.4-39.3) | 99.9 (99.7-100.0) | 57.3 (55.5-59.0) | 72.8 (71.4-74.2) | 0.0 (0.0-0.0) | 0.9 | 1.9 |
-| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 0.1 (0.0-0.3) | 96.3 (95.5-97.2) | 98.5 (97.9-99.1) | 97.4 (96.8-98.1) | 1.7 (1.1-2.2) | 16.6 | 30.6 |
+| pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | 300 | 0.1 (0.0-0.3) | 96.4 (95.6-97.3) | 98.5 (97.8-99.1) | 97.4 (96.7-98.1) | 1.5 (1.0-2.1) | 16.1 | 30.1 |
 
 Leak by construction (values in brackets): identifiers whose checksum passes, those altered to fail it, and values with an adversarial perturbation.
 
@@ -2090,8 +2090,8 @@ Newest first. `imported` runs were converted from earlier scorecards and Linear/
 
 | Date | Run | System | Set | Lang | Source | Commit | Hardware | Cost |
 |---|---|---|---|---|---|---|---|---|
-| 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `87ea986` | — | — |
-| 2026-10-30 | `2026-10-30-datasets-agent-traffic-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic | de, en, hu | recorded | `87ea986` | — | — |
+| 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic-dev | de, en, hu | recorded | `e2f5480` | — | — |
+| 2026-10-30 | `2026-10-30-datasets-agent-traffic-fast` | pii-guard fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) | agent-traffic | de, en, hu | recorded | `e2f5480` | — | — |
 | 2026-10-30 | `2026-10-30-datasets-agent-traffic-dev-rules` | pii-guard rules | agent-traffic-dev | de, en, hu | recorded | `87ea986` | — | — |
 | 2026-10-30 | `2026-10-30-datasets-agent-traffic-rules` | pii-guard rules | agent-traffic | de, en, hu | recorded | `87ea986` | — | — |
 | 2026-10-30 | `2026-10-30-lab-1589-pl-smoke-fast-wismut-nym` | rules + Wismut/nym-pii-multilingual in place of pii-guard NER (comparison) | smoke | pl | recorded | `252b680` | — | — |
