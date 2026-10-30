@@ -33,6 +33,7 @@ import logging
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from itertools import combinations
 from typing import Any
 
 from pii_guard.policy import Policy
@@ -41,7 +42,7 @@ from pii_guard.vault import PLACEHOLDER_RE, VaultSession, normalize_value
 from pii_guard.visual.fuzzy import CONFUSION_GROUPS, Candidate, Match, match_value, name_tokens
 from pii_guard.visual.mrz import MrzData, check_digit, parse_mrz
 from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
-from pii_guard.visual.regions import Box, Region
+from pii_guard.visual.regions import Box, Region, same_value
 from pii_guard.visual.summary import (
     ID_DOCUMENTS,
     ExpiryPolicy,
@@ -124,6 +125,8 @@ class VaultMatcher:
         self.language = language
         self._candidates: list[Candidate] = []
         self._known: dict[str, tuple[str, EntityType]] = {}
+        #: Placeholders the session held before this request: the conversation's values.
+        self.prior: frozenset[str] = frozenset(p for p, _t, _c in session.entities())
         for placeholder, entity_type, _count in session.entities():
             value = session.unmask(placeholder)
             if value != placeholder:
@@ -357,14 +360,147 @@ def _overlap(a: Box, b: Box) -> int:
 
 
 def _best_finding(region: Region, labelled: Sequence[tuple[TextFinding, RegionLabel]]) -> int:
-    best, best_area = -1, 0
+    """The finding behind ``region``: its own if it is one, else the same-type finding that
+    overlaps it most, ties going to the tightest box. A value inside a wide read of the row
+    keeps its own finding's label, not the wide read's (LAB-1672)."""
+    best, best_key = -1, (0, 0)
     for index, (finding, _label) in enumerate(labelled):
         if finding.region.entity_type is not region.entity_type:
             continue
+        if finding.region is region:
+            return index
         area = _overlap(finding.region.box, region.box)
-        if area > best_area:
-            best, best_area = index, area
+        key = (area, -finding.region.box.width * finding.region.box.height)
+        if area > 0 and key > best_key:
+            best, best_key = index, key
     return best
+
+
+def _same_text(a: str, b: str) -> bool:
+    """Whether the shorter read's tokens (folded, letters and digits) are a contiguous run of
+    the longer read's: ``ZX123456`` and ``ZX123456 UTO`` are one value, ``ZX123456`` and
+    ``ZX123457 UTO`` are not."""
+    ta, tb = _alnum_tokens(a), _alnum_tokens(b)
+    short, long = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+    if not short:
+        return False
+    n = len(short)
+    return any(long[k : k + n] == short for k in range(len(long) - n + 1))
+
+
+def _unify(
+    covered: Sequence[tuple[Region, Policy]],
+    labels: list[RegionLabel],
+    reads: dict[int, tuple[str, str]],
+    prior: frozenset[str],
+    preferred: frozenset[str] = frozenset(),
+) -> tuple[list[RegionLabel], dict[str, str]]:
+    """One label for masked text regions of one type that read the same value (LAB-1672).
+
+    Two detectors often read one printed value: the caption read is tight
+    (``[319,264,429,294]``), an NER read runs along the row (``[321,266,695,292]``), and each
+    got its own placeholder. Printed as two labels in overlapping covers, neither is
+    readable, and the transcript names the value twice.
+
+    ``reads`` maps a region's index to its finding's ``(origin, text)``. Regions join a group
+    only when every pair in it is :func:`~pii_guard.visual.regions.same_value` and
+    :func:`_same_text` (one read is a contiguous run of the other). Never unified:
+
+    - a region whose overlapping same-type neighbours are not the same value as each other
+      (a wide NER box over two distinct numbers keeps its own label, so neither number's
+      placeholder is handed to the other);
+    - a group that overlaps another same-type masked region outside it;
+    - a read whose own vault match was ``uncertain`` (the matcher's gate stands), and a
+      region with no finding or no placeholder.
+
+    The group's label: the holder's placeholder (``preferred``), else one the session held
+    before this request (the conversation's value), else a reused match
+    (``exact``/``fuzzy``), else the caption read's, else the tightest box's. Only labels
+    change: every region is still covered with its own box. Returns the labels and each
+    losing placeholder's winner, so the summary and other labels can follow.
+    """
+    candidates = [
+        i
+        for i, (region, policy) in enumerate(covered)
+        if policy is Policy.MASK and not region.entity_type.is_visual
+    ]
+
+    def near(i: int, j: int) -> bool:
+        a, b = covered[i][0], covered[j][0]
+        return a.entity_type is b.entity_type and same_value(a.box, b.box)
+
+    neighbours = {i: [j for j in candidates if j != i and near(i, j)] for i in candidates}
+    ambiguous = {
+        i
+        for i, around in neighbours.items()
+        if any(not near(a, b) for a, b in combinations(around, 2))
+    }
+    joinable = [
+        i
+        for i in candidates
+        if i not in ambiguous
+        and i in reads
+        and labels[i].placeholder is not None
+        and labels[i].match != "uncertain"
+    ]
+
+    def same(i: int, j: int) -> bool:
+        return near(i, j) and _same_text(reads[i][1], reads[j][1])
+
+    root = {i: i for i in joinable}
+
+    def find(i: int) -> int:
+        while root[i] != i:
+            root[i] = root[root[i]]
+            i = root[i]
+        return i
+
+    for i, j in combinations(joinable, 2):
+        if same(i, j):
+            root[find(i)] = find(j)
+    groups: dict[int, list[int]] = {}
+    for i in joinable:
+        groups.setdefault(find(i), []).append(i)
+
+    def rank(i: int) -> tuple[bool, bool, bool, bool, int]:
+        label, box = labels[i], covered[i][0].box
+        return (
+            label.placeholder in preferred,
+            label.placeholder in prior,
+            label.match in ("exact", "fuzzy"),
+            reads[i][0] == "caption",
+            -box.width * box.height,
+        )
+
+    out = list(labels)
+    winners: dict[str, str] = {}
+    for group in groups.values():
+        members = set(group)
+        if len({labels[i].placeholder for i in group}) < 2:
+            continue
+        if not all(same(i, j) for i, j in combinations(group, 2)):
+            continue
+        if any(j not in members for i in group for j in neighbours[i]):
+            continue
+        best = labels[max(group, key=rank)]
+        for i in group:
+            loser = labels[i].placeholder
+            if loser is not None and loser != best.placeholder and best.placeholder:
+                winners[loser] = best.placeholder
+            out[i] = best
+    if winners:
+        out = [_remap(label, winners) for label in out]
+    return out, winners
+
+
+def _remap(label: RegionLabel, winners: dict[str, str]) -> RegionLabel:
+    """``label`` naming the winner of a unified placeholder (``MRZ · …`` included)."""
+    old = label.placeholder
+    if old is None or old not in winners:
+        return label
+    new = winners[old]
+    text = label.label.replace(old, new) if label.label else label.label
+    return RegionLabel(text, new, label.match, label.confidence)
 
 
 def _kind_label(entity_type: EntityType, holder: _Holder | None) -> RegionLabel:
@@ -406,11 +542,14 @@ def _transcript(
     for word in words:
         area = word.box.width * word.box.height
         best: RegionLabel | None = None
-        best_area = 0
+        best_area, best_size = 0, 0
         for box, label in covered:
             inter = _overlap(word.box, box)
-            if inter > best_area:
-                best, best_area = label, inter
+            size = box.width * box.height
+            # Ties go to the tightest cover: a word inside a wide read of the row and inside
+            # its own value's box is that value (LAB-1672).
+            if inter > best_area or (inter and inter == best_area and size < best_size):
+                best, best_area, best_size = label, inter, size
         replaced = best is not None and best_area >= WORD_COVER * area
         token = word.text
         if replaced and best is not None:
@@ -584,8 +723,8 @@ def label_image(
         summary_fields.append(SummaryField("document_number", mrz_document, "new"))
 
     region_labels: list[RegionLabel] = []
-    covered_boxes: list[tuple[Box, RegionLabel]] = []
-    for region, policy in covered:
+    reads: dict[int, tuple[str, str]] = {}
+    for position, (region, policy) in enumerate(covered):
         if policy is not Policy.MASK:
             region_labels.append(RegionLabel(None, None))
             continue
@@ -596,8 +735,28 @@ def label_image(
             label = (
                 labelled[index][1] if index >= 0 else RegionLabel(region.entity_type.value, None)
             )
+            if index >= 0:
+                finding = labelled[index][0]
+                reads[position] = (finding.origin, finding.text)
         region_labels.append(label)
-        covered_boxes.append((region.box, label))
+    region_labels, winners = _unify(
+        covered,
+        region_labels,
+        reads,
+        getattr(matcher, "prior", frozenset()),
+        frozenset({holder.label.placeholder})
+        if holder and holder.label.placeholder
+        else frozenset(),
+    )
+    summary_fields = [
+        SummaryField(f.name, winners.get(f.placeholder, f.placeholder), f.status)
+        for f in summary_fields
+    ]
+    covered_boxes = [
+        (region.box, label)
+        for (region, policy), label in zip(covered, region_labels, strict=True)
+        if policy is Policy.MASK
+    ]
 
     transcript = _transcript(words, covered_boxes, _expiry_redactions(ocr, expiry))
     transcript = matcher.sweep(transcript, masked_types)

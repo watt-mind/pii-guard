@@ -14,7 +14,16 @@ from dataclasses import dataclass
 
 from pii_guard.types import EntityType
 
-__all__ = ["Box", "Region", "SamMask", "intersection", "iou", "iou_xyxy"]
+__all__ = [
+    "SAME_VALUE_OVERLAP",
+    "Box",
+    "Region",
+    "SamMask",
+    "intersection",
+    "iou",
+    "iou_xyxy",
+    "same_value",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +148,25 @@ def intersection(a: Box, b: Box) -> int:
     ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
     iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
     return ix * iy if ix > 0 and iy > 0 else 0
+
+
+#: Share of the smaller box (in area and in height) that must lie inside the other for two
+#: boxes to read as the same value on one row (:func:`same_value`, LAB-1672).
+SAME_VALUE_OVERLAP = 0.5
+
+
+def same_value(a: Box, b: Box, threshold: float = SAME_VALUE_OVERLAP) -> bool:
+    """Whether ``a`` and ``b`` cover the same printed value: at least ``threshold`` of the
+    smaller box lies inside the other, and they share at least ``threshold`` of the smaller
+    height (one row). A caption read (``[319,264,429,294]``) and a broad NER read along the
+    row (``[321,266,695,292]``) qualify; two adjacent values that touch or overlap by a few
+    pixels do not. A box inside another always qualifies."""
+    inter = intersection(a, b)
+    if not inter:
+        return False
+    rows = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
+    smaller = min(a.width * a.height, b.width * b.height)
+    return inter >= threshold * smaller and rows >= threshold * min(a.height, b.height)
 
 
 def iou(a: Box, b: Box) -> float:
