@@ -1,0 +1,126 @@
+{
+  "grid": [
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9
+  ],
+  "dev_files": [
+    "eval/generated/distill-s11/labelled/hu-distill-dev.jsonl",
+    "eval/generated/distill-s11/labelled/en-distill-dev.jsonl",
+    "eval/generated/openpii-train/hu-openpii-dev.jsonl",
+    "eval/generated/openpii-train/en-openpii-dev.jsonl",
+    "eval/generated/openpii-train/de-openpii-dev.jsonl",
+    "eval/generated/v42-mix/targeted/dates-de-dev.jsonl",
+    "eval/generated/v42-mix/targeted/dates-en-dev.jsonl",
+    "eval/generated/v42-mix/targeted/dates-hu-dev.jsonl",
+    "eval/generated/v42-mix/targeted/de-genitive-de-dev.jsonl",
+    "eval/generated/v42-mix/targeted/hu-surname-given-hu-dev.jsonl",
+    "eval/generated/v42-mix/targeted/numbers-de-dev.jsonl",
+    "eval/generated/v42-mix/targeted/numbers-en-dev.jsonl",
+    "eval/generated/v42-mix/targeted/numbers-hu-dev.jsonl"
+  ],
+  "dev_documents": 1631,
+  "leaked_by_threshold": {
+    "0.5": {
+      "hu/ADDRESS": 3,
+      "hu/ORGANIZATION": 181,
+      "hu/PERSON": 2,
+      "en/BANK_ACCOUNT": 1,
+      "en/ID_DOCUMENT": 1,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 7,
+      "de/ADDRESS": 6,
+      "de/ID_DOCUMENT": 2,
+      "de/PERSON": 1
+    },
+    "0.6": {
+      "hu/ADDRESS": 2,
+      "hu/ORGANIZATION": 181,
+      "hu/PERSON": 2,
+      "en/BANK_ACCOUNT": 1,
+      "en/ID_DOCUMENT": 1,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 8,
+      "de/ADDRESS": 5,
+      "de/ID_DOCUMENT": 2,
+      "de/PERSON": 1
+    },
+    "0.7": {
+      "hu/ADDRESS": 4,
+      "hu/ORGANIZATION": 181,
+      "hu/PERSON": 2,
+      "en/BANK_ACCOUNT": 2,
+      "en/ID_DOCUMENT": 1,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 12,
+      "de/ADDRESS": 6,
+      "de/ID_DOCUMENT": 2,
+      "de/PERSON": 1
+    },
+    "0.8": {
+      "hu/ADDRESS": 2,
+      "hu/ORGANIZATION": 181,
+      "hu/PERSON": 3,
+      "en/BANK_ACCOUNT": 2,
+      "en/ID_DOCUMENT": 1,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 12,
+      "de/ADDRESS": 6,
+      "de/ID_DOCUMENT": 2,
+      "de/PERSON": 1
+    },
+    "0.9": {
+      "hu/ADDRESS": 3,
+      "hu/ORGANIZATION": 181,
+      "hu/PERSON": 4,
+      "en/BANK_ACCOUNT": 2,
+      "en/ID_DOCUMENT": 1,
+      "en/ORGANIZATION": 135,
+      "en/PERSON": 14,
+      "de/ADDRESS": 7,
+      "de/ID_DOCUMENT": 2,
+      "de/PERSON": 1
+    }
+  },
+  "thresholds": {
+    "hu": {
+      "ADDRESS": 0.9,
+      "BANK_ACCOUNT": 0.9,
+      "DATE_OF_BIRTH": 0.9,
+      "EMAIL": 0.9,
+      "ID_DOCUMENT": 0.9,
+      "NATIONAL_ID_HU_TAJ": 0.9,
+      "NATIONAL_ID_HU_TAX": 0.9,
+      "ORGANIZATION": 0.9,
+      "PERSON": 0.7,
+      "PHONE": 0.9
+    },
+    "en": {
+      "ADDRESS": 0.9,
+      "BANK_ACCOUNT": 0.6,
+      "DATE_OF_BIRTH": 0.9,
+      "EMAIL": 0.9,
+      "ID_DOCUMENT": 0.9,
+      "NATIONAL_ID_HU_TAJ": 0.9,
+      "NATIONAL_ID_HU_TAX": 0.9,
+      "ORGANIZATION": 0.9,
+      "PHONE": 0.9
+    },
+    "de": {
+      "ADDRESS": 0.8,
+      "BANK_ACCOUNT": 0.9,
+      "DATE_OF_BIRTH": 0.9,
+      "EMAIL": 0.9,
+      "ID_DOCUMENT": 0.9,
+      "NATIONAL_ID_HU_TAJ": 0.9,
+      "NATIONAL_ID_HU_TAX": 0.9,
+      "ORGANIZATION": 0.9,
+      "PERSON": 0.9,
+      "PHONE": 0.9
+    }
+  },
+  "model": "v42-b3",
+  "note": "LAB-1625 post-hoc: dev files only (no hu-poa-dev: regenerated copy differs from LAB-1547's hash; no selection split, no gate set)"
+}

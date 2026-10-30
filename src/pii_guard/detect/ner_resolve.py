@@ -6,8 +6,10 @@ Resolution order (LAB-1192, ``docs/models.md``), first match wins:
    ``PII_GUARD_NER_REVISION``). A configured model that can't load stops startup (ADR 0006).
 2. **Published**: the published pii-guard checkpoint, ``PII_GUARD_NER_PUBLISHED_MODEL``
    (``repo`` or ``repo@revision``, default :data:`PUBLISHED_REPO`). It is used only once it is
-   pinned: a ``@revision`` in the setting, or :data:`PUBLISHED`'s revision (release ``v2.0``,
-   pinned with the weights' SHA-256 by LAB-1306).
+   pinned: a ``@revision`` in the setting, or :data:`PUBLISHED`'s revision (release ``v4.2``,
+   pinned with the weights' SHA-256 by LAB-1625; ``v2.0`` before it, LAB-1306). Naming
+   :data:`PREVIOUS_PUBLISHED`'s revision (``<repo>@95f612a9...``) rolls back to v2.0 with its
+   weights still checked.
 3. **Public fallback**: :data:`PUBLIC_FALLBACK`, a public multilingual PII token classifier
    (Apache-2.0), pinned to a hub revision. A stop-gap until the published checkpoint exists:
    it leaks little but over-masks (about 23 % on en-smoke). ``PII_GUARD_NER_FALLBACK`` decides
@@ -44,10 +46,13 @@ from pii_guard.types import DetectionError
 
 __all__ = [
     "FALLBACK_ENV_VAR",
+    "PREVIOUS_PUBLISHED",
     "PREVIOUS_PUBLISHED_REPOS",
+    "PREVIOUS_RELEASE",
     "PUBLIC_FALLBACK",
     "PUBLISHED",
     "PUBLISHED_ENV_VAR",
+    "PUBLISHED_RELEASE",
     "PUBLISHED_REPO",
     "NerChoice",
     "PinnedModel",
@@ -155,12 +160,29 @@ PUBLISHED_REPO = "watt-mind/pii-guard-ner-xlmr-base"
 PREVIOUS_PUBLISHED_REPOS = tuple(
     f"{owner}/{PUBLISHED_REPO.partition('/')[2]}" for owner in ("hdkiller",)
 )
+#: The release tag of :data:`PUBLISHED`, for labels and run records (LAB-1625).
+PUBLISHED_RELEASE = "v4.2"
 #: The published checkpoint. LAB-1306 sets ``revision``, ``weights_sha256``, ``licence`` and
 #: ``size_mb`` when it publishes; with an empty revision the step is skipped (nothing to pin).
 PUBLISHED = PinnedModel(
     repo_id=PUBLISHED_REPO,
-    # Release tag v2.0 (LAB-1306): the LAB-1150 checkpoint xlmr-base-v2-hn, kept over a v2.1
-    # retrain on agent-traffic-dev leak (eval/results/2026-10-27-ner-v21/README.md).
+    # Release tag v4.2 (LAB-1625): candidate B3, fine-tuned from v2.0 on 24 EU languages; it
+    # passed every LAB-1535 gate against v2.0 (eval/results/2026-10-30-lab-1625-ner-v42).
+    # Rollback: PREVIOUS_PUBLISHED (v2.0, 95f612a9).
+    revision="33ef18fed56abd06e8caeb4ad0268633d5346ed5",
+    licence=(
+        "Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA; "
+        "kiji Apache-2.0, nym MIT, E3 MIT, pii-anon CC0-1.0; see the model's NOTICE)"
+    ),
+    size_mb=1110,
+    weights_sha256="40e8406cc7d5be7d809d43948a46b5b5059734f044ba87f5a5a8009f041ef05d",
+    previous_repo_ids=PREVIOUS_PUBLISHED_REPOS,
+)
+#: The release before :data:`PUBLISHED` (tag ``v2.0``, LAB-1306: the LAB-1150 checkpoint
+#: xlmr-base-v2-hn), kept pinned with its weights' SHA-256 for rollback and for re-scoring.
+PREVIOUS_RELEASE = "v2.0"
+PREVIOUS_PUBLISHED = PinnedModel(
+    repo_id=PUBLISHED_REPO,
     revision="95f612a9ad65cc5ade5b9248bd152020541e7097",
     licence="Apache-2.0 (trained on Ai4Privacy OpenPII-1M, CC-BY-4.0: Ai4Privacy / Ai Suisse SA)",
     size_mb=1110,
@@ -213,6 +235,8 @@ def _published(value: str) -> PinnedModel | None:
         return None  # not published yet (LAB-1306): never load an unpinned checkpoint
     if repo == PUBLISHED.repo_id and revision == PUBLISHED.revision:
         return PUBLISHED
+    if repo == PREVIOUS_PUBLISHED.repo_id and revision == PREVIOUS_PUBLISHED.revision:
+        return PREVIOUS_PUBLISHED  # a rollback keeps the weights check
     return PinnedModel(repo_id=repo, revision=revision, licence="see its model card", size_mb=0)
 
 
