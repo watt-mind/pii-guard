@@ -32,6 +32,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from contextlib import suppress
 from typing import Any, cast
 
 import httpx
@@ -216,7 +217,7 @@ class ResponsesGateway:
         language = gw._language(headers)
         trace.mode, trace.language = mode.value, language
         echo = gw._echo(headers)
-        stats = _Stats(mode=mode)
+        stats = _Stats(mode=mode, mode_alias=gw._mode_alias(headers))
         trace.stats = stats
         collected = collect_response_texts(body)
         body = cast(dict[str, Any], body)
@@ -275,19 +276,14 @@ class ResponsesGateway:
             _count_masked(stats, before, session)
             with timer.span("mask"):
                 gw._recheck(body, collect_response_texts, session, language, stats, names, issued)
+            forwarding = time.perf_counter()
+            payload = gw._forwarded(body, session, stats, add_responses_note)
+            check_upstream_payload(payload, stats.image_payload_bytes)
         except BaseException:
             stats.log("blocked")
             gw._release_session(session, created, masked=False)
             raise
         gw._release_session(session, created, masked=True)
-
-        forwarding = time.perf_counter()
-        payload = gw._forwarded(body, session, stats, add_responses_note)
-        try:
-            check_upstream_payload(payload, stats.image_payload_bytes)
-        except PayloadTooLargeError:
-            stats.log("blocked")
-            raise
         if trace.payloads:
             trace.masked_request = payload
         masked_input = _masked_input(body) if echo else None
@@ -326,6 +322,7 @@ class ResponsesGateway:
             finally:
                 await response.aclose()
             stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
             if response.status_code in (404, 405):
                 stats.log("responses_unsupported")
                 raise ResponsesUnsupportedError(
@@ -336,7 +333,17 @@ class ResponsesGateway:
             return _upstream_error(response.status_code, raw, out_headers), stats
 
         is_sse = response.headers.get("content-type", "").startswith("text/event-stream")
-        if not stream or not is_sse:
+        if stream and not is_sse:
+            with suppress(httpx.HTTPError):
+                await response.aclose()
+            stats.upstream_ms = (time.perf_counter() - started) * 1000
+            timer.add("upstream", stats.upstream_ms / 1000 - timer.stages["upstream"])
+            stats.log("upstream_did_not_stream")
+            raise UpstreamError(
+                "upstream did not return an event stream; retry without stream",
+                code="upstream_did_not_stream",
+            ) from None
+        if not stream:
             return await self._whole(
                 response,
                 started,
@@ -484,13 +491,14 @@ class ResponsesGateway:
                 stats.upstream_ms = timer.stages["upstream"] * 1000
                 stats.unresolved = len(restorer.unresolved)
                 if outcome == "ok":
-                    restored = {}
-                    for index, masked in restorer.masked_content().items():
-                        text, spans, _ = restore_text(session, masked)
-                        restored[index] = (text, spans)
-                    self.gateway._seed_cache(session, language, detector, restored, stats)
-                    if trace.full:
-                        trace.stream_restored = {i: t for i, (t, _) in restored.items()}
+                    with suppress(PiiGuardError):
+                        restored = {}
+                        for index, masked in restorer.masked_content().items():
+                            text, spans, _ = restore_text(session, masked)
+                            restored[index] = (text, spans)
+                        self.gateway._seed_cache(session, language, detector, restored, stats)
+                        if trace.full:
+                            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
                 stats.log(outcome)
                 if trace.payloads:
                     trace.stream_masked = restorer.masked_content()
@@ -502,6 +510,7 @@ class ResponsesGateway:
                 else:
                     trace.finish(outcome="stream_error", error={"code": "stream_failed"})
 
+        out_headers["Cache-Control"] = "no-cache"
         return (
             StreamingResponse(events(), media_type="text/event-stream", headers=out_headers),
             stats,

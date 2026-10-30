@@ -273,3 +273,24 @@ def test_form_catalog_names_a_refused_key_without_provider_detail(gateway, statu
         resource["base_path"] + "/models", headers={"Authorization": "Bearer " + key}
     )
     assert listing.status_code == 502 and listing.json()["error"]["code"] == code
+
+
+def test_project_gateway_preserves_issued_session_Across_requests(gateway):
+    client, _, endpoint, sent, _ = gateway
+    resource, key = endpoint(model="synthetic-pinned")
+    first = _chat(client, resource, key)
+    assert first.status_code == 200
+    session_id = first.headers["X-PII-Guard-Session"]
+    second = client.post(
+        resource["base_path"] + "/chat/completions",
+        headers={
+            "Authorization": "Bearer " + key,
+            "X-PII-Guard-Session": session_id,
+        },
+        json={"messages": [{"role": "user", "content": EMAIL}]},
+    )
+    assert second.status_code == 200
+    assert second.headers["X-PII-Guard-Session"] == session_id
+    first_content = json.loads(sent[-2].content)["messages"][-1]["content"]
+    second_content = json.loads(sent[-1].content)["messages"][-1]["content"]
+    assert first_content == second_content
