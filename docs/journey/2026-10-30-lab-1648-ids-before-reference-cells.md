@@ -39,7 +39,7 @@ and [`-dev-fast`](../../eval/results/runs/2026-10-30-datasets-agent-traffic-dev-
 The LAB-1258 names (`Teszt Elek`, `Max Mustermann` in `customers.csv`) are still found
 whole: agent-text doesn't move.
 
-**Not fixed: en-0091, 13 vs 12 on 10-28.** `"ids": {"national": "109435909"}` was masked on
+**Not fixed: en-0091, 13 vs 12 on 10-28.** `"ids": {"national": "<nine digits>"}` was masked on
 10-28 only because the Hungarian bare-TAJ rule fired in English text and the number happened to
 pass its mod-10 check (one nine-digit number in ten does). LAB-1433 limited that rule to
 Hungarian on purpose, for precision. The NER doesn't propose the value, and no English cue
