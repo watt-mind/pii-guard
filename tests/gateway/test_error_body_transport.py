@@ -70,7 +70,9 @@ def test_error_body_transport_failure_is_sanitized_and_recorded(
     assert broken.closed
     (event,) = traffic
     assert event["outcome"] == "refused"
-    assert event["error"] == {"code": "upstream_unavailable", "status": 502}
+    error = dict(event["error"])
+    assert error.pop("message")  # the API error message, types and counts only (LAB-1314)
+    assert error == {"code": "upstream_unavailable", "status": 502}
     front_end = "chat.completions" if path.endswith("completions") else "responses"
     assert any(
         record.getMessage().startswith(f"{front_end} upstream_unreachable ")

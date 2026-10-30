@@ -131,6 +131,7 @@ UNSUPPLIED_CHECK_TYPES: frozenset[EntityType] = frozenset(
         EntityType.EMAIL,
         EntityType.PHONE,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.NATIONAL_ID_HU_TAX,
         EntityType.NATIONAL_ID_HU_TAJ,
         EntityType.COMPANY_ID_HU,

@@ -66,7 +66,7 @@ const LANGUAGES = [{ value: "en", label: "English" }, { value: "hu", label: "Hun
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
 const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
 
-const link = "underline underline-offset-4 hover:text-ink";
+const link = "inline-flex min-h-6 items-center underline underline-offset-4 hover:text-ink";
 
 /** Anonymous visitors get the public page; a signed-in owner gets the console (`console`). */
 export function HostedApp({ call = request, console: renderConsole }: { call?: Requester; console?: (session: HostedSession) => ReactNode }) {

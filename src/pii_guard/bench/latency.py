@@ -8,10 +8,11 @@ and streaming (off, on). Each request opens a new session (a fresh ``/s/<session
 so nothing is served from the detection cache.
 
 Per request it keeps the gateway's own timing (:class:`~pii_guard.observability.RequestTimer`:
-stages, per-detector time, ``overhead = total - upstream - client``, added time to first token)
-and the client-side wall time; per cell it reports p50 / p95 / p99 / mean. Because the upstream
-is a fixed sleep, the overhead is pii-guard's work and nothing else: parsing, detection, masking,
-the HTTP hop to the upstream and back, unmasking. With ``--record SLUG`` the result is written
+stages, per-detector time, ``overhead = total - upstream - client``, added time to first token,
+the outbound re-check's own time) and the client-side wall time; per cell it reports p50 / p95 /
+p99 / mean. Because the upstream is a fixed sleep, the overhead is pii-guard's work and nothing
+else: parsing, detection, masking, the outbound re-check, the HTTP hop to the upstream and back,
+unmasking. With ``--record SLUG`` the result is written
 as run records (``kind: latency``, one per mode) in ``eval/results/runs/`` and the benchmark
 report is regenerated.
 
@@ -201,6 +202,14 @@ class CellResult:
                 name: percentiles([t["detectors_ms"].get(name, 0.0) for t in timing])
                 for name in detector_names
             },
+            # The outbound re-check's own time (LAB-1500), part of the detect-to-forward path.
+            "outbound_check_ms": percentiles(
+                [
+                    e["outbound_check"]["ms"]
+                    for e in self.events
+                    if (e.get("outbound_check") or {}).get("ms") is not None
+                ]
+            ),
         }
 
 

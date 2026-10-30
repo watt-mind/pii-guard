@@ -25,9 +25,11 @@ export interface ConnectProps {
   accounts?: ReactNode;
   /** Hosted: the owner's endpoint picker, which renders the client blocks for the picked endpoint. */
   clientSetup?: (quickstart: (load: SnippetsLoader) => ReactNode) => ReactNode;
+  /** A `#connect/<client>` deep link names this client tab first (LAB-1314). */
+  initialClient?: string | null;
 }
 
-export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts, clientSetup }: ConnectProps) {
+export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts, clientSetup, initialClient = null }: ConnectProps) {
   const server = status.state === "ok" ? status.status : null;
   const gateway = server?.gateway.url ?? DEFAULT_GATEWAY_URL;
 
@@ -41,7 +43,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
       {clientSetup ? (
         <>
           {clientSetup((load) => (
-            <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={load} />
+            <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={load} initialTool={initialClient} />
           ))}
           {/* The Playground's own provider keys: optional, folded so the first run asks for one key only (LAB-1455). */}
           {accounts && (
@@ -62,7 +64,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
 
       {clientSetup ? null : serverSnippets ? (
         <>
-          <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} />
+          <ConnectQuickstart traffic={traffic} ner={server ? server.ner.available : null} onOpenLog={onOpenLog} onOpenSession={onOpenSession} load={loadSnippets} initialTool={initialClient} />
 
           {gatewayLine && <GatewayLine status={status} server={server} gateway={gateway} />}
         </>

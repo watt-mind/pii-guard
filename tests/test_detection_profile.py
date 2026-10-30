@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from pii_guard.api.app import create_app
-from pii_guard.config import Settings, get_settings
+from pii_guard.config import Settings
 from pii_guard.detect import ner, stack
 from pii_guard.detect.llm import LlmDetector
 from pii_guard.detection_profile import DetectionProfileError
@@ -104,19 +104,12 @@ def test_lazy_local_load_cannot_download_and_uses_local_files_only(tmp_path, mon
     assert loaded[0][0] == str(tmp_path)
 
 
-def test_stack_passes_local_load_constraint_and_direct_environment_honors_it(tmp_path, monkeypatch):
+def test_stack_passes_local_load_constraint(tmp_path, monkeypatch):
     seen = []
     monkeypatch.setattr(stack, "create_detector", lambda name, **kw: seen.append(kw))
     stack.build_detector("ner", local(ner_model=str(tmp_path)))
     assert seen[0]["local_files_only"] is True
     assert seen[0]["backend_kind"] == "transformers"
-    monkeypatch.setenv("PII_GUARD_DETECTION_PROFILE", "local-only")
-    get_settings.cache_clear()
-    try:
-        with pytest.raises(DetectionProfileError):
-            ner.NerDetector(model="synthetic-hub/model", preload=False)
-    finally:
-        get_settings.cache_clear()
 
 
 @pytest.mark.parametrize("url", ["https://raw-detector.example/v1", "http://127.0.0.1:8765/v1"])

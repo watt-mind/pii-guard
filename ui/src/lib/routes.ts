@@ -8,8 +8,22 @@ export interface Route {
   section: Section;
   /** The Playground's sub-tab; only meaningful when `section` is "playground". */
   tab: PlaygroundTab;
+  /** The Connect screen's client tab; only meaningful when `section` is "connect". */
+  client?: string;
   /** The open vault session's ref; only meaningful when `section` is "vault". */
   ref?: string;
+  /** The Evaluation screen's filters; only meaningful when `section` is "evaluation". */
+  evaluation?: EvaluationParams;
+}
+
+/** The Benchmarks filters a URL hash carries (LAB-1133): set, language, systems, sort. */
+export interface EvaluationParams {
+  set?: string;
+  lang?: string;
+  /** The selected systems, one `systems` key each: ids can contain commas (LAB-1133). */
+  systems?: string[];
+  /** A sort column, `key` or `key:dir` (LAB-1133). */
+  sort?: string;
 }
 
 export const SECTIONS: readonly { id: Section; label: string; hint: string }[] = [
@@ -41,15 +55,58 @@ export const LEGACY_HASHES: Readonly<Record<string, Route>> = {
   "#traffic": { section: "logs", tab: "text" },
 };
 
+/** The Connect screen's client tabs (`api/connect.ts` TOOLS): `#connect/<client>` deep-links one. */
+export const CONNECT_CLIENTS: readonly string[] = [
+  "muse-code",
+  "pi",
+  "codex",
+  "opencode",
+  "curl",
+  "python",
+  "claude-code",
+];
+
 const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 const TAB_IDS = new Set<string>(PLAYGROUND_TABS.map((t) => t.id));
+const CLIENT_IDS = new Set<string>(CONNECT_CLIENTS);
 
 export function hashOf(route: Route): string {
   if (route.section === "playground") return `#playground/${route.tab}`;
+  if (route.section === "connect" && route.client && CLIENT_IDS.has(route.client)) return `#connect/${route.client}`;
+  if (route.section === "evaluation") {
+    const query = evaluationQuery(route.evaluation);
+    return query ? `#evaluation?${query}` : "#evaluation";
+  }
   // A vault session deep link; refs change on restart, so a stale one lands on the
   // existing "session is gone" state (LAB-1333).
   if (route.section === "vault" && route.ref) return `#vault/${route.ref}`;
   return `#${route.section}`;
+}
+
+/** The Benchmarks filters as a hash query string, or "" for the defaults (LAB-1133). */
+export function evaluationQuery(params: EvaluationParams | undefined): string {
+  if (!params) return "";
+  const query = new URLSearchParams();
+  if (params.set) query.set("set", params.set);
+  if (params.lang) query.set("lang", params.lang);
+  for (const system of params.systems ?? []) query.append("systems", system);
+  if (params.sort) query.set("sort", params.sort);
+  return query.toString();
+}
+
+/** The filters a `#evaluation?...` hash names (unknown keys dropped, LAB-1133). */
+export function parseEvaluationQuery(query: string): EvaluationParams {
+  const params: EvaluationParams = {};
+  const search = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+  const set = search.get("set");
+  const lang = search.get("lang");
+  const sort = search.get("sort");
+  if (set) params.set = set;
+  if (lang) params.lang = lang;
+  if (sort) params.sort = sort;
+  const systems = search.getAll("systems").filter((s) => s);
+  if (systems.length) params.systems = systems;
+  return params;
 }
 
 /**
@@ -61,22 +118,36 @@ export function parseHash(hash: string): { route: Route; redirect: boolean } | n
   if (legacy) return { route: legacy, redirect: true };
   // No hash, and the skip link's #main, are not routes: the section stays as it is.
   if (hash === "" || hash === "#" || hash === "#main") return null;
-  const m = /^#([a-z]+)(?:\/([^/]+))?$/.exec(hash);
+  // Client ids contain hyphens (`muse-code`); section ids don't. A vault ref is `s_<hex>`.
+  const m = /^#([a-z]+)(?:\/([^/?#]+))?(\?[^#]*)?$/.exec(hash);
   // Any other unknown hash lands on the Overview, with the URL cleaned up.
   if (!m || !SECTION_IDS.has(m[1]!)) return { route: DEFAULT_ROUTE, redirect: true };
   const section = m[1] as Section;
+  const sub = m[2];
+  const query = m[3];
   if (section === "playground") {
-    const tab = m[2] && TAB_IDS.has(m[2]) ? (m[2] as PlaygroundTab) : "text";
-    return { route: { section, tab }, redirect: m[2] !== tab };
+    const tab = sub && TAB_IDS.has(sub) ? (sub as PlaygroundTab) : "text";
+    return { route: { section, tab }, redirect: sub !== tab || query !== undefined };
+  }
+  if (section === "connect") {
+    const client = sub !== undefined && CLIENT_IDS.has(sub) ? sub : undefined;
+    if (query !== undefined)
+      return { route: { section, tab: "text", ...(client ? { client } : {}) }, redirect: true };
+    return { route: { section, tab: "text", ...(client ? { client } : {}) }, redirect: sub !== client };
+  }
+  if (section === "evaluation") {
+    if (sub !== undefined) return { route: { section, tab: "text" }, redirect: true };
+    if (query === undefined) return { route: { section, tab: "text" }, redirect: false };
+    return { route: { section, tab: "text", evaluation: parseEvaluationQuery(query) }, redirect: false };
   }
   // #vault/<ref> deep-links an open session (LAB-1333); anything else after a section
   // is not a route and rewrites to the section.
-  if (section === "vault") {
-    if (m[2] === undefined) return { route: { section, tab: "text" }, redirect: false };
-    if (/^s_[0-9a-f]{1,32}$/i.test(m[2])) return { route: { section, tab: "text", ref: m[2] }, redirect: false };
+  if (section === "vault" && query === undefined) {
+    if (sub === undefined) return { route: { section, tab: "text" }, redirect: false };
+    if (/^s_[0-9a-f]{1,32}$/i.test(sub)) return { route: { section, tab: "text", ref: sub }, redirect: false };
     return { route: { section, tab: "text" }, redirect: true };
   }
-  return { route: { section, tab: "text" }, redirect: m[2] !== undefined };
+  return { route: { section, tab: "text" }, redirect: sub !== undefined || query !== undefined };
 }
 
 export function routeFromLocation(): Route {
@@ -86,4 +157,6 @@ export function routeFromLocation(): Route {
 export const sameRoute = (a: Route, b: Route) =>
   a.section === b.section &&
   (a.section !== "playground" || a.tab === b.tab) &&
+  (a.section !== "connect" || a.client === b.client) &&
+  (a.section !== "evaluation" || evaluationQuery(a.evaluation) === evaluationQuery(b.evaluation)) &&
   (a.section !== "vault" || a.ref === b.ref);
