@@ -29,15 +29,16 @@ export function PublicEvaluation({ loginUrl, hash }: { loginUrl: string; hash: s
         Skip to content
       </a>
       <header className="sticky top-0 z-30 bg-canvas">
-        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:h-12 lg:px-10">
-          <a href="#" className="flex h-9 min-w-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink">
+        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-2 px-4 sm:px-6 lg:h-12 lg:px-10">
+          <a href="#" className="flex h-9 shrink-0 items-center gap-2.5 rounded-sm text-base font-medium text-ink">
             <Logo />
             PII Guard
           </a>
-          <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-5">
+          <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-3 sm:gap-5">
             <a className="hidden text-muted hover:text-ink sm:inline" href="#demo">Demo</a>
             <a className="hidden text-muted hover:text-ink sm:inline" href="#results">Results</a>
             <span aria-current="page" className="hidden text-ink underline decoration-guard decoration-2 underline-offset-[6px] sm:inline">Evaluation</span>
+            <a className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap text-muted hover:text-ink pointer-coarse:min-h-11" href="#api"><span>API</span></a>
             <ButtonLink href={loginFor(loginUrl, hash)}>Console</ButtonLink>
           </nav>
         </div>
@@ -51,7 +52,10 @@ export function PublicEvaluation({ loginUrl, hash }: { loginUrl: string; hash: s
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6 lg:px-10">
           <p className="text-xs text-muted">Published benchmark results, the same for every visitor. No account data is shown here.</p>
-          <ThemeToggle theme={theme} onTheme={setTheme} />
+          <div className="flex items-center gap-5">
+            <a className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap text-xs text-muted hover:text-ink pointer-coarse:min-h-11" href="#api">API reference</a>
+            <ThemeToggle theme={theme} onTheme={setTheme} />
+          </div>
         </div>
       </footer>
     </div>

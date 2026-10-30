@@ -33,7 +33,8 @@ export function referenceConfig(specUrl: string, dark: boolean): Configuration {
     withDefaultFonts: false,
     mcp: { disabled: true },
     agent: { disabled: true },
-    documentDownloadType: "json",
+    // The page toolbar owns the bundled-spec download.
+    documentDownloadType: "none",
     defaultOpenFirstTag: true,
     operationTitleSource: "summary",
     persistAuth: false,
