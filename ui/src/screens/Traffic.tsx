@@ -803,35 +803,77 @@ function Role({ role }: { role: string }) {
   return <p className="mb-1 font-mono text-2xs text-muted">{role}</p>;
 }
 
-function ImagePart({ summary, event }: { summary: string; event?: TrafficEvent }) {
+interface Thumbnail {
+  index: number;
+  width?: number;
+  height?: number;
+  data?: string;
+  omitted?: string;
+}
+
+/** The masked-image thumbnails of an event by image index (LAB-1188); the log keeps no originals. */
+function thumbnailsOf(event?: TrafficEvent): Map<number, Thumbnail> {
+  const out = new Map<number, Thumbnail>();
+  const list = (event?.request as { thumbnails?: unknown } | null | undefined)?.thumbnails;
+  if (!Array.isArray(list)) return out;
+  for (const t of list) {
+    if (typeof t !== "object" || t === null || typeof (t as Thumbnail).index !== "number") continue;
+    const thumb = t as Thumbnail;
+    // Only our own small WebP/PNG data URLs render as an image.
+    if (thumb.data !== undefined && !/^data:image\/(?:webp|png);base64,/.test(thumb.data)) continue;
+    out.set(thumb.index, thumb);
+  }
+  return out;
+}
+
+function ImagePart({ summary, event, thumbnail }: { summary: string; event?: TrafficEvent; thumbnail?: Thumbnail }) {
   const img = event?.entities?.images;
+  const shown = thumbnail?.data;
   return (
     <div className="flex items-start gap-3 rounded-lg border border-field bg-surface-2 p-3 text-xs text-muted">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-8 shrink-0 text-faint" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <rect x="6" y="8" width="5" height="5" fill="currentColor" />
-        <path d="M13 9h5M13 12h5M6 16h12" />
-      </svg>
-      <p>
-        <span className="font-medium text-ink">Image</span> <span className="font-mono">{summary}</span>
+      {shown ? (
+        <img
+          src={shown}
+          width={thumbnail?.width}
+          height={thumbnail?.height}
+          alt="The masked image as sent to the model (downscaled)"
+          data-testid="masked-thumbnail"
+          className="h-auto max-h-48 w-auto max-w-[min(100%,20rem)] shrink-0 rounded border border-line bg-surface"
+        />
+      ) : (
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-8 shrink-0 text-faint" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <rect x="6" y="8" width="5" height="5" fill="currentColor" />
+          <path d="M13 9h5M13 12h5M6 16h12" />
+        </svg>
+      )}
+      <p className="min-w-0">
+        <span className="font-medium text-ink">Image</span> <span className="break-all font-mono">{summary}</span>
         <br />
         {img
           ? `${Object.values(img.masked).reduce((a, b) => a + (b ?? 0), 0)} regions blacked out, ${Object.values(img.kept).reduce((a, b) => a + (b ?? 0), 0)} kept, OCR ${img.ocr ? "on" : "off"}. `
           : ""}
-        The log keeps a summary of each image, not its pixels.
+        {shown
+          ? "A downscaled copy of the masked image the model received; the original is never kept."
+          : thumbnail?.omitted
+            ? "The masked image was too large or unreadable for a thumbnail, so the log keeps only this summary."
+            : "The log keeps a summary of each image, not its pixels."}
       </p>
     </div>
   );
 }
 
 function MessageList({ messages, event }: { messages: Message[]; event?: TrafficEvent }) {
+  const thumbnails = thumbnailsOf(event);
+  // Image index across all messages, the way the server numbers its thumbnails.
+  let imageIndex = 0;
   return (
     <>
       {messages.map((m, i) => (
         <div key={i}>
           <Role role={m.role} />
           <div className="space-y-2">
-            {m.parts.map((p, j) => (p.kind === "text" ? <MaskedText key={j} text={p.text} /> : <ImagePart key={j} summary={p.summary} event={event} />))}
+            {m.parts.map((p, j) => (p.kind === "text" ? <MaskedText key={j} text={p.text} /> : <ImagePart key={j} summary={p.summary} event={event} thumbnail={thumbnails.get(imageIndex++)} />))}
             {m.toolCalls.map((c, j) => (
               <ToolCallView key={`t${j}`} name={c.name}>
                 <MaskedText text={c.arguments} />

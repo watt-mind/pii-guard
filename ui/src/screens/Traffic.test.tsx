@@ -149,6 +149,44 @@ describe("Live traffic", () => {
     expect(screen.getAllByText(/The log keeps a summary of each image/).length).toBeGreaterThan(0);
   });
 
+  it("shows the masked-image thumbnail in the masked request, matched by image index (LAB-1188)", async () => {
+    const thumb = "data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==";
+    const imageCall: TrafficEvent = {
+      ...asMasked(huChat),
+      id: "req_thumbnail",
+      entities: { ...huChat.entities!, images: { count: 2, masked: { FACE: 1 }, kept: {}, ocr: true } },
+      request: {
+        masked: {
+          model: "test-model",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Two pictures" },
+                { type: "image_url", image_url: { url: "[inline image/png, 5000 chars]" } },
+                { type: "image_url", image_url: { url: "[inline image/png, 9000 chars]" } },
+              ],
+            },
+          ],
+        },
+        thumbnails: [
+          { index: 0, omitted: "too_large" },
+          { index: 1, width: 1, height: 1, data: thumb },
+        ],
+      } as TrafficEvent["request"],
+    };
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([imageCall]);
+    const masked = await screen.findByTestId("masked-request");
+    const img = within(masked).getByTestId("masked-thumbnail");
+    expect(img).toHaveAttribute("src", thumb);
+    expect(img).toHaveAccessibleName(/masked image as sent to the model/);
+    expect(within(masked).getAllByTestId("masked-thumbnail")).toHaveLength(1);
+    expect(masked).toHaveTextContent(/too large or unreadable for a thumbnail/);
+    expect(masked).toHaveTextContent(/the original is never kept/);
+  });
+
   it("draws the waterfall from the event's timing", async () => {
     const f = fakeConnect();
     render(<Traffic connect={f.connect} pageHost="localhost" />);
