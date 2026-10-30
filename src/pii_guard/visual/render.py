@@ -23,7 +23,9 @@ A cover inside another cover with the same label (the face inside its ID photo, 
 ``labelCovers``: the fill and the border still cover every pixel, but the placeholder
 reads once instead of twice. Covers with the same label that mostly overlap on one row (two
 detectors' reads of one date, a few pixels apart) are drawn as their union box with the
-label once (LAB-1672); coverage only grows.
+label once (LAB-1672). Coverage never shrinks below the padded detected boxes; a
+suppressed duplicate is not extended for its label, so a pixel only an old label extension
+covered can be left free.
 
 The label's font size is then fitted to the box: the largest size from the box height down
 to :data:`MIN_FONT_SIZE` at which it fits; if the bracketed placeholder is too wide even then,
@@ -155,7 +157,7 @@ def _duplicate_labels(
       (fill and border) without it;
     - **overlapping** (a caption read and an NER read of one date, a few pixels apart): every
       cover of the group is widened in ``rects`` to the group's union box, which holds every
-      original cover, so no pixel covered before shows; the first prints the label.
+      padded detected box, so coverage never shrinks below them; the first prints the label.
 
     Only labels are skipped: every cover is still filled.
     """

@@ -825,6 +825,8 @@ def test_unified_label_prefers_the_placeholder_the_conversation_already_holds() 
     ocr, covered = _document_row()
     outcome = label_image(ocr, covered, VaultMatcher(session, "en"))
     assert [label.placeholder for label in outcome.labels] == [in_text, in_text]
+    # The summary follows the winner, not the caption read's losing placeholder.
+    assert outcome.summary["document_number"] == in_text
 
 
 def test_adjacent_distinct_values_keep_their_own_labels() -> None:
@@ -903,3 +905,102 @@ def test_unified_covers_keep_every_originally_covered_pixel() -> None:
     for box, covered in zip(boxes, out.boxes, strict=True):
         assert covered is not None
         assert covered.union(_padded(box)) == covered  # every reported cover holds its box
+
+
+def test_a_wide_read_over_two_values_never_merges_them() -> None:
+    # [A, N, B]: N runs over two distinct numbers. It must not hand A's placeholder to B's
+    # word, and B's value must stay B in the transcript.
+    from pii_guard.visual.labels import label_image
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    a_box, b_box, n_box = Box(100, 50, 200, 70), Box(220, 50, 320, 70), Box(100, 50, 320, 70)
+    a = Region(EntityType.ID_DOCUMENT, a_box, None, "ocr")
+    n = Region(EntityType.ID_DOCUMENT, n_box, None, "ocr")
+    b = Region(EntityType.ID_DOCUMENT, b_box, None, "ocr")
+    ocr = OcrText(
+        [OcrWord("ZX123456", a_box, (0,)), OcrWord("QY654321", b_box, (0,))],
+        [
+            TextFinding(a, "ZX123456", "detector"),
+            TextFinding(n, "ZX123456 QY654321", "detector"),
+            TextFinding(b, "QY654321", "detector"),
+        ],
+        [],
+        [],
+    )
+    covered = [(a, Policy.MASK), (n, Policy.MASK), (b, Policy.MASK)]
+    outcome = label_image(ocr, covered, VaultMatcher(session, "en"))
+    first, wide, last = (label.placeholder for label in outcome.labels)
+    assert len({first, wide, last}) == 3
+    assert session.unmask(outcome.transcript) == "ZX123456 QY654321"
+
+
+def test_reads_that_disagree_keep_their_own_placeholders() -> None:
+    # The conversation holds ZX123457 UTO; the caption read ZX123456 is another number and
+    # must not be restored as the conversation's one.
+    from pii_guard.visual.labels import label_image
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    other = "ZX123457 UTO"
+    in_text = session.mask(other, [Span(0, len(other), EntityType.ID_DOCUMENT, other, 1.0, "ner")])
+    ocr, covered = _document_row(ner_text=other)
+    caption_label, ner_label = label_image(ocr, covered, VaultMatcher(session, "en")).labels
+    assert ner_label.placeholder == in_text
+    assert caption_label.placeholder != in_text
+    assert session.unmask(caption_label.placeholder or "") == FICTIONAL_DOCUMENT
+
+
+def test_an_uncertain_read_never_takes_another_reads_placeholder() -> None:
+    from pii_guard.visual.labels import RegionLabel, _unify
+
+    caption = Region(EntityType.ID_DOCUMENT, ID_CAPTION, None, "ocr")
+    ner = Region(EntityType.ID_DOCUMENT, ID_NER, None, "ocr")
+    labels = [
+        RegionLabel("[[ID_DOCUMENT_a1b2c3]]", "[[ID_DOCUMENT_a1b2c3]]", "exact", 1.0),
+        RegionLabel("[[ID_DOCUMENT_d4e5f6]]", "[[ID_DOCUMENT_d4e5f6]]", "uncertain", 0.7),
+    ]
+    reads = {0: ("caption", FICTIONAL_DOCUMENT), 1: ("detector", f"{FICTIONAL_DOCUMENT} UTO")}
+    out, winners = _unify(
+        [(caption, Policy.MASK), (ner, Policy.MASK)], labels, reads, frozenset({"x"})
+    )
+    assert out == labels and winners == {}
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_labelled_covers_never_leave_a_detected_pixel_visible(seed: int) -> None:
+    # Randomized layouts: nested covers sharing a right edge, chains of three or more
+    # overlapping reads, boxes clipped at the image edge, same and different labels.
+    import random
+
+    rnd = random.Random(seed)  # noqa: S311 - layout fuzzing, not cryptography
+    width, height = 220, 90
+    image = magenta_png((width, height))
+    labels = ["[[DATE_OF_BIRTH_a1b2c3]]", "[[ID_DOCUMENT_d4e5f6]]", None]
+    for _ in range(60):
+        items: list[LabelBox] = []
+        for _ in range(rnd.randint(2, 6)):
+            shape = rnd.random()
+            if items and shape < 0.3:  # nested, sharing the right edge
+                o = items[-1].box
+                x1 = rnd.randint(o.x1, o.x2)
+                box = Box(x1, rnd.randint(o.y1, o.y2), o.x2, o.y2)
+            elif items and shape < 0.6:  # the next link of a chain along the row
+                o = items[-1].box
+                x1 = min(width - 1, o.x1 + rnd.randint(1, max(1, o.width)))
+                box = Box(x1, o.y1, min(width - 1, x1 + rnd.randint(2, 80)), o.y2)
+            else:  # anywhere, often against the image edge
+                x1, y1 = rnd.randint(0, width - 3), rnd.randint(0, height - 3)
+                box = Box(
+                    x1, y1, min(width - 1, x1 + rnd.randint(2, 150)), min(height - 1, y1 + 30)
+                )
+            items.append(LabelBox(box, rnd.choice(labels)))
+        out = render_labels(image, items)
+        padded = [
+            Box(
+                max(0, b.x1 - 2),
+                max(0, b.y1 - 2),
+                min(width - 1, b.x2 + 2),
+                min(height - 1, b.y2 + 2),
+            )
+            for b in (i.box for i in items)
+        ]
+        assert _magenta_pixels(out.image, padded) == 0, items
