@@ -367,6 +367,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | Status | `code` | When |
 |---|---|---|
 | 400 | `unsupported_content` | Gateway: the body holds a key or content part outside the [request allow-list](#gateway-request-fields-implemented) (an unknown field, a remote image URL, an audio part). Nothing is forwarded or stored. A malformed gateway body (not JSON, a wrong value type) is `400 invalid_request`. |
+| 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the Anthropic Messages API, which Claude Code speaks, is not served yet. The message points to the OpenAI-compatible routes (`/v1/chat/completions`, `/v1/responses`) and the console's Connect page; the response has `x-should-retry: false`. Nothing is detected, stored or forwarded; the attempt is one `refused` traffic event (model and `stream` only, never the body). |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
