@@ -279,7 +279,7 @@ def fetch_catalog(
     Already-downloaded files whose SHA-256 matches a previous manifest entry are not fetched
     again (pass that manifest's entries in ``catalog['previous']``).
     """
-    today = today or dt.date.today()
+    today = today or dt.datetime.now(dt.UTC).date()
     entries = list(catalog.get("specimens", []))
     if len(entries) > MAX_SPECIMENS:
         raise ValueError(f"catalog lists {len(entries)} specimens; the bound is {MAX_SPECIMENS}")

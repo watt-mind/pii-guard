@@ -331,7 +331,7 @@ class NerWarmup:
 
         if self.state == "loading":
             with anyio.move_on_after(timeout):
-                while not self._done.is_set():
+                while not self._done.is_set():  # noqa: ASYNC110
                     await anyio.sleep(poll)
         self.check(timeout)
 

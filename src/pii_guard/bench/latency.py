@@ -34,7 +34,8 @@ import threading
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -361,7 +362,7 @@ def _cpu_brand() -> str | None:
                 check=True,
             ).stdout.strip()
             return out or None
-        with open("/proc/cpuinfo", encoding="utf-8") as f:
+        with Path("/proc/cpuinfo").open(encoding="utf-8") as f:
             for line in f:
                 if line.startswith("model name"):
                     return line.split(":", 1)[1].strip()
@@ -397,7 +398,7 @@ def build_records(
     from pii_guard.eval.record import RECORD_SCHEMA_VERSION, host_info
     from pii_guard.eval.report import git_commit
 
-    day = day or date.today().isoformat()
+    day = day or datetime.now(UTC).date().isoformat()
     commit_hash, dirty = commit if commit is not None else git_commit()
     hardware = host_info()
     brand = _cpu_brand()

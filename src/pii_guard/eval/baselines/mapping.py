@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable, Sequence
+from typing import Any
 
 from pii_guard.detect.pipeline import resolve_spans
 from pii_guard.types import EntityType, Span
@@ -80,7 +81,7 @@ def map_label(label: str) -> EntityType | None:
 
 
 def to_spans(
-    text: str, raw: Iterable[Sequence[object]], detector: str
+    text: str, raw: Iterable[Sequence[Any]], detector: str
 ) -> tuple[list[Span], Counter[str]]:
     """Mapped, non-overlapping spans plus the per-label count of unmapped ones.
 
