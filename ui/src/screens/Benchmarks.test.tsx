@@ -118,7 +118,20 @@ describe("Benchmarks screen", () => {
     const names = rowNames(table);
     const partial = names.findIndex((n) => / only$/.test(n!));
     if (partial >= 0) expect(names.slice(partial).every((n) => / only$/.test(n!))).toBe(true);
-    const f1s = names.filter((n) => !/ only$/.test(n!)).map((n) => parseFloat(cell(table, n!, "F1")));
+    // Read each row in place: re-scores of one model share a display name (LAB-1547).
+    const f1Col = within(table)
+      .getAllByRole("columnheader")
+      .findIndex((h) => h.textContent?.replace(/[▲▼]/g, "").trim() === "F1");
+    const f1s = within(table)
+      .getAllByRole("row")
+      .filter((r) => {
+        const n = nameOf(within(r).queryByRole("rowheader"));
+        return n && !/ only$/.test(n);
+      })
+      .map((r) => {
+        const cells = [within(r).getByRole("rowheader"), ...within(r).getAllByRole("cell")];
+        return parseFloat(cells[f1Col]!.textContent!);
+      });
     expect(f1s).toEqual([...f1s].sort((a, b) => b - a));
 
     for (const box of within(panel).getAllByRole("checkbox")) {
@@ -199,7 +212,7 @@ describe("Benchmarks screen, round E1 (LAB-1493)", () => {
     const best = Math.min(...tools.map((s) => s.all.leak ?? 1));
     expect(head).toHaveTextContent(new RegExp(`fast mode lets ${pct(fast.all.leak).replace(".", "\\.")} of personal values through`));
     expect(head).toHaveTextContent(new RegExp(`lets ${pct(best).replace(".", "\\.")} through`));
-    expect(head).toHaveTextContent(/hand-written German, English and Hungarian documents/);
+    expect(head).toHaveTextContent(/hand-written German, English, Hungarian and Polish documents/);
     expect(head).not.toHaveTextContent(/pii-guard/);
     // The production row is marked in the table.
     const row = within(resultsTable(panel)).getAllByRole("row").find((r) => within(r).queryByText("fast mode"));
@@ -257,6 +270,24 @@ describe("Benchmarks screen, round E2 (LAB-1531)", () => {
   });
 });
 
+
+describe("Benchmarks screen, deep links (LAB-1133)", () => {
+  it("opens on the filters a shared link names", async () => {
+    history.replaceState(null, "", "#evaluation?lang=en");
+    render(<App api={offlineApi()} mock={createMockClient()} loadBenchmarks={load} />);
+    const panel = screen.getByRole("region", { name: "Evaluation" });
+    await within(panel).findByRole("region", { name: "Results" });
+    expect(within(panel).getByRole("radio", { name: "English" })).toBeChecked();
+    expect(cell(resultsTable(panel), "rules", "Leak")).toBe(pct(snap("smoke", "rules").languages.en!.leak));
+  });
+
+  it("writes filter changes back to the hash, so the URL stays shareable", async () => {
+    const { user, panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    await user.click(within(panel).getByRole("radio", { name: "English" }));
+    await waitFor(() => expect(location.hash).toContain("lang=en"));
+  });
+});
 
 it("retries failed dataset and run-log reads independently", async () => {
   const user = userEvent.setup();

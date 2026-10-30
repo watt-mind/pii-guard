@@ -74,12 +74,27 @@ def test_personal_id_look_alikes(detector: RuleDetector, text: str) -> None:
     assert ids(detector, f"személyi szám: {text}") == []
 
 
+def _valid_first_digits(born: date) -> str:
+    """Sex/century digits an ID issued for ``born`` can carry (LAB-1298).
+
+    The generator used to draw the first digit independently of the date, producing
+    never-issued combos (an 1800s digit with a 1900s birth, a 2000s digit with a date
+    before 2000). The checksum helper accepts those, but no authority issues them, so
+    every generated value is now one that could have been issued."""
+    return "1278" if born.year < 2000 else "56"
+
+
 @given(
-    first=st.sampled_from("12345678"),
-    born=st.dates(min_value=date(1900, 1, 1), max_value=date(2099, 12, 31)),
-    serial=st.integers(0, 999),
+    parts=st.dates(min_value=date(1900, 1, 1), max_value=date(2099, 12, 31)).flatmap(
+        lambda born: st.tuples(
+            st.just(born),
+            st.sampled_from(_valid_first_digits(born)),
+            st.integers(0, 999),
+        )
+    ),
 )
-def test_any_valid_personal_id_is_found(first: str, born: date, serial: int) -> None:
+def test_any_valid_personal_id_is_found(parts: tuple[date, str, int]) -> None:
+    born, first, serial = parts
     payload = f"{first}{born:%y%m%d}{serial:03d}"
     check = hu_personal_id_check_digit(payload)
     if check is None:
@@ -87,6 +102,27 @@ def test_any_valid_personal_id_is_found(first: str, born: date, serial: int) -> 
     value = payload + str(check)
     found = RuleDetector().detect(f"személyi azonosító jele: {value}.")
     assert [(s.text, s.entity_type) for s in found] == [(value, E.ID_DOCUMENT)]
+
+
+def test_personal_id_generator_boundaries() -> None:
+    """LAB-1298: pinned edges of the generator space (leap day, serial ends, the
+    1997-01-01 weight switch, every issuable century digit). A recurrence of the
+    once-seen xdist failure reproduces here without the full suite."""
+    cases = [
+        ("5", date(2000, 2, 29), 0),  # leap day with a 2000s digit
+        ("6", date(2099, 12, 31), 999),  # serial top
+        ("1", date(1900, 1, 1), 0),  # serial bottom
+        ("8", date(1996, 12, 31), 500),  # pre-1997 weights, foreign-resident digit
+        ("2", date(1997, 1, 1), 1),  # reversed weights from 1997-01-01
+        ("7", date(1950, 6, 15), 123),
+    ]
+    for first, born, serial in cases:
+        payload = f"{first}{born:%y%m%d}{serial:03d}"
+        check = hu_personal_id_check_digit(payload)
+        assert check is not None, payload
+        value = payload + str(check)
+        found = RuleDetector().detect(f"személyi azonosító jele: {value}.")
+        assert [(s.text, s.entity_type) for s in found] == [(value, E.ID_DOCUMENT)]
 
 
 # --- Document numbers next to their label ---------------------------------------

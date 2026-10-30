@@ -15,6 +15,7 @@ from pii_guard.detect.normalize import (
     NormalizedText,
     _normalize_reference,
     normalize_for_detection,
+    spaced_view,
 )
 
 ZWSP, ZWJ, SHY, BOM, RLO = "\u200b", "\u200d", "\u00ad", "\ufeff", "\u202e"
@@ -188,6 +189,23 @@ def test_separator_elsewhere_is_dropped(text: str, expected: str) -> None:
 @pytest.mark.parametrize("joiner", [ZWJ, "\u200c"])
 def test_joiners_are_never_read_as_a_space(joiner: str) -> None:
     assert normalize_for_detection(f"Teszt{joiner}Elek").text == "TesztElek"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (f"Kedves teszt{ZWSP}elek!", "Kedves teszt elek!"),
+        (f"TESZT{ZWSP}ELEK", "TESZT ELEK"),
+        (f"a{BOM}b", "a b"),  # a mid-text BOM is a separator too
+        (f"Teszt{ZWSP}Elek", None),  # lower->upper already reads as a space
+        (f"Te{ZWSP}szt", "Te szt"),  # ambiguous with inside-a-word: both readings run
+        ("clean text", None),  # no second pass on clean texts
+        ("", None),
+    ],
+)
+def test_spaced_view_only_spaces_same_case_separators(text: str, expected: str | None) -> None:
+    # LAB-1252: detection runs over this second view, mapped back offset for offset.
+    assert spaced_view(text) == expected
 
 
 # --- regrouped values: obfuscated e-mails, spelled-out and dot-regrouped values (LAB-1297) -

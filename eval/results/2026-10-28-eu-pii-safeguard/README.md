@@ -21,9 +21,9 @@ Apache-2.0; the run records carry the corrected licence string.
 
 ```
 uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py score --record \
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score --record \
   --summary eval/results/2026-10-28-eu-pii-safeguard/unmapped.json
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py latency \
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency \
   --json eval/results/2026-10-28-eu-pii-safeguard/latency-cpu.json
 ```
 

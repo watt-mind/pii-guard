@@ -24,7 +24,13 @@ from pii_guard.detect.known import KNOWN_DETECTOR
 from pii_guard.types import EntityType, Span
 from pii_guard.vault.placeholders import PLACEHOLDER_RE, normalize_value
 
-__all__ = ["EXEMPT_TYPES", "identifier_keeps_tool_names", "tool_names", "without_tool_names"]
+__all__ = [
+    "EXEMPT_TYPES",
+    "identifier_keeps_tool_names",
+    "model_words",
+    "tool_names",
+    "without_tool_names",
+]
 
 #: The entity types a declared tool name is exempt from: the word-like types the NER (or the
 #: LLM) can misread a tool vocabulary word as ("Muse" as a PERSON, LAB-1299). Every other type
@@ -68,6 +74,38 @@ def tool_names(body: Mapping[str, Any]) -> frozenset[str]:
     for function in functions if isinstance(functions, list) else []:
         add(function)
     return frozenset(names)
+
+
+#: A model id's tokens and the separators between them (``claude``, ``-``, ``sonnet``, ...).
+_MODEL_TOKEN_RE = re.compile(r"[A-Za-z0-9]{1,32}|[^A-Za-z0-9]{1,4}")
+_MAX_MODEL_TOKENS = 16
+
+
+def model_words(body: Mapping[str, Any]) -> frozenset[str]:
+    """The words of the request's ``model`` id, and each run of them as written
+    (``claude``, ``sonnet``, ``claude-sonnet``, ``claude-sonnet-4``, ...), normalized, as
+    declared vocabulary.
+
+    The model id goes upstream verbatim and is checked as an identifier (LAB-1563). Claude
+    Code's prompts name the assistant and its models ("You are Claude ...", "claude-sonnet");
+    the NER reads those as a PERSON, and the vault's sweep then rewrote ``claude-sonnet-4-5``
+    and refused every request (LAB-1605). Like a declared tool name, a model word keeps only
+    the identifiers it rewrote as written (:func:`identifier_keeps_tool_names`); prose
+    occurrences are masked as usual, and a format- or checksum-validated type never gets the
+    exemption. Runs without a letter (``4-5``) are left out.
+    """
+    model = body.get("model")
+    if not isinstance(model, str):
+        return frozenset()
+    tokens = _MODEL_TOKEN_RE.findall(model)[: 2 * _MAX_MODEL_TOKENS]
+    words = [i for i, t in enumerate(tokens) if t[0].isalnum()]
+    out: set[str] = set()
+    for a, start in enumerate(words):
+        for end in words[a:]:
+            run = "".join(tokens[start : end + 1])
+            if any(ch.isalpha() for ch in run):
+                out.add(normalize_value(run))
+    return frozenset(out)
 
 
 def without_tool_names(

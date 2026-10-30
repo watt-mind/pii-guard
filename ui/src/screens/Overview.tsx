@@ -47,7 +47,7 @@ function summarize(events: readonly TrafficEvent[]) {
     masked: events.reduce((n, e) => n + totalMasked(e), 0),
     blocked: events.filter((e) => BLOCKED.has(e.outcome)).length,
     failed: events.filter((e) => e.outcome !== "ok" && !BLOCKED.has(e.outcome)).length,
-    upstreamErrors: events.filter((e) => e.outcome === "upstream_error").length,
+    upstreamErrors: events.filter((e) => e.outcome === "upstream_error" || e.outcome === "upstream_failed").length,
     types: [...types.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
     stages,
     overhead: { p50: percentile(overhead, 50), p95: percentile(overhead, 95) },
@@ -99,7 +99,8 @@ export function Overview({ t, status, forced, onOpenCall, sendDemo = sendDemoTra
 
       {/* Your server's setup, never mixed into the recorded demo's numbers. */}
       {!recorded && serverSetup && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        // Alone in its row (hosted: no upstream panel) it spans the row instead of half of it (LAB-1626).
+        <div className={["grid gap-6", !server || server.upstream ? "lg:grid-cols-2" : ""].join(" ")}>
           {/* A hosted owner's status has no upstream: the owner's endpoints pick their own. */}
           {(!server || server.upstream) && (
             <Panel title="Upstream" note="Where the gateway forwards masked requests.">

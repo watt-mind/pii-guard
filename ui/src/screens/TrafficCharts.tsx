@@ -15,6 +15,7 @@ import {
   type OwnStage,
 } from "../lib/traffic";
 import { useWidth } from "../hooks/useWidth";
+import { clockMinutes, clockTime } from "../lib/time";
 import { Metric } from "../components/ui";
 import { ChartEmpty } from "./BenchmarksCharts";
 
@@ -317,7 +318,7 @@ export function StageChart({ events, onSelect }: { events: TrafficEvent[]; onSel
           {recent.map((e) => {
             const parts = OWN_STAGES.map((k) => [k, e.timing.stages_ms[k] ?? 0] as const).filter(([, v]) => v > 0);
             const label = parts.map(([k, v]) => `${STAGE_LABEL[k]} ${formatMsShort(v)}`).join(", ");
-            const time = new Date(e.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            const time = clockTime(e.time);
             return (
               <li key={e.id} className="flex h-full min-w-0 flex-1">
                 <button
@@ -365,7 +366,7 @@ export function EntitiesChart({ events, now }: { events: TrafficEvent[]; now: nu
   };
   const present = new Set(buckets.flatMap((b) => [...byGroup(b.counts).keys()]));
   const groups = ENTITY_GROUPS.filter((g) => present.has(g.id));
-  const hhmm = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const hhmm = clockMinutes;
   return (
     <div>
       <div className="flex gap-2">

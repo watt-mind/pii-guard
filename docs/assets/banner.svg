@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="t d">
   <title id="t">pii-guard</title>
-  <desc id="d">pii-guard, a privacy firewall for AI agents: personal data is swapped for reversible placeholders before the model sees it and put back in the answer.</desc>
+  <desc id="d">pii-guard, a privacy gateway for AI agents: personal data is swapped for reversible placeholders before the model sees it and put back in the answer.</desc>
   <defs>
     <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#b6f36b" stop-opacity="0.10"/>
@@ -27,7 +27,7 @@
   </g>
   <text x="186" y="128" class="sans" font-size="60" font-weight="700" fill="#eceef2" letter-spacing="-1.5">pii-guard</text>
 
-  <text x="64" y="212" class="sans" font-size="30" font-weight="600" fill="#eceef2">A privacy firewall for AI agents.</text>
+  <text x="64" y="212" class="sans" font-size="30" font-weight="600" fill="#eceef2">A privacy gateway for AI agents.</text>
   <text x="64" y="254" class="sans" font-size="21" fill="#a3a7b0">Personal data becomes reversible placeholders before it</text>
   <text x="64" y="284" class="sans" font-size="21" fill="#a3a7b0">leaves your network, and comes back in the answer.</text>
   <text x="64" y="324" class="sans" font-size="16" fill="#737782">Built on Meta’s open models · runs on your machine · Apache-2.0</text>

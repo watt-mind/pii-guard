@@ -125,7 +125,7 @@ def render_attack_table(breakdown: dict[str, dict[str, Any]]) -> str:
         "| Attack | Docs | Blocked | Values | Leaked | Leak % | Partial % | Docs leaked |",
         "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
-    total = defaultdict(int)
+    total: defaultdict[str, int] = defaultdict(int)
     for name, row in breakdown.items():
         lines.append(
             f"| `{name}` | {row['documents']} | {row['blocked']} | {row['values']} | "

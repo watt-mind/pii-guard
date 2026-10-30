@@ -758,6 +758,20 @@ class ProjectStore:
             if cursor.rowcount != 1:
                 raise ProjectNotFoundError()
 
+    def key_endpoint(self, secret: str) -> str | None:
+        """The endpoint a live key belongs to (digests are unique), else ``None``.
+
+        Only for the root Muse Code catalog (LAB-1462), which Muse reads at the root of its
+        base URL; the caller still resolves the key against this endpoint."""
+        if not isinstance(secret, str) or not secret.startswith("pg_ep_") or len(secret) > 128:
+            return None
+        with self._transaction() as db:
+            row = db.execute(
+                "SELECT endpoint_id FROM endpoint_keys WHERE digest = ? AND revoked_at IS NULL",
+                (hashlib.sha256(secret.encode()).digest(),),
+            ).fetchone()
+        return None if row is None else str(row["endpoint_id"])
+
     def resolve_key(self, secret: str, endpoint: str) -> EndpointSnapshot | None:
         if not isinstance(secret, str) or not secret.startswith("pg_ep_") or len(secret) > 128:
             return None

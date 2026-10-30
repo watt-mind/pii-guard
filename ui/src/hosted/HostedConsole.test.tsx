@@ -197,8 +197,9 @@ describe("hosted console for a signed-in owner", () => {
   it("offers Chat's fast mode only, before and after the status answers", async () => {
     history.replaceState(null, "", "#playground/chat");
     renderHosted(requester(), withStatus);
-    const group = await screen.findByRole("radiogroup", { name: "Detection mode" });
-    expect(within(group).getAllByRole("radio").map((r) => r.closest("label")?.textContent)).toEqual(["Fast"]);
+    // Fast only: nothing to choose, so no one-option Detection control (LAB-1629).
+    expect(await screen.findByRole("textbox", { name: /message/i })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Detection mode" })).toBeNull();
   });
 
   it("doesn't offer Send demo traffic on the Overview or Logs", async () => {
@@ -323,7 +324,7 @@ describe("hosted console for a signed-in owner", () => {
     expect(within(preview).getByRole("tab", { name: "Claude Code" })).toBeInTheDocument();
     expect(within(preview).getByRole("link", { name: /Create an endpoint/ })).toHaveAttribute("href", "#projects");
     // Client setup comes before the Playground's provider keys.
-    const keys = screen.getByRole("region", { name: "Model provider keys for the Playground" });
+    const keys = screen.getByRole("region", { name: "Provider keys for the Playground" });
     expect(setup.compareDocumentPosition(keys) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

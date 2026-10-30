@@ -30,11 +30,11 @@ from pii_guard.vault.inflection import inflection_for
 
 __all__ = [
     "CODE_ENTITY_TYPES",
-    "HungarianForms",
     "LanguageForms",
     "PackForms",
     "find_surface_forms",
     "language_forms",
+    "matching_types",
     "register_language_forms",
     "surface_pattern",
 ]
@@ -47,11 +47,22 @@ CODE_ENTITY_TYPES: frozenset[EntityType] = frozenset(
         EntityType.NATIONAL_ID_HU_TAJ,
         EntityType.ID_DOCUMENT,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.COMPANY_ID_HU,
         EntityType.PARCEL_NUMBER_HU,
         EntityType.VEHICLE_PLATE,
     }
 )
+
+#: Types that score as one: gold sets built before ``PAYMENT_CARD`` existed (LAB-1102) label
+#: cards ``BANK_ACCOUNT``, and learned detectors still report a card they find that way.
+_SCORED_ALIKE: frozenset[EntityType] = frozenset({EntityType.BANK_ACCOUNT, EntityType.PAYMENT_CARD})
+
+
+def matching_types(entity_type: EntityType) -> frozenset[EntityType]:
+    """The types a gold span of ``entity_type`` matches when scoring (itself, or its alias)."""
+    return _SCORED_ALIKE if entity_type in _SCORED_ALIKE else frozenset({entity_type})
+
 
 _SEP = r"[\s\-./()]*"
 
@@ -92,15 +103,6 @@ class PackForms(LanguageForms):
 
     def stem_variants(self, value: str, entity_type: EntityType) -> list[str]:
         return self._forms.stem_variants(value, entity_type)
-
-
-class HungarianForms(PackForms):
-    """Hungarian surface forms (kept for compatibility; they live in the ``hu`` pack)."""
-
-    def __init__(self) -> None:
-        from pii_guard.languages.hu.forms import HungarianSurfaceForms
-
-        super().__init__("hu", HungarianSurfaceForms())
 
 
 #: Hooks registered with :func:`register_language_forms`; they take precedence over packs.
@@ -181,19 +183,21 @@ def _code_alternatives(value: str, entity_type: EntityType) -> list[str]:
 def _word_alternatives(value: str, entity_type: EntityType, forms: LanguageForms) -> list[str]:
     value = value.strip()
     body = _words(value)
-    left = r"(?<!\w)" if _is_word(value[0]) else ""
+    # An underscore counts as a boundary, not a word character: a value glued to one
+    # (``[[PERSON_Teszt Elek]]``, ``user_Teszt Elek``) still survived there (LAB-1147).
+    left = r"(?<![^\W_])" if _is_word(value[0]) else ""
     if _is_word(value[-1]):
         suffix = forms.suffix_pattern(value, entity_type)
-        right = f"(?=(?:{suffix})?(?!\\w))" if suffix else r"(?!\w)"
+        right = f"(?=(?:{suffix})?(?![^\\W_]))" if suffix else r"(?![^\W_])"
     else:
         right = ""
     alternatives = [left + body + right]
-    alternatives.extend(left + v + r"(?!\w)" for v in forms.stem_variants(value, entity_type))
+    alternatives.extend(left + v + r"(?![^\W_])" for v in forms.stem_variants(value, entity_type))
     return alternatives
 
 
 def _is_word(char: str) -> bool:
-    return char.isalnum() or char == "_"
+    return char.isalnum()
 
 
 @lru_cache(maxsize=4096)

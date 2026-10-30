@@ -395,7 +395,9 @@ def test_traffic_event_and_log_carry_the_result(
     assert check["result"] == "passed" and check["hits"] == {} and check["short"] == 0
     assert check["texts"] == 2 and check["ms"] >= 0  # the message and ``model`` (LAB-1563)
     assert blocked["outcome"] == "blocked"
-    assert blocked["error"] == {
+    error = dict(blocked["error"])
+    assert error.pop("message")  # the API error message, types and counts only (LAB-1314)
+    assert error == {
         "code": "outbound_check_failed",
         "status": 422,
         "entity_types": {"PERSON": 1},

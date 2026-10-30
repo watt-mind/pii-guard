@@ -4,6 +4,7 @@
 // pretending. The masked image is drawn by the UI from those regions (`image` is empty).
 
 import englishRecording from "../content/imageLabelsRecording.en.json";
+import hungarianRecording from "../content/imageLabelsRecording.json";
 import recordings from "../content/imageRecordings.json";
 import type { ImageMaskRequest, ImageMaskResponse } from "./types";
 
@@ -20,23 +21,35 @@ export interface ImageRecordings {
   samples: Record<string, Omit<ImageMaskResponse, "image">>;
 }
 
-// Reuse the English specimen's real local-detector run, retaining only the region response.
-// Labels-mode placeholders and transcript belong to the landing showcase, not this replay.
-const { media_type, width, height, masked, kept, analysis } = englishRecording.image;
+// Reuse each specimen's real local-detector run (LAB-1260, LAB-1488), retaining only the
+// region response. Labels-mode placeholders and transcript belong to the landing showcase,
+// not this replay. The bundled SAM-era entry for the Hungarian card left the surname
+// without a region box; the fresh local-detector recording covers both name lines.
+const stripToRegions = (recording: typeof englishRecording | typeof hungarianRecording) => ({
+  media_type: recording.image.media_type,
+  width: recording.image.width,
+  height: recording.image.height,
+  masked: recording.image.masked,
+  kept: recording.image.kept,
+  analysis: recording.image.analysis,
+  regions: recording.image.regions.map(({ entity_type, box, source, detector, score, policy }) =>
+    ({ entity_type, box, source, detector, score, policy })),
+});
 export const IMAGE_RECORDINGS: ImageRecordings = {
   ...recordings as unknown as ImageRecordings,
   samples: {
     ...recordings.samples as unknown as ImageRecordings["samples"],
-    "id-card-en": {
-      media_type, width, height, masked, kept, analysis,
-      regions: englishRecording.image.regions.map(({ entity_type, box, source, detector, score, policy }) =>
-        ({ entity_type, box, source, detector, score, policy })),
-    } as unknown as Omit<ImageMaskResponse, "image">,
+    "id-card-en": stripToRegions(englishRecording) as unknown as Omit<ImageMaskResponse, "image">,
+    "id-card": stripToRegions(hungarianRecording) as unknown as Omit<ImageMaskResponse, "image">,
   },
 };
 
 export const imageRecordedOn = (sampleId: string | null) =>
-  sampleId === "id-card-en" ? englishRecording.recorded : IMAGE_RECORDINGS.recorded;
+  sampleId === "id-card-en"
+    ? englishRecording.recorded
+    : sampleId === "id-card"
+      ? hungarianRecording.recorded
+      : IMAGE_RECORDINGS.recorded;
 
 export interface MockImageOptions {
   latencyMs?: number;

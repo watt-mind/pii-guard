@@ -77,9 +77,17 @@ class SseRestorer:
     """Rewrites SSE data payloads; feed them in order with :meth:`process`, then :meth:`finish`."""
 
     def __init__(
-        self, session: VaultSession, on_ids: Callable[[list[str]], None] | None = None
+        self,
+        session: VaultSession,
+        on_ids: Callable[[list[str]], None] | None = None,
+        *,
+        keep_restored_tools: bool = False,
     ) -> None:
-        """``on_ids`` receives the ids each chunk carries, raw (LAB-1469)."""
+        """``on_ids`` receives the ids each chunk carries, raw (LAB-1469).
+
+        ``keep_restored_tools`` also retains the restored tool-call arguments (traffic log
+        level ``full``); the masked ones are always retained, under the same cap (LAB-1189).
+        """
         self._session = session
         self._on_ids = on_ids
         # One budget for the whole response: every choice, field and tool call (LAB-1350).
@@ -90,6 +98,13 @@ class SseRestorer:
         self._masked_content: dict[int, list[str]] = {}
         self._masked_overflow: set[int] = set()  # choices past the retention cap (LAB-1566)
         self._masked_len: dict[int, int] = {}
+        # Per choice, per tool index: the tool call as the upstream streamed it (masked) and
+        # as the client received it (restored), for the traffic log (LAB-1189).
+        self._keep_restored_tools = keep_restored_tools
+        self._tools: dict[int, dict[Any, dict[str, Any]]] = {}
+        self._tools_restored: dict[int, dict[Any, list[str]]] = {}
+        self._tools_len: dict[int, int] = {}
+        self._tools_overflow: set[int] = set()
         self._template: dict[str, Any] | None = None
         self._done = False
         self.chunks = 0
@@ -112,6 +127,14 @@ class SseRestorer:
         """
         return {index: "".join(parts) for index, parts in self._masked_content.items()}
 
+    def masked_truncated(self) -> frozenset[int]:
+        """The choices whose masked copy passed the retention cap and was dropped (LAB-1581).
+
+        The ``masked_answer`` echo marks them truncated, so a dropped copy is distinguishable
+        from a short or empty answer.
+        """
+        return frozenset(self._masked_overflow)
+
     def _retain_masked(self, index: int, value: str) -> None:
         if index in self._masked_overflow:
             return
@@ -123,6 +146,60 @@ class SseRestorer:
             return
         parts.append(value)
         self._masked_len[index] = self._masked_len.get(index, 0) + len(value)
+
+    def masked_tool_calls(self) -> dict[int, list[dict[str, Any]]]:
+        """Per choice, the streamed tool calls as the upstream sent them (masked), in the
+        non-streamed ``message.tool_calls`` shape. A choice past the cap is absent."""
+        return {
+            index: [_tool_call(i, call, call["function"]["arguments"]) for i, call in calls.items()]
+            for index, calls in self._tools.items()
+        }
+
+    def restored_tool_calls(self) -> dict[int, list[dict[str, Any]]]:
+        """Per choice, the streamed tool calls as the client received them (restored); empty
+        unless ``keep_restored_tools``."""
+        return {
+            index: [
+                _tool_call(i, call, "".join(self._tools_restored[index][i]))
+                for i, call in calls.items()
+            ]
+            for index, calls in self._tools.items()
+            if index in self._tools_restored
+        }
+
+    def _retain_tool(
+        self, index: int, tool_index: Any, call: dict[str, Any], masked: str, restored: str
+    ) -> None:
+        if index in self._tools_overflow:
+            return
+        size = len(masked) + (len(restored) if self._keep_restored_tools else 0)
+        if self._tools_len.get(index, 0) + size > MAX_MASKED_CONTENT_CHARS:
+            self._tools.pop(index, None)
+            self._tools_restored.pop(index, None)
+            self._tools_len.pop(index, None)
+            self._tools_overflow.add(index)
+            return
+        self._tools_len[index] = self._tools_len.get(index, 0) + size
+        held = self._tools.setdefault(index, {}).setdefault(
+            tool_index, {"function": {"arguments": ""}}
+        )
+        for name in ("id", "type"):
+            if isinstance(call.get(name), str):
+                held[name] = call[name]
+        function = call.get("function")
+        if isinstance(function, dict) and isinstance(function.get("name"), str):
+            held["function"]["name"] = function["name"]
+        held["function"]["arguments"] += masked
+        if self._keep_restored_tools:
+            self._tools_restored.setdefault(index, {}).setdefault(tool_index, []).append(restored)
+
+    def _retain_rest(self, key: tuple[Any, ...], rest: str) -> None:
+        """A flushed remainder of a tool call's arguments joins its restored copy."""
+        if key[1] != "tool" or not self._keep_restored_tools:
+            return
+        parts = self._tools_restored.get(key[0], {}).get(key[2])
+        if parts is not None:
+            parts.append(rest)
 
     def _unmasker(self, key: tuple[Any, ...], kind: str = "text") -> StreamUnmasker:
         unmasker = self._unmaskers.get(key)
@@ -205,9 +282,14 @@ class SseRestorer:
                 continue
             tool_index = call.get("index", position_in_delta)
             function = call.get("function")
-            if isinstance(function, dict) and isinstance(function.get("arguments"), str):
-                function["arguments"] = self._unmasker((index, "tool", tool_index), "json").feed(
-                    function["arguments"]
+            if isinstance(function, dict):
+                masked = function.get("arguments")
+                restored = ""
+                if isinstance(masked, str):
+                    restored = self._unmasker((index, "tool", tool_index), "json").feed(masked)
+                    function["arguments"] = restored
+                self._retain_tool(
+                    index, tool_index, call, masked if isinstance(masked, str) else "", restored
                 )
             custom = call.get("custom")
             if isinstance(custom, dict) and isinstance(custom.get("input"), str):
@@ -230,6 +312,7 @@ class SseRestorer:
             self._retired_unresolved.update(dict.fromkeys(unmasker.unresolved))
             if not rest:
                 continue
+            self._retain_rest(key, rest)
             _append_rest(delta, key, rest)
 
     def finish(self) -> list[str]:
@@ -242,6 +325,7 @@ class SseRestorer:
             rest = unmasker.flush()
             if not rest or not isinstance(key[0], int):
                 continue
+            self._retain_rest(key, rest)
             _append_rest(pending.setdefault(key[0], {}), key, rest)
         if not pending:
             return []
@@ -251,6 +335,11 @@ class SseRestorer:
             for index, delta in sorted(pending.items())
         ]
         return [json.dumps(chunk, ensure_ascii=False)]
+
+
+def _tool_call(tool_index: Any, held: dict[str, Any], arguments: str) -> dict[str, Any]:
+    """One retained tool call in the ``message.tool_calls`` shape, with ``arguments``."""
+    return {"index": tool_index, **held, "function": {**held["function"], "arguments": arguments}}
 
 
 #: Unmasker key kind -> (tool-call field, its text field). Text fields sit on the delta itself.

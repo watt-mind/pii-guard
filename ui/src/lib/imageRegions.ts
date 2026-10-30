@@ -1,6 +1,9 @@
 import type { EntityType, ImageAnalysis, ImageRegion } from "../api/types";
 import { DETECTOR_TYPES, detectorLabel, metaFor } from "./entities";
 
+/** Hosted builds run detection on the PII Guard server, not on the owner's device (LAB-1626). */
+const HOSTED_BUILD = import.meta.env.VITE_PII_GUARD_HOSTED === "true";
+
 /**
  * Outline colour of a region box, by what happened to it (not by type: the type is written on
  * the box). Drawn over the image itself, which is a light document in either theme, so these
@@ -112,7 +115,7 @@ export type DetectorModels = Readonly<Record<string, string>>;
 
 export function sourceLabel(region: Pick<ImageRegion, "source" | "detector" | "entity_type">, models: DetectorModels = {}): string {
   if (region.source === "sam") return "SAM 3.1";
-  if (region.source === "local") return "YuNet (on-device)";
+  if (region.source === "local") return HOSTED_BUILD ? "YuNet (PII Guard server)" : "YuNet (on-device)";
   return `OCR + ${detectorLabel(region.detector, { types: [region.entity_type], model: models[region.detector] })}`;
 }
 
@@ -175,6 +178,7 @@ export const TEXT_TYPE_NOUN: Partial<Record<EntityType, string>> = {
   NATIONAL_ID_HU_TAJ: "TAJ numbers",
   ID_DOCUMENT: "ID document numbers",
   BANK_ACCOUNT: "bank accounts",
+  PAYMENT_CARD: "payment card numbers",
   COMPANY_ID_HU: "company IDs",
   ORGANIZATION: "organization names",
   PARCEL_NUMBER_HU: "parcel numbers",

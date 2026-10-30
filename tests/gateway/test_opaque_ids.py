@@ -295,7 +295,9 @@ def test_codex_cache_key_and_metadata_ids_are_forwarded_as_sent() -> None:
 def test_id_values() -> None:
     from pii_guard.gateway.opaque_ids import is_id_value
 
-    for value in (CODEX_UUID, MESSAGE_ID, "c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c"):
+    # The console's Connect test key: "pgtest_f" + the policy version id as hex (LAB-1640).
+    console_test = "pgtest_f" + b"pmnRn0C4txtT6QrZrleUwBaV".hex()
+    for value in (CODEX_UUID, MESSAGE_ID, "c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c", console_test):
         assert is_id_value(value), value
     for value in ("36301234567", "4111111111111111", "id_4111111111111111", PERSON, "1.5"):
         assert not is_id_value(value), value

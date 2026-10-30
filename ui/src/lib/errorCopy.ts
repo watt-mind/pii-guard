@@ -65,13 +65,46 @@ export function errorCopy(code: string | undefined, status: number | null = null
         title: "The upstream could not be reached, or its answer was unusable.",
         body: "PII Guard masked the request before forwarding it; the upstream didn't give a usable answer. Nothing unmasked left PII Guard. Retry, or check the upstream URL.",
       };
+    case "upstream_did_not_stream":
+      return {
+        kind: "upstream",
+        title: "The model answered without streaming.",
+        body: "The masked request reached the model, which sent a whole answer instead of a stream; PII Guard doesn't pass that on. Nothing unmasked left PII Guard. Retry; a client can also call without streaming.",
+      };
     case "stream_failed":
       return {
         kind: "stream",
         title: "The answer stream failed partway.",
         body: "The masked request reached the upstream, but its answer stream broke off. Nothing unmasked left PII Guard. Retry the message.",
       };
+    // Image and detector outages in plain words (LAB-1619); the code stays on the notice as small text.
+    case "ocr_unavailable":
+      return {
+        kind: "fail_closed",
+        title: "Text recognition is unavailable right now, so the image was not sent.",
+        body: "PII Guard can't read the text in images at the moment, and it never forwards an image it couldn't check. Retry in a minute.",
+      };
+    case "detector_loading":
+      return {
+        kind: "fail_closed",
+        title: "The detectors are still starting, so nothing was sent.",
+        body: "PII Guard loads its models after a restart, and never forwards what it couldn't check. Retry in a few seconds.",
+      };
+    case "request_timeout":
+      return {
+        kind: "fail_closed",
+        title: "Checking took too long, so nothing was sent.",
+        body: "PII Guard stops rather than forward something it couldn't finish checking. Retry, or try a smaller image or text.",
+      };
     default:
+      // Any other upstream_* code (upstream_did_not_stream, …): the masked request reached the
+      // model, which answered in a way PII Guard can't use. Not a detection failure (LAB-1626).
+      if (code?.startsWith("upstream_"))
+        return {
+          kind: "upstream",
+          title: "The model didn't answer as expected.",
+          body: "The masked request was sent; no original values were exposed. Retry the message, or pick another model.",
+        };
       return { kind: "fail_closed", title: "Blocked. Nothing was sent to the model.", body: FAIL_CLOSED };
   }
 }

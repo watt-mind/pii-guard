@@ -13,9 +13,11 @@ export interface PolicyVersion {
 }
 /** `local`: on-device faces, ID photos and signatures. `sam`: SAM 3.1 on the Meta API too. */
 export type VisualDetection = "local" | "sam";
+/** Hosted, "local" runs on the PII Guard server, not on the owner's device (LAB-1626). */
+const HOSTED_BUILD = import.meta.env.VITE_PII_GUARD_HOSTED === "true";
 /** What the Detection choice says, in the editor and the read-only policy view. */
 export const VISUAL_DETECTION_LABEL: Record<VisualDetection, string> = {
-  local: "On-device (fast)",
+  local: HOSTED_BUILD ? "On the PII Guard server (fast)" : "On-device (fast)",
   sam: "SAM 3.1 (better signatures, ~2–4 s, sends the image to Meta)",
 };
 export interface Endpoint {
@@ -39,3 +41,21 @@ const EXAMPLE_MODEL: Record<string, string> = {
   openrouter: "openai/gpt-4.1-mini",
 };
 export const exampleModel = (provider: string | null | undefined): string | null => (provider ? EXAMPLE_MODEL[provider] ?? null : null);
+
+/**
+ * "Tune what is masked" on Connect (LAB-1626): Projects opens a new version of this policy family
+ * once it has loaded; cleared when it opens.
+ */
+let policyEdit: string | null = null;
+let policyEditEndpoint: string | null = null;
+/** `endpointId`: the endpoint Connect tested, which "Save and apply" then moves to the new version (LAB-1629). */
+export function requestPolicyEdit(policyId: string | null, endpointId: string | null = null) {
+  policyEdit = policyId;
+  policyEditEndpoint = policyId ? endpointId : null;
+}
+export function pendingPolicyEdit(): string | null {
+  return policyEdit;
+}
+export function pendingPolicyEndpoint(): string | null {
+  return policyEditEndpoint;
+}

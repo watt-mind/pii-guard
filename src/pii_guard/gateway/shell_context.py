@@ -284,6 +284,7 @@ class ArgumentsContext:
         self._key: str | None = None  # the top-level key whose value is being read
         self._in_string = False
         self._string_is_key = False
+        self._fresh = False  # in a string, nothing of it read yet
         self._escape = False
         self._unicode = ""
         self._buffer = ""  # decoded text of a short string (a key or an array element)
@@ -295,6 +296,11 @@ class ArgumentsContext:
             return BYTE_EXACT
         return self._shell.context()
 
+    @property
+    def at_value_start(self) -> bool:
+        """The last character read opened a string that is a value, not an object key."""
+        return not self._broken and self._in_string and self._fresh and not self._string_is_key
+
     def feed(self, text: str) -> None:
         for char in text:
             if self._broken:
@@ -305,6 +311,7 @@ class ArgumentsContext:
                 self._structure(char)
 
     def _string_char(self, char: str) -> None:
+        self._fresh = False
         if self._unicode:
             self._unicode += char
             if len(self._unicode) == 5:
@@ -338,7 +345,7 @@ class ArgumentsContext:
             self._buffer += char
 
     def _start_string(self) -> None:
-        self._in_string, self._buffer = True, ""
+        self._in_string, self._buffer, self._fresh = True, "", True
         self._string_is_key = bool(self._stack) and self._stack[-1] == "o" and self._expect_key
         if self._string_is_key:
             return

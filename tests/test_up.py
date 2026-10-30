@@ -78,7 +78,10 @@ def test_ui_served_at_root_without_a_status_strip(ui_dir: Path) -> None:
     assert "detectors:" not in page.text
     assert page.headers["cache-control"] == "no-cache"
     assert client.get("/assets/app.js").text == "console.log('ui')"
-    assert client.get("/healthz").json() == {"status": "ok", "version": __version__, "ner": "off"}
+    health = client.get("/healthz").json()
+    assert health["status"] == "ok" and health["version"] == __version__
+    assert health["ner"] == "off" and health["ocr"] in ("on", "off")
+    assert health["image_require_ocr"] is True
 
 
 def test_ui_index_is_served_byte_for_byte(ui_dir: Path) -> None:
@@ -247,8 +250,26 @@ def _free_port() -> int:
         return int(s.getsockname()[1])
 
 
+def _wait_until_healthy(base: str, proc: subprocess.Popen[bytes]) -> bool:
+    """Poll the child's health endpoint: True once it answers, False if it exited.
+
+    A 10 s healthz timeout (not 1 s) survives a loaded machine (LAB-1319); a child that is
+    still alive but never answers fails the test at the deadline."""
+    deadline = time.monotonic() + 120
+    while True:
+        if proc.poll() is not None:
+            return False
+        try:
+            if httpx.get(f"{base}/healthz", timeout=10).status_code == 200:
+                return True
+        except httpx.HTTPError:
+            pass
+        if time.monotonic() >= deadline:
+            pytest.fail("pii-guard up did not start")
+        time.sleep(0.5)
+
+
 def test_up_process_serves_everything_and_stops_on_sigint(tmp_path: Path) -> None:
-    port = _free_port()
     env = {k: v for k, v in os.environ.items() if not k.startswith("PII_GUARD_")}
     # Rules only (LAB-1321): never load or download the NER (1.1 GB). An empty models dir keeps a
     # cached or pinned checkpoint out too. `make smoke-fast` covers the NER-loading `up`.
@@ -257,26 +278,34 @@ def test_up_process_serves_everything_and_stops_on_sigint(tmp_path: Path) -> Non
     # The child writes to a file, not a pipe nobody reads: a full pipe blocks it mid-request and
     # the chat call times out (the flake in LAB-1321 / LAB-1319).
     log = tmp_path / "up.log"
-    with log.open("wb") as sink:
-        proc = subprocess.Popen(  # noqa: S603 - fixed argument list
-            [sys.executable, "-m", "pii_guard", "up", "--no-browser", "--port", str(port)],
-            cwd=tmp_path,
-            env=env,
-            stdout=sink,
-            stderr=subprocess.STDOUT,
-        )
-    base = f"http://127.0.0.1:{port}"
+    log.write_bytes(b"")
+    proc: subprocess.Popen[bytes] | None = None
+    base = ""
+    last_log = ""
+    for _ in range(3):
+        # The pre-picked port can be taken between pick and bind under parallel load: retry
+        # with a fresh one when the child died on a busy port (LAB-1319). Anything else in
+        # the log fails the test; the log accumulates every attempt.
+        port = _free_port()
+        with log.open("ab") as sink:
+            proc = subprocess.Popen(  # noqa: S603 - fixed argument list
+                [sys.executable, "-m", "pii_guard", "up", "--no-browser", "--port", str(port)],
+                cwd=tmp_path,
+                env=env,
+                stdout=sink,
+                stderr=subprocess.STDOUT,
+            )
+        base = f"http://127.0.0.1:{port}"
+        if _wait_until_healthy(base, proc):
+            break
+        last_log = log.read_text(errors="replace")
+        proc = None
+        if "address already in use" not in last_log.lower():
+            pytest.fail(f"pii-guard up exited early:\n{last_log}")
+    else:
+        pytest.fail(f"pii-guard up found no free port in 3 tries:\n{last_log}")
+    assert proc is not None
     try:
-        deadline = time.monotonic() + 120
-        while True:
-            assert proc.poll() is None, log.read_text(errors="replace")
-            try:
-                if httpx.get(f"{base}/healthz", timeout=1).status_code == 200:
-                    break
-            except httpx.HTTPError:
-                pass
-            assert time.monotonic() < deadline, "pii-guard up did not start"
-            time.sleep(0.2)
         assert httpx.get(f"{base}/", timeout=30).status_code == 200
         reply = httpx.post(
             f"{base}/v1/chat/completions",
@@ -398,3 +427,17 @@ def test_up_generates_a_tenant_key_when_none_is_configured(
     key = settings.tenant_key.get_secret_value()
     assert len(bytes.fromhex(key)) == 32
     assert key != TENANT_KEY
+
+
+def test_up_honours_gateway_mode_from_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LAB-1365: a .env-only PII_GUARD_GATEWAY_MODE survives `up`'s defaults."""
+    import os
+
+    from pii_guard.gateway.config import GatewayConfig
+
+    dotenv = f"PII_GUARD_TENANT_KEY={TENANT_KEY}\nPII_GUARD_GATEWAY_MODE=audit\n"
+    _settings_up_serves(tmp_path, monkeypatch, dotenv)
+    assert os.environ["PII_GUARD_GATEWAY_MODE"] == "audit"
+    assert GatewayConfig().mode.value == "audit"

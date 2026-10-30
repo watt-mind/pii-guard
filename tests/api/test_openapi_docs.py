@@ -224,7 +224,7 @@ def _vault() -> Vault:
 
 
 def _request() -> Request:
-    return cast(Request, SimpleNamespace(state=SimpleNamespace()))
+    return cast(Request, SimpleNamespace(state=SimpleNamespace(), headers={}))
 
 
 def _blocked() -> BlockedEntityError:

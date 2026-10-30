@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { FALLBACK_CHAT_MODEL, SYSTEM_PROMPT, isChatModel, pickDefaultModel, type ChatClient, type ChatMessage, type ChatMode } from "../api/chat";
+import { FALLBACK_CHAT_MODEL, SYSTEM_PROMPT, isChatModel, pickDefaultModel, type ChatClient, type ChatMessage, type ChatMode, type KeptSpan } from "../api/chat";
 import { MaskedText } from "../components/MaskedText";
 import { Popover } from "../components/Popover";
 import { RestoredText } from "../components/RestoredText";
@@ -12,6 +12,7 @@ import { alignLoose, alignRestored, tokenize, type RestoredSegment } from "../li
 import { toRunError, type RunError } from "../lib/run";
 import { errorCopy, statusFromMessage } from "../lib/errorCopy";
 import { readPref, writePref } from "../lib/storage";
+import { useHostedSession } from "../hosted/session";
 
 /** Where the last model used in Chat is remembered (per viewer, best effort). */
 export const MODEL_PREF = "chat-model";
@@ -32,6 +33,8 @@ interface Turn {
   status: "masking" | "streaming" | "done" | "error";
   thinking: boolean;
   maskedUser: string | null;
+  /** Values in your message detected but kept by policy (gateway echo, LAB-1180). */
+  keptUser: KeptSpan[];
   maskedSystem: string | null;
   answer: string;
   maskedAnswer: string | null;
@@ -61,6 +64,10 @@ interface Props {
 }
 
 const ALL_MODES: readonly ChatMode[] = ["fast", "audit"];
+
+/** Hosted, fast mode runs on the PII Guard server, not on the owner's machine (LAB-1619). */
+const HOSTED_FAST_HINT =
+  "The default and the production path. Rules + the NER model on the PII Guard server: finds names, addresses and structured data in milliseconds, with no detection model call and nothing sent to a third party.";
 
 const MODES: { id: ChatMode; label: string; hint: string }[] = [
   {
@@ -170,7 +177,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
     history.push({ role: "user", content: message });
     setTurns((ts) => [
       ...(fresh ? [] : ts.filter((t) => t.status !== "error")),
-      { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null, finishReason: null },
+      { id, user: message, mode, status: "masking", thinking: false, maskedUser: null, keptUser: [], maskedSystem: null, answer: "", maskedAnswer: null, masked: null, ms: null, error: null, finishReason: null },
     ]);
     setText("");
     // Keep the keyboard user in the composer; bring the new turn into view.
@@ -188,10 +195,11 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
         language: lang,
         sessionId: fresh ? (override.sessionId ?? null) : sessionId,
         signal: controller.signal,
-        onMaskedRequest: (msgs) =>
+        onMaskedRequest: (msgs, kept) =>
           update(id, {
             status: "streaming",
             maskedUser: [...msgs].reverse().find((m) => m.role === "user")?.content ?? null,
+            keptUser: kept[kept.length - 1] ?? [],
             maskedSystem: msgs.find((m) => m.role === "system")?.content ?? null,
           }),
         onAnswer: (answer) => update(id, { answer }),
@@ -204,6 +212,7 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
         answer: result.answer,
         maskedAnswer: result.maskedAnswer || null,
         maskedUser: [...result.maskedMessages].reverse().find((m) => m.role === "user")?.content ?? null,
+        keptUser: result.keptSpans?.[result.keptSpans.length - 1] ?? [],
         masked: result.masked,
         ms: result.ms,
         finishReason: result.finishReason ?? null,
@@ -231,16 +240,23 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
 
   // A document handed over from the Mask screen starts a new conversation and is sent at once.
   const conversationRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    if (!draft || draft.nonce === lastDraft.current) return;
-    lastDraft.current = draft.nonce;
-    setLanguage(draft.language);
-    setSessionId(draft.sessionId ?? null);
-    setHandedOver(Boolean(draft.sessionId));
-    void send({ text: draft.text, language: draft.language, sessionId: draft.sessionId ?? null });
+  // Chat mounting with the draft already set waits for the model list first (LAB-1626): with no
+  // model yet, send() would drop the document. No model at all: the document waits in the composer.
+  const modelsLoading = models.status === "loading";
+  const takeDraft = (handed: ChatDraft) => {
+    lastDraft.current = handed.nonce;
+    setLanguage(handed.language);
+    setSessionId(handed.sessionId ?? null);
+    setHandedOver(Boolean(handed.sessionId));
+    if (needsModel) return setText(handed.text);
+    void send({ text: handed.text, language: handed.language, sessionId: handed.sessionId ?? null });
     requestAnimationFrame(() => conversationRef.current?.focus({ preventScroll: true }));
+  };
+  useEffect(() => {
+    if (!draft || draft.nonce === lastDraft.current || (needsModel && modelsLoading)) return;
+    takeDraft(draft);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per handed-over draft
-  }, [draft]);
+  }, [draft, needsModel, modelsLoading]);
 
   return (
     <div className="space-y-6">
@@ -375,6 +391,8 @@ function TurnView({
 }) {
   const userSegments = segmentsFor(turn.maskedUser, turn.user);
   const maskedValues = userSegments.filter((s) => s.kind === "restored").length;
+  const keptValues = turn.keptUser.length;
+  const keptLine = `${keptValues} ${keptValues === 1 ? "value" : "values"} detected but kept by policy (dashed outline)`;
   const answerSegments = turn.status === "done" ? segmentsFor(turn.maskedAnswer, turn.answer) : null;
   const marked = answerSegments?.filter((s) => s.kind === "restored").length ?? 0;
   const placeholdersInAnswer = turn.maskedAnswer ? tokenize(turn.maskedAnswer).filter((t) => t.kind === "placeholder").length : 0;
@@ -385,21 +403,28 @@ function TurnView({
     <article id={`turn-${turn.id}`} aria-label="Chat turn" className="scroll-mt-24 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6">
       {/* Row 1: what you wrote | what the model received */}
       <Bubble side="you" label="You wrote">
-        <RestoredText segments={userSegments} activeKey={activeKey} onActivate={onActivate} outgoing />
+        <RestoredText segments={userSegments} activeKey={activeKey} onActivate={onActivate} outgoing kept={turn.keptUser} />
         {turn.maskedUser !== null && (
           <p className="mt-2 text-xs text-muted">
-            {maskedValues === 0
+            {maskedValues === 0 && keptValues === 0
               ? "Nothing was detected in this message, so it was sent as written."
-              : `${maskedValues} ${maskedValues === 1 ? "value" : "values"} masked before sending (${simulated ? "demo engine" : `${turn.mode} mode`}). Unmarked text was sent as written.`}
+              : maskedValues === 0
+                ? `Nothing was masked; ${keptLine}. The rest was sent as written.`
+                : `${maskedValues} ${maskedValues === 1 ? "value" : "values"} masked before sending (${simulated ? "demo engine" : `${turn.mode} mode`})${keptValues ? `; ${keptLine}` : ""}. Unmarked text was sent as written.`}
           </p>
         )}
       </Bubble>
       <Bubble side="model" label="What the model received">
         {turn.status === "error" && turn.maskedUser === null ? (
           <p className="text-sm text-muted">
-            {turn.error && reachedUpstream(turn.error)
-              ? "The masked request was sent; the upstream refused it before answering."
-              : "Nothing was sent."}
+            {/* One line here; the notice below says why (LAB-1629). */}
+            {turn.error && reachedUpstream(turn.error) ? (
+              <>
+                The masked request was forwarded; no answer came back. Its masked text is in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>.
+              </>
+            ) : (
+              "Nothing was sent."
+            )}
           </p>
         ) : turn.maskedUser === null ? (
           <Pending
@@ -499,7 +524,9 @@ function Bubble({ side, label, children, className = "" }: { side: "you" | "mode
         className,
       ].join(" ")}
     >
-      <h3
+      {/* A label, not a heading: the section is already named, and an h3 under no h2 broke heading order (LAB-1629). */}
+      <p
+        aria-hidden="true"
         className={[
           "mb-1.5 font-mono text-2xs",
           side === "model" ? "text-model" : "text-guard",
@@ -507,7 +534,7 @@ function Bubble({ side, label, children, className = "" }: { side: "you" | "mode
       >
         {side === "model" ? "Model side · " : "Your side · "}
         {label}
-      </h3>
+      </p>
       {children}
     </section>
   );
@@ -548,9 +575,11 @@ interface ComposerProps {
 function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, language, onLanguage, model, onModel, models, needsModel, mock, sessionId, onReset, mockUpstream, sessionSource, handedOver }: ComposerProps) {
   const chatIds = models.ids.filter(isChatModel);
   const options = model && !chatIds.includes(model) ? [model, ...chatIds] : chatIds;
+  const hosted = useHostedSession() !== null;
+  const hintOf = (m: (typeof MODES)[number]) => (hosted && m.id === "fast" ? HOSTED_FAST_HINT : m.hint);
   const modeHint = mock
     ? "The demo engine runs a small rule set in your browser in both modes; the AI detector and the real model need the live API."
-    : MODES.find((m) => m.id === mode)!.hint;
+    : hintOf(MODES.find((m) => m.id === mode)!);
   return (
     <section aria-label="New message" className="space-y-3 rounded-xl border border-line bg-surface p-4 sm:p-5">
       <div role="group" aria-labelledby="chat-samples-label" className="flex flex-wrap items-center gap-2">
@@ -589,13 +618,21 @@ function Composer({ text, onText, onSend, onStop, busy, mode, modes, onMode, lan
         className="doc block"
       />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <SegmentedControl
-          label="Detection mode"
-          name="chat-mode"
-          value={mode}
-          onChange={onMode}
-          options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: m.hint }))}
-        />
+        {/* One mode available: nothing to choose, so no one-option control (LAB-1629). */}
+        {MODES.filter((m) => modes.includes(m.id)).length > 1 && (
+          <span className="flex items-center gap-2">
+            <span aria-hidden="true" className="text-sm text-muted">
+              Detection
+            </span>
+            <SegmentedControl
+              label="Detection mode"
+              name="chat-mode"
+              value={mode}
+              onChange={onMode}
+              options={MODES.filter((m) => modes.includes(m.id)).map((m) => ({ value: m.id, label: m.label, title: hintOf(m) }))}
+            />
+          </span>
+        )}
         <label className="flex items-center gap-2 text-sm text-muted">
           Language
           <span className="w-32">

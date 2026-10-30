@@ -174,9 +174,10 @@ class ResponsesGateway:
         max_text_chars: int | None = None,
         received_at: float | None = None,
         path_session: str | None = None,
+        request_id: str | None = None,
     ) -> tuple[Response, RequestStats]:
         timer = RequestTimer(received_at)
-        trace = CallTrace(self.gateway.observability, timer, body)
+        trace = CallTrace(self.gateway.observability, timer, body, request_id=request_id)
         try:
             response, stats = await self.gateway._with_session_lease(
                 self._responses(
@@ -283,7 +284,7 @@ class ResponsesGateway:
         forwarding = time.perf_counter()
         payload = gw._forwarded(body, session, stats, add_responses_note)
         try:
-            check_upstream_payload(payload)
+            check_upstream_payload(payload, stats.image_payload_bytes)
         except PayloadTooLargeError:
             stats.log("blocked")
             raise

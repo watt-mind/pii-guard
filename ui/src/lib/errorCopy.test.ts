@@ -12,6 +12,20 @@ describe("error copy per code (LAB-1335)", () => {
     expect(`${c.title} ${c.body}`).not.toMatch(/Nothing was sent|fails closed/);
   });
 
+  it("says an unusable model answer was sent masked, never that detection failed (LAB-1626)", () => {
+    const c = errorCopy("upstream_some_new_failure");
+    expect(c.kind).toBe("upstream");
+    expect(c.title).toBe("The model didn't answer as expected.");
+    expect(c.body).toContain("The masked request was sent");
+    // A streamed call answered whole gets its own words (LAB-1629).
+    const s = errorCopy("upstream_did_not_stream");
+    expect(s.kind).toBe("upstream");
+    expect(s.title).toBe("The model answered without streaming.");
+    expect(s.body).toContain("Nothing unmasked left PII Guard.");
+    expect(c.title + c.body).not.toMatch(/Nothing was sent|detection or masking fails/);
+    expect(errorCopy("detection_failed").kind).toBe("fail_closed");
+  });
+
   it("gives a hint per upstream status", () => {
     expect(upstreamHint(401)).toMatch(/API key/);
     expect(upstreamHint(429)).toMatch(/rate limited/);
@@ -27,6 +41,12 @@ describe("error copy per code (LAB-1335)", () => {
       expect(c.title).toBe("Blocked. Nothing was sent to the model.");
       expect(c.body).toMatch(/fails closed/);
     }
+  });
+
+  it("says in plain words when OCR or the detectors are down (LAB-1619)", () => {
+    expect(errorCopy("ocr_unavailable").title).toBe("Text recognition is unavailable right now, so the image was not sent.");
+    expect(errorCopy("detector_loading").body).toMatch(/Retry/);
+    for (const code of ["ocr_unavailable", "detector_loading", "request_timeout"]) expect(errorCopy(code).kind).toBe("fail_closed");
   });
 
   it("keeps the policy text for policy blocks", () => {

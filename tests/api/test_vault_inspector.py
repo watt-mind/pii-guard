@@ -45,6 +45,7 @@ VALUES: dict[EntityType, str] = {
     EntityType.NATIONAL_ID_HU_TAJ: "123 456 788",
     EntityType.ID_DOCUMENT: "AB1234567",
     EntityType.BANK_ACCOUNT: "HU42 1177 3016 1111 1018 0000 0000",
+    EntityType.PAYMENT_CARD: "4000 0000 0000 0002",
     EntityType.COMPANY_ID_HU: "01-09-123456",
     EntityType.ORGANIZATION: "Mintavállalat Kft.",
     EntityType.PARCEL_NUMBER_HU: "Budapest 12345/6",
@@ -167,6 +168,22 @@ def test_detail_reports_origin_counts_variants_and_pending_known_values(
         "count": 0,
     }
     assert any(i["forms"] >= 1 for i in items)  # Minta Máriának -> Minta Mária + nak
+
+
+def test_detail_reports_detector_and_first_last_seen(
+    masked: tuple[TestClient, VaultSession],
+) -> None:
+    client, _ = masked
+    items = client.get(f"/v1/vault/sessions/{_ref(client)}").json()["items"]
+    by_hint = {i["hint"]: i for i in items}
+    person = by_hint["T•••• E•••"]
+    assert person["detector"] == "test"  # the first span that created the entry
+    assert person["first_seen"] is not None and person["last_seen"] is not None
+    assert person["first_seen"] <= person["last_seen"]
+    assert person["count"] >= 1
+    pending = by_hint["P•••• Z••••••••"]
+    assert pending["detector"] is None
+    assert pending["first_seen"] is None and pending["last_seen"] is None
 
 
 def test_listing_reports_counts_and_source_without_extending_the_ttl() -> None:

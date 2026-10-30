@@ -151,7 +151,27 @@ def test_all_noise_at_once() -> None:
 
 
 def test_td3_with_its_second_line_missing_is_still_one_region() -> None:
-    assert_one_zone(ocr_words(TD3[:1]))
+    # LAB-1160: the surviving first line grows down by the missing line's height.
+    words = ocr_words(TD3[:1])
+    (region,) = mrz_regions(words)
+    grown = union(words)
+    assert region.box == Box(grown.x1, grown.y1, grown.x2, grown.y2 + LINE_H)
+
+
+def test_lone_later_line_grows_up_by_the_missing_lines() -> None:
+    # LAB-1160: a surviving later line (no document code) grows up instead.
+    words = ocr_words(TD3[1:], first_line=1)
+    (region,) = mrz_regions(words)
+    grown = union(words)
+    assert region.box == Box(grown.x1, grown.y1 - LINE_H, grown.x2, grown.y2)
+
+
+def test_lone_td1_first_line_grows_down_by_two_lines() -> None:
+    # LAB-1160: a TD1 first line stands in for two missing lines below it.
+    words = ocr_words(TD1[:1])
+    (region,) = mrz_regions(words)
+    grown = union(words)
+    assert region.box == Box(grown.x1, grown.y1, grown.x2, grown.y2 + 2 * LINE_H)
 
 
 def test_td1_with_a_line_missing_is_one_region_of_the_other_two() -> None:

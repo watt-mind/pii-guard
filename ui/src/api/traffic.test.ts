@@ -3,7 +3,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { DEMO_SCENARIOS } from "./demoTraffic";
 import { ApiError, UnreachableError } from "./http";
-import { DEDUP_WINDOW, MAX_BACKOFF_MS, SSE_MAX_ERRORS, TrafficRateLimitedError, connectTraffic, fetchTraffic, outboundCheckLabel, parseRetryAfter, parseTrafficEvent, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
+import { DEDUP_WINDOW, MAX_BACKOFF_MS, SSE_MAX_ERRORS, TrafficRateLimitedError, connectTraffic, fetchTraffic, outboundCheckLabel, parseRetryAfter, parseTrafficEvent, readOutcome, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
 
 const events = (full.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -304,6 +304,33 @@ describe("connectTraffic resilience", () => {
     conn.close();
   });
 
+  it("reports a boot change through onRestart, once per restart", async () => {
+    vi.useFakeTimers();
+    const pages = [
+      () => page("boot_a", full.events.slice(0, 2)),
+      () => page("boot_b", []),
+      () => page("boot_b", afterRestart),
+      () => page("boot_b", []),
+    ];
+    const boots: string[] = [];
+    const urls: string[] = [];
+    const conn2 = connectTraffic({
+      fetch: (async (url: RequestInfo | URL) => (urls.push(String(url)), pages[Math.min(urls.length - 1, pages.length - 1)]!())) as typeof fetch,
+      EventSource: null,
+      pollMs: 1000,
+      onEvents: () => {},
+      onStatus: () => {},
+      onRestart: (boot) => boots.push(boot),
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(urls).toHaveLength(3);
+    });
+    expect(boots).toEqual(["boot_b"]);
+    conn2.close();
+  });
+
   it("resets the cursor when the SSE stream sends a new event with a lower seq (server without boot)", async () => {
     vi.useFakeTimers();
     const urls: string[] = [];
@@ -502,5 +529,20 @@ describe("outbound re-check field (LAB-1500)", () => {
     const old = parseTrafficEvent(base);
     expect(old?.outbound_check).toBeNull();
     expect(outboundCheckLabel(null)).toBe("not reached");
+  });
+});
+
+describe("readOutcome (LAB-1629)", () => {
+  it("reads an older server's refused upstream failure as upstream_failed", () => {
+    expect(readOutcome("refused", "upstream_unavailable")).toBe("upstream_failed");
+    expect(readOutcome("refused", "upstream_did_not_stream")).toBe("upstream_failed");
+    expect(readOutcome("upstream_failed", "upstream_unavailable")).toBe("upstream_failed");
+  });
+  it("keeps refusals that stopped in the guard, and unknown outcomes as they are", () => {
+    expect(readOutcome("refused", "upstream_not_configured")).toBe("refused");
+    expect(readOutcome("refused", "upstream_destination_not_allowed")).toBe("refused");
+    expect(readOutcome("refused", "invalid_request")).toBe("refused");
+    expect(readOutcome("something_new", undefined)).toBe("something_new");
+    expect(readOutcome(undefined, undefined)).toBe("ok");
   });
 });

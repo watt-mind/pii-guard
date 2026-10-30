@@ -9,6 +9,13 @@
       "limits": {"leak_rate_max": 0.42, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.0}
     },
     {
+      "name": "pl-smoke",
+      "fixtures": ["eval/fixtures/pl-smoke.jsonl"],
+      "detectors": ["rules"],
+      "tolerance": {"leak_rate": 0.0, "roundtrip_rate": 0.0, "over_masking_rate": 0.0},
+      "limits": {"leak_rate_max": 0.4, "roundtrip_rate_min": 1.0, "over_masking_rate_max": 0.0}
+    },
+    {
       "name": "synth-sample",
       "fixtures": ["eval/fixtures/hu-synth-sample.jsonl", "eval/fixtures/en-synth-sample.jsonl"],
       "detectors": ["rules"],
