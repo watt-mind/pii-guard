@@ -51,7 +51,15 @@ logger = logging.getLogger("pii_guard.api")
 #: other route answers at once while it loads. ``tests/api/test_ner_warmup.py`` checks that
 #: each ``POST`` route of the app is either here or in its non-detecting list.
 DETECTING_PATHS = frozenset(
-    {"/v1/analyze", "/v1/mask", "/v1/mask/image", "/v1/chat/completions", "/v1/responses"}
+    {
+        "/v1/analyze",
+        "/v1/mask",
+        "/v1/mask/image",
+        "/v1/chat/completions",
+        "/v1/responses",
+        "/v1/messages",
+        "/v1/messages/count_tokens",
+    }
 )
 #: Seconds a refused client is told to wait before retrying ``503 detector_loading``.
 RETRY_AFTER_SECONDS = 5

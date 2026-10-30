@@ -32,8 +32,6 @@ TEXT = "Teszt Elek"
 NON_DETECTING_POSTS = frozenset(
     {
         "/v1/unmask",
-        "/v1/messages",
-        "/v1/messages/count_tokens",
         "/v1/sessions",
         "/v1/sessions/{session_id}/known-values",
         "/v1/projects",

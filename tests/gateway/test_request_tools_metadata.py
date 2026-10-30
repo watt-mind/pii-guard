@@ -188,13 +188,15 @@ def test_tools_without_personal_data_are_forwarded_unchanged() -> None:
 
 def test_structural_strings_are_never_masked_slots() -> None:
     """Structural values are identifier-checked, never masked (LAB-1563: they used to be
-    skipped unchecked). The API's own words (``function``) get no slot at all."""
+    skipped unchecked). The API's own words (``function``, and JSON Schema's seven type
+    names since LAB-1605: the NER read "boolean" as a PERSON) get no slot at all."""
     body = {"model": "m", "messages": MESSAGES, "tools": [tool()]}
     slots = collect_texts(body).slots
-    for structural in ("string", "object", "integer", "email", "#/$defs/address"):
+    for structural in ("email", "#/$defs/address"):
         found = [s for s in slots if s.text == structural]
         assert found and all(s.kind == "identifier" for s in found)
-    assert all(s.text != "function" for s in slots)
+    for word in ("function", "string", "object", "integer"):
+        assert all(s.text != word for s in slots)
 
 
 # --- identifiers are checked, not masked --------------------------------------------------
