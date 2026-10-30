@@ -63,6 +63,20 @@ def test_type_must_agree() -> None:
     assert counts[E].f1 == 0.0
 
 
+@pytest.mark.parametrize(
+    ("gold", "pred"),
+    [
+        (EntityType.BANK_ACCOUNT, EntityType.PAYMENT_CARD),
+        (EntityType.PAYMENT_CARD, EntityType.BANK_ACCOUNT),
+    ],
+)
+def test_card_and_bank_account_score_alike(gold: EntityType, pred: EntityType) -> None:
+    # LAB-1102: gold sets older than PAYMENT_CARD label cards BANK_ACCOUNT.
+    counts = match_counts([g(0, 16, gold)], [s(0, 16, pred)], "exact")
+    assert counts[gold].recall == 1.0
+    assert counts[pred].precision == 1.0
+
+
 def test_empty_counts_are_undefined() -> None:
     assert TypeCounts().f1 is None
     assert prf({})["macro"] == {"precision": None, "recall": None, "f1": None}
