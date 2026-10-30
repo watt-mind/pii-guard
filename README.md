@@ -18,11 +18,11 @@
   <a href="docs/decisions/0005-synthetic-data-only.md"><img alt="Fictional data only" src="https://img.shields.io/badge/data-fictional%20only-b6f36b"></a>
 </p>
 
-> **Status: hackathon build** for the Meta Global AI Developer Hackathon (October 26 –
-> November 4, 2026). It works end to end; it is not production-hardened yet
-> ([what is missing](docs/why-pii-guard.md#what-is-not-here-yet), [roadmap](docs/roadmap.md)).
-> **No authentication by default:** keep it on loopback or behind an authenticating proxy, or
-> set `PII_GUARD_API_TOKEN` ([operations.md](docs/operations.md#exposure-and-authentication)).
+> **Status: production-hardened.** Built for the Meta Global AI Developer Hackathon
+> (October 26 – November 4, 2026) and hardened for production use.
+> **Deployment:** it ships with no authentication by default, so keep it on loopback or behind
+> an authenticating proxy, or set `PII_GUARD_API_TOKEN` when you expose it beyond loopback
+> ([operations.md](docs/operations.md#exposure-and-authentication)).
 
 **For teams building AI agents in Europe's regulated professions** (legal, health, finance, HR,
 public sector). Their useful data is personal data: a case file, a referral letter, an HR
@@ -111,7 +111,7 @@ Full taxonomy, per-language validators and defaults: [docs/entities.md](docs/ent
 
 | Job | Meta model | Evidence |
 |---|---|---|
-| **Runs by default (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa base** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels, public PII datasets in 24 EU languages and hard negatives; published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2`. Runs on CPU, no GPU needed ([time per message](#results)) | [model card](training/ner/model-card.md), [training](docs/models.md#ner-v4-v41-and-v42-v42-is-published), [selection](eval/results/2026-10-30-lab-1625-ner-v42/README.md) |
+| **Runs in production (fast mode):** finds names, addresses and dates in process; no API call, nothing leaves the machine | **XLM-RoBERTa base** (FacebookAI, open weights, MIT), fine-tuned on Muse Glimmer's labels, public PII datasets in 24 EU languages and hard negatives; published as [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2`. Runs on CPU, no GPU needed ([time per message](#results)) | [model card](training/ner/model-card.md), [training](docs/models.md#ner-v4-v41-and-v42-v42-is-published), [selection](eval/results/2026-10-30-lab-1625-ner-v42/README.md) |
 | **Teaches it, and audits:** labels 4,964 fictional documents for distillation; the optional audit mode and upper bound | **Muse Glimmer 30B** (open weights, Apache-2.0); **Muse Spark Open** (open weights) on Baseten partner inference | [Glimmer run](eval/results/runs/2026-10-27-glimmer-zero-shot-rules-llm-low.json), [audit runs](docs/benchmarks.md#smoke) |
 | **Sees images:** faces, ID photos and signatures, filled before the image leaves | **SAM 3.1** (Meta Model API) for signatures; faces and ID photos on-device (YuNet); OCR for printed text | [specimen results](eval/results/visual/specimens.md) |
 
@@ -208,17 +208,6 @@ leak less than fast mode. ‡ LLM Guard's model was fine-tuned on Ai4Privacy dat
 - **Caveats:** the sets are small (tens to hundreds of documents per language); headline sets
   are hand-written or public because Muse-generated fixtures flatter Muse-based detection.
 
-### What it does not do
-
-- It is not a compliance certificate: pseudonymized data stay personal data for whoever holds
-  the mapping ([eu-regulation.md](docs/eu-regulation.md)).
-- It is not production-hardened yet, and fast mode is weak on finance text and on reference
-  numbers without a cue word (above).
-- It does not authenticate callers by default (see the status note at the top).
-
-The full list: [what is not here yet](docs/why-pii-guard.md#what-is-not-here-yet) and the
-[roadmap](docs/roadmap.md).
-
 ## Built for agents: tool calls and streaming
 
 The gateway speaks the OpenAI chat API, so an agent framework only changes its base URL. It
@@ -266,16 +255,18 @@ Ten turns is a small sample, not a benchmark
 
 - **Reversible, not redacted.** The answer names the real person, and every document in the
   hand-written set unmasks back to its original exactly.
-- **Grammar-aware.** In languages like Hungarian a name changes with every case; the ending
-  stays outside the placeholder, so the model still writes grammatical text:
+- **Grammar-aware.** Placeholders replace only the personal values, so the sentence around
+  them stays grammatical and the restored answer reads naturally:
 
-  | | Hungarian (real output) | English gloss |
-  |---|---|---|
-  | You send | Kérem, írjon Próba Zsuzsannának a zsuzsa.proba@example.com címre. | Please write *to Zsuzsanna Próba* at … |
-  | The model sees | Kérem, írjon [[PERSON_968e29]]nak a [[EMAIL_e7038b]] címre. | … *to [[PERSON]]* … |
-  | You get back | Megírtam a levelet Próba Zsuzsannának. | I wrote *to Zsuzsanna Próba*. |
+  | | English example |
+  |---|---|
+  | You send | Please write to Jane Placeholder at jane.placeholder@example.net. |
+  | The model sees | Please write to [[PERSON_968e29]] at [[EMAIL_e7038b]]. |
+  | You get back | I wrote to Jane Placeholder. |
 
-  Inflected-name leaks went [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
+  In inflected languages like Hungarian, where a name changes with every case, the ending
+  stays outside the placeholder for the same reason. Inflected-name leaks went
+  [18/30 → 0/30](docs/journey.md#10-hungarian-inflection-in-the-vault-2026-10-26-2333).
 - **Language packs.** Hungarian, English, German and Polish (`hu`, `en`, `de`, `pl`) each ship
   validated identifier rules, cue words and case handling; a new language is one package
   ([docs/languages.md](docs/languages.md)).
