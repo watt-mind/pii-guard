@@ -122,6 +122,19 @@ describe("Connect quickstart", () => {
     expect(again.mock.calls[0]![0].session).toBe(sessions[2]);
   });
 
+  it("opens the deep-linked client tab first, and follows later links (LAB-1314)", async () => {
+    const load = loader();
+    const { rerender } = render(<Connect status={okStatus} traffic={live()} loadSnippets={load} initialClient="codex" />);
+    expect(await screen.findByText("Waiting for Codex…")).toBeInTheDocument();
+    rerender(<Connect status={okStatus} traffic={live()} loadSnippets={load} initialClient="pi" />);
+    expect(await screen.findByText("Waiting for pi…")).toBeInTheDocument();
+  });
+
+  it("ignores an unknown deep-linked client (LAB-1314)", async () => {
+    render(<Connect status={okStatus} traffic={live()} loadSnippets={loader()} initialClient="bogus" />);
+    expect(await screen.findByText("Waiting for Muse Code…")).toBeInTheDocument();
+  });
+
   it("turns step 3 green when the tool's first request arrives, and links to it in Logs", async () => {
     const user = userEvent.setup();
     const onOpenLog = vi.fn();

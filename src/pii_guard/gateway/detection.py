@@ -135,6 +135,19 @@ class ModeDetector:
         Raises :class:`~pii_guard.policy.BlockedEntityError` if a span has a ``block`` policy,
         :class:`DetectionUnavailableError` if the mode is unavailable.
         """
+        spans, timings = self.resolve(text, language)
+        return self.policies.apply(spans).masked, timings
+
+    def detect_many(
+        self, texts: Sequence[str], language: str
+    ) -> tuple[list[list[Span]], dict[str, float]]:
+        """:meth:`detect` for several texts in one call (one worker job), with summed timings."""
+        found, timings = self.resolve_many(texts, language)
+        return [self.policies.apply(spans).masked for spans in found], timings
+
+    def resolve(self, text: str, language: str) -> tuple[list[Span], dict[str, float]]:
+        """Like :meth:`detect`, but the spans kept by policy stay in (the gateway reports
+        them in its echo, LAB-1180). ``block`` raises as in :meth:`detect`."""
         self.require_available()
         token = _timings.set({})
         try:
@@ -143,12 +156,13 @@ class ModeDetector:
         finally:
             _timings.reset(token)
         spans = check_spans(spans, text, f"{self.mode.value} pipeline")
-        return self.policies.apply(spans).masked, timings
+        self.policies.apply(spans)  # BlockedEntityError for a ``block`` type
+        return list(spans), timings
 
-    def detect_many(
+    def resolve_many(
         self, texts: Sequence[str], language: str
     ) -> tuple[list[list[Span]], dict[str, float]]:
-        """:meth:`detect` for several texts in one call (one worker job), with summed timings.
+        """:meth:`resolve` for several texts in one call (one worker job), with summed timings.
 
         Uses the pipeline's ``detect_many`` when it has one, so the NER model runs on all
         texts in batched forwards. Fail closed: any error fails every text.
@@ -167,11 +181,12 @@ class ModeDetector:
         if not isinstance(found, list) or len(found) != len(texts):
             raise DetectionError(f"{self.mode.value} pipeline returned the wrong number of results")
         name = f"{self.mode.value} pipeline"
-        masked = [
-            self.policies.apply(check_spans(spans, text, name)).masked
-            for spans, text in zip(found, texts, strict=True)
+        resolved = [
+            list(check_spans(spans, text, name)) for spans, text in zip(found, texts, strict=True)
         ]
-        return masked, timings
+        for spans in resolved:
+            self.policies.apply(spans)  # BlockedEntityError for a ``block`` type
+        return resolved, timings
 
 
 def gateway_policies(settings: Settings, config: GatewayConfig) -> PolicySet:

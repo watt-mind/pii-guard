@@ -8,10 +8,11 @@ and streaming (off, on). Each request opens a new session (a fresh ``/s/<session
 so nothing is served from the detection cache.
 
 Per request it keeps the gateway's own timing (:class:`~pii_guard.observability.RequestTimer`:
-stages, per-detector time, ``overhead = total - upstream - client``, added time to first token)
-and the client-side wall time; per cell it reports p50 / p95 / p99 / mean. Because the upstream
-is a fixed sleep, the overhead is pii-guard's work and nothing else: parsing, detection, masking,
-the HTTP hop to the upstream and back, unmasking. With ``--record SLUG`` the result is written
+stages, per-detector time, ``overhead = total - upstream - client``, added time to first token,
+the outbound re-check's own time) and the client-side wall time; per cell it reports p50 / p95 /
+p99 / mean. Because the upstream is a fixed sleep, the overhead is pii-guard's work and nothing
+else: parsing, detection, masking, the outbound re-check, the HTTP hop to the upstream and back,
+unmasking. With ``--record SLUG`` the result is written
 as run records (``kind: latency``, one per mode) in ``eval/results/runs/`` and the benchmark
 report is regenerated.
 
@@ -41,6 +42,7 @@ import httpx
 from pii_guard import __version__
 from pii_guard.bench.mock_upstream import create_mock_upstream
 from pii_guard.eval import stats
+from pii_guard.eval.record import with_role
 from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel
 from pii_guard.observability.timing import STAGES
 
@@ -200,6 +202,14 @@ class CellResult:
                 name: percentiles([t["detectors_ms"].get(name, 0.0) for t in timing])
                 for name in detector_names
             },
+            # The outbound re-check's own time (LAB-1500), part of the detect-to-forward path.
+            "outbound_check_ms": percentiles(
+                [
+                    e["outbound_check"]["ms"]
+                    for e in self.events
+                    if (e.get("outbound_check") or {}).get("ms") is not None
+                ]
+            ),
         }
 
 
@@ -289,13 +299,15 @@ def run_benchmark(
     progress: Any = None,
 ) -> list[CellResult]:
     """Run every cell; ``mode_requests`` caps N per mode (``{"audit": 12}``)."""
+    from pydantic import SecretStr
+
     from pii_guard.api.app import create_app
     from pii_guard.config import Settings
 
     settings = Settings(
         host="127.0.0.1",
         upstream_api_key=None,
-        tenant_key=secrets.token_hex(32),
+        tenant_key=SecretStr(secrets.token_hex(32)),
         upstream_base_url="http://127.0.0.1:1/v1",  # replaced below
     )
     mock_app = create_mock_upstream(delay_ms=delay_ms)
@@ -456,14 +468,16 @@ def build_records(
                     "pii_guard_version": __version__,
                     "note": None,
                 },
-                "system": {
-                    "key": f"gateway-latency:{mode}:{system_detectors or 'none'}",
-                    "label": label,
-                    "family": "pii-guard",
-                    "tool": "pii-guard",
-                    "version": __version__,
-                    "detectors": detectors,
-                },
+                "system": with_role(
+                    {
+                        "key": f"gateway-latency:{mode}:{system_detectors or 'none'}",
+                        "label": label,
+                        "family": "pii-guard",
+                        "tool": "pii-guard",
+                        "version": __version__,
+                        "detectors": detectors,
+                    }
+                ),
                 "fixture_set": "latency-corpus",
                 "fixtures": [
                     {

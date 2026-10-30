@@ -130,6 +130,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--record", action="store_true", help="write run records and counts")
     p.add_argument("--limit", type=int, help="first N documents per language")
     p.add_argument("--day", help="record date (default: today)")
+    p.add_argument(
+        "--tag",
+        "--slug",
+        dest="tag",
+        help="slug-safe suffix for the run id (a second fast-mode run on the same day)",
+    )
     return parser
 
 
@@ -162,7 +168,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         systems = [s.strip() for s in args.system.split(",") if s.strip()]
         summaries = run_dataset(
-            get(args.name), systems, record=args.record, limit=args.limit, day=args.day
+            get(args.name),
+            systems,
+            record=args.record,
+            limit=args.limit,
+            day=args.day,
+            tag=args.tag,
         )
         print_summaries(summaries)
         if args.record:

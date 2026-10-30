@@ -5,12 +5,14 @@ export type Policy = "mask" | "keep" | "block";
 /** Coarse families for charts: five fixed categorical slots instead of one hue per type. */
 export type EntityGroup = "name" | "contact" | "identifier" | "image" | "organization";
 
+/** Names must not wear masked blue (LAB-1263): blue (series-1) sits on Organizations,
+which are `keep` and rarely render here, so routinely drawn groups stay off the status hues. */
 export const ENTITY_GROUPS: readonly { id: EntityGroup; label: string; color: string }[] = [
-  { id: "name", label: "Names", color: "var(--series-1)" },
+  { id: "name", label: "Names", color: "var(--series-4)" },
   { id: "contact", label: "Contact", color: "var(--series-2)" },
   { id: "identifier", label: "Identifiers", color: "var(--series-3)" },
-  { id: "image", label: "Image regions", color: "var(--series-4)" },
-  { id: "organization", label: "Organizations", color: "var(--series-5)" },
+  { id: "image", label: "Image regions", color: "var(--series-5)" },
+  { id: "organization", label: "Organizations", color: "var(--series-1)" },
 ];
 
 interface EntityDef {
@@ -102,8 +104,15 @@ const ENTITY_DEFS: Record<EntityType, EntityDef> = {
     group: "identifier",
   },
   BANK_ACCOUNT: {
-    label: "Bank account",
-    short: "IBN",
+    // Covers IBANs and payment cards (docs/entities.md): never read as IBAN-only (LAB-1187).
+    label: "Bank account / card",
+    short: "BNK",
+    policy: "mask",
+    group: "identifier",
+  },
+  PAYMENT_CARD: {
+    label: "Payment card",
+    short: "CRD",
     policy: "mask",
     group: "identifier",
   },
@@ -209,6 +218,7 @@ export const CHECKSUM_TYPES: ReadonlySet<EntityType> = new Set<EntityType>([
   "NATIONAL_ID_HU_TAX",
   "NATIONAL_ID_HU_TAJ",
   "BANK_ACCOUNT",
+  "PAYMENT_CARD",
   "COMPANY_ID_HU",
 ]);
 
@@ -220,7 +230,7 @@ const TEXT_TYPES = Object.keys(ENTITY_DEFS).filter((t) => !["FACE", "SIGNATURE",
  */
 export const DETECTOR_TYPES: Record<string, { types: readonly EntityType[]; partly?: readonly EntityType[] }> = {
   rules: {
-    types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE", "SECRET"],
+    types: ["EMAIL", "PHONE", "NATIONAL_ID_HU_TAX", "NATIONAL_ID_HU_TAJ", "BANK_ACCOUNT", "PAYMENT_CARD", "COMPANY_ID_HU", "ID_DOCUMENT", "VEHICLE_PLATE", "SECRET"],
     partly: ["ADDRESS"],
   },
   ner: { types: ["PERSON", "ORGANIZATION", "ADDRESS"] },
@@ -256,5 +266,7 @@ export function detectorLabel(detector: string, options: DetectorLabelOptions = 
   if (detector === "ner") return "Multilingual NER";
   if (detector === "known") return "Known value (pre-loaded)";
   if (detector === "demo") return "Demo rules (in browser)";
+  if (detector === "captions") return "Field captions";
+  if (detector === "mrz") return "Machine-readable zone";
   return detector;
 }

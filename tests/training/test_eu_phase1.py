@@ -171,3 +171,13 @@ def test_phase1b_sources_in_manifest() -> None:
         assert src["synthetic"] is True
         langs = {f.split("-")[0] for f in src["files"]}
         assert langs == {"fr", "es", "it", "nl", "ro", "ga", "mt"}, name
+
+
+def test_openpii_manifest_writer_keeps_synthetic_flag() -> None:
+    """LAB-1543: rebuilding the manifest must not drop the hand-added synthetic flag."""
+    import openpii
+
+    manifest = openpii.build_manifest({}, {}, 1525, {}, {})
+    assert manifest["synthetic"] is True
+    committed = json.loads((ROOT / "training/ner/eu-openpii-train-manifest.json").read_text())
+    assert committed["synthetic"] is True

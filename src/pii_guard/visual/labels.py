@@ -38,8 +38,8 @@ from typing import Any
 from pii_guard.policy import Policy
 from pii_guard.types import EntityType, MaskingError, Span
 from pii_guard.vault import PLACEHOLDER_RE, VaultSession, normalize_value
-from pii_guard.visual.fuzzy import Candidate, Match, match_value, name_tokens
-from pii_guard.visual.mrz import MrzData, parse_mrz
+from pii_guard.visual.fuzzy import CONFUSION_GROUPS, Candidate, Match, match_value, name_tokens
+from pii_guard.visual.mrz import MrzData, check_digit, parse_mrz
 from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
 from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.summary import (
@@ -321,6 +321,35 @@ def _holder_text(fields: dict[str, list[TextFinding]], mrz: MrzData | None) -> s
     return None
 
 
+#: OCR confusions tried for an MRZ document number beyond :data:`CONFUSION_GROUPS`:
+#: Tesseract reads ``J`` for ``I`` on OCR-B. Not a global confusion: one letter read for
+#: another is another document (LAB-1211); the check digit gates the substitution here.
+_MRZ_EXTRA_CONFUSIONS = ("IJ", "ij")
+
+
+def mrz_number_fixes(mrz: MrzData) -> list[str]:
+    """The document number with one OCR-confusion substitution that makes its check digit
+    pass (LAB-1197): Tesseract reads ``O`` for ``0``, ``I`` for ``1`` (and ``J`` for ``I``
+    on OCR-B) and the like; the digit says which read is right. ``[]`` when the check
+    digit itself is unreadable or nothing passes."""
+    check = mrz.number_check
+    if len(check) != 1 or not check.isdigit() or not mrz.document_number:
+        return []
+    out: list[str] = []
+    for index, char in enumerate(mrz.document_number):
+        for group in (*CONFUSION_GROUPS, *_MRZ_EXTRA_CONFUSIONS):
+            if char.casefold() not in group:
+                continue
+            for alt in group:
+                if not alt.isalnum() or alt == char.casefold():
+                    continue
+                fixed = alt.upper() if alt.isalpha() else alt
+                variant = mrz.document_number[:index] + fixed + mrz.document_number[index + 1 :]
+                if check_digit(variant) == check and variant not in out:
+                    out.append(variant)
+    return out
+
+
 def _overlap(a: Box, b: Box) -> int:
     ix = min(a.x2, b.x2) - max(a.x1, b.x1) + 1
     iy = min(a.y2, b.y2) - max(a.y1, b.y1) + 1
@@ -346,10 +375,31 @@ def _kind_label(entity_type: EntityType, holder: _Holder | None) -> RegionLabel:
     return RegionLabel(f"{kind} · {placeholder}", placeholder, holder.label.match)
 
 
-def _transcript(words: Sequence[OcrWord], covered: Sequence[tuple[Box, RegionLabel]]) -> str:
+#: The transcript token for a non-personal expiry value under ``expiry="reduce"``.
+EXPIRY_MARKER = "[EXPIRY]"
+
+
+def _expiry_redactions(ocr: OcrText | None, expiry: ExpiryPolicy) -> list[tuple[Box, str]]:
+    """The expiry value boxes to redact in the transcript when ``expiry="reduce"``
+    (LAB-1196): ``reduce`` then means the same in the transcript as in the summary.
+    Empty under ``expiry="keep"``: the date stays verbatim."""
+    if ocr is None or expiry != "reduce":
+        return []
+    return [
+        (value.box, EXPIRY_MARKER) for value in ocr.fields if field_name(value.caption) == "expiry"
+    ]
+
+
+def _transcript(
+    words: Sequence[OcrWord],
+    covered: Sequence[tuple[Box, RegionLabel]],
+    redacted: Sequence[tuple[Box, str]] = (),
+) -> str:
     """The OCR text, lines kept, with every covered word replaced by its region's token
     (the placeholder, or ``[PHOTO · [[PERSON_x]]]`` for a labelled visual region / MRZ).
-    Consecutive words of one region collapse into one token."""
+    Consecutive words of one region collapse into one token. ``redacted`` additionally
+    replaces the words under its boxes with a fixed marker (the ``[EXPIRY]`` transcript
+    redaction); a covered word keeps its placeholder."""
     parts: list[str] = []
     previous_line: tuple[int, ...] | None = None
     previous_token: str | None = None
@@ -368,6 +418,11 @@ def _transcript(words: Sequence[OcrWord], covered: Sequence[tuple[Box, RegionLab
                 token = best.placeholder
             else:
                 token = f"[{best.label or 'MASKED'}]"
+        elif redacted:
+            for box, marker in redacted:
+                if _overlap(word.box, box) >= WORD_COVER * area:
+                    token, replaced = marker, True
+                    break
         if word.line != previous_line:
             if parts:
                 parts.append("\n")
@@ -489,6 +544,10 @@ def label_image(
                 mrz_data.document_number, EntityType.ID_DOCUMENT
             ).placeholder
         else:
+            # A misread zone's number is only matched, never stored. First as read, then
+            # the check-digit-gated OCR-confusion fixes (LAB-1197). A fix reconstructs the
+            # printed number with the digit's certainty, so it must match exactly: a fuzzy
+            # reuse could merge a near-namesake the digit ruled out.
             found = matcher.match(mrz_data.document_number, EntityType.ID_DOCUMENT)
             if (
                 found.accepted
@@ -496,6 +555,16 @@ def label_image(
                 and not found.candidate.placeholder.startswith("known:")
             ):
                 mrz_document = found.candidate.placeholder
+            else:
+                for fix in mrz_number_fixes(mrz_data):
+                    fixed = matcher.match(fix, EntityType.ID_DOCUMENT)
+                    if (
+                        fixed.status == "exact"
+                        and fixed.candidate is not None
+                        and not fixed.candidate.placeholder.startswith("known:")
+                    ):
+                        mrz_document = fixed.candidate.placeholder
+                        break
     for finding in findings:
         if id(finding) in holder_findings and holder is not None:
             labelled.append((finding, holder.label))
@@ -530,7 +599,7 @@ def label_image(
         region_labels.append(label)
         covered_boxes.append((region.box, label))
 
-    transcript = _transcript(words, covered_boxes)
+    transcript = _transcript(words, covered_boxes, _expiry_redactions(ocr, expiry))
     transcript = matcher.sweep(transcript, masked_types)
     transcript = matcher.session.mask(transcript, [], language=matcher.language, remask=True)
     summary = build_summary(

@@ -3,14 +3,16 @@
 ```
 pii-guard eval [PATH ...] [--fixtures PATH ...] [--detectors rules[,ner,llm]]
                [--language hu[,en]] [--json OUT] [--markdown OUT]
-               [--baselines presidio,llm-guard,privaite] [--known-values]
+               [--baselines presidio,llm-guard,privaite] [--known-values] [--outbound-check]
                [--redteam [--redteam-contexts masked-only,decoys]]
+               [--price-input USD --price-cached USD --price-output USD]  # per 1M tokens
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
 pii-guard eval visual --specimens data/specimens  # visual recall on specimen ID documents
 pii-guard eval injection --detectors rules,llm   # leak rate per prompt-injection attack class
 pii-guard eval ... --record SLUG [--record-extra FILE.json]  # also write a run record
 pii-guard eval record SCORECARD.json --slug SLUG  # run record(s) from a saved scorecard
 pii-guard eval report [--check]  # index.json, charts and docs/benchmarks.md from the records
+pii-guard eval gate [--gates FILE] [--runs-dir DIR]  # regression gate (eval/gates.json), 0/1/2
 pii-guard eval datasets list|fetch|check|run  # registered datasets (docs/datasets.md)
 ```
 
@@ -24,12 +26,19 @@ Fixtures whose documents carry ``meta.attack`` (the prompt-injection sets) also 
 table per attack class (:mod:`pii_guard.eval.injection`).
 ``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
 ``known`` detector), to measure the uplift of pre-loading values an application already knows.
+``--outbound-check`` also replays the documents through the gateway in fast mode with the same
+detectors and counts the requests its outbound re-check refuses (false blocks) and its time per
+request (:mod:`pii_guard.eval.outbound`), per language and overall.
 ``--redteam`` then asks an attacker model (Muse Spark Open on Baseten by default) to recover
 the masked values from the masked text, and reports the re-identification rate and exposure
 per context, language and entity type (:mod:`pii_guard.eval.redteam`).
 ``--record SLUG`` writes ``eval/results/runs/<date>-<SLUG>.json`` (one per comparison tool
 too, :mod:`pii_guard.eval.record`) and regenerates the benchmark report; ``--record-extra``
 merges a partial record (models, settings, hardware, cost) into it.
+Detectors that meter requests (the LLM detector) add ``meta.usage`` to the scorecard: request,
+token, invalid-output and refusal counts. ``--price-input/--price-cached/--price-output`` (USD
+per 1M tokens) price them as a total and $ per 1k messages; with ``--record`` that estimate
+becomes the run record's ``cost`` unless ``--record-extra`` sets one.
 
 Exit codes: 0 success, 1 a detector or the vault failed during the run, 2 bad arguments,
 unreadable fixtures or no loadable detector.
@@ -59,6 +68,16 @@ def _csv(value: str) -> list[str]:
     if not items:
         raise argparse.ArgumentTypeError("expected a comma-separated list")
     return items
+
+
+def _price(value: str) -> float:
+    try:
+        price = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("expected a number (USD per 1M tokens)") from None
+    if not price >= 0 or price == float("inf"):
+        raise argparse.ArgumentTypeError("expected a non-negative number (USD per 1M tokens)")
+    return price
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -104,9 +123,25 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="pre-load each document's meta.known_values into its session (known detector)",
     )
+    parser.add_argument(
+        "--outbound-check",
+        action="store_true",
+        help="also replay the documents through the gateway and count outbound re-check blocks",
+    )
     from pii_guard.eval.redteam import add_redteam_arguments
 
     add_redteam_arguments(parser)
+    for kind, what in (
+        ("input", "uncached prompt"),
+        ("cached", "cached prompt (default: the input price)"),
+        ("output", "completion"),
+    ):
+        parser.add_argument(
+            f"--price-{kind}",
+            type=_price,
+            metavar="USD",
+            help=f"LLM detector price per 1M {what} tokens, for the cost in meta.usage",
+        )
     parser.add_argument("--json", type=Path, metavar="OUT", help="write the JSON scorecard here")
     parser.add_argument(
         "--markdown", type=Path, metavar="OUT", help="also write the Markdown table here"
@@ -166,6 +201,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pii_guard.eval.report_cli import main as report_main
 
         return report_main(argv[1:])
+    if argv[:1] == ["gate"]:  # ``pii-guard eval gate``: quality regression gate vs run records
+        from pii_guard.eval.gate import main as gate_main
+
+        return gate_main(argv[1:])
     args = build_parser().parse_args(argv)
     if args.record_extra and not args.record:
         print("pii-guard eval: --record-extra needs --record SLUG", file=sys.stderr)
@@ -217,6 +256,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Fail closed and say why without raw values (messages carry types and counts only).
         print(f"pii-guard eval: run failed: {exc.code}: {exc.message}", file=sys.stderr)
         return 1
+    usage = analyzer.usage()  # before the red team, which may run the detectors again
 
     scorecard = build_scorecard(
         results,
@@ -224,11 +264,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         skipped_detectors=analyzer.skipped,
         fixture_paths=fixture_paths,
         languages=args.language,
+        usage=usage,
+        price={"input": args.price_input, "cached": args.price_cached, "output": args.price_output},
     )
     if args.known_values:
         scorecard["meta"]["known_values"] = sum(
             len(d.meta.get("known_values") or ()) for d in documents
         )
+    if args.outbound_check:
+        from pii_guard.eval.outbound import outbound_blocks
+
+        try:
+            replayed = outbound_blocks(documents, analyzer.detectors)
+        except PiiGuardError as exc:
+            print(
+                f"pii-guard eval: outbound replay failed: {exc.code}: {exc.message}",
+                file=sys.stderr,
+            )
+            return 1
+        scorecard["overall"]["outbound_check"] = replayed["overall"]
+        for lang, block in replayed["languages"].items():
+            if lang in scorecard["languages"]:
+                scorecard["languages"][lang]["outbound_check"] = block
     markdown = render_markdown(scorecard)
     if any("attack" in d.meta for d in documents):
         from pii_guard.eval.injection import attack_breakdown, attack_of, render_attack_table
@@ -274,15 +331,59 @@ def main(argv: Sequence[str] | None = None) -> int:
             json.dumps(scorecard, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
     if args.record:
-        return _record(scorecard, args.record, extra, args.runs_dir)
+        return _record(scorecard, args.record, _with_usage_cost(extra, scorecard), args.runs_dir)
     return 0
+
+
+def _with_usage_cost(
+    extra: dict[str, Any] | None, scorecard: dict[str, Any]
+) -> dict[str, Any] | None:
+    """``extra`` with the priced LLM usage as the record's ``cost``, unless it sets one."""
+    usage = scorecard["meta"].get("usage") or {}
+    cost = usage.get("cost")
+    if not cost or (extra and extra.get("cost")):
+        return extra
+    total = usage["total"]
+    prompt, completion = total.get("prompt_tokens", 0), total.get("completion_tokens", 0)
+    prices = cost["prices_per_1m_tokens"]
+    note = (
+        f"LLM detector usage priced at ${prices['input']}/${prices['cached']}/"
+        f"${prices['output']} per 1M input/cached/output tokens"
+    )
+    return {
+        **(extra or {}),
+        "cost": {
+            "usd": round(cost["usd"], 4),
+            "estimated": True,
+            "model_calls": total.get("requests"),
+            "tokens": {
+                "prompt": prompt,
+                "cached": total.get("cached_tokens", 0),
+                "completion": completion,
+                "reasoning": total.get("reasoning_tokens", 0),
+                "total": prompt + completion,
+            },
+            "note": note,
+        },
+    }
 
 
 def _record(
     scorecard: dict[str, Any], slug: str, extra: dict[str, Any] | None, runs_dir: Path
 ) -> int:
-    """Write the run record(s) for ``scorecard`` and rebuild the benchmark report."""
-    from pii_guard.eval.record import RecordError, build_records, host_info, write_records
+    """Write the run record(s) for ``scorecard`` and rebuild the benchmark report.
+
+    With a non-default ``--runs-dir`` the report rebuild is skipped (LAB-1368): rebuilding
+    ``docs/benchmarks.md`` from a lone probe record would overwrite the committed page.
+    The default path rebuilds the committed docs as before.
+    """
+    from pii_guard.eval.record import (
+        DEFAULT_RUNS_DIR,
+        RecordError,
+        build_records,
+        host_info,
+        write_records,
+    )
     from pii_guard.eval.report_cli import main as report_main
 
     try:
@@ -293,4 +394,11 @@ def _record(
         return 2
     for path in paths:
         print(f"pii-guard eval: wrote {path}", file=sys.stderr)
+    if Path(runs_dir) != DEFAULT_RUNS_DIR:
+        print(
+            "pii-guard eval: --record: custom --runs-dir, skipping docs/benchmarks.md "
+            "rebuild (run `pii-guard eval report` for the committed runs dir)",
+            file=sys.stderr,
+        )
+        return 0
     return report_main(["--runs-dir", str(runs_dir)])

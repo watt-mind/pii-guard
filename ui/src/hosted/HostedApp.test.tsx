@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import * as chatApi from "../api/chat";
@@ -36,7 +36,7 @@ describe("public hosted workflow", () => {
     await screen.findAllByText(/free runs/i);
     expect(screen.getByText(/Runs on Muse Spark 1.3 · no key needed/)).toHaveTextContent("3 of 3 free runs left today");
     expect(document.body.textContent).not.toMatch(/sponsor/i);
-    const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Console" })];
+    const links = [...screen.getAllByRole("link", { name: "Sign in with Google" }), ...screen.getAllByRole("link", { name: "Sign in to console" })];
     expect(links.length).toBeGreaterThanOrEqual(2);
     for (const link of links) expect(link).toHaveAttribute("href", "/.auth/login/google?post_login_redirect_uri=%2F%23overview");
   });
@@ -342,7 +342,7 @@ describe("positioning and copy (LAB-1466)", () => {
     render(<HostedApp call={call} />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Send the work to the model.Keep the people out of it.");
     await screen.findByText(/Runs on Muse Spark 1.3/);
-    expect(screen.getAllByText(/measured 27–28 Oct 2026/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/measured 27–30 Oct 2026/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Run the live demo" })).toHaveAttribute("href", "#demo");
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/sponsor|Llama|GDPR[- ]compliant|compliant with GDPR|anonymi[sz]ed data|privacy firewall|Hungarian first|coming soon/i);
@@ -355,7 +355,7 @@ describe("positioning and copy (LAB-1466)", () => {
     expect(screen.getByRole("list", { name: "Meta models and what each does" })).toHaveTextContent(/XLM-RoBERTa.*Muse Glimmer 30B.*served on Modal.*The teacher.*Muse Spark Open.*on Baseten.*SAM 3\.1.*Muse Spark 1\.3/);
     expect(text).not.toMatch(/LoRA|being finali[sz]ed|not a live run|Checking availability|written by hand/);
     expect(text).not.toMatch(/Claude Code/);
-    expect(screen.getByText(/^Next best: PrivAiTe 12\.7\s%$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Next best: PrivAiTe 13\.0\s%$/)).toBeInTheDocument();
   });
   it("doesn't name a model the server didn't report", async () => {
     const call = requester((path) => path === "/v1/account" ? { ...account, included_model: undefined } : result);
@@ -363,12 +363,12 @@ describe("positioning and copy (LAB-1466)", () => {
     await screen.findByText(/Runs on Meta’s model · no key needed/);
     expect(document.body.textContent).not.toMatch(/Muse Spark 1\.3/);
   });
-  it("keeps one primary action in the header area: sign-in is secondary", async () => {
+  it("keeps sign-in clearly named in the header", async () => {
     const call = requester((path) => path === "/v1/account" ? account : result);
     render(<HostedApp call={call} />);
     await screen.findAllByText(/free runs/);
-    const nav = screen.getByRole("navigation", { name: "Main navigation" });
-    expect(nav.querySelector("a[href^='/.auth/login']")?.className).not.toMatch(/bg-primary/);
+    const nav = screen.getByRole("navigation", { name: "Main navigation" }).closest("header")!;
+    expect(within(nav).getByRole("link", { name: "Sign in to console" })).toHaveAttribute("href", account.login_url);
   });
 });
 
@@ -402,16 +402,16 @@ describe("landing round L3 (LAB-1515, LAB-1503)", () => {
   it("offers a section menu where the nav links don't fit, closed after a link is followed", async () => {
     const user = userEvent.setup();
     render(<HostedApp call={requester((path) => path === "/v1/account" ? account : result)} />);
-    const menu = screen.getByText("Sections").closest("details")!;
-    await user.click(screen.getByText("Sections"));
+    const menu = screen.getByText("Menu").closest("details")!;
+    await user.click(screen.getByText("Menu"));
     expect(menu).toHaveAttribute("open");
     await user.click(screen.getAllByRole("link", { name: "Why Europe" })[0]!);
     expect(menu).not.toHaveAttribute("open");
-    await user.click(screen.getByText("Sections"));
+    await user.click(screen.getByText("Menu"));
     await user.keyboard("{Escape}");
     expect(menu).not.toHaveAttribute("open");
-    expect(screen.getByText("Sections").closest("summary")).toHaveFocus();
-    await user.click(screen.getByText("Sections"));
+    expect(screen.getByText("Menu").closest("summary")).toHaveFocus();
+    await user.click(screen.getByText("Menu"));
     await user.click(screen.getByRole("heading", { level: 1 }));
     expect(menu).not.toHaveAttribute("open");
   });
@@ -444,7 +444,7 @@ describe("landing recovery and keyboard navigation (LAB-1540)", () => {
 
   it("closes when keyboard focus leaves and focuses the destination after following a section", async () => {
     const user = userEvent.setup(); render(<HostedApp call={requester(() => account)} />);
-    const toggle = screen.getByText("Sections").closest("summary")!;
+    const toggle = screen.getByText("Menu").closest("summary")!;
     const menu = toggle.closest("details")!;
     await user.click(toggle);
     await user.tab({ shift: true });
@@ -475,5 +475,23 @@ describe("hosted recovery copy", () => {
     }
     expect(recovery(new ApiError(404, "not_found", "x"))).not.toMatch(/Reconnect/);
     expect(recovery(new ApiError(404, "not_found", "x"), "site")).not.toMatch(/Reconnect/);
+  });
+});
+
+describe("public footer", () => {
+  it("links the official brand marks once by name and preserves useful destinations", () => {
+    render(<HostedApp call={requester(() => account)} />);
+    const footer = screen.getByRole("navigation", { name: "Footer" }).closest("footer")!;
+    const links = [...footer.querySelectorAll("a")];
+    for (const [name, href, src] of [["Built by Watt Mind", "https://watt-mind.com/", "/brands/watt-mind.svg"], ["Source on GitHub", "https://github.com/watt-mind/pii-guard", "/brands/github.svg"]] as const) {
+      const a = links.find((el) => el.textContent?.includes(name))!;
+      expect(a).toHaveAccessibleName(name);
+      expect(a).toHaveAttribute("href", href);
+      expect(a).not.toHaveAttribute("target");
+      expect(a.querySelector("img")).toHaveAttribute("alt", "");
+      expect(a.querySelector("img")).toHaveAttribute("src", src);
+    }
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(expect.arrayContaining(["#data", "https://github.com/watt-mind/pii-guard#try-it", "https://github.com/watt-mind/pii-guard/blob/develop/docs/integrations/README.md", "https://github.com/watt-mind/pii-guard/issues"]));
+    expect(footer).toHaveTextContent("Apache-2.0");
   });
 });

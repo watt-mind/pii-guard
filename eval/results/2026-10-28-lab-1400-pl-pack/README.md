@@ -7,9 +7,13 @@ in both. Run records:
 [before](../runs/2026-10-28-lab-1400-pl-pii-bench-before.json),
 [after](../runs/2026-10-28-lab-1400-pl-pii-bench-after.json),
 [rules only, after](../runs/2026-10-28-lab-1400-pl-pii-bench-rules.json). The pl-smoke
-scorecards are in this folder ([rules](pl-smoke-rules.json), [fast](pl-smoke-fast.json)), not in
-the run log: a run record there would add Polish to the headline `smoke` set, which no
-comparison tool has run on yet.
+scorecards in this folder ([rules](pl-smoke-rules.json), [fast](pl-smoke-fast.json)) were kept
+out of the run log at the time, because a record there adds Polish to the headline `smoke` set
+and no comparison tool had run on it. Since LAB-1589 (2026-10-30) Polish is part of `smoke`:
+rules, fast mode, Presidio, LLM Guard, PrivAiTe and the open-model comparison have run records
+on `pl-smoke` (`../runs/2026-10-30-lab-1589-pl-smoke*.json`). Those runs use the file after
+three of its phone numbers moved to the Polish fiction block of ADR 0005, so these two
+scorecards are on an earlier version of it (same counts: rules leak 39.5 %, fast 0.0 %).
 
 ## Selection discipline
 

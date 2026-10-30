@@ -390,8 +390,8 @@ image parts are refused with `503 ocr_unavailable` (fail closed, ADR 0006): set
 `PII_GUARD_IMAGE_REQUIRE_OCR=false` only if SAM-only masking is acceptable, which leaves text in
 images unchecked (`X-PII-Guard-Image-OCR: off`). pytesseract hands Tesseract the image through
 a temp file, so the read-only `api` and `demo-api` containers mount a `tmpfs` on `/tmp`; a
-read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck checks `/healthz`
-and OCR availability, and prints `ocr on|off` (`docker inspect --format
+read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck reads `/healthz`
+(`"ocr"` plus `"image_require_ocr"`), and prints `ocr on|off` (`docker inspect --format
 '{{json .State.Health}}' <container>`). For `make demo` outside Docker: `brew install
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
@@ -468,6 +468,7 @@ Every limit fails closed with a JSON error and no value in it:
 | Image time | `PII_GUARD_GATEWAY_IMAGE_TIMEOUT` (120 s, per request) and `PII_GUARD_IMAGE_TIMEOUT` (120 s, `/v1/mask/image`) | `503 detection_failed`. The deadline goes into the work: Tesseract gets the remaining time as its subprocess timeout (killed, not left running) and every stage checks it, so the rest of the request's images are not started. |
 | Image size | `PII_GUARD_IMAGE_MAX_PIXELS` (16 000 000) | `413 payload_too_large`, read from the image header before decoding. OCR time and memory grow with pixels: a 221 KB PNG of 7900 x 5000 took 33 to 73 s and about 1 GB, depending on the machine. The decoder's own cap is 40 MP. |
 | Vault sessions | `PII_GUARD_VAULT_MAX_SESSIONS` (10 000) | Creating one more **evicts the least recently used session** (the one whose sliding TTL ends first). Eviction rather than `429` keeps the service up under a flood of `/v1/mask` calls without `session_id`; a later use of an evicted session is `404 session_not_found`, and the client starts a new one. |
+| Leases per client | `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` (1 000) in-flight gateway requests (streams included) per client identity (`Authorization` hash, or `anonymous`) | `503 vault_capacity_exhausted` for that client only, before any session is created; other clients still get a slot. Without it, one client holding about `PII_GUARD_VAULT_MAX_SESSIONS` long streams (up to 600 s each) pinned every slot and everyone else got the 503 (LAB-1584). |
 | Restored characters | `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` (1 000 000, five times the 200 000-character text limit) per `/v1/unmask` call and per gateway response (every choice, field and tool call, streamed or not) | `413 unmask_output_too_large`; a stream ends with an `unmask_output_too_large` error event. Counted before each value is written, so the output never grows past it. Without it, a short text repeating the placeholder of a long secret (a PEM key) expanded about 93 times (LAB-1350). |
 
 Image values are registered in the vault session only when the whole request succeeded: the
@@ -531,6 +532,15 @@ runtime.
   `[redacted]`, `Bearer …` strings are cut, and the configured upstream key is removed from any
   string. Inline images are replaced by a summary (`[inline image/png, N chars]`); strings over
   20,000 characters are truncated.
+- **Masked-image thumbnails, never originals.** Each inline image in the *masked* request
+  (regions already blacked out, exactly what the upstream received) also gets a downscaled WebP
+  copy in `request.thumbnails`, so the Live traffic tab can show it. Longest side at most
+  320 px, each data URL at most 16 KiB (a 240 or 160 px copy is tried before giving up), and at
+  most 4 per event; an image that does not fit is listed as `{"index", "omitted"}`. Original
+  images are never thumbnailed or kept, at `full` either.
+- **Bounded memory.** Thumbnails add at most 64 KiB per event, so the ring buffer holds at most
+  `PII_GUARD_TRAFFIC_LOG_SIZE` × 64 KiB of them (12.5 MiB at the default 200), on top of the
+  event text (strings capped at 20,000 characters each).
 - **No session ids.** The session id is a bearer handle to the vault, so events carry only
   `session_ref`: an HMAC-SHA256 of it under a random key generated when the process starts.
   The ref groups the calls of one conversation, cannot be turned back into the id, and changes
@@ -549,7 +559,7 @@ runtime.
 | `seq`, `time` | Order in this process; UTC timestamp |
 | `endpoint` | Hosted only: `{"id", "name"}` of the endpoint the call went through; absent for calls on the project itself |
 | `level` | `masked` or `full` |
-| `outcome` | `ok`, `blocked` (a `block` policy, or the outbound re-check), `refused` (any other error before or at the upstream), `upstream_error` (upstream HTTP >= 400), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
+| `outcome` | `ok`, `blocked` (a `block` policy, or the outbound re-check), `refused` (any other error that stopped the call in the guard, so nothing was forwarded), `upstream_error` (upstream HTTP >= 400), `upstream_failed` (the masked request was forwarded and the upstream failed: unreachable, an unusable answer, or no event stream for a streamed call; `error.code` keeps its `upstream_*` value, such as `upstream_unavailable` or `upstream_did_not_stream`. Before LAB-1629 these calls were `refused`, so a consumer matching `refused` plus an `upstream_*` code still finds older events), `stream_error`, `client_disconnected` (the client went away mid-stream; the partial answer does not seed the detection cache), `error` |
 | `error` | `{"code", "status"}` and, for `blocked`, `entity_types` (counts) |
 | `outbound_check` | The [outbound re-check](architecture-gateway.md#outbound-re-check) of the masked request: `result` (`passed` or `blocked`), `texts` checked, `hits` (blocking occurrences per entity type), `short` (occurrences too short to block), `ms`; `null` when the call was refused before it |
 | `mode`, `language`, `stream`, `model` | As requested; `model` is `"[withheld]"` unless it passed its identifier check (refused, blocked and failed calls), here and in the `full` original (LAB-1358) |
@@ -560,7 +570,7 @@ runtime.
 | `upstream` | HTTP status, the model it reported (`"[withheld]"` when it is not model-id shaped, for example holds an e-mail address), `unresolved_placeholders` (placeholders the model invented) |
 | `usage` | Token usage as the upstream reported it (streams: when `stream_options.include_usage` is set) |
 | `timing` | See [Timing](#timing) |
-| `request` | `masked` (the body sent upstream); `original` at level `full` |
+| `request` | `masked` (the body sent upstream); `original` at level `full`; `thumbnails` when the masked body had inline images: `{"index", "width", "height", "data"}` per image (`index` counts the `image_url` parts of `messages` in order, remote URLs included), or `{"index", "omitted"}` with `too_large`, `invalid` or `limit` |
 | `response` | `masked` (the upstream's answer; streams: content per choice and the chunk count); `unmasked` at level `full` |
 
 ## Vault inspector

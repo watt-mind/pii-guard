@@ -506,6 +506,11 @@ def check(
             if args != {"text": o.scenario.text}:
                 failures.append(f"{label}: tool arguments were not restored exactly")
         elif o.content != o.expected:
+            # An image scenario masked (not refused) is forwarded with its masked transcript
+            # and summary after the text; the mock echoes all of it, so the answer starts
+            # with the expected echo instead of equalling it (LAB-1255).
+            if o.scenario.image and (o.content or "").startswith(o.expected):
+                continue
             failures.append(f"{label}: answer was not restored exactly")
     gold = gold_values([o.scenario for o in outcomes], detectors=detectors)
     for value in leaks(received, gold):

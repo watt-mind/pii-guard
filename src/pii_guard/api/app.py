@@ -49,10 +49,22 @@ logger = logging.getLogger("pii_guard.api")
 
 #: The routes that run detectors (``POST``), so wait for a loading NER model (LAB-1303). Every
 #: other route answers at once while it loads. ``tests/api/test_ner_warmup.py`` checks that
-#: each ``POST`` route of the app is either here or in its non-detecting list.
+#: each ``POST`` route of the app, hosted or not, is either here (or in
+#: ``HOSTED_DETECTING_PATHS``) or in its non-detecting lists.
 DETECTING_PATHS = frozenset(
-    {"/v1/analyze", "/v1/mask", "/v1/mask/image", "/v1/chat/completions", "/v1/responses"}
+    {
+        "/v1/analyze",
+        "/v1/mask",
+        "/v1/mask/image",
+        "/v1/chat/completions",
+        "/v1/responses",
+        "/v1/messages",
+        "/v1/messages/count_tokens",
+    }
 )
+#: The hosted-only routes that run detectors, added to ``DETECTING_PATHS`` in hosted mode.
+#: ``/v1/demo`` masks a sample through the gateway (LAB-1601).
+HOSTED_DETECTING_PATHS = frozenset({"/v1/demo"})
 #: Seconds a refused client is told to wait before retrying ``503 detector_loading``.
 RETRY_AFTER_SECONDS = 5
 
@@ -182,6 +194,7 @@ def create_app(
         resolve_detector(name)
     app.state.settings = settings
     app.state.detector_names = list(detector_names)
+    app.state.max_text_chars = settings.max_text_chars
     app.state.policies = PolicySet.from_settings(settings)
     warmup = NerWarmup(settings)
     app.state.ner_warmup = warmup
@@ -219,11 +232,25 @@ def create_app(
             **error_responses("traffic_log_not_local", common=False),
         },
     )
-    def healthz() -> dict[str, str]:
-        """``{"status": "ok", "version": ..., "ner": ...}`` while the server is up, also while
-        the NER model loads (``ner``: ``loading``). Needs no token, and touches no detector,
-        vault or upstream."""
-        return {"status": "ok", "version": __version__, "ner": warmup.state}
+    def healthz() -> dict[str, object]:
+        """``{"status": "ok", "version": ..., "ner": ..., "ocr": ...}`` while the server
+        is up, also while the NER model loads (``ner``: ``loading``). ``ocr`` is ``"on"``
+        when Tesseract is installed and ``"off"`` otherwise; ``image_require_ocr`` says
+        whether image requests are refused without it (503 ``ocr_unavailable``). Needs no
+        token, and touches no detector, vault or upstream."""
+        try:
+            from pii_guard.visual.ocr import tesseract_available
+
+            ocr = "on" if tesseract_available() else "off"
+        except Exception:  # the ocr extra is not installed: OCR is off, not an error
+            ocr = "off"
+        return {
+            "status": "ok",
+            "version": __version__,
+            "ner": warmup.state,
+            "ocr": ocr,
+            "image_require_ocr": settings.image_require_ocr,
+        }
 
     from pii_guard.projects.runtime import ProjectService
 
@@ -272,7 +299,9 @@ def create_app(
         NerWarmupMiddleware,
         warmup=warmup,
         timeout=settings.ner_warmup_timeout,
-        detecting_paths=DETECTING_PATHS | {"/v1/demo"} if settings.hosted else DETECTING_PATHS,
+        detecting_paths=(
+            DETECTING_PATHS | HOSTED_DETECTING_PATHS if settings.hosted else DETECTING_PATHS
+        ),
     )
     if inspect_mode is not InspectMode.OFF and not settings.hosted:
         app.add_middleware(SessionRecorderMiddleware, directory=app.state.vault_directory)

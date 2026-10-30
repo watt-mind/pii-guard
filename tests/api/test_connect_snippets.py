@@ -65,8 +65,13 @@ def test_every_tool_gets_the_session_url_and_the_preset_model() -> None:
     assert [t["id"] for t in body["tools"]] == list(snippets.TOOL_IDS)
     for tool in body["tools"]:
         if tool["supported"]:
-            assert url in tool["code"], tool["id"]
-    assert not _tool(body, "claude-code")["supported"]
+            # Claude Code's base URL is the session root: its SDK appends /v1/messages.
+            expected = url.removesuffix("/v1") if tool["id"] == "claude-code" else url
+            assert expected in tool["code"], tool["id"]
+    # The Meta Model API has no Messages API: Claude Code is labelled, not offered (LAB-1605).
+    claude = _tool(body, "claude-code")
+    assert not claude["supported"] and claude["kind"] == "unsupported"
+    assert "Anthropic Messages upstream" in claude["note"]
     assert _tool(body, "codex")["tested_version"] == snippets.CODEX_VERSION
     assert "muse-spark-1.3" in _tool(body, "codex")["code"]
 
@@ -239,10 +244,14 @@ def test_endpoint_blocks_use_the_endpoint_url_model_and_key(tmp_path: Path) -> N
     assert "$PII_GUARD_ENDPOINT_KEY" in _tool(body, "curl")["code"]
     assert 'env_key="PII_GUARD_ENDPOINT_KEY"' in _tool(body, "codex")["code"]
     assert "{env:PII_GUARD_ENDPOINT_KEY}" in _tool(body, "opencode")["code"]
+    assert not _tool(body, "claude-code")["supported"]  # endpoint upstreams are OpenAI-only
     assert "--no-session-path" in _tool(body, "pi")["code"]
     assert "--api-key '$PII_GUARD_ENDPOINT_KEY'" in _tool(body, "pi")["code"]
-    # Muse Code reads its catalog from the gateway root, which an endpoint URL doesn't serve.
-    assert not _tool(body, "muse-code")["supported"]
+    # Muse Code reads its catalog at the root; the endpoint key gets its own there (LAB-1462).
+    assert _tool(body, "muse-code")["supported"]
+    assert 'META_API_KEY="$PII_GUARD_ENDPOINT_KEY" muse' in _tool(body, "muse-code")["code"]
+    # LAB-1614: no /s/<session> in front of /e/<id>/v1, which would 401 every call.
+    assert "--no-session-path" in _tool(body, "muse-code")["code"]
     compile(_tool(body, "python")["code"], "<snippet>", "exec")
     for secret in (PROVIDER_KEY, "api.openai.com", "pg_ep_"):
         assert secret not in res.text
@@ -269,3 +278,31 @@ def test_endpoint_blocks_need_local_owner_access(tmp_path: Path) -> None:
     assert "Synthetic endpoint" not in res.text
     # The session blocks are unchanged for the same caller.
     assert remote.get("/v1/connect/snippets").status_code == 200
+
+
+def test_claude_code_is_offered_only_with_an_anthropic_upstream() -> None:
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY,
+        upstream_base_url="https://api.anthropic.com/v1",
+        upstream_api_key=SecretStr(UPSTREAM_KEY),
+    )
+    body = _client(settings, ["claude-test-model"]).get("/v1/connect/snippets?session=c_x").json()
+    url = body["session_url"]
+    claude = _tool(body, "claude-code")
+    assert claude["supported"] and claude["kind"] == "launch"
+    assert f"ANTHROPIC_BASE_URL={url.removesuffix('/v1')} " in claude["code"]
+    assert claude["tested_version"] == snippets.CLAUDE_CODE_VERSION
+    assert UPSTREAM_KEY not in json.dumps(body)
+
+
+@pytest.mark.parametrize(
+    ("origin", "expected"),
+    [
+        ("https://api.anthropic.com", True),
+        ("https://api.meta.ai", False),
+        ("https://api.anthropic.com.example.test", False),
+        (None, False),
+    ],
+)
+def test_messages_upstream(origin: str | None, expected: bool) -> None:
+    assert snippets.messages_upstream(origin) is expected

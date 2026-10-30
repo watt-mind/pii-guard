@@ -1,13 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES, type TextEntityType, type VisualEntityType } from "../api/types";
 import { ENTITY_META, type Policy } from "../lib/entities";
 import { ApiError } from "../api/http";
-import { Announcer, Button, Card, Checkbox, ConfirmAction, Field, Input, Notice, PageHeader, SecretReveal, Select } from "../components/ui";
+import { Announcer, Badge, Button, Card, Checkbox, ConfirmAction, Field, Input, Notice, PageHeader, SecretReveal, Select } from "../components/ui";
 import { localRequest } from "./request";
 import { request, recovery, type Requester } from "../hosted/api";
 import { useHostedSession } from "../hosted/session";
+import { dateTime, relativeTime } from "../lib/time";
 import { setSelectedEndpoint } from "./selection";
-import { exampleModel, projectPath, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
+import { exampleModel, projectPath, pendingPolicyEdit, pendingPolicyEndpoint, requestPolicyEdit, type Endpoint, type EndpointKey, type EndpointModels, type EndpointModelsQuery, type PolicyVersion, type Project, type ProjectList, type VisualDetection, VISUAL_DETECTION_LABEL } from "./api";
 
 const OwnerAccess = import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? null : lazy(() => import("./OwnerAccess"));
 
@@ -62,6 +63,61 @@ function useFocusLater() {
     setTick((n) => n + 1);
   }, []);
 }
+
+/** The newest version number of each policy family (`policy_id`). */
+function latestVersions(policies: PolicyVersion[]): Map<string, number> {
+  const latest = new Map<string, number>();
+  for (const p of policies) latest.set(p.policy_id, Math.max(latest.get(p.policy_id) ?? 0, p.version));
+  return latest;
+}
+
+/** One row per policy family (LAB-1626): its latest version first, older versions behind it. */
+function policyFamilies(policies: PolicyVersion[]): { latest: PolicyVersion; older: PolicyVersion[] }[] {
+  const families = new Map<string, PolicyVersion[]>();
+  for (const p of policies) families.set(p.policy_id, [...(families.get(p.policy_id) ?? []), p]);
+  return [...families.values()].map((versions) => {
+    const sorted = [...versions].sort((a, b) => b.version - a.version);
+    return { latest: sorted[0]!, older: sorted.slice(1) };
+  });
+}
+
+/**
+ * Escape closes an inline form like Cancel (a confirmation inside it handles its own Escape first).
+ * Once something in the form was changed, Escape asks before discarding it (LAB-1629).
+ */
+function useEscapeGuard(onCancel: () => void, busy: boolean) {
+  const [touched, setTouched] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const returnTo = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (asking) keepRef.current?.focus();
+  }, [asking]);
+  const keep = () => {
+    setAsking(false);
+    const back = returnTo.current;
+    requestAnimationFrame(() => back?.focus());
+  };
+  const onKeyDown = (e: { key: string; defaultPrevented: boolean; preventDefault: () => void }) => {
+    if (e.key !== "Escape" || e.defaultPrevented || busy) return;
+    e.preventDefault();
+    if (asking) return keep();
+    if (!touched) return onCancel();
+    returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setAsking(true);
+  };
+  const prompt = asking ? (
+    <div role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn-soft p-3 text-sm">
+      <p className="w-full font-medium text-warn sm:w-auto sm:flex-1">Discard your changes?</p>
+      <Button size="sm" variant="danger" onClick={onCancel}>Discard changes</Button>
+      <Button size="sm" ref={keepRef} onClick={keep}>Keep editing</Button>
+    </div>
+  ) : null;
+  return { onKeyDown, onChange: () => setTouched(true), prompt };
+}
+
+/** A panel opened from a row (edit, new version, keys) renders inside that row, below it (LAB-1619). */
+const INLINE = "w-full basis-full pt-1";
 
 const LIST = "divide-y divide-line";
 const ROW = "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0";
@@ -139,7 +195,7 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
                 }).catch((e: unknown) => setError(configurationRecovery(e, hosted))).finally(() => setBusy(false));
               }}
             >
-              <Field label="New project name" required className="min-w-40 flex-1">
+              <Field label="New project name" className="min-w-40 flex-1">
                 <Input maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
               <Button type="submit" busy={busy} disabled={!busy && !name.trim()}>{busy ? "Creating…" : "Create project"}</Button>
@@ -148,7 +204,8 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
           {created && <Notice tone="success" live className="mt-4">{created}</Notice>}
         </Card>
       )}
-      {!loaded && !error && <p role="status" className="text-sm text-muted">Loading your default project…</p>}
+      {/* A tall placeholder, so the cards that replace it don't push anything on screen (CLS, LAB-1619). */}
+      {!loaded && !error && <p role="status" className="min-h-dvh text-sm text-muted">Loading your default project…</p>}
       {project && <ProjectConfiguration key={project.id} project={project} call={call} hosted={hosted} />}
     </div>
   );
@@ -157,6 +214,11 @@ export function Workspace({ call: suppliedCall, hosted = false, projectId, onPro
 type Notified = { area: "endpoints" | "policies"; text: string; endpointId?: string } | null;
 interface EndpointBody { name: string; provider: string; model: string | null; policy_version_id: string; enabled: boolean; base_url?: string; api_key?: string }
 interface PolicyBody { name: string; entity_policies: Record<TextEntityType, Policy> & Record<VisualEntityType, "mask" | "keep">; language: string; mode: string; visual_detection: VisualDetection }
+
+/** The endpoint as saved, with another policy version or enabled state; the stored credential stays (omitted). */
+function endpointBody(endpoint: Endpoint, change: Partial<Pick<EndpointBody, "policy_version_id" | "enabled">>): EndpointBody {
+  return { name: endpoint.name, provider: endpoint.provider, model: endpoint.model, policy_version_id: endpoint.policy_version_id, enabled: endpoint.enabled, ...(endpoint.provider === "custom" ? { base_url: endpoint.base_url } : {}), ...change };
+}
 
 function ProjectConfiguration({ project, call, hosted }: { project: Project; call: Requester; hosted: boolean }) {
   const [policies, setPolicies] = useState<PolicyVersion[]>([]);
@@ -198,16 +260,112 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
     focusLater(() => (was === "new" || !was ? createPolicyRef.current : versionRefs.current.get(was.policy_version_id)));
   };
   const inspected = endpoints.find((e) => e.id === inspect);
+  const latest = latestVersions(policies);
+  /** The family's latest version when it is newer than the one this endpoint pins. */
+  const newerVersion = (endpoint: Endpoint): PolicyVersion | undefined => {
+    const v = latest.get(endpoint.policy_id) ?? 0;
+    return v > endpoint.policy_version ? policies.find((p) => p.policy_id === endpoint.policy_id && p.version === v) : undefined;
+  };
+  const applyLatest = (endpoint: Endpoint) => action(async () => {
+    const next = newerVersion(endpoint);
+    if (!next) return;
+    await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, endpointBody(endpoint, { policy_version_id: next.policy_version_id }), "PUT");
+    await reload();
+    setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' now uses ${next.name} v${next.version}. The next request uses it.` });
+    focusLater(byId(ENDPOINTS_TITLE));
+  });
+  const deleteEndpoint = (endpoint: Endpoint) => action(async () => {
+    await call(`${base}/endpoints/${encodeURIComponent(endpoint.id)}`, undefined, "DELETE");
+    await reload();
+    setNotice({ area: "endpoints", text: `Endpoint '${endpoint.name}' deleted.` });
+    focusLater(byId(ENDPOINTS_TITLE));
+  });
+  // Opened from Connect's "Tune what is masked": a new version of that policy, its form focused.
+  const [wantedEdit] = useState(pendingPolicyEdit);
+  const [wantedEndpoint] = useState(pendingPolicyEndpoint);
+  const [openedWanted, setOpenedWanted] = useState(false);
+  if (wantedEdit && loaded && !openedWanted) {
+    setOpenedWanted(true);
+    requestPolicyEdit(null);
+    const family = policyFamilies(policies).find((f) => f.latest.policy_id === wantedEdit);
+    // Start from the version the endpoint uses, not the latest (LAB-1640): Tune changes what that
+    // endpoint masks, so a newer version's other changes must not ride along unseen.
+    const pinned = endpoints.find((e) => e.id === wantedEndpoint && e.policy_id === wantedEdit);
+    const start = (pinned && policies.find((p) => p.policy_version_id === pinned.policy_version_id)) ?? family?.latest;
+    if (start) { setPolicyEdit(start); setEndpointEdit(null); }
+  }
+  const policyForm = policyEdit && (
+    <PolicyForm
+      template={policies.find((p) => p.policy_id === project.default_policy_id) ?? policies[0]}
+      key={`policy-form-${policyEdit === "new" ? "new" : policyEdit.policy_version_id}`}
+      policy={policyEdit === "new" ? undefined : policyEdit}
+      endpoints={endpoints}
+      preferred={policyEdit !== "new" && policyEdit.policy_id === wantedEdit ? wantedEndpoint : null}
+      latest={policyEdit === "new" ? undefined : latest.get(policyEdit.policy_id)}
+      hosted={hosted}
+      busy={busy}
+      onCancel={closePolicyForm}
+      onSave={(body, applyTo) => action(async () => {
+        const saved = await call<Partial<PolicyVersion> | undefined>(policyEdit === "new" ? `${base}/policies` : `${base}/policies/${encodeURIComponent(policyEdit.policy_id)}`, body, policyEdit === "new" ? "POST" : "PUT");
+        // "Save and apply": the endpoints move to the version just saved (LAB-1629).
+        const versionId = saved?.policy_version_id;
+        if (applyTo.length && versionId) {
+          for (const target of applyTo) await call(`${base}/endpoints/${encodeURIComponent(target.id)}`, endpointBody(target, { policy_version_id: versionId }), "PUT");
+        }
+        await reload();
+        setPolicyEdit(null);
+        const version = saved?.version ? ` v${saved.version}` : "";
+        setNotice({
+          area: "policies",
+          text: applyTo.length && versionId
+            ? `Policy '${body.name}'${version} saved and applied to ${listNames(applyTo)}. The next request uses it.`
+            : `Policy '${body.name}'${version} saved.`,
+        });
+        focusLater(byId(POLICIES_TITLE));
+      })}
+    />
+  );
+  const endpointForm = endpointEdit && (
+    <EndpointForm
+      key={`endpoint-form-${typeof endpointEdit === "string" ? "new" : endpointEdit.id}`}
+      endpoint={endpointEdit === "new" ? undefined : endpointEdit}
+      policies={policies}
+      busy={busy}
+      hosted={hosted}
+      catalog={catalog}
+      onCancel={closeEndpointForm}
+      onSave={(body) => action(async () => {
+        const creating = endpointEdit === "new";
+        const saved = await call<Partial<Endpoint> | undefined>(creating ? `${base}/endpoints` : `${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, body, creating ? "POST" : "PUT");
+        await reload();
+        setEndpointEdit(null);
+        setNotice(
+          creating
+            ? { area: "endpoints", text: `Endpoint '${body.name}' created. Next, create an endpoint key so your application can use it.`, endpointId: saved?.id }
+            : { area: "endpoints", text: `Endpoint '${body.name}' saved.` },
+        );
+        focusLater(byId(ENDPOINTS_TITLE));
+      })}
+      onDisable={endpointEdit === "new" ? undefined : () => action(async () => {
+        await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, endpointBody(endpointEdit, { enabled: false }), "PUT");
+        await reload();
+        setEndpointEdit(null); setInspect("");
+        setNotice({ area: "endpoints", text: `Endpoint '${endpointEdit.name}' disabled. Its endpoint keys are revoked.` });
+        focusLater(byId(ENDPOINTS_TITLE));
+      })}
+    />
+  );
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted">Configuration is saved by the guard. Restoration mappings and activity remain temporary. Create a policy first: every endpoint pins one policy version.</p>
+      <p className="text-sm text-muted">Configuration is saved {hosted ? "on the PII Guard server" : "by the guard"}. Restoration mappings and activity remain temporary.{loaded && !policies.length ? " Create a policy first: every endpoint pins one policy version." : ""}</p>
       {error && (
         <Notice tone="danger" live action={<Button size="sm" busy={busy} onClick={() => void action(reload)}>Reload configuration</Button>}>
           {error}
         </Notice>
       )}
-      {!loaded && !error && <p role="status" className="text-sm text-muted">Loading endpoints and policies…</p>}
+      {/* The cards wait for the data: rendered empty, they'd jump up from below a tall placeholder (CLS, LAB-1619). */}
+      {!loaded && !error ? <p role="status" className="min-h-dvh text-sm text-muted">Loading endpoints and policies…</p> : <>
 
       <Card
         title="Reusable policies"
@@ -219,45 +377,51 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
         {loaded && !policies.length && <p className="text-sm text-muted">No policies yet. Create one to choose what each endpoint masks, keeps or blocks.</p>}
         {policies.length > 0 && (
           <ul className={LIST}>
-            {policies.map((policy) => (
-              <li key={policy.policy_version_id} className={ROW}>
+            {policyFamilies(policies).map(({ latest: policy, older }) => {
+              const pinned = (version: PolicyVersion) => endpoints.filter((e) => e.enabled && e.policy_version_id === version.policy_version_id).length;
+              const family = endpoints.filter((e) => e.enabled && e.policy_id === policy.policy_id).length;
+              return (
+              <li key={policy.policy_id} className={ROW}>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-medium text-ink break-words">{policy.name} · v{policy.version}</h3>
-                  <p className="mt-0.5 text-sm text-muted">{describePolicy(policy)} · {plural(endpoints.filter((e) => e.enabled && e.policy_version_id === policy.policy_version_id).length, "endpoint")}</p>
+                  <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
+                    {policy.name} · v{policy.version}
+                    {older.length > 0 && <Badge tone="live">Latest</Badge>}
+                  </h3>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {describePolicy(policy)} · {plural(family, "endpoint")}
+                    {older.length > 0 && <> · {plural(older.length + 1, "version")}</>}
+                  </p>
                 </div>
                 <Button
                   size="sm"
                   busy={busy}
-                  aria-label={`New version of ${policy.name} v${policy.version}`}
+                  aria-label={`New version of ${policy.name}`}
                   ref={(el) => { if (el) versionRefs.current.set(policy.policy_version_id, el); else versionRefs.current.delete(policy.policy_version_id); }}
                   onClick={() => openPolicyForm(policy)}
                 >
                   New version
                 </Button>
+                {policyEdit !== "new" && policyEdit?.policy_id === policy.policy_id && <div className={INLINE}>{policyForm}</div>}
+                {older.length > 0 && (
+                  <details className="w-full basis-full text-sm">
+                    <summary className="cursor-pointer text-muted hover:text-ink">Older versions ({older.length})</summary>
+                    <ul className="mt-2 space-y-1 border-l border-line pl-3">
+                      {older.map((v) => (
+                        <li key={v.policy_version_id} className="text-muted">
+                          <span className="text-ink">v{v.version}</span> · {describePolicy(v)} · {plural(pinned(v), "endpoint")}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </Card>
 
-      {policyEdit && (
-        <PolicyForm
-          template={policies.find((p) => p.policy_id === project.default_policy_id) ?? policies[0]}
-          key={`policy-form-${policyEdit === "new" ? "new" : policyEdit.policy_version_id}`}
-          policy={policyEdit === "new" ? undefined : policyEdit}
-          endpoints={endpoints}
-          hosted={hosted}
-          busy={busy}
-          onCancel={closePolicyForm}
-          onSave={(body) => action(async () => {
-            await call(policyEdit === "new" ? `${base}/policies` : `${base}/policies/${encodeURIComponent(policyEdit.policy_id)}`, body, policyEdit === "new" ? "POST" : "PUT");
-            await reload();
-            setPolicyEdit(null);
-            setNotice({ area: "policies", text: `Policy '${body.name}' saved.` });
-            focusLater(byId(POLICIES_TITLE));
-          })}
-        />
-      )}
+      {policyEdit === "new" && policyForm}
 
       <Card
         title="Gateway endpoints"
@@ -283,20 +447,50 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
         {loaded && !endpoints.length && <p className="text-sm text-muted">No endpoints yet. Create one, then create an endpoint key to connect your application.</p>}
         {endpoints.length > 0 && (
           <ul className={LIST}>
-            {endpoints.map((endpoint) => (
-              <li key={endpoint.id} className={ROW}>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-medium text-ink break-words">
+            {[...endpoints.filter((e) => e.enabled), ...endpoints.filter((e) => !e.enabled)].map((endpoint) => (
+              <li key={endpoint.id} className={`${ROW} sm:flex-nowrap`}>
+                <div className="min-w-0 sm:flex-1">
+                  <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
                     {endpoint.name}
-                    {!endpoint.enabled && <span className="ml-1.5 font-normal text-muted">· Disabled</span>}
+                    {!endpoint.enabled && <Badge>Disabled</Badge>}
                   </h3>
                   <p className="mt-0.5 text-sm text-muted break-words">{providerLabel(endpoint.provider)} · {endpoint.model ? <span className="font-mono text-xs">{endpoint.model}</span> : "Client chooses the model"}</p>
-                  <p className="text-sm text-muted">{policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+                    {policies.find((p) => p.policy_version_id === endpoint.policy_version_id)?.name ?? "Policy"} · v{endpoint.policy_version}
+                    {endpoint.enabled && newerVersion(endpoint) && <Badge>v{newerVersion(endpoint)!.version} available</Badge>}
+                  </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
-                    Connect & keys
-                  </Button>
+                <div className="flex flex-wrap items-center gap-2 sm:max-w-[60%] sm:shrink-0 sm:justify-end">
+                  {endpoint.enabled && newerVersion(endpoint) && (
+                    // Asks first (LAB-1640): the endpoint may carry production traffic.
+                    <ConfirmAction
+                      size="sm"
+                      trigger={`Apply v${newerVersion(endpoint)!.version}`}
+                      triggerLabel={`Apply v${newerVersion(endpoint)!.version} to ${endpoint.name}`}
+                      title={`Apply ${newerVersion(endpoint)!.name} v${newerVersion(endpoint)!.version} to '${endpoint.name}'?`}
+                      body={`The next request through it uses v${newerVersion(endpoint)!.version} instead of v${endpoint.policy_version}. Other endpoints keep their versions.`}
+                      confirm={`Apply v${newerVersion(endpoint)!.version}`}
+                      busy={busy}
+                      onConfirm={() => applyLatest(endpoint)}
+                    />
+                  )}
+                  {!endpoint.enabled && (
+                    <ConfirmAction
+                      size="sm"
+                      trigger="Delete"
+                      triggerLabel={`Delete ${endpoint.name}`}
+                      title={`Delete endpoint '${endpoint.name}'?`}
+                      body="Its configuration is removed; its endpoint keys are already revoked."
+                      confirm="Delete endpoint"
+                      busy={busy}
+                      onConfirm={() => deleteEndpoint(endpoint)}
+                    />
+                  )}
+                  {endpoint.enabled && (
+                    <Button size="sm" aria-expanded={inspect === endpoint.id} aria-label={`Connect & keys for ${endpoint.name}`} onClick={() => { setInspect(inspect === endpoint.id ? "" : endpoint.id); setEndpointEdit(null); }}>
+                      Connect & keys
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     busy={busy}
@@ -307,43 +501,20 @@ function ProjectConfiguration({ project, call, hosted }: { project: Project; cal
                     Edit
                   </Button>
                 </div>
+                {endpointEdit !== "new" && endpointEdit?.id === endpoint.id && <div className={INLINE}>{endpointForm}</div>}
+                {inspected?.id === endpoint.id && (
+                  <div className={INLINE}>
+                    <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={inspected} base={base} call={call} hosted={hosted} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         )}
       </Card>
 
-      {endpointEdit && (
-        <EndpointForm
-          key={`endpoint-form-${typeof endpointEdit === "string" ? "new" : endpointEdit.id}`}
-          endpoint={endpointEdit === "new" ? undefined : endpointEdit}
-          policies={policies}
-          busy={busy}
-          hosted={hosted}
-          catalog={catalog}
-          onCancel={closeEndpointForm}
-          onSave={(body) => action(async () => {
-            const creating = endpointEdit === "new";
-            const saved = await call<Partial<Endpoint> | undefined>(creating ? `${base}/endpoints` : `${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, body, creating ? "POST" : "PUT");
-            await reload();
-            setEndpointEdit(null);
-            setNotice(
-              creating
-                ? { area: "endpoints", text: `Endpoint '${body.name}' created. Next, create an endpoint key so your application can use it.`, endpointId: saved?.id }
-                : { area: "endpoints", text: `Endpoint '${body.name}' saved.` },
-            );
-            focusLater(byId(ENDPOINTS_TITLE));
-          })}
-          onDisable={endpointEdit === "new" ? undefined : () => action(async () => {
-            await call(`${base}/endpoints/${encodeURIComponent(endpointEdit.id)}`, { name: endpointEdit.name, provider: endpointEdit.provider, model: endpointEdit.model, policy_version_id: endpointEdit.policy_version_id, enabled: false, ...(endpointEdit.provider === "custom" ? { base_url: endpointEdit.base_url } : {}) }, "PUT");
-            await reload();
-            setEndpointEdit(null); setInspect("");
-            setNotice({ area: "endpoints", text: `Endpoint '${endpointEdit.name}' disabled. Its endpoint keys are revoked.` });
-            focusLater(byId(ENDPOINTS_TITLE));
-          })}
-        />
-      )}
-      {inspected && <EndpointConnection key={`endpoint-connection-${inspect}`} endpoint={inspected} base={base} call={call} hosted={hosted} />}
+      {endpointEdit === "new" && endpointForm}
+      </>}
     </div>
   );
 }
@@ -412,11 +583,15 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
   const titleId = useId();
   useFocusOnOpen(titleId);
   const changed = Boolean(endpoint && endpoint.policy_version_id !== policyId);
+  const latestOf = latestVersions(policies);
   const selected = policies.find((p) => p.policy_version_id === policyId);
   const requiresCredential = provider !== "sponsored" && (!endpoint?.credential_configured || endpoint.provider !== provider);
   const keyLabel = requiresCredential ? "Provider API key" : "Replace provider API key (optional)";
+  const guard = useEscapeGuard(onCancel, busy);
   const blockedReason = isSponsored && !model ? "Choose a model to save." : !policyId ? "Choose a policy version to save." : changed && !reviewed ? "Confirm the policy change below to save." : "";
   return (
+    // Escape anywhere in the form, its focused heading included, is Cancel (LAB-1626), asking first once edited.
+    <div onKeyDown={guard.onKeyDown}>
     <Card
       title={endpoint ? `Edit ${endpoint.name}` : "Create endpoint"}
       titleId={titleId}
@@ -425,6 +600,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
       <form
         aria-labelledby={titleId}
         className="space-y-4"
+        onChange={guard.onChange}
         onSubmit={(e) => { e.preventDefault(); const apiKey = secret; setSecret(""); void onSave({ name, provider, model: model.trim() || null, policy_version_id: policyId, enabled: endpoint ? endpoint.enabled || reenable : true, ...(provider === "custom" ? { base_url: baseUrl } : {}), ...(apiKey ? { api_key: apiKey } : {}) }); }}
       >
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
@@ -489,7 +665,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
           <Field label="Policy version" required hint={policies.length === 1 && !endpoint ? "The project’s only policy version is selected." : "The endpoint keeps this version until you reassign it."}>
             <Select value={policyId} onChange={(e) => { setPolicyId(e.target.value); setReviewed(false); }}>
               <option value="" disabled>Choose a policy version</option>
-              {policies.map((policy) => <option key={policy.policy_version_id} value={policy.policy_version_id}>{policy.name} · v{policy.version}</option>)}
+              {policies.map((policy) => <option key={policy.policy_version_id} value={policy.policy_version_id}>{policy.name} · v{policy.version}{latestOf.get(policy.policy_id) === policy.version ? " (latest)" : ""}</option>)}
             </Select>
           </Field>
         </fieldset>
@@ -506,6 +682,7 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
             <Checkbox className="mt-3" checked={reviewed} disabled={busy} onChange={(e) => setReviewed(e.target.checked)} label={`Apply ${selected?.name} v${selected?.version} to this endpoint`} />
           </div>
         )}
+        {guard.prompt}
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" type="submit" busy={busy} disabled={!busy && Boolean(blockedReason)}>{busy ? "Saving…" : endpoint ? "Save endpoint" : "Create endpoint"}</Button>
           <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
@@ -524,10 +701,17 @@ function EndpointForm({ endpoint, policies, busy, hosted, catalog, onSave, onCan
         </div>
       </form>
     </Card>
+    </div>
   );
 }
 
-function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCancel }: { policy?: PolicyVersion; template?: PolicyVersion; endpoints: Endpoint[]; hosted: boolean; busy: boolean; onSave: (body: PolicyBody) => Promise<void>; onCancel: () => void }) {
+/** "A", "A and B", "3 endpoints". */
+function listNames(items: { name: string }[]): string {
+  if (items.length > 2) return `${items.length} endpoints`;
+  return items.map((e) => `'${e.name}'`).join(" and ");
+}
+
+function PolicyForm({ policy, template, endpoints, preferred = null, latest, hosted, busy, onSave, onCancel }: { policy?: PolicyVersion; template?: PolicyVersion; endpoints: Endpoint[]; /** The endpoint Connect's "Tune" came from: the one "Save and apply" moves. */ preferred?: string | null; /** The family's latest version number. */ latest?: number; hosted: boolean; busy: boolean; onSave: (body: PolicyBody, applyTo: Endpoint[]) => Promise<void>; onCancel: () => void }) {
   const [name, setName] = useState(policy?.name ?? "");
   const [entities, setEntities] = useState({ ...(policy?.entity_policies ?? template?.entity_policies ?? defaults) });
   const [language, setLanguage] = useState(policy?.language ?? template?.language ?? "hu");
@@ -543,11 +727,17 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
   const titleId = useId();
   useFocusOnOpen(titleId);
   const affected = endpoints.filter((e) => e.enabled && e.policy_id === policy?.policy_id);
+  // "Save and apply" (LAB-1629): the endpoint Tune came from, else every endpoint on this policy.
+  const fromTune = affected.filter((e) => e.id === preferred);
+  const applyTo = fromTune.length ? fromTune : affected;
+  const guard = useEscapeGuard(onCancel, busy);
+  const body = (): PolicyBody => ({ name, entity_policies: { ...entities, ...visual }, language, mode, visual_detection: detection });
   return (
+    <div onKeyDown={guard.onKeyDown}>
     <Card title={policy ? `New version of ${policy.name}` : "Create policy"} titleId={titleId} subtitle="Mask replaces detected values with reversible placeholders. Keep sends them unchanged. Block refuses the entire request when that type is detected.">
-      <form aria-labelledby={titleId} className="space-y-4" onSubmit={(e) => { e.preventDefault(); void onSave({ name, entity_policies: { ...entities, ...visual }, language, mode, visual_detection: detection }); }}>
+      <form aria-labelledby={titleId} className="space-y-4" onChange={guard.onChange} onSubmit={(e) => { e.preventDefault(); void onSave(body(), policy && fromTune.length ? applyTo : []); }}>
         <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Policy name" required>
+          <Field label="Policy name" required={!policy}>
             <Input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Language">
@@ -606,24 +796,50 @@ function PolicyForm({ policy, template, endpoints, hosted, busy, onSave, onCance
             ))}
           </div>
           {detection === "local" && visual.STAMP === "mask" && (
-            <p role="alert" className="mt-2 text-sm text-warn">On-device detection cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.</p>
+            <p role="alert" className="mt-2 text-sm text-warn">{hosted ? "Detection on the PII Guard server" : "On-device detection"} cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.</p>
           )}
         </fieldset>
         <div className={REVIEW}>
-          <p>{policy ? "Saving creates a new version. No endpoint changes automatically." : "The new policy is available to endpoints in this project."}</p>
+          <p>
+            {policy ? "Saving creates a new version." : "The new policy is available to endpoints in this project."}
+            {policy && latest !== undefined && latest > policy.version && (
+              <> It starts from v{policy.version}{fromTune[0] ? `, the version '${fromTune[0].name}' uses` : ""}, not the latest v{latest}; v{latest + 1} gets these settings.</>
+            )}
+          </p>
           {policy && (
-            <>
-              <p className="mt-1">Endpoints using this policy family: {affected.length ? affected.map((e) => `${e.name} (v${e.policy_version})`).join(", ") : "none"}.</p>
-              <p className="mt-1">To apply the saved version, edit an endpoint and review its policy assignment.</p>
-            </>
+            <p className="mt-1">
+              Endpoints using this policy: {affected.length ? affected.map((e) => `${e.name} (v${e.policy_version})`).join(", ") : "none"}.
+              {applyTo.length > 0 && (fromTune.length
+                ? <> Save and apply moves {listNames(applyTo)} to the new version; Save only keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version.</>
+                : <> Save new version keeps {applyTo.length === 1 ? "it" : "them"} on {applyTo.length === 1 ? "its" : "their"} current version; Save and apply asks before moving {applyTo.length === 1 ? "it" : "them"}.</>)}
+            </p>
           )}
         </div>
+        {guard.prompt}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" type="submit" busy={busy}>{busy ? "Saving…" : policy ? "Save new version" : "Save policy"}</Button>
+          {/* Enter saves. It applies only to the one endpoint Tune came from; moving endpoints
+              opened from Projects (production among them) is a confirmed second step (LAB-1640). */}
+          <Button variant="primary" type="submit" busy={busy}>
+            {busy ? "Saving…" : !policy ? "Save policy" : fromTune.length ? `Save and apply to ${listNames(applyTo)}` : "Save new version"}
+          </Button>
+          {policy && fromTune.length > 0 && (
+            <Button disabled={busy} onClick={() => void onSave(body(), [])}>Save only</Button>
+          )}
+          {policy && !fromTune.length && applyTo.length > 0 && (
+            <ConfirmAction
+              trigger="Save and apply…"
+              title={`Save and apply the new version to ${applyTo.length === 1 && applyTo[0] ? `'${applyTo[0].name}'` : `${applyTo.length} endpoints`}?`}
+              body={`The next request through ${applyTo.map((e) => `'${e.name}'`).join(", ")} uses it. Other endpoints keep their versions.`}
+              confirm={applyTo.length === 1 ? "Save and apply" : `Save and apply to ${applyTo.length}`}
+              busy={busy}
+              onConfirm={() => onSave(body(), applyTo)}
+            />
+          )}
           <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
         </div>
       </form>
     </Card>
+    </div>
   );
 }
 
@@ -649,6 +865,8 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
   const keyPath = `${base}/endpoints/${encodeURIComponent(endpoint.id)}/keys`;
   useEffect(() => { let active = true; call<{ keys: EndpointKey[] }>(keyPath).then((data) => { if (!Array.isArray(data.keys)) throw new Error("Invalid keys"); if (active) { setKeys(data.keys); setLoaded(true); } }).catch((e: unknown) => { if (active) setError(configurationRecovery(e, hosted)); }); return () => { active = false; }; }, [call, keyPath, hosted]);
   async function action(work: () => Promise<void>) { setBusy(true); setError(""); try { await work(); } catch (e) { setError(configurationRecovery(e, hosted)); } finally { setBusy(false); } }
+  const active = keys.filter((k) => !k.revoked_at).sort(newestFirst);
+  const revoked = keys.filter((k) => k.revoked_at).sort(newestFirst);
   const url = `${globalThis.location.origin}${endpoint.base_path}`;
   const snippet = `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url=${JSON.stringify(url)},\n    api_key=os.environ["PII_GUARD_ENDPOINT_KEY"],\n)\nresponse = client.chat.completions.create(\n    model=${JSON.stringify(endpoint.model ?? "<model-id>")},\n    messages=[{"role": "user", "content": "Hello, Robin Example."}],\n)`;
   function copy(value: string, label: string) { void navigator.clipboard.writeText(value).then(() => setCopied(`${label} copied`)).catch(() => setCopied("Copy failed. Select the text and copy it manually.")); }
@@ -661,7 +879,7 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
     focusLater(byId(keysTitle));
   });
   return (
-    <Card ref={panel} tabIndex={-1} aria-label={`Connect ${endpoint.name}`} title={`Connect ${endpoint.name}`} subtitle="Endpoint keys authorize only this endpoint. Provider credentials are managed by the guard." className="focus:outline-none">
+    <Card ref={panel} tabIndex={-1} aria-label={`Connect ${endpoint.name}`} title={`Connect ${endpoint.name}`} subtitle={`Endpoint keys authorize only this endpoint. Your provider key stays ${hosted ? "on the PII Guard server" : "in the guard"}; apps never see it.`} className="focus:outline-none">
       <div className="space-y-4">
         <Field label="OpenAI-compatible base URL">
           <Input readOnly value={url} className="font-mono" />
@@ -721,33 +939,56 @@ function EndpointConnection({ endpoint, base, call, hosted }: { endpoint: Endpoi
         {secret && <SecretReveal label={`endpoint key '${secret.name}'`} secret={secret.key} envName="PII_GUARD_ENDPOINT_KEY" onDismiss={() => setSecret(null)} />}
         <Announcer message={announce} />
         {loaded && !keys.length && <p className="text-sm text-muted">No endpoint keys yet. Create one to connect an application to this endpoint.</p>}
-        {keys.length > 0 && (
+        {active.length > 0 && (
           <ul className={LIST} aria-labelledby={keysTitle}>
-            {keys.map((key) => (
-              <li key={key.id} className={ROW}>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink break-words">{key.name}</p>
-                  <p className="mt-0.5 text-sm text-muted">
-                    <span className={key.revoked_at ? "text-danger" : "text-guard"}>{key.revoked_at ? "Revoked" : "Active"}</span> · created {new Date(key.created_at).toLocaleString()}
-                  </p>
-                </div>
-                {!key.revoked_at && (
-                  <ConfirmAction
-                    size="sm"
-                    trigger="Revoke"
-                    triggerLabel={`Revoke key ${key.name}`}
-                    title={`Revoke key '${key.name}'?`}
-                    body="Apps using it stop working."
-                    confirm="Revoke key"
-                    busy={busy}
-                    onConfirm={() => revoke(key)}
-                  />
-                )}
-              </li>
+            {active.map((key) => (
+              <KeyRow key={key.id} item={key}>
+                <ConfirmAction
+                  size="sm"
+                  trigger="Revoke"
+                  triggerLabel={`Revoke key ${key.name}`}
+                  title={`Revoke key '${key.name}'?`}
+                  body="Apps using it stop working."
+                  confirm="Revoke key"
+                  busy={busy}
+                  onConfirm={() => revoke(key)}
+                />
+              </KeyRow>
             ))}
           </ul>
+        )}
+        {loaded && keys.length > 0 && !active.length && <p className="text-sm text-muted">No active endpoint keys. Create one to connect an application to this endpoint.</p>}
+        {revoked.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted hover:text-ink">Show {plural(revoked.length, "revoked key")}</summary>
+            <ul className={`${LIST} mt-3`} aria-label="Revoked endpoint keys">
+              {revoked.map((key) => <KeyRow key={key.id} item={key} />)}
+            </ul>
+          </details>
         )}
       </div>
     </Card>
   );
 }
+
+/** Newest first; created_at is ISO 8601, so it sorts as text. */
+const newestFirst = (a: EndpointKey, b: EndpointKey) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
+
+function KeyRow({ item, children }: { item: EndpointKey; children?: ReactNode }) {
+  return (
+    <li className={ROW}>
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink break-words">
+          {item.name}
+          <Badge tone={item.revoked_at ? "failed" : "live"}>{item.revoked_at ? "Revoked" : "Active"}</Badge>
+        </p>
+        <p className="mt-0.5 text-sm text-muted">
+          Created <time dateTime={item.created_at} title={dateTime(item.created_at)}>{relativeTime(item.created_at)}</time>
+          {item.revoked_at && <>, revoked <time dateTime={item.revoked_at} title={dateTime(item.revoked_at)}>{relativeTime(item.revoked_at)}</time></>}
+        </p>
+      </div>
+      {children}
+    </li>
+  );
+}
+

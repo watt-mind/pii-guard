@@ -117,19 +117,35 @@ export interface TestRoundTrip {
   restored: string;
   maskedCount: number | null;
   ms: number;
+  /** The call's id in Logs (`X-PII-Guard-Request-Id`), when the server sends it. */
+  requestId?: string | null;
+}
+
+/**
+ * The Connect test's `prompt_cache_key` for a policy version: `pgtest_` and a hex run, the
+ * whole-id shape the gateway leaves unmasked (gateway/opaque_ids.py rule 3). A free-text key
+ * such as `pii-guard-connect-test:<id>` was read by the NER as an ID document, so every test
+ * showed one masked value that wasn't in the prompt (LAB-1640). The leading `f` keeps a hex
+ * letter in the run (an all-digit run is not exempt).
+ */
+export function testSessionKey(policyVersionId: string): string {
+  const hex = Array.from(new TextEncoder().encode(policyVersionId), (b) => b.toString(16).padStart(2, "0")).join("");
+  return `pgtest_f${hex.slice(0, 127)}`;
 }
 
 /**
  * One request through the endpoint, as the owner (same-origin session, no endpoint key): the
  * gateway masks it, the endpoint's model answers, and the echo shows what the model saw.
  */
-export async function sendTestRequest(endpointId: string, doFetch: typeof fetch = (...a) => fetch(...a), signal?: AbortSignal): Promise<TestRoundTrip> {
+export async function sendTestRequest(endpointId: string, doFetch: typeof fetch = (...a) => fetch(...a), signal?: AbortSignal, policyVersionId?: string): Promise<TestRoundTrip> {
   const started = performance.now();
   const response = await doFetch(`/e/${encodeURIComponent(endpointId)}/v1/chat/completions`, {
     method: "POST",
     credentials: "same-origin",
     headers: { Accept: "application/json", "Content-Type": "application/json", "X-PII-Guard-Echo": "masked" },
-    body: JSON.stringify({ messages: [{ role: "user", content: TEST_PROMPT }], stream: false }),
+    // One vault session per policy version (`prompt_cache_key`, LAB-1629): a value masked in an
+    // earlier test stays masked in that session, so a version that keeps it would look unapplied.
+    body: JSON.stringify({ messages: [{ role: "user", content: TEST_PROMPT }], stream: false, ...(policyVersionId ? { prompt_cache_key: testSessionKey(policyVersionId) } : {}) }),
     signal,
   });
   let payload: unknown = null;
@@ -154,6 +170,7 @@ export async function sendTestRequest(endpointId: string, doFetch: typeof fetch 
     restored: choice && typeof choice.content === "string" ? choice.content : "",
     maskedCount: response.headers.has("X-PII-Guard-Masked") && Number.isFinite(count) ? count : null,
     ms: Math.round(performance.now() - started),
+    requestId: response.headers.get("X-PII-Guard-Request-Id"),
   };
 }
 
@@ -181,7 +198,7 @@ export function testRecovery(error: unknown): string {
 }
 
 /**
- * A block that works by copy-paste with zero edits: with the guard key known, shell blocks
+ * A block that works by copy-paste with zero edits: with the endpoint key known, shell blocks
  * start by exporting it and the OpenAI SDK block names it inline. Without it, blocks keep
  * reading `$PII_GUARD_ENDPOINT_KEY`. Keys are `pg_ep_` + URL-safe base64: shell-safe unquoted.
  */

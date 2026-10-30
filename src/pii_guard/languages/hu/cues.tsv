@@ -1,5 +1,6 @@
 # Cue words for context-cued numbers (languages/cues.py, LAB-1170).
 # cue <TAB> entity type of the number right after it, or "-" for a cue that names something
+# (a third column "after" marks a cue that follows its value: "a 06 30 123 4567 számon");
 # that is not personal data, or a word that hands the window on ("and"): a "-" cue ends the
 # window, so the number after it is never masked by an earlier cue.
 # Case and accents are ignored; a space also matches a hyphen or nothing; a trailing "*"
@@ -39,6 +40,25 @@ okmányazonosító*	ID_DOCUMENT
 útlevél*	ID_DOCUMENT
 jogosítvány*	ID_DOCUMENT
 vezetői engedély*	ID_DOCUMENT
+# Cues after the value (third column "after", LAB-1199): "a +36 30 123 4567 számon",
+# "a KA652524 számú útlevelére". A bare "számú" names nothing ("a 4500123456 számú
+# szerződés"), so it is a cue only with its noun; a phone before one needs a + or 0 prefix.
+számon	PHONE	after
+számra	PHONE	after
+telefonszámon	PHONE	after
+telefonszámra	PHONE	after
+mobilszámon	PHONE	after
+mobilszámra	PHONE	after
+számú telefon*	PHONE	after
+számú mobil*	PHONE	after
+számú bankszámla*	BANK_ACCOUNT	after
+számú bankkártya*	BANK_ACCOUNT	after
+számú hitelkártya*	BANK_ACCOUNT	after
+számú útlevél*	ID_DOCUMENT	after
+számú személyi igazolvány*	ID_DOCUMENT	after
+számú igazolvány*	ID_DOCUMENT	after
+számú jogosítvány*	ID_DOCUMENT	after
+számú vezetői engedély*	ID_DOCUMENT	after
 rendelésszám*	-
 megrendelésszám*	-
 rendelési szám*	-

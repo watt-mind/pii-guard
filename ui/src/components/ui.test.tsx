@@ -120,7 +120,7 @@ describe("SecretReveal", () => {
     const onDismiss = vi.fn();
     const user = userEvent.setup();
     render(<SecretReveal label="endpoint key ci" secret="pg_example_secret" onDismiss={onDismiss} />);
-    expect(screen.getByRole("alert")).toHaveTextContent("shown only once");
+    expect(screen.getByRole("alert")).toHaveTextContent("Shown only once: copy endpoint key ci and store it now.");
     expect(screen.getByRole("button", { name: "Copy endpoint key ci" })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "Dismiss key" }));
     expect(onDismiss).not.toHaveBeenCalled();

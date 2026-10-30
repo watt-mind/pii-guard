@@ -46,6 +46,26 @@ describe("Chat model picker (LAB-1335)", () => {
     expect(screen.getByRole("combobox", { name: "Language" })).toHaveValue("hu");
   });
 
+  it("sends a draft it mounts with, once the model list has answered (LAB-1626)", async () => {
+    let answer: (ids: string[]) => void = () => {};
+    const { client, calls } = liveChat({ models: () => new Promise((resolve) => (answer = resolve)) });
+    const text = "Fictional document for the handover.";
+    render(<Chat client={client} live draft={{ text, language: "en", sessionId: "s_text", nonce: 7 }} />);
+    // No model yet: nothing is sent, and the document is not dropped.
+    expect(calls).toHaveLength(0);
+    answer(META);
+    await waitFor(() => expect(calls[0]).toMatchObject({ sessionId: "s_text", messages: expect.arrayContaining([expect.objectContaining({ role: "user", content: text })]) }));
+    expect(calls[0]!.model).not.toBe("");
+  });
+
+  it("keeps a draft in the composer when no model can be listed (LAB-1626)", async () => {
+    const { client, calls } = liveChat({ models: () => Promise.resolve([]) });
+    const text = "Fictional document that waits for a model.";
+    render(<Chat client={client} live draft={{ text, language: "en", nonce: 8 }} />);
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /message/i })).toHaveValue(text));
+    expect(calls).toHaveLength(0);
+  });
+
   it("starts in English and sends explicit language and sample choices unchanged", async () => {
     const user = userEvent.setup();
     const { client, calls } = liveChat();
@@ -138,7 +158,9 @@ describe("Chat error copy per code (LAB-1335)", () => {
     expect(alert).toHaveTextContent("Nothing unmasked left PII Guard.");
     expect(alert).not.toHaveTextContent("Nothing was sent to the model");
     expect(alert).not.toHaveTextContent("fails closed");
-    expect(screen.getByText("The masked request was sent; the upstream refused it before answering.")).toBeInTheDocument();
+    // Said once beside the masked side, the reason only in the notice (LAB-1629).
+    expect(screen.getByText(/The masked request was forwarded; no answer came back\./)).toBeInTheDocument();
+    expect(screen.queryByText(/refused it before answering/)).toBeNull();
   });
 
   it("detection_failed keeps the fail-closed text", async () => {
@@ -185,8 +207,8 @@ describe("Chat detection modes (LAB-1435)", () => {
     const { client, calls } = liveChat();
     render(<Chat client={client} live draft={null} modes={["fast"]} />);
     await screen.findByRole("combobox", { name: "Model" });
-    expect(radios()).toEqual(["Fast"]);
-    expect(screen.getByRole("radio", { name: "Fast" })).toBeChecked();
+    // One mode: no one-option control (LAB-1629).
+    expect(screen.queryByRole("radiogroup", { name: "Detection mode" })).toBeNull();
     await user.click(screen.getByRole("button", { name: /send through PII Guard/i }));
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]!.mode).toBe("fast");
@@ -230,5 +252,33 @@ describe("Chat recovery and reset (LAB-1441)", () => {
     await user.click(screen.getByRole("button", { name: "Clear and start over" }));
     expect(screen.queryByRole("article", { name: "Chat turn" })).not.toBeInTheDocument();
     expect(screen.getByText("No messages yet")).toBeInTheDocument();
+  });
+});
+
+describe("Chat kept-by-policy values (LAB-1180)", () => {
+  it("outlines a value the gateway kept by policy in your message", async () => {
+    const user = userEvent.setup();
+    const { client } = liveChat({
+      send: (req) => {
+        const text = req.messages[req.messages.length - 1]!.content;
+        const start = text.indexOf("Minta Kft");
+        const kept = req.messages.map((_, i) => (i === req.messages.length - 1 ? [{ entityType: "ORGANIZATION" as const, start, end: start + 9 }] : []));
+        req.onMaskedRequest?.(req.messages, kept);
+        return Promise.resolve({ sessionId: "s_1", answer: "ok", maskedAnswer: "ok", maskedMessages: req.messages, keptSpans: kept, masked: 0, mode: req.mode, ms: 1, finishReason: "stop" });
+      },
+    });
+    render(<Chat client={client} live draft={null} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    const input = screen.getByRole("textbox", { name: "Message" });
+    await user.clear(input);
+    await user.type(input, "I write for Minta Kft today.");
+    await user.click(screen.getByRole("button", { name: /send through/i }));
+    const turn = await screen.findByRole("article", { name: "Chat turn" });
+    await waitFor(() => expect(turn.querySelector("mark[data-kept]")).not.toBeNull());
+    const mark = turn.querySelector("mark[data-kept]")!;
+    expect(mark.getAttribute("data-kept")).toBe("ORGANIZATION");
+    expect(mark.className).toContain("outline-dashed");
+    expect(mark.textContent).toContain("Minta Kft");
+    expect(within(turn).getByText(/1 value detected but kept by policy/)).toBeInTheDocument();
   });
 });

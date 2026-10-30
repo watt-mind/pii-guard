@@ -4,6 +4,8 @@
 goes through (counts, the masked body, the upstream's answer, timing) and turned into an event
 by :meth:`CallTrace.finish`, which publishes it once. Payloads are only kept when the traffic
 log is on; originals (the client's request, the restored answer) only at level ``full``.
+Inline images in the masked request also get small thumbnails
+(:mod:`pii_guard.observability.thumbnails`); original images never do.
 
 The event never holds request headers (so no ``Authorization`` or upstream key), and the
 session only as its :meth:`~pii_guard.observability.traffic.TrafficLog.session_ref`.
@@ -13,6 +15,10 @@ keeps it only once that check has passed: the outbound re-check ran and found no
 refused, blocked or failed call gets :data:`MODEL_WITHHELD` instead, in ``model`` and in the
 ``full`` original alike (LAB-1358). The upstream's reported model is kept only when the request
 model was and it is model-id shaped.
+
+``outcome`` is ``refused`` only when the guard stopped the call; a masked request that was
+forwarded and then failed upstream (unreachable, unusable answer, no event stream) is
+``upstream_failed``, its ``error.code`` still the ``upstream_*`` code (LAB-1629).
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pii_guard.observability import Observability, RequestTimer
+from pii_guard.observability.thumbnails import masked_thumbnails
 from pii_guard.policy import BlockedEntityError
 from pii_guard.types import PiiGuardError
 
@@ -88,10 +95,13 @@ class CallTrace:
         observability: Observability | None,
         timer: RequestTimer,
         body: object,
+        request_id: str | None = None,
     ) -> None:
         self.observability = observability
         self.timer = timer
-        self.request_id = new_request_id()
+        # The route may assign the id up front (LAB-1179) so the error handler can stamp
+        # even refused calls with the id of the traffic event recorded for them.
+        self.request_id = request_id or new_request_id()
         self.recording = observability is not None and observability.recording
         self.payloads = observability is not None and observability.traffic.enabled
         self.full = observability is not None and observability.traffic.full
@@ -111,6 +121,9 @@ class CallTrace:
         self.answer: Any = None  # restored, ``full`` only
         self.stream_masked: dict[int, str] | None = None
         self.stream_restored: dict[int, str] | None = None
+        # Streamed tool calls per choice, ``message.tool_calls`` shaped (LAB-1189).
+        self.stream_masked_tools: dict[int, list[dict[str, Any]]] = {}
+        self.stream_restored_tools: dict[int, list[dict[str, Any]]] = {}
         self.stream_chunks = 0
         self.usage: Any = None
         self.streaming = False  # the event is emitted when the stream ends
@@ -131,11 +144,22 @@ class CallTrace:
 
     def fail(self, exc: BaseException) -> None:
         from pii_guard.gateway.outbound import OutboundCheckFailedError
+        from pii_guard.gateway.service import UpstreamError
 
         if isinstance(exc, PiiGuardError):
             blocked = isinstance(exc, BlockedEntityError | OutboundCheckFailedError)
-            outcome = "blocked" if blocked else "refused"
-            error = {"code": exc.code, "status": exc.status_code}
+            # The masked request was forwarded and the upstream failed (unreachable, unusable
+            # answer, no event stream): not a refusal, nothing stopped in the guard (LAB-1629).
+            # ``error.code`` keeps its ``upstream_*`` value, so older consumers still match it.
+            if blocked:
+                outcome = "blocked"
+            elif isinstance(exc, UpstreamError):
+                outcome = "upstream_failed"
+            else:
+                outcome = "refused"
+            # The message names types and counts only, never values (the same redaction
+            # rule as API error bodies, LAB-1314). Anything else may echo the request.
+            error = {"code": exc.code, "status": exc.status_code, "message": exc.message}
             if isinstance(exc, BlockedEntityError):
                 error["entity_types"] = {t.value: n for t, n in sorted(exc.counts.items())}
             elif isinstance(exc, OutboundCheckFailedError):
@@ -231,7 +255,7 @@ class CallTrace:
             if self.upstream_body is not None:
                 response["masked"] = upstream_answer
             elif self.stream_masked is not None:
-                response["masked"] = {"content": _by_choice(self.stream_masked)}
+                response["masked"] = _streamed(self.stream_masked, self.stream_masked_tools)
                 response["chunks"] = self.stream_chunks
             if self.full:
                 original = self.original
@@ -241,14 +265,32 @@ class CallTrace:
                 if answer is not None:
                     response["unmasked"] = answer
                 elif self.stream_restored is not None:
-                    response["unmasked"] = {"content": _by_choice(self.stream_restored)}
+                    response["unmasked"] = _streamed(
+                        self.stream_restored, self.stream_restored_tools
+                    )
             event["request"] = obs.scrub(request)
+            # Added after scrubbing (which summarizes inline images): bounded WebP copies of
+            # the masked images only, never the originals (LAB-1188).
+            thumbnails = masked_thumbnails(self.masked_request)
+            if thumbnails:
+                event["request"]["thumbnails"] = thumbnails
             event["response"] = obs.scrub(response) if response else None
         obs.record(event)
 
 
-def _by_choice(content: Mapping[int, str]) -> dict[str, str]:
+def _by_choice(content: Mapping[int, Any]) -> dict[str, Any]:
     return {str(k): v for k, v in sorted(content.items())}
+
+
+def _streamed(
+    content: Mapping[int, str], tool_calls: Mapping[int, list[dict[str, Any]]]
+) -> dict[str, Any]:
+    """A stream's collected answer: ``content`` per choice, and ``tool_calls`` per choice
+    when it streamed any (each list as in a non-streamed ``message.tool_calls``)."""
+    out: dict[str, Any] = {"content": _by_choice(content)}
+    if tool_calls:
+        out["tool_calls"] = _by_choice(tool_calls)
+    return out
 
 
 def _entities(stats: RequestStats | None) -> dict[str, Any] | None:
@@ -257,6 +299,9 @@ def _entities(stats: RequestStats | None) -> dict[str, Any] | None:
     out: dict[str, Any] = {
         "detected": dict(sorted(stats.spans.items())),
         "masked": dict(sorted((k, v) for k, v in stats.masked.items() if v)),
+        # Fail-closed overrides the resolver forced over a keep type (LAB-1248, LAB-1228):
+        # counts by entity type only, never values or detector internals beyond the type.
+        "forced_masks": dict(sorted((k, v) for k, v in stats.forced.items() if v)),
         "texts": stats.texts,
     }
     if stats.images:

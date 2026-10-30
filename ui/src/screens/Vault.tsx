@@ -6,6 +6,11 @@ import { Button, Card, ConfirmAction, Input, KeyValues, Metric, Notice, PageHead
 import type { ServerStatusState } from "../hooks/useServerStatus";
 import { useNow } from "../hooks/useNow";
 import { metaFor } from "../lib/entities";
+import { relativeTime } from "../lib/time";
+import { useHostedSession } from "../hosted/session";
+import type { Endpoint } from "../projects/api";
+import { localRequest } from "../projects/request";
+import { getSelectedProject, setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 
 export interface VaultProps {
   status: ServerStatusState;
@@ -14,8 +19,10 @@ export interface VaultProps {
   /** The section is on screen: the list refreshes only then. */
   active: boolean;
   client?: VaultClient;
-  /** Open this session (a Logs row's "Open in Vault"); `nonce` reopens the same one. */
+  /** Open this session (a Logs row's "Open in Vault", or a #vault/<ref> deep link); `nonce` reopens the same one. */
   focus?: { ref: string; nonce: number } | null;
+  /** The open session changed (or cleared): the URL hash follows it (LAB-1333). */
+  onSelectRef?: (ref: string | null) => void;
   refreshMs?: number;
 }
 
@@ -25,6 +32,46 @@ type DetailState = { state: "idle" } | { state: "loading" } | { state: "ok"; det
 const SOURCES: SessionSource[] = ["path", "prompt_cache_key", "default", "header", "api"];
 const mono = (s: ReactNode) => <code className="font-mono text-xs">{s}</code>;
 
+/**
+ * Hosted has no "Send demo traffic" (LAB-1619). A call through an endpoint keeps its session under
+ * that endpoint, so the project-wide view stays empty after a first call: say where it is, and
+ * offer the switch when the project has exactly one endpoint.
+ */
+function HostedEmpty() {
+  const endpointSelected = useSelectedEndpoint() !== null;
+  const project = getSelectedProject();
+  const [only, setOnly] = useState<Endpoint | null>(null);
+  useEffect(() => {
+    if (endpointSelected || !project) return;
+    let live = true;
+    localRequest<{ endpoints: Endpoint[] }>(`/v1/projects/${encodeURIComponent(project)}/endpoints`).then(
+      (data) => {
+        const enabled = Array.isArray(data.endpoints) ? data.endpoints.filter((e) => e.enabled) : [];
+        if (live) setOnly(enabled.length === 1 ? enabled[0]! : null);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [endpointSelected, project]);
+  if (endpointSelected)
+    return <p className="py-6 text-center text-sm text-muted">No sessions on this endpoint yet. Send a call through it from your client, or open Connect to send a test request.</p>;
+  return (
+    <div className="space-y-3 py-4 text-center text-sm text-muted">
+      <p>
+        No sessions in this view. Calls through an endpoint keep their sessions under that endpoint: pick it in the header menu (Inspect activity &amp; vault), or open a call
+        in Logs.
+      </p>
+      {only && (
+        <Button size="sm" className="h-auto! min-h-8 max-w-full py-1.5 whitespace-normal! pointer-coarse:min-h-11" onClick={() => setSelectedEndpoint(only.id)}>
+          Show the sessions of {only.name}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function errorOf(err: unknown): { code: string; message: string } {
   if (err instanceof ApiError) return { code: err.code, message: err.message };
   return {
@@ -33,28 +80,24 @@ function errorOf(err: unknown): { code: string; message: string } {
   };
 }
 
-function ago(iso: string | null, now: number): string {
-  if (!iso) return "not recorded";
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return s < 5 ? "just now" : `${s} s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min ago`;
-}
+const ago = (iso: string | null, now: number): string => relativeTime(iso, now);
 
 function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   if (s < 60) return `${s} s`;
   if (s < 3600) return `${Math.floor(s / 60)} min`;
-  return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
+  const minutes = Math.floor((s % 3600) / 60);
+  return minutes ? `${Math.floor(s / 3600)} h ${minutes} min` : `${Math.floor(s / 3600)} h`;
 }
 
 const typeLabel = (t: string) => metaFor(t as EntityType).label ?? t;
 
-export function Vault({ status, live, active, client, focus = null, refreshMs = 5000 }: VaultProps) {
+export function Vault({ status, live, active, client, focus = null, onSelectRef, refreshMs = 5000 }: VaultProps) {
   const vault = useMemo(() => client ?? createVaultClient(), [client]);
   const server = status.state === "ok" ? status.status : null;
   const mode = server?.vault_inspect ?? (server ? "masked" : null);
   const usable = live && server !== null && mode !== "off";
+  const hosted = useHostedSession() !== null;
 
   const [list, setList] = useState<ListState>({ state: "loading" });
   const [source, setSource] = useState<SessionSource | "all">("all");
@@ -66,6 +109,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
   const [dropping, setDropping] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [handledFocus, setHandledFocus] = useState<number | null>(null);
+  const [autoPicked, setAutoPicked] = useState(false);
   // The detail to load: a new object (nonce) refetches, e.g. after a drop or a reveal.
   const [want, setWant] = useState<{ ref: string; reveal: boolean; nonce: number } | null>(null);
   // What the open detail was loaded at (generation, counts): when the list shows the session
@@ -136,6 +180,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
     setNotice(null);
     setDetail({ state: "loading" });
     setWant((w) => ({ ref, reveal: false, nonce: (w?.nonce ?? 0) + 1 }));
+    onSelectRef?.(ref);
   };
 
   if (focus && focus.nonce !== handledFocus && usable) {
@@ -153,7 +198,27 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
 
   const sessions = list.state === "ok" ? list.list.sessions : [];
   const shown = sessions.filter((s) => (source === "all" || s.source === source) && (query.trim() === "" || s.ref.includes(query.trim().toLowerCase())));
+  // A filter that hides the open session clears its detail (LAB-1333): the screen never
+  // shows a session under a list that no longer contains it. Without a filter the detail
+  // stays, so an expired session still says it is gone instead of vanishing silently.
+  if (selected !== null && (source !== "all" || query.trim() !== "") && !shown.some((s) => s.ref === selected)) {
+    setSelected(null);
+    setDetail({ state: "idle" });
+    setWant(null);
+    setRevealed(false);
+    onSelectRef?.(null);
+  }
   const current = detail.state === "ok" && detail.detail.ref === selected ? detail.detail : null;
+
+  // Like Logs, the screen opens on a session (LAB-1626): the most recently used one, once, without
+  // moving focus or the page. Not after a drop, whose confirmation sits where the detail goes.
+  if (!autoPicked && selected === null && notice === null && want === null && shown.length > 0) {
+    setAutoPicked(true);
+    const recent = shown.reduce((a, b) => (b.last_used > a.last_used ? b : a));
+    setSelected(recent.ref);
+    setDetail({ state: "loading" });
+    setWant((w) => ({ ref: recent.ref, reveal: false, nonce: (w?.nonce ?? 0) + 1 }));
+  }
 
   const latest = sessions.find((s) => s.ref === selected);
   const latestKey = latest ? `${latest.generation}|${latest.entries}|${latest.occurrences}|${latest.known_values}` : null;
@@ -177,6 +242,7 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
       await vault.drop(selected);
       setNotice(`Dropped session ${selected}. Its placeholders can't be restored any more.`);
       setSelected(null);
+      onSelectRef?.(null);
       setDetail({ state: "idle" });
       setWant(null);
       setRevealed(false);
@@ -195,7 +261,11 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
     <div className="space-y-6">
       <PageHeader
         title="Vault"
-        lead="The vault sessions this server holds: where each came from, and which placeholder stands for which value. For troubleshooting a value that was or wasn't restored. Values are shown as redacted hints; originals only on demand, when the server runs the inspector in full mode on localhost."
+        lead={
+          hosted
+            ? "The vault sessions of this project: where each came from, and which placeholder stands for which value. For troubleshooting a value that was or wasn't restored. Values are shown as redacted hints; originals are never shown on the hosted service."
+            : "The vault sessions this server holds: where each came from, and which placeholder stands for which value. For troubleshooting a value that was or wasn't restored. Values are shown as redacted hints; originals only on demand, when the server runs the inspector in full mode on localhost."
+        }
       />
 
       {!usable ? (
@@ -214,7 +284,8 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
         </Notice>
       ) : (
         <>
-          <ModeNote mode={mode === "full" ? "full" : "masked"} />
+          {/* Hosted, the lead already says originals are never shown (LAB-1629). */}
+          {!hosted && <ModeNote mode={mode === "full" ? "full" : "masked"} />}
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
             <Card
               title="Sessions"
@@ -252,13 +323,17 @@ export function Vault({ status, live, active, client, focus = null, refreshMs = 
                     Couldn't list the sessions: {list.message}
                   </p>
                 )}
-                {list.state === "ok" && sessions.length === 0 && (
-                  <p className="py-6 text-center text-sm text-muted">
-                    No live sessions. Send traffic through the gateway (Overview or Logs: "Send demo traffic") or mask a text in the Playground.
-                  </p>
-                )}
+                {list.state === "ok" && sessions.length === 0 &&
+                  (hosted ? (
+                    <HostedEmpty />
+                  ) : (
+                    <p className="py-6 text-center text-sm text-muted">
+                      No live sessions. Send traffic through the gateway (Overview or Logs: "Send demo traffic") or mask a text in the Playground.
+                    </p>
+                  ))}
                 {list.state === "ok" && sessions.length > 0 && shown.length === 0 && <p className="py-6 text-center text-sm text-muted">No session matches.</p>}
-                <ul className="space-y-1" aria-label="Vault sessions">
+                {/* Capped like the Logs list, so the detail stays beside it (LAB-1626). */}
+                <ul className="max-h-[26rem] space-y-1 overflow-y-auto overscroll-contain lg:max-h-[calc(100dvh-16rem)]" aria-label="Vault sessions">
                   {shown.map((s) => (
                     <li key={s.ref}>
                       <SessionRow s={s} now={now} selected={s.ref === selected} onOpen={() => open(s.ref)} />
@@ -365,7 +440,7 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
           )}
           <ConfirmAction
             size="sm"
-            trigger="Drop…"
+            trigger="Drop session…"
             triggerLabel={`Drop session ${d.ref}`}
             title={<>Drop session {mono(d.ref)}?</>}
             body={
@@ -402,7 +477,10 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
           <p className="py-6 text-center text-sm text-muted">This session holds no placeholders yet.</p>
         ) : (
           <>
-            <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            {/* Columns follow the card's width, not the window's: at 1024 px the card is narrow (LAB-1629).
+                The scroll wrapper is a focusable region, so keyboard users can scroll it. */}
+            <div className="@container">
+            <div tabIndex={0} role="region" aria-label={`Placeholders of session ${d.ref}`} className="-mx-4 overflow-x-auto px-4 focus-visible:outline-2 focus-visible:outline-offset-2 sm:mx-0 sm:px-0">
             <table className="w-full text-sm">
               <caption className="sr-only">
                 Placeholders of session {d.ref}
@@ -416,16 +494,22 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                   <th scope="col" className="px-2 py-2 font-medium">
                     {revealed ? "Value" : "Hint"}
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 font-medium sm:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 font-medium @md:table-cell">
                     Type
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 font-medium @2xl:table-cell">
                     Origin
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 font-medium @3xl:table-cell">
+                    Detector
+                  </th>
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium @md:table-cell">
                     Masked
                   </th>
-                  <th scope="col" className="hidden py-2 pl-2 text-right font-medium md:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium @3xl:table-cell">
+                    Seen
+                  </th>
+                  <th scope="col" className="hidden py-2 pl-2 text-right font-medium @xl:table-cell">
                     Forms
                   </th>
                 </tr>
@@ -436,7 +520,7 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                     <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-masked">
                       {item.placeholder ?? <span className="font-sans text-muted">not matched yet</span>}
                       {item.variant_of && <span className="block font-sans text-2xs whitespace-normal text-muted">variant of {item.variant_of}</span>}
-                      <span className="block font-sans text-2xs whitespace-normal text-muted sm:hidden">
+                      <span className="block font-sans text-2xs whitespace-normal text-muted @md:hidden">
                         {typeLabel(item.entity_type)} · {item.origin === "known" ? "known value" : "detected"} · masked {item.count}×
                       </span>
                     </td>
@@ -452,20 +536,28 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                         <span className="text-muted">{item.hint}</span>
                       )}
                     </td>
-                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap sm:table-cell">{typeLabel(item.entity_type)}</td>
-                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted md:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
-                    <td className="hidden px-2 py-2 text-right text-xs tabular-nums sm:table-cell">{item.count}</td>
-                    <td className="hidden py-2 pl-2 text-right text-xs tabular-nums md:table-cell">{item.forms}</td>
+                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap @md:table-cell">{typeLabel(item.entity_type)}</td>
+                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted @2xl:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
+                    <td className="hidden px-2 py-2 font-mono text-xs whitespace-nowrap text-muted @3xl:table-cell">{item.detector ?? "—"}</td>
+                    <td className="hidden px-2 py-2 text-right text-xs tabular-nums @md:table-cell">{item.count}</td>
+                    <td className="hidden px-2 py-2 text-right text-xs whitespace-nowrap tabular-nums text-muted @3xl:table-cell" title="Vault-clock seconds of the first and latest masked occurrence">
+                      {item.first_seen == null ? "—" : `${item.first_seen.toFixed(1)} → ${(item.last_seen ?? item.first_seen).toFixed(1)}`}
+                    </td>
+                    <td className="hidden py-2 pl-2 text-right text-xs tabular-nums @xl:table-cell">{item.forms}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             </div>
+            {/* The legend names only the columns this width shows (LAB-1629). */}
             <p className="mt-3 text-xs text-pretty text-muted">
               <span className="text-ink">Hint</span>: a redacted shape of the value (a word's first letter and length, a number's last two digits, nothing of a secret).{" "}
-              <span className="text-ink">Masked</span>: occurrences replaced by the placeholder so far. <span className="text-ink">Forms</span>: other written forms matched onto
-              the same value, such as inflections. <span className="text-ink">Known value</span>: pre-loaded with {mono("POST /v1/sessions")} rather than detected.
+              <span className="hidden @md:inline"><span className="text-ink">Masked</span>: occurrences replaced by the placeholder so far. </span>
+              <span className="hidden @xl:inline"><span className="text-ink">Forms</span>: other written forms matched onto the same value, such as inflections. </span>
+              <span className="hidden @3xl:inline"><span className="text-ink">Detector</span>: the detector of the first span that created the entry. <span className="text-ink">Seen</span>: vault-clock seconds of the first → latest masked occurrence. </span>
+              <span className="text-ink">Known value</span>: pre-loaded with {mono("POST /v1/sessions")} rather than detected.
             </p>
+            </div>
           </>
         )}
       </div>

@@ -197,7 +197,7 @@
             }
           },
           "500": {
-            "description": "`internal_error`: Anything unexpected. No exception text is returned. `vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
             "content": {
               "application/json": {
                 "schema": {
@@ -212,22 +212,13 @@
                         "message": "internal_error"
                       }
                     }
-                  },
-                  "vault_not_configured": {
-                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
-                    "value": {
-                      "error": {
-                        "code": "vault_not_configured",
-                        "message": "vault_not_configured"
-                      }
-                    }
                   }
                 }
               }
             }
           },
           "503": {
-            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request; retry. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
+            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes. `vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
             "content": {
               "application/json": {
                 "schema": {
@@ -253,11 +244,20 @@
                     }
                   },
                   "vault_capacity_exhausted": {
-                    "summary": "A new session is needed while every vault slot is held by an active request; retry.",
+                    "summary": "A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes.",
                     "value": {
                       "error": {
                         "code": "vault_capacity_exhausted",
                         "message": "vault_capacity_exhausted"
+                      }
+                    }
+                  },
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
                       }
                     }
                   },
@@ -694,7 +694,7 @@
             }
           },
           "500": {
-            "description": "`internal_error`: Anything unexpected. No exception text is returned. `vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
             "content": {
               "application/json": {
                 "schema": {
@@ -709,22 +709,13 @@
                         "message": "internal_error"
                       }
                     }
-                  },
-                  "vault_not_configured": {
-                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
-                    "value": {
-                      "error": {
-                        "code": "vault_not_configured",
-                        "message": "vault_not_configured"
-                      }
-                    }
                   }
                 }
               }
             }
           },
           "503": {
-            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request; retry. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
+            "description": "`detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `upstream_not_configured`: The server has no upstream (`PII_GUARD_UPSTREAM_BASE_URL`). `vault_capacity_exhausted`: A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes. `vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key).",
             "content": {
               "application/json": {
                 "schema": {
@@ -750,11 +741,20 @@
                     }
                   },
                   "vault_capacity_exhausted": {
-                    "summary": "A new session is needed while every vault slot is held by an active request; retry.",
+                    "summary": "A new session is needed while every vault slot is held by an active request, or this client already has `PII_GUARD_VAULT_MAX_LEASES_PER_IDENTITY` requests in flight (then existing sessions are refused too); retry once a request finishes.",
                     "value": {
                       "error": {
                         "code": "vault_capacity_exhausted",
                         "message": "vault_capacity_exhausted"
+                      }
+                    }
+                  },
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
                       }
                     }
                   },
@@ -1325,22 +1325,13 @@
             }
           },
           "500": {
-            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `masking_failed`: Masking or re-identification could not complete. `internal_error`: Anything unexpected. No exception text is returned.",
+            "description": "`masking_failed`: Masking or re-identification could not complete. `internal_error`: Anything unexpected. No exception text is returned.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
-                  "vault_not_configured": {
-                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
-                    "value": {
-                      "error": {
-                        "code": "vault_not_configured",
-                        "message": "vault_not_configured"
-                      }
-                    }
-                  },
                   "masking_failed": {
                     "summary": "Masking or re-identification could not complete.",
                     "value": {
@@ -1364,13 +1355,22 @@
             }
           },
           "503": {
-            "description": "`detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key). `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key). `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
+                      }
+                    }
+                  },
                   "detection_failed": {
                     "summary": "A detector (or SAM, or OCR) failed or timed out.",
                     "value": {
@@ -1564,22 +1564,13 @@
             }
           },
           "500": {
-            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `masking_failed`: Masking or re-identification could not complete. `internal_error`: Anything unexpected. No exception text is returned.",
+            "description": "`masking_failed`: Masking or re-identification could not complete. `internal_error`: Anything unexpected. No exception text is returned.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
-                  "vault_not_configured": {
-                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
-                    "value": {
-                      "error": {
-                        "code": "vault_not_configured",
-                        "message": "vault_not_configured"
-                      }
-                    }
-                  },
                   "masking_failed": {
                     "summary": "Masking or re-identification could not complete.",
                     "value": {
@@ -1595,6 +1586,27 @@
                       "error": {
                         "code": "internal_error",
                         "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "vault_not_configured": {
+                    "summary": "`PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
+                    "value": {
+                      "error": {
+                        "code": "vault_not_configured",
+                        "message": "vault_not_configured"
                       }
                     }
                   }
@@ -1617,7 +1629,7 @@
           "Masking"
         ],
         "summary": "Detect personal data without masking it",
-        "description": "Detect without masking. Every span carries its type's policy; ``block`` spans are\nreported here, not refused (nothing leaves the guard).\n\nWith ``session_id`` the session's known values are merged in as ``/v1/mask`` does\n(``detector: \"known\"``). The vault is only resolved then, so analyze without a session\nneeds no tenant key. Nothing is stored and no session is created; an unknown or expired\nsession is a 404. Known spans of a ``keep`` type report ``mask``: ``/v1/mask`` masks them.",
+        "description": "Detect without masking. Every span carries its type's policy; ``block`` spans are\nreported here, not refused (nothing leaves the guard).\n\nWith ``session_id`` the session's known values are merged in as ``/v1/mask`` does\n(``detector: \"known\"``). The vault is only resolved then, so analyze without a session\nneeds no tenant key. Nothing is stored and no session is created; an unknown or expired\nsession is a 404, as is one a gateway request bound to another client identity (LAB-1590).\nKnown spans of a ``keep`` type report ``mask``: ``/v1/mask`` masks them.",
         "operationId": "analyze_v1_analyze_post",
         "requestBody": {
           "content": {
@@ -1746,7 +1758,28 @@
             }
           },
           "500": {
-            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `internal_error`: Anything unexpected. No exception text is returned.",
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key). `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1762,27 +1795,6 @@
                       }
                     }
                   },
-                  "internal_error": {
-                    "summary": "Anything unexpected. No exception text is returned.",
-                    "value": {
-                      "error": {
-                        "code": "internal_error",
-                        "message": "internal_error"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "`detection_failed`: A detector (or SAM, or OCR) failed or timed out. `detection_profile_denied`: The selected or cached processing component is not permitted by the detection profile. `detection_unavailable`: A configured detector can't run safely (the LLM detector without a key). `detector_loading`: The NER model is still loading after `PII_GUARD_NER_WARMUP_TIMEOUT`; retry after `Retry-After` seconds.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
                   "detection_failed": {
                     "summary": "A detector (or SAM, or OCR) failed or timed out.",
                     "value": {
@@ -1971,7 +1983,28 @@
             }
           },
           "500": {
-            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `internal_error`: Anything unexpected. No exception text is returned.",
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1984,15 +2017,6 @@
                       "error": {
                         "code": "vault_not_configured",
                         "message": "vault_not_configured"
-                      }
-                    }
-                  },
-                  "internal_error": {
-                    "summary": "Anything unexpected. No exception text is returned.",
-                    "value": {
-                      "error": {
-                        "code": "internal_error",
-                        "message": "internal_error"
                       }
                     }
                   }
@@ -2015,7 +2039,7 @@
           "Sessions"
         ],
         "summary": "Add known values to a session",
-        "description": "Add known values to an existing session (404 if it is unknown or expired).\n\nA refused request (an invalid value, or more than the session may hold) adds nothing.",
+        "description": "Add known values to an existing session (404 if it is unknown or expired).\n\nA refused request (an invalid value, or more than the session may hold) adds nothing.\nA session a gateway request bound to another client identity is a 404 too, and nothing is\nadded to it (LAB-1590).",
         "operationId": "add_known_values_v1_sessions__session_id__known_values_post",
         "parameters": [
           {
@@ -2177,7 +2201,28 @@
             }
           },
           "500": {
-            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes. `internal_error`: Anything unexpected. No exception text is returned.",
+            "description": "`internal_error`: Anything unexpected. No exception text is returned.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "internal_error": {
+                    "summary": "Anything unexpected. No exception text is returned.",
+                    "value": {
+                      "error": {
+                        "code": "internal_error",
+                        "message": "internal_error"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`vault_not_configured`: `PII_GUARD_TENANT_KEY` is unset, not hex or shorter than 16 bytes.",
             "content": {
               "application/json": {
                 "examples": {
@@ -2187,15 +2232,6 @@
                       "error": {
                         "code": "vault_not_configured",
                         "message": "vault_not_configured"
-                      }
-                    }
-                  },
-                  "internal_error": {
-                    "summary": "Anything unexpected. No exception text is returned.",
-                    "value": {
-                      "error": {
-                        "code": "internal_error",
-                        "message": "internal_error"
                       }
                     }
                   }
@@ -3075,7 +3111,7 @@
               }
             ],
             "title": "Session Id",
-            "description": "Optional vault session (1-128 characters, as on `/v1/mask`) whose pre-loaded known values are merged in (`detector: \"known\"`). Unknown or expired: 404 `not_found`. Never creates a session."
+            "description": "Optional vault session (1-128 characters, as on `/v1/mask`) whose pre-loaded known values are merged in (`detector: \"known\"`). Unknown, expired or bound to another client identity: 404 `not_found`. Never creates a session."
           }
         },
         "type": "object",
@@ -3362,7 +3398,7 @@
               }
             ],
             "title": "Session Id",
-            "description": "Vault session to mask in (1-128 characters). Omitted or `null`: a new session is created and returned. An existing id reuses its mapping, so the same value keeps the same placeholder across calls. Unknown or expired: 404 `not_found`."
+            "description": "Vault session to mask in (1-128 characters). Omitted or `null`: a new session is created and returned. An existing id reuses its mapping, so the same value keeps the same placeholder across calls. Unknown, expired or bound to another client identity: 404 `not_found`."
           }
         },
         "type": "object",

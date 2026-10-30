@@ -1,7 +1,7 @@
 """Static SVG charts from the benchmark index, hand-written (no plotting dependency).
 
 Every chart is 1600 x 900 (16:9, slide-sized: at 1920 px wide the smallest text is >= 24 px),
-on a white card with dark text, colour-blind-safe colours (Okabe-Ito / Paul Tol; comparison
+on a white card with dark text, color-blind-safe colours (Okabe-Ito / Paul Tol; comparison
 tools grey with distinct marker shapes) and a caption naming the fixture set, its size,
 the run dates and the commits. Output depends only on the index, so it is byte-stable.
 
@@ -30,6 +30,7 @@ from pii_guard.eval.stats import fmt_duration, fmt_pct
 
 __all__ = [
     "by_language",
+    "dark_variant",
     "latency",
     "leak_vs_latency",
     "number_validity",
@@ -45,7 +46,12 @@ MUTED = "#4A4A52"
 GRID = "#E3E3E8"
 AXIS = "#8A8A93"
 BG = "#FFFFFF"
-#: Language colours (Paul Tol bright/muted, colour-blind safe), assigned in index order.
+#: Dark-canvas counterparts of the light card, for the `*-dark.svg` variants (LAB-1238).
+DARK_BG = "#111318"
+DARK_INK = "#F2F2F5"
+DARK_MUTED = "#B8B8C0"
+DARK_GRID = "#33333A"
+#: Language colors (Paul Tol bright/muted, colour-blind safe), assigned in index order.
 LANG_COLORS = ["#332288", "#44AA99", "#DDCC77", "#CC6677", "#88CCEE", "#AA4499", "#117733"]
 
 
@@ -135,6 +141,20 @@ def _svg(title: str, desc: str, body: Sequence[str], caption: Sequence[str]) -> 
         y += 30
     out.append("</svg>")
     return "\n".join(out) + "\n"
+
+
+def dark_variant(svg: str) -> str:
+    """The `*-dark.svg` twin of a chart: the same drawing on a dark card (LAB-1238).
+
+    Only the card chrome is swapped (background, ink, muted caption/axis text, grid);
+    data colors stay as-is so a series keeps its color across themes.
+    """
+    return (
+        svg.replace(BG, DARK_BG)
+        .replace(INK, DARK_INK)
+        .replace(MUTED, DARK_MUTED)
+        .replace(GRID, DARK_GRID)
+    )
 
 
 def _short(commit: str) -> str:
@@ -354,7 +374,7 @@ def leak_vs_latency(index: Mapping[str, Any], *, fixture_set: str, systems: Sequ
             _text(p["lx"], p["ly"] + 8, p["label"], size=22, anchor=p["anchor"], weight="600")
         )
     # Legend: ours vs comparison tools, one row under the subtitle.
-    legend_a = "pii-guard (filled, one colour per configuration)"
+    legend_a = "pii-guard (filled, one color per configuration)"
     body.append(_marker("circle", 66, 151, 10, "#0072B2"))
     body.append(_text(86, 158, legend_a, size=20, fill=MUTED))
     lx = 86 + text_width(legend_a, 20) + 48
@@ -417,7 +437,7 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
         )
     ]
     # Legend for languages.
-    lx = 56
+    lx: float = 56
     info = index["fixture_sets"].get(fixture_set, {})
     for lang in langs:
         body.append(f'<rect x="{lx}" y="140" width="22" height="22" fill="{colors[lang]}"/>')
@@ -470,7 +490,7 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
     caption = [
         set_caption(index, fixture_set) + ". Bars: runs on the current fixture files only.",
         (
-            "Full leak = labelled values of mask-policy types surviving masking in any surface "
+            "Full leak = labeled values of mask-policy types surviving masking in any surface "
             "form. F1 = span overlap match, micro."
         ),
         _provenance(snaps),
@@ -487,7 +507,7 @@ def by_language(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence
 
 # --- (b2) number validity ------------------------------------------------------------------
 
-#: (key in the compact validity block or ``None`` for the headline, legend, colour)
+#: (key in the compact validity block or ``None`` for the headline, legend, color)
 VALIDITY_BARS: tuple[tuple[str | None, str, str], ...] = (
     (None, "All values (headline)", "#4A4A52"),
     ("valid", "Valid numbers", "#117733"),
@@ -528,7 +548,7 @@ def number_validity(index: Mapping[str, Any], *, fixture_set: str) -> str:
             fill=MUTED,
         )
     ]
-    lx = 56
+    lx: float = 56
     for _, name, color in VALIDITY_BARS:
         body.append(f'<rect x="{lx}" y="140" width="22" height="22" fill="{color}"/>')
         body.append(_text(lx + 30, 159, name, size=21))
@@ -631,7 +651,14 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
         body.append(
             _text(px0 - 16, sy(t) + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end")
         )
+    # Thin the x labels so dates never overlap at 1600 px (LAB-1224): keep at most
+    # ~6 labeled categories, always including the first and the last.
+    keep = {0, len(cats) - 1}
+    step = max(1, math.ceil(len(cats) / 6))
+    keep.update(range(0, len(cats), step))
     for i, (day, commit) in enumerate(cats):
+        if i not in keep:
+            continue
         body.append(_text(sx(i), py1 + 34, day, size=20, fill=MUTED, anchor="middle"))
         body.append(_text(sx(i), py1 + 60, _short(commit), size=20, fill=MUTED, anchor="middle"))
     body.append(
@@ -682,7 +709,10 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
             continue
         body.append(_marker("circle", 1230, ly, 10, st["color"]))
         name = st["short_label"] + (" (default)" if st.get("default") else "")
-        body.append(_text(1250, ly + 7, name, size=20, weight="600"))
+        # Wrap long legend names so they stay inside the 1600 px card (LAB-1224).
+        for k, line in enumerate(_wrap(name, 20, 330)):
+            body.append(_text(1250, ly + 7 + k * 26, line, size=20, weight="600"))
+        ly += 26 * max(len(_wrap(name, 20, 330)) - 1, 0)
         body.append(
             _text(
                 1250,
@@ -729,7 +759,7 @@ _BLUES = [(0.0, (0xF3, 0xF6, 0xFB)), (0.5, (0x6B, 0xAE, 0xD6)), (1.0, (0x08, 0x3
 
 
 def _blue(v: float) -> tuple[str, bool]:
-    """A sequential single-hue colour for ``v`` in [0, 1], and whether text on it is white."""
+    """A sequential single-hue color for ``v`` in [0, 1], and whether text on it is white."""
     for (a, ca), (b, cb) in itertools.pairwise(_BLUES):
         if v <= b:
             t = (v - a) / (b - a)
@@ -867,7 +897,7 @@ def is_segment_run(run: Mapping[str, Any]) -> bool:
 
 
 def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
-    # The latest run of each system on each set: bars grouped by set, coloured by system.
+    # The latest run of each system on each set: bars grouped by set, colored by system.
     # ``segmenters``: only the segmenter comparison runs (else: every other visual run).
     latest: dict[tuple[str, str], Mapping[str, Any]] = {}
     for r in index["visual"]:
@@ -901,13 +931,14 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
         _text(
             56,
             112,
-            "Share of labelled image regions masked (IoU >= 0.5), by region type; in each group, "
+            "Share of labeled image regions masked (IoU >= 0.5), by region type; in each group, "
             + " | ".join(set_order),
             size=24,
             fill=MUTED,
         )
     ]
-    lx, ly = 56, 140
+    lx: float = 56
+    ly = 140
     for sk in systems:
         txt = short(sk)
         width = 30 + text_width(txt, 21) + 36
@@ -926,6 +957,20 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
         )
     for g, name in enumerate(groups):
         gx = px0 + g * gw + (gw - bw * slots) / 2
+        # Narrow bars (many systems) cannot carry a value label each: the labels
+        # overlap (LAB-1193). Label every bar only when they fit; otherwise label just
+        # the group's best bar, whose value the legend cannot show.
+        cand: list[tuple[float, float]] = []
+        for k, r in enumerate(runs):
+            block = r["overall"] if name == "all" else r["by_region_type"].get(name)
+            if not block:
+                continue
+            v = block["recall_iou50"] or 0
+            set_index = set_order.index(str(r.get("fixture_set") or "specimens"))
+            x = gx + (k + gap * set_index) * bw
+            cand.append((x, v))
+        label_all = bw >= 30 or not cand
+        best_x = max(cand, key=lambda t: t[1])[0] if cand else 0.0
         ns: list[int] = []
         for k, r in enumerate(runs):
             block = r["overall"] if name == "all" else r["by_region_type"].get(name)
@@ -940,15 +985,16 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
                 f'<rect x="{_n(x + 3)}" y="{_n(sy(v))}" width="{_n(bw - 6)}" '
                 f'height="{_n(max(py1 - sy(v), 1))}" fill="{color[str(r["system"])]}"/>'
             )
-            body.append(
-                _text(
-                    x + bw / 2,
-                    sy(v) - 10,
-                    fmt_pct(v, 0),
-                    size=19 if bw >= 34 else 18,
-                    anchor="middle",
+            if label_all or x == best_x:
+                body.append(
+                    _text(
+                        x + bw / 2,
+                        sy(v) - 10,
+                        fmt_pct(v, 0),
+                        size=19 if bw >= 34 else 18,
+                        anchor="middle",
+                    )
                 )
-            )
         body.append(
             _text(px0 + (g + 0.5) * gw, py1 + 34, name, size=21, anchor="middle", weight="600")
         )
@@ -1002,7 +1048,7 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
 
 # --- Gateway latency ----------------------------------------------------------------------
 
-#: Stage colours (Okabe-Ito), in pipeline order; ``other`` is untimed glue (HTTP, scheduling).
+#: Stage colors (Okabe-Ito), in pipeline order; ``other`` is untimed glue (HTTP, scheduling).
 STAGE_COLORS = {
     "parse": "#56B4E9",
     "detect": "#0072B2",

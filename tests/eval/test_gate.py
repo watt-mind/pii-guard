@@ -1,4 +1,4 @@
-"""The quality regression gate (``python -m pii_guard.eval.gate``, eval/gates.json)."""
+"""The quality regression gate (``pii-guard eval gate``, ``python -m pii_guard.eval.gate``)."""
 
 from __future__ import annotations
 
@@ -128,3 +128,35 @@ def test_malformed_gates_exit_2(in_repo: Path, tmp_path: Path, gates: dict) -> N
     path = tmp_path / "gates.json"
     path.write_text(json.dumps(gates), encoding="utf-8")
     assert gate.main(["--gates", str(path)]) == 2
+
+
+def _one_suite(in_repo: Path, tmp_path: Path, leak_rate_max: float) -> list[str]:
+    gates = json.loads((in_repo / "eval/gates.json").read_text(encoding="utf-8"))
+    gates["suites"] = gates["suites"][:1]
+    gates["suites"][0]["limits"]["leak_rate_max"] = leak_rate_max
+    path = tmp_path / "gates.json"
+    path.write_text(json.dumps(gates), encoding="utf-8")
+    runs = tmp_path / "results" / "runs"
+    runs.mkdir(parents=True)
+    (tmp_path / "results" / "schema").mkdir()
+    shutil.copy(in_repo / "eval/results/schema/run.schema.json", tmp_path / "results" / "schema")
+    return ["--gates", str(path), "--runs-dir", str(runs)]
+
+
+@pytest.mark.parametrize(("leak_rate_max", "code"), [(1.0, 0), (0.01, 1)])
+def test_pii_guard_eval_gate_exits_like_the_module(
+    in_repo: Path, tmp_path: Path, leak_rate_max: float, code: int
+) -> None:
+    """``pii-guard eval gate`` dispatches to the module and keeps its 0/1/2 exit codes."""
+    from pii_guard.eval import cli as eval_cli
+
+    args = _one_suite(in_repo, tmp_path, leak_rate_max)
+    assert eval_cli.main(["gate", *args]) == code == gate.main(args)
+
+
+def test_pii_guard_eval_gate_bad_gates_exit_2(in_repo: Path, tmp_path: Path) -> None:
+    from pii_guard.eval import cli as eval_cli
+
+    path = tmp_path / "gates.json"
+    path.write_text(json.dumps({"suites": []}), encoding="utf-8")
+    assert eval_cli.main(["gate", "--gates", str(path)]) == 2

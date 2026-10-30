@@ -67,12 +67,14 @@ __all__ = [
     "DEVICE_ENV_VAR",
     "LABEL_MAP",
     "MODEL_ENV_VAR",
+    "MPS_PAD_BUCKET",
     "NER_ENTITY_TYPES",
     "NER_V1_ENTITY_TYPES",
     "NerBackend",
     "NerDetector",
     "RawEntity",
     "TransformersBackend",
+    "bucket_padded_width",
     "decode_tokens",
     "dependencies_available",
     "merge_entities",
@@ -158,6 +160,21 @@ DEFAULT_THRESHOLDS: dict[str, dict[EntityType, float]] = {
 # house numbers ("1982.06.26.", "utca 12."); a PERSON span loses a trailing dot.
 _TRIM = " \t\r\n,;:!?()[]{}\"'\u00ab\u00bb\u201e\u201c\u201d\u2018\u2019\u2013\u2014-/"
 _REQUIRED_MODULES = ("torch", "transformers")
+#: Right-pad micro-batches to a multiple of this on Apple MPS (LAB-1329): a forward pass
+#: with an unseen input shape compiles a new kernel, so bucketing keeps the shape set small.
+MPS_PAD_BUCKET = 32
+
+
+def bucket_padded_width(width: int, max_length: int, bucket: int | None) -> int:
+    """The padded width of a micro-batch (LAB-1329): with ``bucket`` set (MPS), round up
+    to a multiple of it (capped at ``max_length``), so a new width does not compile a new
+    kernel mid-traffic. The extra positions are attention-masked padding, so spans are
+    unchanged."""
+    if not bucket or width >= max_length:
+        return width
+    return min(max_length, -(-width // bucket) * bucket)
+
+
 #: Windows per forward pass in :meth:`TransformersBackend.predict_batch` (LAB-1279), the cap
 #: on padded tokens per pass (8 full 512-token windows), and on padded / real tokens.
 DEFAULT_BATCH_SIZE = 8
@@ -398,6 +415,10 @@ class TransformersBackend:
         self.max_batch_tokens = max_batch_tokens
         self.max_padding = max_padding
         self.max_combined_texts = max_combined_texts
+        # Bucket the padded width on MPS only (LAB-1329): CPU pays the extra padding
+        # with nothing to gain, and the batch dim stays as-is (a dummy row would need
+        # its own masking and buys no kernel reuse across combined calls).
+        self.pad_bucket = MPS_PAD_BUCKET if self.device == "mps" else None
         self._lock = threading.Lock()  # fast tokenizers are not safe for concurrent calls
         # Callers waiting for a run, oldest first, and whether a run is in progress (LAB-1177).
         # While ``_running`` is set, exactly one thread runs or is about to run the queue.
@@ -513,7 +534,7 @@ class TransformersBackend:
             best: list[list[float]] = [[] for _ in lengths]
             label_ids: list[list[int]] = [[] for _ in lengths]
             for chunk in self._micro_batches(lengths):
-                width = lengths[chunk[0]]  # longest first
+                width = self._padded_width(lengths[chunk[0]])  # longest first
                 inputs = {
                     key: torch.tensor(
                         [
@@ -541,6 +562,10 @@ class TransformersBackend:
                 )
             )
         return [merge_entities(entities) for entities in per_text]
+
+    def _padded_width(self, width: int) -> int:
+        """The padded width of a micro-batch: :func:`bucket_padded_width` on MPS."""
+        return bucket_padded_width(width, self.max_length, self.pad_bucket)
 
     def _micro_batches(self, lengths: Sequence[int]) -> list[list[int]]:
         """Window indices, longest first, cut into batches for :meth:`predict_batch`.
@@ -642,10 +667,6 @@ class NerDetector:
         local_files_only: bool = False,
     ) -> None:
         self.number_checks = number_checks
-        from pii_guard.config import get_settings
-        from pii_guard.detection_profile import is_local_only
-
-        local_files_only = local_files_only or is_local_only(get_settings())
         self.local_files_only = local_files_only
         kind = (backend_kind or os.environ.get(BACKEND_ENV_VAR) or "transformers").strip().lower()
         if kind not in BACKENDS:
@@ -871,11 +892,16 @@ class NerDetector:
         return guard_spans(text, found, language)
 
 
-# A ``,`` or ``;`` with a capital letter right after it: a cell boundary before a name in a
+# A ``,`` or ``;`` with a capitalised word right after it: a cell boundary before a name in a
 # delimited row ("2,Teszt Elek,teszt.elek@example.com"). Prose puts a space after them,
 # decimals ("1,5") have a digit, and header rows (``id,name,tax_id``) stay as they are: the
-# model reads number types from them.
+# model reads number types from them. An all-caps cell (``ORD-2024-544367``, ``SO7466927``) is
+# a reference, not a name: spacing it glued the reference to the ID before it
+# ("610456508 ORD-…") and the model dropped the ID (LAB-1648).
 _GLUED_DELIMITER = re.compile(r"[,;](?=[^\W\d_])")
+#: What may follow a cell's capital for it to start a name: a lower-case letter (``Teszt``,
+#: ``Ádám``), an apostrophe (``O'Brien``) or an initial's period (``J. Smith``).
+_NAME_SECOND = frozenset("'\u2019.")
 
 
 def model_view(text: str) -> tuple[str, tuple[int, ...]]:
@@ -885,13 +911,21 @@ def model_view(text: str) -> tuple[str, tuple[int, ...]]:
     model mis-spans it ("Elek,teszt.elek@example.com,+36") or misses it. Each glued delimiter
     becomes a space: same length, so model offsets are offsets into ``text``.
     """
-    cuts = tuple(m.start() for m in _GLUED_DELIMITER.finditer(text) if text[m.end()].isupper())
+    cuts = tuple(m.start() for m in _GLUED_DELIMITER.finditer(text) if _starts_name(text, m.end()))
     if not cuts:
         return text, ()
     chars = list(text)
     for cut in cuts:
         chars[cut] = " "
     return "".join(chars), cuts
+
+
+def _starts_name(text: str, pos: int) -> bool:
+    """A capital at ``pos`` followed by a lower-case letter, ``'`` or ``.``: a name's start."""
+    if not text[pos].isupper():
+        return False
+    nxt = text[pos + 1 : pos + 2]
+    return nxt.islower() or nxt in _NAME_SECOND
 
 
 def _cut_at_cells(start: int, end: int, cuts: Sequence[int]) -> list[tuple[int, int]]:

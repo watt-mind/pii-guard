@@ -168,7 +168,8 @@ def test_ner_pieces_of_one_number_cover_it_and_mask_it_whole() -> None:
         RawEntity("NATIONAL_ID_HU_TAX", start + 3, start + 6, 0.6),
     ]
     ner = NerDetector(backend=FakeBackend(raw), number_checks=False)
-    assert {s.text for s in ner.detect(text, "hu")} == {"8461269321"}
+    # The lexicon name rule (LAB-1606) also finds the name in the first cell.
+    assert {s.text for s in ner.detect(text, "hu")} == {"8461269321", "Kozák Gabriella"}
     pipeline = DetectionPipeline([NerDetector(backend=FakeBackend(raw))])
     session = Vault(KEY).session()
     out = session.mask(text, pipeline.detect(text, "hu"), language="hu")
@@ -241,3 +242,53 @@ def test_surname_join_is_hungarian_lexicon_driven_and_round_trips() -> None:
     out = session.mask(text, pipeline.detect(text, "hu"), language="hu")
     assert "Fekete" not in out and "Tihamér" not in out
     assert session.unmask(out) == text
+
+
+# LAB-1606: the model emitted no span for a common-word surname + inflected given name
+# (``Fekete Piroskáról``), so the join above had nothing to extend. A capitalised lexicon
+# surname + a capitalised lexicon given name (bare or inflected) is a PERSON span.
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("A számlát Fekete Piroskáról adtuk át.", "Fekete Piroská"),  # stem as written
+        ("A levelet Fekete Bélát kaptuk meg tegnap.", "Fekete Bélá"),
+        ("Holnap Kovács Zoltánnal egyeztetünk.", "Kovács Zoltán"),
+        ("Molnár Anna Mária írta alá.", "Molnár Anna Mária"),
+        ("Holnap Fekete-Szabó Ilonának írunk.", "Fekete-Szabó Iloná"),
+    ],
+)
+def test_lexicon_surname_and_given_name_without_a_model_span(text: str, expected: str) -> None:
+    pipeline = DetectionPipeline([RuleDetector(), NerDetector(backend=FakeBackend([]))])
+    assert [s.text for s in pipeline.detect(text, "hu")] == [expected]
+    session = Vault(KEY).session()
+    out = session.mask(text, pipeline.detect(text, "hu"), language="hu")
+    assert all(word not in out for word in expected.replace("-", " ").split())
+    assert session.unmask(out) == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "A fekete Béla nevű ló nyert.",  # lowercase: the everyday word
+        "Holnap Teszt Béla jön.",  # not a lexicon surname (fictional test surname)
+        "Holnap Fekete Gépész jön.",  # not a given name
+        "Ezt mondta Fekete, Béla pedig hallgatott.",  # punctuation between
+        "Holnap Fekete  Béla jön.",  # two spaces
+        "Fekete\nBéla jön.",  # line break
+        "Holnap Fekete béla jön.",  # lowercase given name
+        "A Kovács Lajos utca 3. alatt lakunk.",  # a street name, not a person
+        "A Kovács Lajos utcában lakunk.",
+    ],
+)
+def test_lexicon_name_needs_both_capitalised_lexicon_words_side_by_side(text: str) -> None:
+    assert ner_spans(text) == []
+
+
+def test_lexicon_name_keeps_a_model_span_over_it_and_needs_a_hungarian_lexicon() -> None:
+    text = "A szerződést Fekete Béla Kft. írta alá."
+    assert ner_spans(text, fragment(text, "Fekete Béla Kft.", "ORGANIZATION")) == [
+        "Fekete Béla Kft."
+    ]
+    text = "Holnap Kovács Zoltánnal egyeztetünk."
+    assert [s.text for s in NerDetector(backend=FakeBackend([])).detect(text, "en")] == []
+    assert ner_spans(text, fragment(text, "Zoltán")) == ["Kovács Zoltán"]

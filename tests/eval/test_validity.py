@@ -71,6 +71,7 @@ def _steuer_id() -> str:
     ("valid", "invalid", "entity_type", "language"),
     [
         pytest.param(_card(), _bump(_card()), E.BANK_ACCOUNT, "en", id="card-luhn"),
+        pytest.param(_card(), _bump(_card()), E.PAYMENT_CARD, "en", id="payment-card"),
         pytest.param(_iban(), "HU00" + _iban()[4:], E.BANK_ACCOUNT, "hu", id="iban"),
         pytest.param(_taj(), _bump(_taj()), E.NATIONAL_ID_HU_TAJ, "hu", id="hu-taj"),
         pytest.param(_tax(), _bump(_tax()), E.NATIONAL_ID_HU_TAX, "hu", id="hu-tax-id"),
@@ -188,6 +189,20 @@ def test_breakdown_splits_the_headline_and_adds_up() -> None:
         "values": leak["values"],
         "leaked": leak["leaked"],
     }
+
+
+def test_a_card_found_as_payment_card_counts_for_a_bank_account_gold() -> None:
+    # Gold sets built before PAYMENT_CARD label cards BANK_ACCOUNT; the scorer counts a
+    # PAYMENT_CARD prediction on one as found, so the breakdown must too (LAB-1222).
+    docs = _docs()
+    card = docs[1].spans[0]
+    found = {
+        docs[1].text: [Span(card.start, card.end, E.PAYMENT_CARD, card.text, 0.9, "t")],
+    }
+    block = summarize(run_documents(docs, _Fixed(found)))
+    micro = block["detection"]["overlap"]["micro"]
+    assert block["validity"]["per_type"]["BANK_ACCOUNT"]["invalid"]["found"] == 1
+    assert v._sums(block["validity"])["found"] == micro["tp_gold"]
 
 
 def test_headline_is_the_same_with_or_without_the_breakdown() -> None:

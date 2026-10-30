@@ -18,7 +18,8 @@ import { restoredSegments } from "./landing";
  * vault session by the real API with the hosted preview's setup (src/content/imageLabels*.json):
  * each printed value is covered by a box carrying its placeholder, the photo and face are covered
  * solid, and the masked transcript and summary go with the image. The model's answer comes back
- * with the real name. Kept regions are outlined in --region-kept, as on the console's Images
+ * with the real name: a recorded Muse Spark answer to the masked message, summary and transcript
+ * (scripts/record_image_labels.py, LAB-1524). Kept regions are outlined in --region-kept, as on the console's Images
  * screen; signatures and stamps are kept, as on the hosted preview (ADR 0014). The English card
  * is the default; the Hungarian one is a click away.
  */
@@ -104,7 +105,7 @@ function Showcase({ card }: { card: ShowcaseCard }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane headingLevel={3} id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the on-device face detector. Dashed: text found by OCR and the rules.">
+        <Pane headingLevel={3} id="image-original" side="you" eyebrow="Stays with PII Guard" title="Your message and image" className="lg:flex-1" footer="Solid outlines: found by the face detector on the PII Guard server. Dashed: text found by OCR and the rules.">
           <div className="space-y-3">
             <YourText text={card.message} masked={message.masked} />
             <Figure card={card} alt={card.sample.alt} compact>
@@ -166,7 +167,7 @@ function Showcase({ card }: { card: ShowcaseCard }) {
         </Pane>
       </div>
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <Pane headingLevel={3} id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="A stand-in model, reading only the masked summary.">
+        <Pane headingLevel={3} id="image-answer" side="model" eyebrow="Still placeholders" title="The model’s answer about the card" className="lg:flex-1" footer="Muse Spark’s recorded answer, from the masked message, summary and transcript only.">
           <MaskedText text={answer.masked} />
         </Pane>
         <Boundary direction="inbound" label="PII Guard boundary: placeholders are restored on the way back" />

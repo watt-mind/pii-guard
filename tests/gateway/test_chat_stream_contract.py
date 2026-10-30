@@ -72,7 +72,7 @@ def test_non_sse_stream_is_sanitized_and_closed(
         assert body.closed and not body.read
         assert app.state.gateway._session_holds == {}
         (event,) = client.get("/v1/traffic").json()["events"]
-        assert event["outcome"] == "refused"
+        assert event["outcome"] == "upstream_failed"  # forwarded, not refused (LAB-1629)
         assert event["error"]["code"] == "upstream_did_not_stream"
         assert event["upstream"]["status"] == status
         assert SENTINEL not in json.dumps(event)
