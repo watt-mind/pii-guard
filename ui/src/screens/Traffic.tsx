@@ -72,7 +72,7 @@ type Filters = { mode: string; type: EntityType | "all"; problems: boolean };
 let reopenAfterSwitch: string | null = null;
 
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
-export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession">) {
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession" | "focus">) {
   const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }

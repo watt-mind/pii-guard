@@ -21,6 +21,8 @@ interface Props {
   statusDetail?: string | null;
   /** What the server offers: sections it doesn't are left out of the menu. */
   caps: Capabilities;
+  /** Hosted: the API reference is open in the main area, so no section is current (LAB-1626). */
+  apiOpen?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  * Sections are plain hash links, so they open in a new tab, can be copied, and keep working
  * with the back button.
  */
-export function Sidebar({ route, onSection, engineState, engine, onPreference, onRecheck, theme, onTheme, statusDetail, caps }: Props) {
+export function Sidebar({ route, onSection, engineState, engine, onPreference, onRecheck, theme, onTheme, statusDetail, caps, apiOpen = false }: Props) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -91,7 +93,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
             <Logo />
             <span className="text-base font-medium">PII Guard</span>
           </a>
-          <span className="truncate text-sm text-muted lg:hidden">{current.label}</span>
+          <span className="truncate text-sm text-muted lg:hidden">{apiOpen ? "API reference" : current.label}</span>
           <span className="flex-1 lg:hidden" />
           <button
             ref={menuButton}
@@ -119,7 +121,7 @@ export function Sidebar({ route, onSection, engineState, engine, onPreference, o
                 )}
                 <ul className="space-y-0.5" aria-labelledby={group.label ? `${menuId}-group-${gi}` : undefined}>
                   {SECTIONS.filter((s) => group.ids.includes(s.id) && offersSection(caps, s.id)).map((s) => {
-                    const active = s.id === route.section;
+                    const active = !apiOpen && s.id === route.section;
                     return (
                       <li key={s.id}>
                         <a

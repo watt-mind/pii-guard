@@ -81,7 +81,8 @@ export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: 
         </p>
       </div>
       {loaded.state === "loading" ? (
-        <p role="status" className="text-sm text-muted">
+        // Tall while loading, so the card that replaces it doesn't push what's below (CLS, LAB-1626).
+        <p role="status" className="min-h-dvh text-sm text-muted">
           Preparing your endpoint…
         </p>
       ) : loaded.state === "failed" ? (

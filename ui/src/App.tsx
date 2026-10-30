@@ -326,10 +326,11 @@ function LocalApp({ api, mock, envMode = import.meta.env.VITE_PII_GUARD_MODE, lo
         onTheme={setTheme}
         statusDetail={server ? statusDetailOf(server) : null}
         caps={caps}
+        apiOpen={apiOpen}
       />
 
       <div className={["min-w-0", settled ? "" : "invisible"].join(" ")} data-settled={settled || undefined}>
-        <HeaderBar route={route} caps={caps} />
+        <HeaderBar route={route} caps={caps} apiOpen={apiOpen} />
         {engine.engine === "mock" && (
           <div role="status" className={apiDown ? "border-b border-danger/30 bg-danger-soft" : "border-b border-warn/30 bg-warn-soft"}>
             <p className="mx-auto max-w-[1280px] px-4 py-2 text-xs text-ink sm:px-6 sm:text-sm">
@@ -560,7 +561,7 @@ function statusDetailOf(s: ServerStatus): string {
 /** The bar above every section, over the accent hairline: where you are on the left (from
  *  1024 px; below it the menu's top bar names the section) and, on the right, the project
  *  switcher and, for a signed-in hosted owner, the profile menu. */
-function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
+function HeaderBar({ route, caps, apiOpen = false }: { route: Route; caps: Capabilities; apiOpen?: boolean }) {
   const section = SECTIONS.find((s) => s.id === route.section)!;
   const tab = route.section === "playground" ? PLAYGROUND_TABS.find((t) => t.id === route.tab) : undefined;
   const session = useHostedSession();
@@ -569,8 +570,8 @@ function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
       {/* Below 1024 px the row shows only when it holds a switcher or an avatar. */}
       <div className="hidden h-12 items-center gap-3 px-4 has-[[data-header-item]]:flex sm:px-6 lg:flex">
         <p className="hidden min-w-0 items-center gap-2 text-base text-ink lg:flex">
-          <span>{section.label}</span>
-          {tab && (
+          <span>{apiOpen ? "API reference" : section.label}</span>
+          {tab && !apiOpen && (
             <>
               <span aria-hidden="true" className="text-faint">
                 /
@@ -581,7 +582,7 @@ function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
         </p>
         <div className="ml-auto flex min-w-0 items-center gap-2.5">
           {caps.accounts && (
-            <a data-header-item href="#api" aria-label="API reference" title="API reference" className="inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:bg-surface-2 hover:text-ink pointer-coarse:min-h-11">
+            <a data-header-item href="#api" aria-label="API reference" title="API reference" aria-current={apiOpen ? "page" : undefined} className="inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:bg-surface-2 hover:text-ink pointer-coarse:min-h-11">
               API
             </a>
           )}

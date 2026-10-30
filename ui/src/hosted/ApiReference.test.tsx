@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../components/Sidebar";
 import { HOSTED_CAPABILITIES, LOCAL_CAPABILITIES } from "../lib/capabilities";
-import { hostedServers, isApiHash, referenceConfig } from "./apiConfig";
+import { hostedServers, hostedSpec, isApiHash, referenceConfig } from "./apiConfig";
 import { HostedApp } from "./HostedApp";
 import type { Account, Requester } from "./api";
 import type { HostedSession } from "./session";
@@ -68,6 +68,24 @@ describe("the renderer's configuration (LAB-1586)", () => {
     expect(config).not.toHaveProperty("proxy");
     expect((referenceConfig("/x.json", true) as Record<string, unknown>).forceDarkModeState).toBe("dark");
     expect(config).not.toHaveProperty("servers");
+  });
+
+  it("rewrites the gateway operations' servers for the console: this origin's endpoint first, self-hosted last (LAB-1626)", () => {
+    const spec = {
+      servers: [{ url: "http://127.0.0.1:8787", description: "Self-hosted" }],
+      paths: {
+        "/v1/chat/completions": {
+          post: { servers: [{ url: "http://127.0.0.1:8787", description: "Self-hosted root gateway" }, { url: "https://guard.watt-mind.com/e/{endpoint_id}", description: "Hosted project endpoint", variables: { endpoint_id: { default: "your-endpoint-id" } } }] },
+        },
+        "/v1/projects": { get: { summary: "List" } },
+      },
+    };
+    const picked = hostedSpec(spec, "https://guard.example.test", "ep_1");
+    expect((picked.paths!["/v1/chat/completions"]!.post as { servers: { url: string }[] }).servers.map((s) => s.url)).toEqual(["https://guard.example.test/e/ep_1", "http://127.0.0.1:8787"]);
+    expect(picked.paths!["/v1/projects"]!.get).toEqual({ summary: "List" });
+    expect(picked.servers![0]!.url).toBe("https://guard.example.test");
+    const none = hostedSpec(spec, "https://guard.example.test", null);
+    expect((none.paths!["/v1/chat/completions"]!.post as { servers: { url: string }[] }).servers[0]!.url).toBe("https://guard.example.test/e/{endpoint_id}");
   });
 
   it("in the console, offers this service first, then the picked endpoint, then self-hosted (LAB-1626)", () => {

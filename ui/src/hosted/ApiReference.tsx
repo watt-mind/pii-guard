@@ -74,7 +74,7 @@ export function ApiReference(props: { consoleHref: string; embedded?: false } | 
     <div className={props.embedded ? "api-reference-frame mt-6 min-h-dvh border-t border-line" : "api-reference-frame mx-auto min-h-dvh max-w-[1280px] border-t border-line"}>
       {ScalarReference ? (
         <Suspense fallback={<p role="status" className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">Loading the reference…</p>}>
-          <ScalarReference specUrl={specUrl} dark={dark} servers={servers} />
+          <ScalarReference specUrl={specUrl} dark={dark} servers={servers} endpoint={props.embedded ? endpoint : null} />
         </Suspense>
       ) : (
         <p className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">
