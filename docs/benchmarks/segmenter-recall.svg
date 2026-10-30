@@ -3,7 +3,7 @@
 <desc id="d">Grouped bars of portrait and signature recall for each segmenter run.</desc>
 <rect width="1600" height="900" fill="#FFFFFF"/>
 <text x="56" y="70" font-size="40" fill="#1B1B1F" font-weight="700">Segmenters: SAM 3.1 API vs on-device</text>
-<text x="56" y="112" font-size="24" fill="#4A4A52">Share of labelled image regions masked (IoU &gt;= 0.5), by region type; in each group, fictional-specimens | specimens | prompt-set</text>
+<text x="56" y="112" font-size="24" fill="#4A4A52">Share of labeled image regions masked (IoU &gt;= 0.5), by region type; in each group, fictional-specimens | specimens | prompt-set</text>
 <rect x="56" y="140" width="22" height="22" fill="#332288"/>
 <text x="86" y="159" font-size="21" fill="#1B1B1F">yunet-2023mar + efficientsam-vitt</text>
 <rect x="452.75" y="140" width="22" height="22" fill="#DDCC77"/>

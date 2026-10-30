@@ -17,6 +17,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from pii_guard.eval.stats import fmt_ms as _fmt_ms
+from pii_guard.eval.stats import fmt_pct as _fmt_pct
+from pii_guard.eval.stats import percentile as _shared_percentile
+
 __all__ = ["RESAMPLES", "SEED", "bootstrap", "load_counts", "render_section", "summarize"]
 
 RESAMPLES = 1000
@@ -49,10 +53,10 @@ METRICS = ("leak", "precision", "recall", "f1", "over_masking")
 
 
 def _percentile(values: Sequence[float], q: float) -> float:
-    ordered = sorted(values)
-    k = (len(ordered) - 1) * q
-    lo, hi = int(k), min(int(k) + 1, len(ordered) - 1)
-    return ordered[lo] + (ordered[hi] - ordered[lo]) * (k - lo)
+    result = _shared_percentile(values, q)
+    if result is None:  # pragma: no cover - callers only pass non-empty draws
+        raise ValueError("no values")
+    return result
 
 
 def bootstrap(
@@ -128,7 +132,7 @@ def load_counts(directory: Path) -> list[dict[str, Any]]:
 
 
 def _pct(v: float | None) -> str:
-    return "-" if v is None else f"{v * 100:.1f}"
+    return _fmt_pct(v, 1, none="-")
 
 
 def _cell(m: Mapping[str, Any]) -> str:
@@ -142,7 +146,7 @@ def _cell(m: Mapping[str, Any]) -> str:
 def _ms(v: float | None) -> str:
     if v is None:
         return "-"
-    return f"{v:,.0f}" if v >= 100 else f"{v:.1f}"
+    return _fmt_ms(v, 1, none="-", whole_from=100)
 
 
 #: Systems in the order the tables list them.

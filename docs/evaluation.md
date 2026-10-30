@@ -444,7 +444,7 @@ default doesn't cover, listed here.
 
 | Tool | How it runs | Configuration | Licenses (tool; models) |
 |---|---|---|---|
-| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default); Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
+| **Presidio** 2.2.365 | in-process (`--extra baselines`) | `AnalyzerEngine` with the predefined recognizers and default threshold, `AnonymizerEngine` default operator (`<ENTITY_TYPE>`). spaCy `en_core_web_lg` for `en` (Presidio's default) and `de_core_news_lg` for `de`; Presidio ships nothing for Hungarian, so `hu` uses huSpaCy `hu_core_news_lg` 3.8.1, the strongest spaCy pipeline for Hungarian, with the language-independent recognizers Presidio registers for a non-English language. | MIT; `en_core_web_lg` MIT, huSpaCy `hu_core_news_lg` CC BY-SA 4.0 |
 | **LLM Guard** 0.3.16 | worker process, own environment | `Anonymize(Vault())` with defaults: the `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` NER model, threshold 0.5, its default entity list, language `en` (it supports only `en` and `zh`, so Hungarian documents also go through `en`). `Deanonymize` restores. A fresh vault per document. | MIT; `Isotonic/deberta-v3-base_finetuned_ai4privacy_v2` CC-BY-NC-4.0 (non-commercial) |
 | **PrivAiTe** 0.7.3 | worker process, own environment | The proxy's `PIIEngine` in-process with the `pii` section of its shipped `config/privaite.openai.yaml`: preset `onnx` (Presidio with `fr_core_news_md` + `en_core_web_lg`, plus the ONNX `openai/privacy-filter` model), placeholder anonymization, cards masked, secrets redacted. Each document is one user message through `process_request`, as the proxy does; `process_response` restores. Its detection doesn't take a language: every text goes through its French and English configuration. | BSD-3-Clause; `openai/privacy-filter` Apache-2.0, `en_core_web_lg` MIT, `fr_core_news_md` LGPL-LR |
 
@@ -725,8 +725,8 @@ fetched once into `$PII_GUARD_MODELS_DIR/ner/` (outside the repository) and chec
 
 ```bash
 uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py score --record
-PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_eu_pii_safeguard.py latency
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score --record
+PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency
 ```
 
 **Label mapping** (`LABEL_MAP` in that module; every one of the 42 labels has an entry):

@@ -13,7 +13,7 @@ These live here, not in ``pii_guard.config``, until the settings work (LAB-1095)
 | ``PII_GUARD_GATEWAY_UPSTREAM_MAX_KEEPALIVE`` | ``upstream_max_keepalive`` (idle kept) | ``20`` |
 | ``PII_GUARD_GATEWAY_UPSTREAM_KEEPALIVE_EXPIRY`` | ``upstream_keepalive_expiry`` (s) | ``30`` |
 | ``PII_GUARD_GATEWAY_CACHE_SIZE`` | ``cache_size`` (entries) | ``4096`` |
-| ``PII_GUARD_GATEWAY_CONCURRENCY`` | ``concurrency`` (parallel detections) | ``4`` |
+| ``PII_GUARD_GATEWAY_CONCURRENCY`` | ``concurrency`` (parallel detections, per mode) | ``4`` |
 | ``PII_GUARD_GATEWAY_MAX_IMAGES`` | ``max_images`` (inline images per request) | ``4`` |
 | ``PII_GUARD_GATEWAY_MAX_IMAGE_BYTES`` | ``max_image_bytes`` (per image, decoded) | ``10485760`` |
 | ``PII_GUARD_GATEWAY_IMAGE_TIMEOUT`` | ``image_timeout`` (s, all images of a request) | ``120`` |
