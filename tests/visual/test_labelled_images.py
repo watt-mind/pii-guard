@@ -701,3 +701,59 @@ def test_photo_cover_never_shrinks_past_its_face() -> None:
     ]
     (clipped, *_) = _clip_photos(regions, [OcrWord("Családi", Box(290, 110, 360, 125), (0,))])
     assert clipped.box.x2 == 287
+
+
+def test_label_image_invalid_mrz_matches_existing_and_fixes() -> None:
+    from pii_guard.visual.labels import label_image
+    from pii_guard.visual.mrz import MrzData, MrzZone
+
+    session = Vault(bytes.fromhex(TENANT_KEY)).session()
+    ph = session.mask("123456AB", [Span(0, 8, EntityType.ID_DOCUMENT, "123456AB", 1.0, "rules")])
+
+    mrz = MrzData(
+        format="td1",
+        document_code="I",
+        issuing_state="HUN",
+        document_number="123456AB",
+        nationality="HUN",
+        birth="800101",
+        expiry="300101",
+        surname="KOVACS",
+        given="JANOS",
+        valid=False,
+        number_check="5",
+    )
+    zone = MrzZone(
+        Region(EntityType.ID_DOCUMENT, Box(0, 0, 10, 10), 1.0, "ocr"), ("l1", "l2", "l3")
+    )
+    ocr = OcrText([], [], [zone], [])
+
+    orig_parse = labels_module.parse_mrz
+    orig_fixes = labels_module.mrz_number_fixes
+    try:
+        labels_module.parse_mrz = lambda lines: mrz
+        matcher = VaultMatcher(session, "hu")
+        outcome = label_image(ocr, [], matcher)
+        assert outcome.summary.get("document_number") == ph
+
+        mrz_confused = MrzData(
+            format="td1",
+            document_code="I",
+            issuing_state="HUN",
+            document_number="I23456AB",
+            nationality="HUN",
+            birth="800101",
+            expiry="300101",
+            surname="KOVACS",
+            given="JANOS",
+            valid=False,
+            number_check="5",
+        )
+        labels_module.parse_mrz = lambda lines: mrz_confused
+        labels_module.mrz_number_fixes = lambda m: ["123456AB"]
+        matcher2 = VaultMatcher(session, "hu")
+        outcome2 = label_image(ocr, [], matcher2)
+        assert outcome2.summary.get("document_number") == ph
+    finally:
+        labels_module.parse_mrz = orig_parse
+        labels_module.mrz_number_fixes = orig_fixes
