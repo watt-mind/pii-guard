@@ -7,8 +7,8 @@ Every person, address, number and organisation below is **fictional** (ADR 0005)
 placeholder-style Hungarian and English surnames; e-mail domains are the reserved
 ``example.com`` / ``example.org`` / ``example.net``; English and German phone numbers come from
 ranges set aside for drama and fiction (German: the Bundesnetzagentur drama numbers), and
-Hungarian ones use a real area code with an ascending-run or ``555 01xx`` subscriber number
-(ADR 0005). Checksummed identifiers are computed from made-up payloads with
+Hungarian and Polish ones use a real area code with an ascending-run or ``555 01xx``
+subscriber number (ADR 0005). Checksummed identifiers are computed from made-up payloads with
 :mod:`pii_guard.detect.checksums`, so they are valid in form but issued to nobody.
 
 Labels are written inline as ``{{TYPE|value}}`` (see :func:`pii_guard.eval.from_markup`), so
@@ -699,7 +699,7 @@ def pl_documents() -> list[Document]:
             "pl-email-0001",
             f"Temat: Kaucja\n\nDzień dobry Pani {P('Anna Przykładowa')},\n\nkaucję przelejemy "
             f"na rachunek {BANK(iban_pl_1)}. W razie pytań proszę dzwonić pod "
-            f"{PH('+48 555 010 203')} albo pisać na {E('anna.przykladowa@example.com')}.\n\n"
+            f"{PH('+48 22 555 01 03')} albo pisać na {E('anna.przykladowa@example.com')}.\n\n"
             f"Z poważaniem\n{P('Jan Testowy')}",
             {"kind": "email"},
         ),
@@ -727,13 +727,13 @@ def pl_documents() -> list[Document]:
             "pl-letter-0004",
             f"{P('Katarzyna Wzorcowa')}\n{A('os. Kwiatowe 3 m. 14\n61-001 Poznań')}\n\n"
             f"Szanowna Pani,\n\ninformujemy, że paszport nr {IDD(paszport_1)} jest gotowy do "
-            f"odbioru. Prosimy o kontakt pod numerem {PH('(61) 555 12 34')}.\n\n"
+            f"odbioru. Prosimy o kontakt pod numerem {PH('(61) 555 01 34')}.\n\n"
             f"Z wyrazami szacunku\n{ORG('Urząd Fikcyjny w Poznaniu')}",
             {"kind": "letter"},
         ),
         (
             "pl-chat-0005",
-            f"hej, tu {P('Ola Fikcyjna')}! mój nowy numer to {PH('555 123 456')}, "
+            f"hej, tu {P('Ola Fikcyjna')}! mój nowy numer to {PH('512 345 678')}, "
             f"możesz też pisać na {E('ola.fikcyjna@example.net')}",
             {"kind": "chat", "tags": ["informal"]},
         ),

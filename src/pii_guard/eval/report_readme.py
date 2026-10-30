@@ -23,8 +23,9 @@ as ``docs/benchmarks.md``, rounded the same way::
 A column reads either the latest snapshot of a fixture set (its pooled ``all`` leak) or the
 latest per-dataset counts of a registered dataset (``eval/datasets/results/``). The lowest
 leak in a column is bold, unless the best cell carries a caveat mark (an in-distribution
-result is not a win). The block also says the hand-written set's detection p50 per row and
-links the records behind the first row.
+result is not a win). The block also says the hand-written set's detection p50 per row, the
+first row's over-masking per column (LAB-1598: it used to be hand-copied prose under the
+table, and went stale) and links the records behind the first row.
 """
 
 from __future__ import annotations
@@ -95,8 +96,14 @@ def _snapshot(index: Mapping[str, Any], fixture_set: str, system: str) -> Any:
 
 
 class _Cell:
-    def __init__(self, value: float | None, docs: int | None, links: list[str]) -> None:
-        self.value, self.docs, self.links = value, docs, links
+    def __init__(
+        self,
+        value: float | None,
+        docs: int | None,
+        links: list[str],
+        over: float | None = None,
+    ) -> None:
+        self.value, self.docs, self.links, self.over = value, docs, links, over
 
 
 def _cell(
@@ -110,15 +117,19 @@ def _cell(
         if snap is None:
             return _Cell(None, None, [])
         links = [f"eval/results/runs/{run_id}.json" for run_id in snap["run_ids"]]
-        return _Cell(snap["all"]["leak"], snap["all"]["documents"], links)
+        return _Cell(
+            snap["all"]["leak"], snap["all"]["documents"], links, snap["all"].get("over_masking")
+        )
     c = latest.get((col["dataset"], system))
     if c is None:
         return _Cell(None, None, [])
     summary = c["summary"]
+    over = summary.get("over_masking")
     return _Cell(
         summary["leak"]["value"],
         summary["documents"],
         [f"eval/datasets/results/{c['run_id']}.json"],
+        over.get("value") if isinstance(over, Mapping) else None,
     )
 
 
@@ -187,6 +198,20 @@ def render_block(
         out.append("")
 
     first = rows[0]
+    overs = [
+        f"{col['title']} {_pct(grid[0][j].over)}"
+        for j, col in enumerate(columns)
+        if grid[0][j].over is not None
+    ]
+    if overs:
+        out.append(
+            f"Over-masking of the {first.get('short', first['label'])} row: "
+            + ", ".join(overs)
+            + " (share of masked spans that are not personal data; "
+            "[how it is scored](docs/benchmarks.md#how-to-read-this))."
+        )
+        out.append("")
+
     refs = []
     for j, col in enumerate(columns):
         links = grid[0][j].links

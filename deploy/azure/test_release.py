@@ -218,6 +218,26 @@ class ReleaseTemplateTests(unittest.TestCase):
             )
         self.assertEqual(probes["Startup"]["failureThreshold"], 60)
 
+    def test_cold_start_probes_tick_fast_without_shrinking_tolerance(self) -> None:
+        # LAB-1594: on dev rev 0000057 a scale-from-zero start took about 54 s to first byte,
+        # about 11 s of it waiting on 10 s Startup and Readiness ticks. /healthz and
+        # /readyz/serving answer about 1 s after the process starts (LAB-1548).
+        probes = {probe["type"]: probe for probe in self.container()["probes"]}
+        startup, readiness = probes["Startup"], probes["Readiness"]
+        self.assertLessEqual(startup["periodSeconds"], 2)
+        self.assertLessEqual(readiness["periodSeconds"], 2)
+        # Startup keeps the failureThreshold Container Apps already accepted (60) and a budget
+        # of at least two minutes for /healthz, which is up well before the model loads.
+        self.assertGreaterEqual(startup["periodSeconds"] * startup["failureThreshold"], 120)
+        # Readiness must ride out the CPU-bound NER load (about 10 s) without dropping the
+        # replica: 20 s of consecutive failures (was 30 s) at the documented ACA cap of 10.
+        self.assertGreaterEqual(readiness["periodSeconds"] * readiness["failureThreshold"], 20)
+        self.assertLessEqual(readiness["failureThreshold"], 10)
+        for probe in (startup, readiness):
+            self.assertNotIn("initialDelaySeconds", probe)
+        # Liveness is not on the cold path; it stays relaxed.
+        self.assertEqual(probes["Liveness"]["periodSeconds"], 30)
+
     def test_readiness_admits_the_replica_while_the_model_loads(self) -> None:
         # LAB-1548: scale to zero holds a cold request until a replica is Ready, so Readiness
         # must not wait for the 1 GB NER load (detecting routes do). Startup and Liveness stay

@@ -18,65 +18,68 @@
 <text x="134" y="260.3" font-size="20" fill="#B8B8C0" text-anchor="end">50%</text>
 <line x1="150" y1="170" x2="1180" y2="170" stroke="#33333A" stroke-width="2"/>
 <text x="134" y="177" font-size="20" fill="#B8B8C0" text-anchor="end">60%</text>
-<text x="166.6" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-26</text>
-<text x="166.6" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">0ba3c1a</text>
-<text x="366" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-27</text>
-<text x="366" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">8944f96</text>
-<text x="565.3" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-27</text>
-<text x="565.3" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">484b7f1</text>
-<text x="764.7" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-28</text>
-<text x="764.7" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">ac0603d</text>
-<text x="964" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-29</text>
-<text x="964" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">10c53ad</text>
-<text x="1163.4" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-30</text>
-<text x="1163.4" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">18edc24</text>
+<text x="166.1" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-26</text>
+<text x="166.1" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">0ba3c1a</text>
+<text x="359.2" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-27</text>
+<text x="359.2" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">8944f96</text>
+<text x="552.3" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-27</text>
+<text x="552.3" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">484b7f1</text>
+<text x="745.5" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-28</text>
+<text x="745.5" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">ac0603d</text>
+<text x="938.6" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-29</text>
+<text x="938.6" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">10c53ad</text>
+<text x="1131.7" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-30</text>
+<text x="1131.7" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">18edc24</text>
+<text x="1163.9" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">2026-10-30</text>
+<text x="1163.9" y="730" font-size="20" fill="#B8B8C0" text-anchor="middle">252b680</text>
 <line x1="150" y1="670" x2="1180" y2="670" stroke="#8A8A93" stroke-width="2"/>
-<path d="M1123.4,670H1203.4" fill="none" stroke="#F2F2F5" stroke-width="3" stroke-dasharray="10 7"/>
-<path d="M166.6,243.5L199.8,243.5L266.3,243.5L366,323.2L399.2,323.2L432.4,323.2L465.6,323.2L498.9,323.2L532.1,323.2L565.3,323.2L631.8,323.2L1030.5,323.2L1063.7,309.7L1096.9,328L1130.2,328L1163.4,328" fill="none" stroke="#0072B2" stroke-width="4"/>
-<circle cx="166.6" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="199.8" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="266.3" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="366" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="399.2" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="432.4" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="465.6" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="498.9" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="532.1" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="565.3" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="631.8" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="1030.5" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="1063.7" cy="309.7" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="1096.9" cy="328" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="1130.2" cy="328" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
-<circle cx="1163.4" cy="328" r="11" fill="#0072B2" stroke="#111318" stroke-width="3"/>
-<path d="M598.5,670L665,670L698.2,670L731.5,670L764.7,670L797.9,670L831.1,670L864.4,670L897.6,670L930.8,670L964,670L997.3,670L1096.9,670L1130.2,670L1163.4,670" fill="none" stroke="#009E73" stroke-width="4"/>
-<circle cx="598.5" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="665" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="698.2" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="731.5" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="764.7" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="797.9" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="831.1" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="864.4" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="897.6" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="930.8" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="964" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="997.3" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="1096.9" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="1130.2" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
-<circle cx="1163.4" cy="670" r="11" fill="#009E73" stroke="#111318" stroke-width="3"/>
-<path d="M299.5,663.8L332.7,663.8" fill="none" stroke="#D55E00" stroke-width="4"/>
-<circle cx="299.5" cy="663.8" r="11" fill="#111318" stroke="#D55E00" stroke-width="4"/>
-<circle cx="332.7" cy="663.8" r="11" fill="#111318" stroke="#D55E00" stroke-width="4"/>
-<circle cx="233.1" cy="670" r="11" fill="#111318" stroke="#CC79A7" stroke-width="4"/>
+<path d="M166.1,243.5L198.3,243.5L262.7,243.5L359.2,323.2L391.4,323.2L423.6,323.2L455.8,323.2L488,323.2L520.2,323.2L552.3,323.2L616.7,323.2L1003,323.2L1035.2,309.7L1067.3,328L1099.5,328L1131.7,328L1163.9,340.6" fill="none" stroke="#0072B2" stroke-width="4"/>
+<circle cx="166.1" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="198.3" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="262.7" cy="243.5" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="359.2" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="391.4" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="423.6" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="455.8" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="488" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="520.2" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="552.3" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="616.7" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="1003" cy="323.2" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="1035.2" cy="309.7" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="1067.3" cy="328" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="1099.5" cy="328" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="1131.7" cy="328" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<circle cx="1163.9" cy="340.6" r="11" fill="#111318" stroke="#0072B2" stroke-width="4"/>
+<path d="M584.5,670L648.9,670L681.1,670L713.3,670L745.5,670L777.7,670L809.8,670L842,670L874.2,670L906.4,670L938.6,670L970.8,670L1067.3,670L1099.5,670L1131.7,670L1163.9,670" fill="none" stroke="#009E73" stroke-width="4"/>
+<circle cx="584.5" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="648.9" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="681.1" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="713.3" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="745.5" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="777.7" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="809.8" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="842" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="874.2" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="906.4" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="938.6" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="970.8" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="1067.3" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="1099.5" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="1131.7" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<circle cx="1163.9" cy="670" r="11" fill="#111318" stroke="#009E73" stroke-width="4"/>
+<path d="M294.8,663.8L327,663.8" fill="none" stroke="#D55E00" stroke-width="4"/>
+<circle cx="294.8" cy="663.8" r="11" fill="#111318" stroke="#D55E00" stroke-width="4"/>
+<circle cx="327" cy="663.8" r="11" fill="#111318" stroke="#D55E00" stroke-width="4"/>
+<circle cx="230.5" cy="670" r="11" fill="#111318" stroke="#CC79A7" stroke-width="4"/>
 <circle cx="1230" cy="180" r="10" fill="#0072B2" stroke="#111318" stroke-width="3"/>
 <text x="1250" y="187" font-size="20" fill="#F2F2F5" font-weight="600">rules (default)</text>
-<text x="1250" y="213" font-size="19" fill="#B8B8C0">latest 41.0% leak</text>
+<text x="1250" y="213" font-size="19" fill="#B8B8C0">latest 39.5% leak, other documents</text>
 <circle cx="1230" cy="250" r="10" fill="#009E73" stroke="#111318" stroke-width="3"/>
 <text x="1250" y="257" font-size="20" fill="#F2F2F5" font-weight="600">fast, NER v2.0 (published</text>
 <text x="1250" y="283" font-size="20" fill="#F2F2F5" font-weight="600">watt-mind/pii-guard-ner-xlmr-base,</text>
 <text x="1250" y="309" font-size="20" fill="#F2F2F5" font-weight="600">LAB-1306)</text>
-<text x="1250" y="335" font-size="19" fill="#B8B8C0">latest 0.0% leak</text>
+<text x="1250" y="335" font-size="19" fill="#B8B8C0">latest 0.0% leak, other documents</text>
 <circle cx="1230" cy="372" r="10" fill="#D55E00" stroke="#111318" stroke-width="3"/>
 <text x="1250" y="379" font-size="20" fill="#F2F2F5" font-weight="600">rules + Muse Spark Open</text>
 <text x="1250" y="405" font-size="20" fill="#F2F2F5" font-weight="600">(Baseten)</text>
@@ -86,8 +89,8 @@
 <text x="1250" y="501" font-size="19" fill="#B8B8C0">latest 0.0% leak, other documents</text>
 <line x1="1218" y1="538" x2="1242" y2="538" stroke="#F2F2F5" stroke-width="3" stroke-dasharray="8 5"/>
 <text x="1250" y="545" font-size="20" fill="#F2F2F5" font-weight="600">best of any configuration so far</text>
-<text x="56" y="780" font-size="20" fill="#B8B8C0">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), de + en + hu pooled (micro-averaged); one configuration at one commit merged.</text>
+<text x="56" y="780" font-size="20" fill="#B8B8C0">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs + pl 11 docs), de + en + hu + pl pooled (micro-averaged); one configuration at one commit merged.</text>
 <text x="56" y="810" font-size="20" fill="#B8B8C0">Hollow: run on an earlier fixture file or on fewer languages (other documents), not comparable with filled points or the best line.</text>
 <text x="56" y="840" font-size="20" fill="#B8B8C0">The default pipeline (rules only) finds no names by design; names come from the NER and LLM stages.</text>
-<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-26 to 2026-10-30 · 31 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-26 to 2026-10-30 · 32 commits (run log in docs/benchmarks.md) · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>
