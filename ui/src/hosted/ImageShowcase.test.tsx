@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { IMAGE_LABELS, IMAGE_LABELS_EN, SHOWCASE, type ImageLabelsRecording } from "../content/imageLabels";
 import { zoomBox } from "../lib/imageRegions";
+import { ImageMaskingPreview } from "./ImageMaskingPreview";
 import ImageShowcase from "./ImageShowcase";
 
 const holderOf = (r: ImageLabelsRecording) => /\[\[PERSON_[0-9a-f]+\]\]/.exec(r.message.masked)![0];
@@ -17,7 +18,7 @@ function expectMasked(container: HTMLElement, recording: ImageLabelsRecording, n
   expect(text.length).toBeGreaterThan(0);
   expect(text.every((t) => /^\[\[[A-Z_]+_[0-9a-f]+\]\]$/.test(t ?? ""))).toBe(true);
   // The photo label is printed once, not again on the face inside it.
-  expect([...figure.querySelectorAll('[data-cover="visual"]')].filter((c) => c.getAttribute("data-label")).length).toBe(1);
+  expect([...figure.querySelectorAll('[data-cover="visual"]')].filter((c) => c.getAttribute("data-label")).length).toBe(2);
   const restored = screen.getByTestId("restored-text");
   const mark = restored.querySelector(`mark[data-restored="${holder}"]`);
   expect(mark?.firstChild?.textContent).toBe(name);
@@ -31,7 +32,7 @@ describe("landing image showcase (labels render, LAB-1484; English specimen, LAB
     expect(screen.getByRole("radio", { name: "English ID card" })).toBeChecked();
     expect(container.querySelector("img")).toHaveAttribute("src", "/samples/id-card-en.png");
     const types = new Set(IMAGE_LABELS_EN.image.regions.filter((r) => r.policy === "mask").map((r) => r.entity_type));
-    expect([...types]).toEqual(expect.arrayContaining(["FACE", "ID_PHOTO", "PERSON", "DATE_OF_BIRTH", "ID_DOCUMENT"]));
+    expect([...types]).toEqual(expect.arrayContaining(["SIGNATURE", "ID_PHOTO", "PERSON", "DATE_OF_BIRTH", "ID_DOCUMENT"]));
     expectMasked(container, IMAGE_LABELS_EN, "Jane Placeholder");
   });
 
@@ -41,7 +42,7 @@ describe("landing image showcase (labels render, LAB-1484; English specimen, LAB
       expect(rec.answer.by).not.toMatch(/stand-in/);
     }
     render(<ImageShowcase />);
-    expect(screen.getByText(/Muse Spark’s recorded answer/)).toBeInTheDocument();
+    expect(screen.getByText(/Muse Spark’s earlier recorded answer/)).toBeInTheDocument();
   });
 
   it("switches to the Hungarian specimen, unchanged", async () => {
@@ -72,3 +73,19 @@ describe("landing image showcase (labels render, LAB-1484; English specimen, LAB
     }
   });
 });
+
+ it("uses the same annotated covers in the compact preview and full demo", () => {
+    const { container } = render(<><ImageMaskingPreview /><ImageShowcase /></>);
+    const compact = container.querySelector("#image-preview")!;
+    const full = container.querySelector('img[alt^="The same card"]')!.parentElement!;
+    const covers = (el: Element) => [...el.querySelectorAll("[data-cover]")].map(c => [c.getAttribute("style"), c.getAttribute("data-label")]);
+    expect(covers(compact)).toEqual(covers(full));
+    expect(compact.textContent).toContain("not detector output");
+    expect(full.querySelectorAll('[data-cover="visual"]')).toHaveLength(2);
+    expect(full.querySelector('[data-label="SIGNATURE"]')).toBeInTheDocument();
+    for (const { recording } of SHOWCASE) {
+      expect(recording.provenance.kind).toBe("annotated-illustration");
+      expect(recording.image.regions.find(r => r.entity_type === "ID_PHOTO")?.box).toEqual([48, 120, 288, 432]);
+      expect(recording.image.regions.some(r => r.entity_type === "FACE")).toBe(false);
+    }
+  });
