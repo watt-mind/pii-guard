@@ -1036,6 +1036,9 @@ Treatments:
   unchanged. The API's own words (`auto`, `function`, `json_schema`, ...) are not checked.
   Numbers with at least six digits in a checked value, and JSON-Schema keyword numbers
   (`maximum`, `minLength`, ...), are checked the same way.
+  The traffic log keeps a checked `model` only after the check passed (the outbound re-check
+  ran clean): a refused, blocked or failed call records `"[withheld]"` in the event's `model`,
+  and in the `full` original (LAB-1358).
 
 **Chat line-number gutters.** Message content, text/refusal content parts and the string
 fields `refusal`, `reasoning_content` and `reasoning` share the Responses gutter handling:

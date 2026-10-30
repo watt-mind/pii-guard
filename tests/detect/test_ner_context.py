@@ -428,3 +428,40 @@ class TestEponyms:
     def test_full_name_hit_is_kept(self) -> None:
         text = "Peter Luhn test results are ready."
         assert kept(text, hit(text, "Peter Luhn", E.PERSON)) == ["Peter Luhn"]
+
+
+class TestFamilyFirmWords:
+    """LAB-1220: ``Fia`` / ``Társa`` in ``Balogh és Fia Kkt.`` names a relation, not a person."""
+
+    def test_family_word_before_a_legal_form_is_not_a_person(self) -> None:
+        for text, value in (
+            ("Vállalkozó: Balogh és Fia Kkt., képviseli az ügyvezető.", "Fia"),
+            ("A Szabó és Fiai Kkt. ajánlata a legkedvezőbb.", "Fiai"),
+            ("A Szabó és Fiai Kkt.-val szerződtünk.", "Fiai"),
+            ("Bérlő: Pintér Zoltán és Társa Bt. fizet.", "Társa"),
+            ("A Simon & Társa Bt.-vel megyünk tovább.", "Társa"),
+            ("A NÉMETH ÉS FIA KFT. képviselője.", "FIA"),
+            ("A Kiss és Lánya Építő Kft. nyerte.", "Lánya"),
+        ):
+            assert kept(text, hit(text, value, E.PERSON)) == [], text
+            assert sweep_vetoed(
+                text, text.index(value), text.index(value) + len(value), E.PERSON, "hu"
+            )
+
+    def test_the_member_name_is_kept(self) -> None:
+        text = "Vállalkozó: Balogh és Fia Kkt."
+        spans = (hit(text, "Balogh", E.PERSON), hit(text, "Fia", E.PERSON))
+        assert kept(text, *spans) == ["Balogh"]
+
+    def test_without_the_firm_shape_it_is_kept(self) -> None:
+        for text, value in (
+            ("Fia Kkt. ügyvezetője.", "Fia"),  # no connector before it
+            ("Balogh és Fia elutazott.", "Fia"),  # no legal form after it
+            ("Kovács és Fia Anna Kft.", "Fia Anna"),  # a longer hit is a name
+            ("Kovács és Fiala Kft.", "Fiala"),  # a surname, not the family word
+        ):
+            assert kept(text, hit(text, value, E.PERSON)) == [value], text
+
+    def test_other_types_are_untouched(self) -> None:
+        text = "A Balogh és Fia Kkt. ajánlata."
+        assert kept(text, hit(text, "Fia", E.ORGANIZATION)) == ["Fia"]

@@ -67,4 +67,5 @@ counts what reached the upstream. The scripted model uses OpenCode's `read` and 
 | Scripted mock | 6 | 0 | 0 of 14 | 14 of 14, no placeholder left |
 | Live, Meta Model API `muse-spark-1.3` (2026-10-28) | 7 | 0 | 0 of 14 | 3 values, no placeholder left |
 
-Names inside CSV rows are a known gap (2 of them upstream), as for pi and Muse Code.
+Names inside CSV rows were a known gap in these runs (2 of them upstream), as for pi and Muse Code;
+the NER now sees each CSV cell (LAB-1258).
