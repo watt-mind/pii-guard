@@ -4,6 +4,8 @@
 goes through (counts, the masked body, the upstream's answer, timing) and turned into an event
 by :meth:`CallTrace.finish`, which publishes it once. Payloads are only kept when the traffic
 log is on; originals (the client's request, the restored answer) only at level ``full``.
+Inline images in the masked request also get small thumbnails
+(:mod:`pii_guard.observability.thumbnails`); original images never do.
 
 The event never holds request headers (so no ``Authorization`` or upstream key), and the
 session only as its :meth:`~pii_guard.observability.traffic.TrafficLog.session_ref`.
@@ -26,6 +28,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pii_guard.observability import Observability, RequestTimer
+from pii_guard.observability.thumbnails import masked_thumbnails
 from pii_guard.policy import BlockedEntityError
 from pii_guard.types import PiiGuardError
 
@@ -246,6 +249,11 @@ class CallTrace:
                 elif self.stream_restored is not None:
                     response["unmasked"] = {"content": _by_choice(self.stream_restored)}
             event["request"] = obs.scrub(request)
+            # Added after scrubbing (which summarizes inline images): bounded WebP copies of
+            # the masked images only, never the originals (LAB-1188).
+            thumbnails = masked_thumbnails(self.masked_request)
+            if thumbnails:
+                event["request"]["thumbnails"] = thumbnails
             event["response"] = obs.scrub(response) if response else None
         obs.record(event)
 
