@@ -677,7 +677,10 @@ class Gateway:
         session: VaultSession,
         language: str,
         stats: RequestStats,
+        kept: list[list[Span]] | None = None,
     ) -> list[list[Span]]:
+        """The spans to mask, per slot. ``kept``, when given, gets the spans kept by policy,
+        per slot (the echo reports them, LAB-1180). The cache holds both."""
         # Audit mode without an LLM key: 503 detection_unavailable before anything is detected,
         # cached, segmented or sent (LAB-1290). Runs first in chat and responses alike.
         detector.require_available()
@@ -715,12 +718,12 @@ class Gateway:
                 self._detect_workers[detector.mode] = workers
 
             async def run(text: str) -> tuple[list[Span], dict[str, float]]:
-                return await workers.run(detector.detect, text, language)
+                return await workers.run(detector.resolve, text, language)
 
             async def run_all(texts: list[str]) -> list[tuple[list[Span], dict[str, float]]]:
                 # Fast mode: one job for every uncached text, so the NER model batches them
                 # (LAB-1279). Timings are per job; the first output carries them.
-                found, timings = await workers.run(detector.detect_many, texts, language)
+                found, timings = await workers.run(detector.resolve_many, texts, language)
                 return [(spans, timings if i == 0 else {}) for i, spans in enumerate(found)]
 
             started = time.perf_counter()
@@ -745,7 +748,10 @@ class Gateway:
                 self.cache.put(key, spans)
                 for index in indices:
                     results[index] = spans
-        out = [r if r is not None else [] for r in results]
+        decisions = [detector.policies.apply(r or []) for r in results]
+        out = [decision.masked for decision in decisions]
+        if kept is not None:
+            kept[:] = [decision.kept for decision in decisions]
         known = session.known_values
         if known:
             # After the cache: values pre-loaded later still apply to cached detections.
@@ -756,6 +762,12 @@ class Gateway:
             ]
             elapsed = (time.perf_counter() - started) * 1000
             stats.detector_ms[KNOWN_DETECTOR] = stats.detector_ms.get(KNOWN_DETECTOR, 0) + elapsed
+        if kept is not None:
+            # A kept span that a masked one overlaps (a pre-loaded known value) is masked.
+            kept[:] = [
+                [k for k in found if not any(m.start < k.end and k.start < m.end for m in spans)]
+                for found, spans in zip(kept, out, strict=True)
+            ]
         for spans in out:
             stats.spans.update(s.entity_type.value for s in spans)
         return out
@@ -1003,7 +1015,10 @@ class Gateway:
         timer.add("parse", time.perf_counter() - timer.started)
         try:
             with timer.span("detect"):
-                spans = await self._detect_all(collected.slots, detector, session, language, stats)
+                kept: list[list[Span]] = []
+                spans = await self._detect_all(
+                    collected.slots, detector, session, language, stats, kept
+                )
                 names = tool_names(body)
                 spans = without_tool_names(
                     [slot.text for slot in collected.slots],
@@ -1051,6 +1066,11 @@ class Gateway:
         # The client's messages as masked: the note is a flag, not a message, so a UI that
         # picks the first system message still finds its own.
         masked_messages = _masked_messages(body)[int(stats.note) :] if echo else None
+        kept_spans = (
+            _kept_spans(collected.slots, kept, len(body["messages"]) - int(stats.note))
+            if echo
+            else None
+        )
         client = self.upstream_client()
         request = client.build_request(
             "POST",
@@ -1134,6 +1154,7 @@ class Gateway:
             if echo:
                 answer["pii_guard"] = {
                     "masked_messages": masked_messages,
+                    "kept_spans": kept_spans,
                     "placeholder_note": stats.note,
                     "masked_answer": masked_answer,
                 }
@@ -1204,6 +1225,7 @@ class Gateway:
                         {
                             "object": "pii_guard.masked_request",
                             "messages": masked_messages,
+                            "kept_spans": kept_spans,
                             "placeholder_note": stats.note,
                         },
                         ensure_ascii=False,
@@ -1317,6 +1339,22 @@ def _masked_messages(body: Mapping[str, Any]) -> list[dict[str, str]]:
             out.append(
                 {"role": str(message.get("role", "")), "content": _flatten(message.get("content"))}
             )
+    return out
+
+
+def _kept_spans(
+    slots: list[TextSlot], kept: list[list[Span]], messages: int
+) -> list[list[dict[str, object]]]:
+    """Per client message, the spans kept by policy as type and code-point offsets into the
+    message's text, for :data:`ECHO_HEADER` (LAB-1180). Never the values. Only a message
+    whose content is one string has offsets to report; any other message gets ``[]``."""
+    out: list[list[dict[str, object]]] = [[] for _ in range(messages)]
+    for slot, found in zip(slots, kept, strict=True):
+        if slot.message is not None and slot.message < messages:
+            out[slot.message] = [
+                {"type": s.entity_type.value, "start": s.start, "end": s.end}
+                for s in sorted(found, key=lambda s: (s.start, s.end))
+            ]
     return out
 
 
