@@ -16,9 +16,11 @@ export function isApiHash(hash: string): boolean {
  * tooling and no web fonts (the hosted CSP allows only this origin). The spec is the committed
  * docs/openapi.json, bundled with the page; the runtime /openapi.json stays off in production.
  */
-export function referenceConfig(specUrl: string, dark: boolean): Configuration {
+export function referenceConfig(specUrl: string, dark: boolean, servers?: ApiServer[]): Configuration {
   return {
     url: specUrl,
+    // Signed in, the examples start from this service, not the self-hosted default (LAB-1626).
+    ...(servers ? { servers } : {}),
     // The reference's anchors start with the document slug, so its deep links stay on this page.
     slug: "api",
     theme: "none",
@@ -41,4 +43,18 @@ export function referenceConfig(specUrl: string, dark: boolean): Configuration {
     // Examples in the languages docs/api.md uses: shell (curl), Python, JavaScript and Node.
     hiddenClients: Object.fromEntries(HIDDEN_CLIENTS.map((target) => [target, true])),
   } as Configuration;
+}
+
+export interface ApiServer { url: string; description: string }
+
+/**
+ * The Server choices in the console: this service first, then the endpoint the header picked
+ * (its gateway routes sit under `/e/<id>`), then a self-hosted install.
+ */
+export function hostedServers(origin: string, endpointId: string | null): ApiServer[] {
+  return [
+    { url: origin, description: "This PII Guard service" },
+    ...(endpointId ? [{ url: `${origin}/e/${encodeURIComponent(endpointId)}`, description: "Your endpoint (gateway routes, endpoint key)" }] : []),
+    { url: "http://127.0.0.1:8787", description: "Self-hosted (`pii-guard serve`)" },
+  ];
 }

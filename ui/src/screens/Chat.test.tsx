@@ -46,6 +46,26 @@ describe("Chat model picker (LAB-1335)", () => {
     expect(screen.getByRole("combobox", { name: "Language" })).toHaveValue("hu");
   });
 
+  it("sends a draft it mounts with, once the model list has answered (LAB-1626)", async () => {
+    let answer: (ids: string[]) => void = () => {};
+    const { client, calls } = liveChat({ models: () => new Promise((resolve) => (answer = resolve)) });
+    const text = "Fictional document for the handover.";
+    render(<Chat client={client} live draft={{ text, language: "en", sessionId: "s_text", nonce: 7 }} />);
+    // No model yet: nothing is sent, and the document is not dropped.
+    expect(calls).toHaveLength(0);
+    answer(META);
+    await waitFor(() => expect(calls[0]).toMatchObject({ sessionId: "s_text", messages: expect.arrayContaining([expect.objectContaining({ role: "user", content: text })]) }));
+    expect(calls[0]!.model).not.toBe("");
+  });
+
+  it("keeps a draft in the composer when no model can be listed (LAB-1626)", async () => {
+    const { client, calls } = liveChat({ models: () => Promise.resolve([]) });
+    const text = "Fictional document that waits for a model.";
+    render(<Chat client={client} live draft={{ text, language: "en", nonce: 8 }} />);
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /message/i })).toHaveValue(text));
+    expect(calls).toHaveLength(0);
+  });
+
   it("starts in English and sends explicit language and sample choices unchanged", async () => {
     const user = userEvent.setup();
     const { client, calls } = liveChat();

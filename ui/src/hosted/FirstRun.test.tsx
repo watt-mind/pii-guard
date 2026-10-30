@@ -67,7 +67,7 @@ function serve() {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const u = String(input);
     if (u.includes("/v1/connect/snippets")) return new Response(JSON.stringify(snippets));
-    if (u.includes("/e/ep-default/v1/chat/completions")) return new Response(JSON.stringify(roundTrip), { headers: { "X-PII-Guard-Masked": "2" } });
+    if (u.includes("/e/ep-default/v1/chat/completions")) return new Response(JSON.stringify(roundTrip), { headers: { "X-PII-Guard-Masked": "2", "X-PII-Guard-Request-Id": "req-test-1" } });
     return new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 });
   });
 }
@@ -108,7 +108,7 @@ describe("first run, sponsored on", () => {
     const setup = await screen.findByRole("region", { name: "Connect your client" });
     expect(location.hash).toBe("#connect");
     expect(await within(setup).findByText("Ready")).toBeInTheDocument();
-    expect(within(setup).getByText("Copy your endpoint key now. It is shown only once.")).toBeInTheDocument();
+    expect(within(setup).getByText("Shown only once: store it now.")).toBeInTheDocument();
     expect(within(setup).getAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}`).length).toBeGreaterThan(0);
     // The first sign-in's single call provisions and issues the key; nothing else mints one.
     expect(call.mock.calls.filter(([p]) => p === "/v1/account/first-run")).toHaveLength(1);
@@ -130,12 +130,21 @@ describe("first run, sponsored on", () => {
 
     await user.click(within(setup).getByRole("button", { name: "Send a test request" }));
     expect(await within(setup).findByText(/Round trip complete: 2 values masked/)).toBeInTheDocument();
-    expect(within(setup).getByText(/to \[\[EMAIL_1a2b3c\]\] \(phone/)).toBeInTheDocument();
+    // What the model saw, with its placeholders as chips (LAB-1626).
+    const saw = within(setup).getByTestId("masked-text");
+    expect(saw.textContent).toContain("Write a two-line note to [[EMAIL_1a2b3c");
+    expect(saw.querySelectorAll("[data-placeholder]")).toHaveLength(2);
     expect(within(setup).getByText("Note to jane.placeholder@example.net: confirmed.")).toBeInTheDocument();
     // Done: say so, and where to go next (LAB-1619).
-    expect(within(setup).getByText(/You're connected\./)).toBeInTheDocument();
-    expect(within(setup).getByRole("link", { name: "Open this call in Logs" })).toHaveAttribute("href", "#logs");
+    // It says what was proven (the endpoint works), not that the owner's own client is connected (LAB-1626).
+    expect(within(setup).getByText(/^Your endpoint works\./)).toBeInTheDocument();
+    expect(within(setup).queryByText(/You're connected/)).not.toBeInTheDocument();
+    // Tuning starts a new version of this endpoint's policy in Projects, not the read-only Policy screen.
+    expect(within(setup).getByRole("link", { name: "Tune what is masked" })).toHaveAttribute("href", "#projects");
     expect(storedAnywhere(KEY)).toBe(false);
+    // This call, by its request id, not whatever Logs shows last.
+    await user.click(within(setup).getByRole("button", { name: "Open this call in Logs" }));
+    await vi.waitFor(() => expect(location.hash).toBe("#logs"));
   });
 
   it("a returning owner whose key was shown before gets one-click new key, not the old one", async () => {

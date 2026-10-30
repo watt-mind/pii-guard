@@ -4,9 +4,9 @@ import "./apiReference.theme.css";
 import "./scalar-toasts.css";
 import { useMemo } from "react";
 import { ApiReferenceReact } from "@scalar/api-reference-react";
-import { referenceConfig } from "./apiConfig";
+import { referenceConfig, type ApiServer } from "./apiConfig";
 
-export default function ScalarReference({ specUrl, dark }: { specUrl: string; dark: boolean }) {
-  const configuration = useMemo(() => referenceConfig(specUrl, dark), [specUrl, dark]);
+export default function ScalarReference({ specUrl, dark, servers }: { specUrl: string; dark: boolean; servers?: ApiServer[] }) {
+  const configuration = useMemo(() => referenceConfig(specUrl, dark, servers), [specUrl, dark, servers]);
   return <ApiReferenceReact configuration={configuration} />;
 }

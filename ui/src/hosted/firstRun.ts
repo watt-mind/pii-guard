@@ -117,6 +117,8 @@ export interface TestRoundTrip {
   restored: string;
   maskedCount: number | null;
   ms: number;
+  /** The call's id in Logs (`X-PII-Guard-Request-Id`), when the server sends it. */
+  requestId?: string | null;
 }
 
 /**
@@ -154,6 +156,7 @@ export async function sendTestRequest(endpointId: string, doFetch: typeof fetch 
     restored: choice && typeof choice.content === "string" ? choice.content : "",
     maskedCount: response.headers.has("X-PII-Guard-Masked") && Number.isFinite(count) ? count : null,
     ms: Math.round(performance.now() - started),
+    requestId: response.headers.get("X-PII-Guard-Request-Id"),
   };
 }
 

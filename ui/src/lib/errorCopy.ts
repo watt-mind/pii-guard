@@ -91,6 +91,14 @@ export function errorCopy(code: string | undefined, status: number | null = null
         body: "PII Guard stops rather than forward something it couldn't finish checking. Retry, or try a smaller image or text.",
       };
     default:
+      // Any other upstream_* code (upstream_did_not_stream, …): the masked request reached the
+      // model, which answered in a way PII Guard can't use. Not a detection failure (LAB-1626).
+      if (code?.startsWith("upstream_"))
+        return {
+          kind: "upstream",
+          title: "The model didn't answer as expected.",
+          body: "The masked request was sent; no original values were exposed. Retry the message, or pick another model.",
+        };
       return { kind: "fail_closed", title: "Blocked. Nothing was sent to the model.", body: FAIL_CLOSED };
   }
 }

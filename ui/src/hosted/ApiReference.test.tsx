@@ -2,14 +2,16 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../components/Sidebar";
 import { HOSTED_CAPABILITIES, LOCAL_CAPABILITIES } from "../lib/capabilities";
-import { isApiHash, referenceConfig } from "./apiConfig";
+import { hostedServers, isApiHash, referenceConfig } from "./apiConfig";
 import { HostedApp } from "./HostedApp";
 import type { Account, Requester } from "./api";
 import type { HostedSession } from "./session";
 
 // The renderer is heavy and needs a real browser; the page around it is what these tests check.
 vi.mock("./ScalarReference", () => ({
-  default: ({ specUrl, dark }: { specUrl: string; dark: boolean }) => <div data-testid="scalar" data-spec={specUrl} data-dark={String(dark)} />,
+  default: ({ specUrl, dark, servers }: { specUrl: string; dark: boolean; servers?: unknown }) => (
+    <div data-testid="scalar" data-spec={specUrl} data-dark={String(dark)} data-servers={servers ? JSON.stringify(servers) : undefined} />
+  ),
 }));
 
 const anonymous: Account = { mode: "hosted", authenticated: false, login_url: "/.auth/login/google?post_login_redirect_uri=%2F%23overview", logout_url: "/.auth/logout?post_logout_redirect_uri=%2F", tier: "anonymous", providers: ["meta"], included_model: "muse-spark-1.3", limits: { requests_per_day: 3 }, usage: { requests_today: 0, resets_at: "2026-10-29T00:00:00Z" }, state: { persistence: "ephemeral", restart_loses_sessions: true }, connections: [] };
@@ -65,6 +67,14 @@ describe("the renderer's configuration (LAB-1586)", () => {
     expect(config).not.toHaveProperty("proxyUrl");
     expect(config).not.toHaveProperty("proxy");
     expect((referenceConfig("/x.json", true) as Record<string, unknown>).forceDarkModeState).toBe("dark");
+    expect(config).not.toHaveProperty("servers");
+  });
+
+  it("in the console, offers this service first, then the picked endpoint, then self-hosted (LAB-1626)", () => {
+    const servers = hostedServers("https://guard.example.test", "ep 1");
+    expect(servers.map((s) => s.url)).toEqual(["https://guard.example.test", "https://guard.example.test/e/ep%201", "http://127.0.0.1:8787"]);
+    expect(hostedServers("https://guard.example.test", null)).toHaveLength(2);
+    expect((referenceConfig("/x.json", false, servers) as Record<string, unknown>).servers).toBe(servers);
   });
 });
 
@@ -86,12 +96,23 @@ describe("the API reference page", () => {
     expect((call as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual(["/v1/account"]);
   });
 
-  it("is the same for a signed-in owner, whose Console link opens the console", async () => {
+  it("opens inside the console for a signed-in owner (LAB-1626)", async () => {
     open("#api");
     render(<HostedApp call={requester(signedIn)} console={consoleStub} />);
-    expect(await screen.findByRole("heading", { level: 1, name: "API reference" })).toBeInTheDocument();
-    await vi.waitFor(() => expect(within(screen.getByRole("navigation", { name: "Main navigation" })).getByRole("link", { name: "Console" })).toHaveAttribute("href", "#overview"));
-    expect(consoleStub).not.toHaveBeenCalled();
+    expect(await screen.findByText("Console stub for standard")).toBeInTheDocument();
+  });
+
+  it("embedded, it has no page chrome of its own and starts the examples from this service", async () => {
+    vi.stubEnv("VITE_PII_GUARD_HOSTED", "true");
+    vi.resetModules();
+    const { ApiReference } = await import("./ApiReference");
+    render(<ApiReference embedded />);
+    expect(screen.getByRole("heading", { level: 1, name: "API reference" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Main navigation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    const scalar = await screen.findByTestId("scalar");
+    expect(JSON.parse(scalar.dataset.servers ?? "[]")[0].url).toBe(window.location.origin);
+    vi.unstubAllEnvs();
   });
 
   it("links to the hosted reference in the local build, which doesn't bundle the renderer", async () => {
@@ -124,7 +145,7 @@ describe("links to the reference", () => {
     for (const link of links) expect(link).toHaveAttribute("href", "#api");
   });
 
-  it("the hosted console's navigation has it; the local console doesn't", () => {
+  it("the sidebar doesn't repeat the header's API link (LAB-1626)", () => {
     const props = {
       route: { section: "overview", tab: "text" },
       onSection: () => {},
@@ -136,7 +157,7 @@ describe("links to the reference", () => {
       onTheme: () => {},
     } as unknown as Parameters<typeof Sidebar>[0];
     const { unmount } = render(<Sidebar {...props} caps={HOSTED_CAPABILITIES} />);
-    expect(screen.getByRole("link", { name: "API reference" })).toHaveAttribute("href", "#api");
+    expect(screen.queryByRole("link", { name: "API reference" })).not.toBeInTheDocument();
     unmount();
     render(<Sidebar {...props} caps={LOCAL_CAPABILITIES} />);
     expect(screen.queryByRole("link", { name: "API reference" })).not.toBeInTheDocument();

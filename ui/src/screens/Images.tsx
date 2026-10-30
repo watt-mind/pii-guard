@@ -28,6 +28,9 @@ import {
 } from "../lib/imageRegions";
 import { toRunError, type RunError } from "../lib/run";
 
+/** Hosted builds run detection on the PII Guard server, not on the owner's device (LAB-1626). */
+const HOSTED_BUILD = import.meta.env.VITE_PII_GUARD_HOSTED === "true";
+
 type Selection =
   | { kind: "sample"; key: string; sample: ImageSample }
   | { kind: "upload"; key: string; name: string; blob: Blob; url: string };
@@ -538,7 +541,7 @@ function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeTy
           <span className="tabular-nums">{row.count}</span>
           {row.sources.map((s) => (
             <span key={s} className="rounded-sm bg-surface-2 px-1 font-mono text-2xs text-muted">
-              {s === "sam" ? "SAM" : s === "local" ? "On-device" : "OCR"}
+              {s === "sam" ? "SAM" : s === "local" ? (HOSTED_BUILD ? "Server" : "On-device") : "OCR"}
             </span>
           ))}
           {row.kept && <span className="font-mono text-2xs text-kept-ink">kept</span>}

@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent,
 import { TOOLS, fetchSnippets, type Snippets, type ToolSnippet } from "../api/connect";
 import { ApiError } from "../api/http";
 import { Button, ButtonLink, Field, Input, Notice, Select } from "../components/ui";
-import { projectPath, type Endpoint, type ProjectList } from "../projects/api";
+import { MaskedText } from "../components/MaskedText";
+import { projectPath, requestPolicyEdit, type Endpoint, type ProjectList } from "../projects/api";
 import { getSelectedProject, setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 import { CodeBlock, CopyButton } from "../screens/ConnectQuickstart";
 import { readPref, writePref } from "../lib/storage";
@@ -34,7 +35,7 @@ type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoi
  * copy-paste blocks for their tool and a test request without creating anything. With sponsored
  * inference unavailable it first asks for one thing: the owner's own Meta API key.
  */
-export function ClientSetup({ call }: { call: Requester }) {
+export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: (id: string) => void }) {
   const session = useHostedSession();
   const sponsoredEnabled = session?.account.limits.sponsored_enabled === true;
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
@@ -110,6 +111,7 @@ export function ClientSetup({ call }: { call: Requester }) {
             state={state!}
             isDefault={isDefault}
             first={isDefault ? first : null}
+            onOpenLog={onOpenLog}
             onChanged={() => setRevision((n) => n + 1)}
           />
         </>
@@ -125,9 +127,11 @@ function ConnectEndpoint({
   state,
   isDefault,
   first,
+  onOpenLog,
   onChanged,
 }: {
   call: Requester;
+  onOpenLog?: (id: string) => void;
   endpoint: Endpoint;
   projectId: string;
   state: FirstRunState;
@@ -156,12 +160,14 @@ function ConnectEndpoint({
             <StateBadge state={state} />
           </p>
           <p className="text-xs text-muted">
-            {upstream} · {endpoint.model ? <>model {mono(endpoint.model)}</> : "your client picks the model"} · policy version {endpoint.policy_version}
+            {upstream} · {endpoint.model ? <>model <code className="font-mono text-xs whitespace-nowrap">{endpoint.model}</code></> : "your client picks the model"} · policy version {endpoint.policy_version}
           </p>
         </div>
         <div className="flex min-w-0 max-w-full items-center gap-2">
-          <code className="min-w-0 truncate font-mono text-xs text-ink" title={url}>
-            {url}
+          {/* Cut in the middle on phones: the endpoint id's end and /v1 stay readable (LAB-1626). */}
+          <code className="flex min-w-0 font-mono text-xs text-ink" title={url}>
+            <span className="min-w-0 truncate">{url.slice(0, -URL_TAIL)}</span>
+            <span className="shrink-0">{url.slice(-URL_TAIL)}</span>
           </code>
           <CopyButton text={url} label="Copy the endpoint base URL" />
         </div>
@@ -185,13 +191,16 @@ function ConnectEndpoint({
             <SnippetStep endpointId={endpoint.id} guardKey={key?.key ?? null} />
           </Step>
           <Step n={3} title="Send a test request">
-            <TestStep endpointId={endpoint.id} />
+            <TestStep endpointId={endpoint.id} policyId={endpoint.policy_id} onOpenLog={onOpenLog} />
           </Step>
         </ol>
       )}
     </div>
   );
 }
+
+/** The end of the endpoint URL that never truncates: the id's last characters and `/v1`. */
+const URL_TAIL = 9;
 
 function StateBadge({ state }: { state: FirstRunState }) {
   const [tone, label] =
@@ -291,7 +300,7 @@ function KeyStep({ call, endpoint, projectId, onKey }: { call: Requester; endpoi
     return (
       <div className="space-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3 sm:p-4">
         <p role="status" className="text-sm font-medium text-warn">
-          Copy your endpoint key now. It is shown only once.
+          Shown only once: store it now.
         </p>
         <CodeBlock text={`export ${ENDPOINT_KEY_ENV}=${key.key}`} label="Copy the export line with your endpoint key" />
         <p className="text-xs text-pretty text-muted">
@@ -458,7 +467,7 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[
   );
 }
 
-function TestStep({ endpointId }: { endpointId: string }) {
+function TestStep({ endpointId, policyId, onOpenLog }: { endpointId: string; policyId: string; onOpenLog?: (id: string) => void }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<TestRoundTrip | null>(null);
   const [error, setError] = useState("");
@@ -489,26 +498,27 @@ function TestStep({ endpointId }: { endpointId: string }) {
       <Button variant="primary" busy={running} onClick={() => void run()} aria-describedby={result ? resultId : undefined}>
         {running ? "Sending…" : result ? "Send again" : "Send a test request"}
       </Button>
-      <div aria-live="polite">
+      {/* Only the status lines are announced, not the three panes (LAB-1626). */}
+      <div>
         {running && (
-          <p className="text-sm text-muted">
+          <p role="status" className="text-sm text-muted">
             Masking, then waiting for the model. Reasoning models can take up to a minute.
           </p>
         )}
         {error && (
-          <Notice tone="danger" className="mt-1">
+          <Notice tone="danger" live className="mt-1">
             {error}
           </Notice>
         )}
         {result && (
           <div id={resultId} className="space-y-3">
-            <p className="text-sm font-medium text-guard-ink">
+            <p role="status" className="text-sm font-medium text-guard-ink">
               ✓ Round trip complete{result.maskedCount !== null ? `: ${result.maskedCount} ${result.maskedCount === 1 ? "value" : "values"} masked before the model saw it` : ""} ·{" "}
               {(result.ms / 1000).toFixed(1)} s
             </p>
             <div className="grid gap-3 lg:grid-cols-3">
               <Pane title="You sent" text={result.original} />
-              <Pane title="The model saw" text={result.masked || "Not reported by the server."} tone="model" />
+              <Pane title="The model saw" text={result.masked || "Not reported by the server."} tone="model" masked={Boolean(result.masked)} />
               <Pane title="You got back" text={result.restored || "The model returned an empty answer. Try again."} tone="restored" />
             </div>
             {result.maskedAnswer && (
@@ -521,11 +531,21 @@ function TestStep({ endpointId }: { endpointId: string }) {
               Detection can miss values: check the masked request. Every call also shows up in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>, tagged with this endpoint.
             </p>
             <div role="note" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-guard/40 bg-guard-soft p-3 text-sm">
-              <p className="min-w-0 flex-1 font-medium text-guard-ink">You&apos;re connected. Your client&apos;s calls go through this endpoint the same way.</p>
-              <ButtonLink size="sm" href="#logs">
-                Open this call in Logs
-              </ButtonLink>
-              <ButtonLink size="sm" variant="ghost" href="#policy">
+              {/* Full width on phones, so the two buttons get their own row (LAB-1626). */}
+              <p className="min-w-0 flex-1 basis-full font-medium text-pretty text-guard-ink sm:basis-auto">
+                Your endpoint works. Paste the block from step 2 and your client&apos;s calls go through it the same way.
+              </p>
+              {result.requestId && onOpenLog ? (
+                <Button size="sm" onClick={() => onOpenLog(result.requestId!)}>
+                  Open this call in Logs
+                </Button>
+              ) : (
+                <ButtonLink size="sm" href="#logs">
+                  Open this call in Logs
+                </ButtonLink>
+              )}
+              {/* Straight to a new version of this endpoint's policy, its form focused (LAB-1626). */}
+              <ButtonLink size="sm" variant="ghost" href="#projects" onClick={() => requestPolicyEdit(policyId)}>
                 Tune what is masked
               </ButtonLink>
             </div>
@@ -536,11 +556,17 @@ function TestStep({ endpointId }: { endpointId: string }) {
   );
 }
 
-function Pane({ title, text, tone }: { title: string; text: string; tone?: "model" | "restored" }) {
+function Pane({ title, text, tone, masked = false }: { title: string; text: string; tone?: "model" | "restored"; masked?: boolean }) {
   return (
     <div className={["min-w-0 rounded-lg border p-3", tone === "model" ? "border-line-strong bg-surface-2" : tone === "restored" ? "border-guard/40 bg-guard-soft" : "border-line bg-surface"].join(" ")}>
       <p className="text-2xs font-medium tracking-wide text-muted uppercase">{title}</p>
-      <p className="mt-1.5 text-sm break-words whitespace-pre-wrap text-ink">{text}</p>
+      {masked ? (
+        <div className="mt-1.5 text-sm break-words whitespace-pre-wrap">
+          <MaskedText text={text} />
+        </div>
+      ) : (
+        <p className="mt-1.5 text-sm break-words whitespace-pre-wrap text-ink">{text}</p>
+      )}
     </div>
   );
 }
