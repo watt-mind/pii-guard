@@ -35,6 +35,7 @@ from pii_guard.detect.rules._base import (
     NOT_IN_WORD_AFTER,
     NUM_END,
     NUM_START,
+    VALIDATED_ID_DOCUMENT,
     Rule,
     _Hit,
     context_before,
@@ -63,7 +64,13 @@ def _find_sv_number(text: str) -> Iterator[_Hit]:
     for m in _SV_RE.finditer(text):
         if is_valid_sv_number(m.group("value")):
             score = 0.97 if context_before(text, m.start(), _SV_CONTEXT) else 0.9
-            yield _Hit(m.start("value"), m.end("value"), EntityType.ID_DOCUMENT, score)
+            yield _Hit(
+                m.start("value"),
+                m.end("value"),
+                EntityType.ID_DOCUMENT,
+                score,
+                VALIDATED_ID_DOCUMENT,
+            )
 
 
 # --- Steuer-ID ----------------------------------------------------------------
@@ -90,13 +97,25 @@ def _steuer_ids(text: str) -> Iterator[tuple[re.Match[str], bool]]:
 def _find_labelled_steuer_id(text: str) -> Iterator[_Hit]:
     for m, labelled in _steuer_ids(text):
         if labelled:
-            yield _Hit(m.start("value"), m.end("value"), EntityType.ID_DOCUMENT, 0.97)
+            yield _Hit(
+                m.start("value"),
+                m.end("value"),
+                EntityType.ID_DOCUMENT,
+                0.97,
+                VALIDATED_ID_DOCUMENT,
+            )
 
 
 def _find_steuer_id(text: str) -> Iterator[_Hit]:
     for m, labelled in _steuer_ids(text):
         if not labelled:
-            yield _Hit(m.start("value"), m.end("value"), EntityType.ID_DOCUMENT, 0.85)
+            yield _Hit(
+                m.start("value"),
+                m.end("value"),
+                EntityType.ID_DOCUMENT,
+                0.85,
+                VALIDATED_ID_DOCUMENT,
+            )
 
 
 # --- Phone numbers ------------------------------------------------------------
