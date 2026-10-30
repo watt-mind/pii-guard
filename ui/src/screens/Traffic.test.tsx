@@ -449,6 +449,26 @@ describe("Upstream refusals in the drawer (LAB-1335)", () => {
     expect(box).not.toHaveTextContent("Nothing was sent to the model");
   });
 
+  it("labels a forwarded call whose upstream failed, and shows its model (LAB-1629)", async () => {
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    const failed: TrafficEvent = {
+      ...asMasked(huChat),
+      outcome: "upstream_failed",
+      model: "synthetic-model",
+      error: { code: "upstream_did_not_stream", status: 502 },
+      upstream: { status: 200, model: null, unresolved_placeholders: 0 },
+      response: null,
+    };
+    f.push([failed]);
+    expect(await screen.findByText("The model answered without streaming.")).toBeInTheDocument();
+    expect(screen.getAllByText("Upstream failed").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Refused")).toBeNull();
+    expect(screen.queryByText("not forwarded")).toBeNull();
+    expect(screen.getAllByText("synthetic-model").length).toBeGreaterThan(0);
+    expect(screen.getByText(/the masked request was forwarded, but the model's provider did not answer usably/)).toBeInTheDocument();
+  });
+
   it("keeps the refusal text when pii-guard stopped the request", async () => {
     const f = fakeConnect();
     render(<Traffic connect={f.connect} pageHost="localhost" />);

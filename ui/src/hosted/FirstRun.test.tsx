@@ -130,6 +130,11 @@ describe("first run, sponsored on", () => {
 
     await user.click(within(setup).getByRole("button", { name: "Send a test request" }));
     expect(await within(setup).findByText(/Round trip complete: 2 values masked/)).toBeInTheDocument();
+    // Its own vault session per policy version, so an applied Keep shows in the next test (LAB-1629).
+    const sent = vi.mocked(globalThis.fetch).mock.calls.find(([u]) => String(u).includes("/chat/completions"));
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ stream: false, prompt_cache_key: "pii-guard-connect-test:pv-1" });
+    // The card names the policy, as Projects does (LAB-1629).
+    expect(within(setup).getByText(/Policy · v1/)).toBeInTheDocument();
     // What the model saw, with its placeholders as chips (LAB-1626).
     const saw = within(setup).getByTestId("masked-text");
     expect(saw.textContent).toContain("Write a two-line note to [[EMAIL_1a2b3c");

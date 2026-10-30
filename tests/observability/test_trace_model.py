@@ -12,13 +12,14 @@ import json
 from typing import Any
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings
 from pii_guard.gateway.config import Mode
 from pii_guard.gateway.outbound import OutboundCheck
-from pii_guard.gateway.service import RequestStats
+from pii_guard.gateway.service import RequestStats, UpstreamError, UpstreamNotConfiguredError
 from pii_guard.gateway.trace import MODEL_WITHHELD, CallTrace
 from pii_guard.observability import Observability, ObservabilitySettings, RequestTimer
 from pii_guard.types import PiiGuardError
@@ -55,6 +56,37 @@ def test_refused_call_withholds_the_model_everywhere_in_a_full_event() -> None:
     assert event["model"] == MODEL_WITHHELD
     assert event["request"]["original"]["model"] == MODEL_WITHHELD
     assert "example.com" not in json.dumps(event)
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        UpstreamError("upstream request failed (ConnectError)"),
+        UpstreamError("upstream did not return an event stream", code="upstream_did_not_stream"),
+    ],
+)
+def test_upstream_failure_is_its_own_outcome_not_refused(exc: UpstreamError) -> None:
+    """Forwarded, then the upstream failed: ``upstream_failed``, the code kept (LAB-1629)."""
+    obs = _observability("masked")
+    trace = _trace(obs, "gpt-4o-mini")
+    assert trace.stats is not None
+    trace.stats.outbound = OutboundCheck(texts=1)
+    trace.stats.upstream_status = 200
+    trace.fail(exc)
+    event = _event(obs)
+    assert event["outcome"] == "upstream_failed"
+    assert event["error"]["code"] == exc.code
+    assert event["error"]["code"].startswith("upstream_")
+    assert event["error"]["status"] == 502
+    # The outbound re-check ran clean, so the forwarded model is shown.
+    assert event["model"] == "gpt-4o-mini"
+
+
+def test_upstream_not_configured_is_still_refused() -> None:
+    """Nothing was forwarded: still ``refused`` (LAB-1629)."""
+    obs = _observability("masked")
+    _trace(obs, "gpt-4o-mini").fail(UpstreamNotConfiguredError("no upstream"))
+    assert _event(obs)["outcome"] == "refused"
 
 
 def test_unexpected_error_withholds_the_model() -> None:

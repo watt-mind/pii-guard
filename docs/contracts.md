@@ -903,6 +903,11 @@ endpoint keys `401`. `endpoint` is required (`422 invalid_request` without it).
 cursor resets it to 0 when `boot` differs from the one it saw last. `GET /v1/traffic/stream`
 sends the same events as server-sent events (`id:` = `seq`).
 
+An event's `outcome` is additive: new values can appear, so a consumer treats an unknown one
+as a failure. `upstream_failed` (LAB-1629) marks a call whose masked request was forwarded and
+then failed upstream (`502 upstream_unavailable`, `upstream_did_not_stream`); such calls were
+`refused` before, and their `error.code` is unchanged.
+
 ### Vault inspector: `/v1/vault/sessions`
 
 For troubleshooting (LAB-1328): which vault sessions exist, where each came from and what it

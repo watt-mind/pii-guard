@@ -69,7 +69,7 @@ def test_error_body_transport_failure_is_sanitized_and_recorded(
     }
     assert broken.closed
     (event,) = traffic
-    assert event["outcome"] == "refused"
+    assert event["outcome"] == "upstream_failed"  # forwarded, not refused (LAB-1629)
     error = dict(event["error"])
     assert error.pop("message")  # the API error message, types and counts only (LAB-1314)
     assert error == {"code": "upstream_unavailable", "status": 502}

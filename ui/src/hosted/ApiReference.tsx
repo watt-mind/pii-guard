@@ -1,8 +1,10 @@
-import { lazy, Suspense, useEffect, useMemo, useSyncExternalStore, type MouseEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore, type MouseEvent } from "react";
 import specUrl from "../../../docs/openapi.json?url";
 import { ButtonLink, Logo, ThemeToggle } from "../components/ui";
 import { useTheme } from "../hooks/useTheme";
-import { useSelectedEndpoint } from "../projects/selection";
+import type { Endpoint, ProjectList } from "../projects/api";
+import { localRequest } from "../projects/request";
+import { getSelectedProject, useSelectedEndpoint } from "../projects/selection";
 import { hostedServers } from "./apiConfig";
 import { SOURCE } from "./session";
 
@@ -23,6 +25,32 @@ const subscribeDark = (cb: () => void) => {
 const isDark = () => document.documentElement.classList.contains("dark");
 
 /**
+ * With no endpoint picked in the header, the current project's first enabled endpoint, so the
+ * examples carry a real endpoint id rather than `your-endpoint-id` (LAB-1629).
+ */
+function useFallbackEndpoint(enabled: boolean): string | null {
+  const [fallback, setFallback] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    (async () => {
+      const list = await localRequest<ProjectList>("/v1/projects");
+      const projectId = getSelectedProject() ?? list.default_project_id ?? list.projects?.[0]?.id;
+      if (!projectId) return null;
+      const data = await localRequest<{ endpoints: Endpoint[] }>(`/v1/projects/${encodeURIComponent(projectId)}/endpoints`);
+      return (Array.isArray(data.endpoints) ? data.endpoints : []).find((e) => e.enabled)?.id ?? null;
+    })().then(
+      (id) => live && setFallback(id),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [enabled]);
+  return fallback;
+}
+
+/**
  * The public, read-only API reference (LAB-1586): the committed docs/openapi.json, bundled with
  * the page and rendered by Scalar with no "try it". It calls no API, so it is the same for every
  * visitor, signed in or not. The server's own /docs and /openapi.json stay off in production.
@@ -31,7 +59,9 @@ export function ApiReference(props: { consoleHref: string; embedded?: false } | 
   const [theme, setTheme] = useTheme();
   const dark = useSyncExternalStore(subscribeDark, isDark, () => false);
   // In the console the examples default to this service, then the endpoint the header picked (LAB-1626).
-  const endpoint = useSelectedEndpoint();
+  const picked = useSelectedEndpoint();
+  const fallback = useFallbackEndpoint(Boolean(props.embedded) && picked === null);
+  const endpoint = picked ?? fallback;
   const servers = useMemo(() => (props.embedded ? hostedServers(globalThis.location?.origin ?? "", endpoint) : undefined), [props.embedded, endpoint]);
   useEffect(() => {
     // Opened from a link further down another page: start at the top.

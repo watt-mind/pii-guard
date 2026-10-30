@@ -723,7 +723,7 @@ function CallDetail({
   const forwarded = maskedBody !== undefined && maskedBody !== null;
   const labelled = labelledScenarioFor(e);
   // An upstream refusal reached the model's provider (masked); everything else here stopped in pii-guard (LAB-1335).
-  const failCode = e.error?.code ?? (e.outcome === "upstream_error" ? "upstream_error" : e.outcome === "stream_error" ? "stream_failed" : undefined);
+  const failCode = e.error?.code ?? (e.outcome === "upstream_error" ? "upstream_error" : e.outcome === "upstream_failed" ? "upstream_unavailable" : e.outcome === "stream_error" ? "stream_failed" : undefined);
   const upstreamCopy = errorCopy(failCode, e.error?.status ?? e.upstream?.status ?? null);
   const upstreamSide = upstreamCopy.kind === "upstream" || upstreamCopy.kind === "stream";
   return (
@@ -1035,10 +1035,15 @@ function DetectorCaveat({ event: e }: { event: TrafficEvent }) {
           This call ran {e.detectors.map((d) => detectorName(d)).join(", ")}: pre-loaded known values (names included) and structured values (email, phone, IBAN, IDs) are
           masked; other names need <NerHint />.
         </>
-      ) : (
+      ) : e.detectors.length ? (
         <>
-          This call ran {e.detectors.length ? e.detectors.map((d) => detectorName(d)).join(", ") : "no detector"} only, which finds structured values (email, phone, IBAN, IDs) but{" "}
+          This call ran {e.detectors.map((d) => detectorName(d)).join(", ")} only, which finds structured values (email, phone, IBAN, IDs) but{" "}
           <strong className="font-medium text-ink">not names</strong>: names need <NerHint />.
+        </>
+      ) : (
+        // No detector list logged (LAB-1629): say what the rules cover, without "ran no detector only".
+        <>
+          Structured values (email, phone, IBAN, IDs) are found by rules, but <strong className="font-medium text-ink">not names</strong>: names need <NerHint />.
         </>
       )}
     </p>
@@ -1051,7 +1056,16 @@ function ResponseView({ event: e, showOriginals }: { event: TrafficEvent; showOr
   const hosted = useHostedSession() !== null;
   const masked = responseChoices(e.response?.masked);
   const unmasked = showOriginals ? responseChoices(e.response?.unmasked) : [];
-  if (!e.response) return <Quiet>{e.outcome === "ok" ? "No answer was logged." : "No answer: the call did not reach the model."}</Quiet>;
+  if (!e.response)
+    return (
+      <Quiet>
+        {e.outcome === "ok"
+          ? "No answer was logged."
+          : e.outcome === "upstream_failed" || e.outcome === "upstream_error"
+            ? "No answer: the masked request was forwarded, but the model's provider did not answer usably."
+            : "No answer: the call did not reach the model."}
+      </Quiet>
+    );
   const nothing = masked.every((c) => !c.content && !c.toolCalls.length);
   const streamedTool = nothing && e.stream && e.outcome === "ok";
   const count = masked.reduce((n, c) => n + placeholdersIn(c.content ?? "") + c.toolCalls.reduce((k, t) => k + placeholdersIn(t.arguments), 0), 0);

@@ -2,7 +2,7 @@
 import "@scalar/api-reference-react/style.css";
 import "./apiReference.theme.css";
 import "./scalar-toasts.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiReferenceReact } from "@scalar/api-reference-react";
 import { hostedSpec, referenceConfig, type ApiServer } from "./apiConfig";
 
@@ -21,6 +21,22 @@ export default function ScalarReference({ specUrl, dark, servers, endpoint = nul
     };
   }, [specUrl, servers, endpoint]);
   const configuration = useMemo(() => referenceConfig(specUrl, dark, servers, content ?? undefined), [specUrl, dark, servers, content]);
+  const frame = useRef<HTMLDivElement>(null);
+  // Scalar renders its content as a <main>; inside the page's own <main> that is a second main
+  // landmark (axe). It stays a named region instead (LAB-1629), re-applied when Scalar re-renders.
+  useEffect(() => {
+    const root = frame.current;
+    if (!root) return;
+    const demote = () => root.querySelectorAll("main").forEach((el) => el.getAttribute("role") !== "region" && el.setAttribute("role", "region"));
+    demote();
+    const observer = new MutationObserver(demote);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [content]);
   if (servers && !content) return <p role="status" className="mx-auto max-w-[1280px] px-4 py-6 text-muted sm:px-6 lg:px-10">Loading the reference…</p>;
-  return <ApiReferenceReact configuration={configuration} />;
+  return (
+    <div ref={frame}>
+      <ApiReferenceReact configuration={configuration} />
+    </div>
+  );
 }

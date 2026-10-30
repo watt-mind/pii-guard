@@ -312,7 +312,9 @@ function FirstRequestStep({
           </>
         ) : (
           <>
-            First request from {label} was stopped ({event.error?.code ?? event.outcome}): nothing was sent to the model.
+            {event.outcome === "upstream_failed" || event.outcome === "upstream_error"
+              ? `First request from ${label} was forwarded masked, but the model's provider failed (${event.error?.code ?? event.outcome}).`
+              : `First request from ${label} was stopped (${event.error?.code ?? event.outcome}): nothing was sent to the model.`}
           </>
         )}
       </p>

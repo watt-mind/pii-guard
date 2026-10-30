@@ -3,7 +3,7 @@ import full from "../test/trafficFull.json";
 import fixture from "../content/trafficFixture.json";
 import { DEMO_SCENARIOS } from "./demoTraffic";
 import { ApiError, UnreachableError } from "./http";
-import { DEDUP_WINDOW, MAX_BACKOFF_MS, SSE_MAX_ERRORS, TrafficRateLimitedError, connectTraffic, fetchTraffic, outboundCheckLabel, parseRetryAfter, parseTrafficEvent, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
+import { DEDUP_WINDOW, MAX_BACKOFF_MS, SSE_MAX_ERRORS, TrafficRateLimitedError, connectTraffic, fetchTraffic, outboundCheckLabel, parseRetryAfter, parseTrafficEvent, readOutcome, startFixtureFeed, type TrafficEvent, type TrafficStatus } from "./traffic";
 
 const events = (full.events as unknown[]).map(parseTrafficEvent) as TrafficEvent[];
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -529,5 +529,20 @@ describe("outbound re-check field (LAB-1500)", () => {
     const old = parseTrafficEvent(base);
     expect(old?.outbound_check).toBeNull();
     expect(outboundCheckLabel(null)).toBe("not reached");
+  });
+});
+
+describe("readOutcome (LAB-1629)", () => {
+  it("reads an older server's refused upstream failure as upstream_failed", () => {
+    expect(readOutcome("refused", "upstream_unavailable")).toBe("upstream_failed");
+    expect(readOutcome("refused", "upstream_did_not_stream")).toBe("upstream_failed");
+    expect(readOutcome("upstream_failed", "upstream_unavailable")).toBe("upstream_failed");
+  });
+  it("keeps refusals that stopped in the guard, and unknown outcomes as they are", () => {
+    expect(readOutcome("refused", "upstream_not_configured")).toBe("refused");
+    expect(readOutcome("refused", "upstream_destination_not_allowed")).toBe("refused");
+    expect(readOutcome("refused", "invalid_request")).toBe("refused");
+    expect(readOutcome("something_new", undefined)).toBe("something_new");
+    expect(readOutcome(undefined, undefined)).toBe("ok");
   });
 });

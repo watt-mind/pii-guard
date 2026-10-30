@@ -284,7 +284,8 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
         </Notice>
       ) : (
         <>
-          {hosted ? <p className="text-xs text-muted">Original values are never sent to this page.</p> : <ModeNote mode={mode === "full" ? "full" : "masked"} />}
+          {/* Hosted, the lead already says originals are never shown (LAB-1629). */}
+          {!hosted && <ModeNote mode={mode === "full" ? "full" : "masked"} />}
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
             <Card
               title="Sessions"
@@ -476,7 +477,10 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
           <p className="py-6 text-center text-sm text-muted">This session holds no placeholders yet.</p>
         ) : (
           <>
-            <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            {/* Columns follow the card's width, not the window's: at 1024 px the card is narrow (LAB-1629).
+                The scroll wrapper is a focusable region, so keyboard users can scroll it. */}
+            <div className="@container">
+            <div tabIndex={0} role="region" aria-label={`Placeholders of session ${d.ref}`} className="-mx-4 overflow-x-auto px-4 focus-visible:outline-2 focus-visible:outline-offset-2 sm:mx-0 sm:px-0">
             <table className="w-full text-sm">
               <caption className="sr-only">
                 Placeholders of session {d.ref}
@@ -490,22 +494,22 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                   <th scope="col" className="px-2 py-2 font-medium">
                     {revealed ? "Value" : "Hint"}
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 font-medium sm:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 font-medium @md:table-cell">
                     Type
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 font-medium @2xl:table-cell">
                     Origin
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 font-medium lg:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 font-medium @3xl:table-cell">
                     Detector
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 text-right font-medium sm:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium @md:table-cell">
                     Masked
                   </th>
-                  <th scope="col" className="hidden px-2 py-2 text-right font-medium lg:table-cell">
+                  <th scope="col" className="hidden px-2 py-2 text-right font-medium @3xl:table-cell">
                     Seen
                   </th>
-                  <th scope="col" className="hidden py-2 pl-2 text-right font-medium md:table-cell">
+                  <th scope="col" className="hidden py-2 pl-2 text-right font-medium @xl:table-cell">
                     Forms
                   </th>
                 </tr>
@@ -516,7 +520,7 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                     <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-masked">
                       {item.placeholder ?? <span className="font-sans text-muted">not matched yet</span>}
                       {item.variant_of && <span className="block font-sans text-2xs whitespace-normal text-muted">variant of {item.variant_of}</span>}
-                      <span className="block font-sans text-2xs whitespace-normal text-muted sm:hidden">
+                      <span className="block font-sans text-2xs whitespace-normal text-muted @md:hidden">
                         {typeLabel(item.entity_type)} · {item.origin === "known" ? "known value" : "detected"} · masked {item.count}×
                       </span>
                     </td>
@@ -532,26 +536,28 @@ function SessionDetail({ headingRef, d, now, canReveal, revealed, onReveal, drop
                         <span className="text-muted">{item.hint}</span>
                       )}
                     </td>
-                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap sm:table-cell">{typeLabel(item.entity_type)}</td>
-                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted md:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
-                    <td className="hidden px-2 py-2 font-mono text-xs whitespace-nowrap text-muted lg:table-cell">{item.detector ?? "—"}</td>
-                    <td className="hidden px-2 py-2 text-right text-xs tabular-nums sm:table-cell">{item.count}</td>
-                    <td className="hidden px-2 py-2 text-right text-xs whitespace-nowrap tabular-nums text-muted lg:table-cell" title="Vault-clock seconds of the first and latest masked occurrence">
+                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap @md:table-cell">{typeLabel(item.entity_type)}</td>
+                    <td className="hidden px-2 py-2 text-xs whitespace-nowrap text-muted @2xl:table-cell">{item.origin === "known" ? "Known value" : "Detected"}</td>
+                    <td className="hidden px-2 py-2 font-mono text-xs whitespace-nowrap text-muted @3xl:table-cell">{item.detector ?? "—"}</td>
+                    <td className="hidden px-2 py-2 text-right text-xs tabular-nums @md:table-cell">{item.count}</td>
+                    <td className="hidden px-2 py-2 text-right text-xs whitespace-nowrap tabular-nums text-muted @3xl:table-cell" title="Vault-clock seconds of the first and latest masked occurrence">
                       {item.first_seen == null ? "—" : `${item.first_seen.toFixed(1)} → ${(item.last_seen ?? item.first_seen).toFixed(1)}`}
                     </td>
-                    <td className="hidden py-2 pl-2 text-right text-xs tabular-nums md:table-cell">{item.forms}</td>
+                    <td className="hidden py-2 pl-2 text-right text-xs tabular-nums @xl:table-cell">{item.forms}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             </div>
+            {/* The legend names only the columns this width shows (LAB-1629). */}
             <p className="mt-3 text-xs text-pretty text-muted">
               <span className="text-ink">Hint</span>: a redacted shape of the value (a word's first letter and length, a number's last two digits, nothing of a secret).{" "}
-              <span className="text-ink">Masked</span>: occurrences replaced by the placeholder so far. <span className="text-ink">Forms</span>: other written forms matched onto
-              the same value, such as inflections. <span className="text-ink">Detector</span>: the detector
-              of the first span that created the entry. <span className="text-ink">Seen</span>: vault-clock seconds
-              of the first → latest masked occurrence. <span className="text-ink">Known value</span>: pre-loaded with {mono("POST /v1/sessions")} rather than detected.
+              <span className="hidden @md:inline"><span className="text-ink">Masked</span>: occurrences replaced by the placeholder so far. </span>
+              <span className="hidden @xl:inline"><span className="text-ink">Forms</span>: other written forms matched onto the same value, such as inflections. </span>
+              <span className="hidden @3xl:inline"><span className="text-ink">Detector</span>: the detector of the first span that created the entry. <span className="text-ink">Seen</span>: vault-clock seconds of the first → latest masked occurrence. </span>
+              <span className="text-ink">Known value</span>: pre-loaded with {mono("POST /v1/sessions")} rather than detected.
             </p>
+            </div>
           </>
         )}
       </div>

@@ -13,10 +13,15 @@ describe("error copy per code (LAB-1335)", () => {
   });
 
   it("says an unusable model answer was sent masked, never that detection failed (LAB-1626)", () => {
-    const c = errorCopy("upstream_did_not_stream");
+    const c = errorCopy("upstream_some_new_failure");
     expect(c.kind).toBe("upstream");
     expect(c.title).toBe("The model didn't answer as expected.");
     expect(c.body).toContain("The masked request was sent");
+    // A streamed call answered whole gets its own words (LAB-1629).
+    const s = errorCopy("upstream_did_not_stream");
+    expect(s.kind).toBe("upstream");
+    expect(s.title).toBe("The model answered without streaming.");
+    expect(s.body).toContain("Nothing unmasked left PII Guard.");
     expect(c.title + c.body).not.toMatch(/Nothing was sent|detection or masking fails/);
     expect(errorCopy("detection_failed").kind).toBe("fail_closed");
   });

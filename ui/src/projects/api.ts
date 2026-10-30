@@ -47,9 +47,15 @@ export const exampleModel = (provider: string | null | undefined): string | null
  * once it has loaded; cleared when it opens.
  */
 let policyEdit: string | null = null;
-export function requestPolicyEdit(policyId: string | null) {
+let policyEditEndpoint: string | null = null;
+/** `endpointId`: the endpoint Connect tested, which "Save and apply" then moves to the new version (LAB-1629). */
+export function requestPolicyEdit(policyId: string | null, endpointId: string | null = null) {
   policyEdit = policyId;
+  policyEditEndpoint = policyId ? endpointId : null;
 }
 export function pendingPolicyEdit(): string | null {
   return policyEdit;
+}
+export function pendingPolicyEndpoint(): string | null {
+  return policyEditEndpoint;
 }

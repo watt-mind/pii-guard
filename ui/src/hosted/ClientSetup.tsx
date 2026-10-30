@@ -3,7 +3,7 @@ import { TOOLS, fetchSnippets, type Snippets, type ToolSnippet } from "../api/co
 import { ApiError } from "../api/http";
 import { Button, ButtonLink, Field, Input, Notice, Select } from "../components/ui";
 import { MaskedText } from "../components/MaskedText";
-import { projectPath, requestPolicyEdit, type Endpoint, type ProjectList } from "../projects/api";
+import { projectPath, requestPolicyEdit, type Endpoint, type PolicyVersion, type ProjectList } from "../projects/api";
 import { getSelectedProject, setSelectedEndpoint, useSelectedEndpoint } from "../projects/selection";
 import { CodeBlock, CopyButton } from "../screens/ConnectQuickstart";
 import { readPref, writePref } from "../lib/storage";
@@ -27,7 +27,7 @@ import {
 } from "./firstRun";
 import { SOURCE, useHostedSession } from "./session";
 
-type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoints: Endpoint[]; first: FirstRun | null; projectId: string };
+type Loaded = { state: "loading" } | { state: "failed" } | { state: "ok"; endpoints: Endpoint[]; first: FirstRun | null; projectId: string; policyNames: Record<string, string> };
 
 /**
  * Hosted Connect, "Connect your client" (LAB-1455): the first screen after sign-in. The server
@@ -41,6 +41,12 @@ export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: 
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
   const [revision, setRevision] = useState(0);
   const picked = useSelectedEndpoint();
+  // Projects saved a change (a policy applied from Tune, LAB-1629): show the endpoint as it is now.
+  useEffect(() => {
+    const update = () => setRevision((n) => n + 1);
+    window.addEventListener("pii-guard-project-configuration", update);
+    return () => window.removeEventListener("pii-guard-project-configuration", update);
+  }, []);
   useEffect(() => {
     let live = true;
     (async () => {
@@ -48,9 +54,14 @@ export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: 
       const first = await loadFirstRun(call).catch(() => null);
       const list = await call<ProjectList>("/v1/projects");
       const projectId = getSelectedProject() ?? list.default_project_id ?? list.projects[0]?.id;
-      if (!projectId) return { first, endpoints: [], projectId: "" };
-      const data = await call<{ endpoints: Endpoint[] }>(`${projectPath(projectId)}/endpoints`);
-      return { first, endpoints: (data.endpoints ?? []).filter((e) => e.enabled), projectId };
+      if (!projectId) return { first, endpoints: [], projectId: "", policyNames: {} };
+      const [data, policies] = await Promise.all([
+        call<{ endpoints: Endpoint[] }>(`${projectPath(projectId)}/endpoints`),
+        // Only for the card's "Default policy · v1" (LAB-1629): without it, the card says "Policy".
+        call<{ policies?: PolicyVersion[] }>(`${projectPath(projectId)}/policies`).catch(() => ({ policies: [] as PolicyVersion[] })),
+      ]);
+      const policyNames = Object.fromEntries((Array.isArray(policies.policies) ? policies.policies : []).map((p) => [p.policy_version_id, p.name]));
+      return { first, endpoints: (data.endpoints ?? []).filter((e) => e.enabled), projectId, policyNames };
     })().then(
       (value) => live && setLoaded({ state: "ok", ...value }),
       () => live && setLoaded({ state: "failed" }),
@@ -105,9 +116,10 @@ export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: 
             </Field>
           )}
           <ConnectEndpoint
-            key={current.id}
+            key={`${current.id}:${current.policy_version_id}`}
             call={call}
             endpoint={current}
+            policyName={ok.policyNames[current.policy_version_id]}
             projectId={ok.projectId}
             state={state!}
             isDefault={isDefault}
@@ -124,6 +136,7 @@ export function ClientSetup({ call, onOpenLog }: { call: Requester; onOpenLog?: 
 function ConnectEndpoint({
   call,
   endpoint,
+  policyName,
   projectId,
   state,
   isDefault,
@@ -134,6 +147,7 @@ function ConnectEndpoint({
   call: Requester;
   onOpenLog?: (id: string) => void;
   endpoint: Endpoint;
+  policyName?: string;
   projectId: string;
   state: FirstRunState;
   isDefault: boolean;
@@ -161,7 +175,7 @@ function ConnectEndpoint({
             <StateBadge state={state} />
           </p>
           <p className="text-xs text-muted">
-            {upstream} · {endpoint.model ? <>model <code className="font-mono text-xs whitespace-nowrap">{endpoint.model}</code></> : "your client picks the model"} · policy version {endpoint.policy_version}
+            {upstream} · {endpoint.model ? <>model <code className="font-mono text-xs whitespace-nowrap">{endpoint.model}</code></> : "your client picks the model"} · {policyName ?? "Policy"} · v{endpoint.policy_version}
           </p>
         </div>
         <div className="flex min-w-0 max-w-full items-center gap-2">
@@ -192,7 +206,7 @@ function ConnectEndpoint({
             <SnippetStep endpointId={endpoint.id} guardKey={key?.key ?? null} />
           </Step>
           <Step n={3} title="Send a test request">
-            <TestStep endpointId={endpoint.id} policyId={endpoint.policy_id} onOpenLog={onOpenLog} />
+            <TestStep endpointId={endpoint.id} policyId={endpoint.policy_id} policyVersionId={endpoint.policy_version_id} onOpenLog={onOpenLog} />
           </Step>
         </ol>
       )}
@@ -436,10 +450,11 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[
     document.getElementById(`first-run-tab-${next.id}`)?.focus();
   };
   return (
+    // Phones wrap the tabs onto a second row: a cut-off "OpenAI" with no scroll cue hid tools (LAB-1629).
     <div
       role="tablist"
       aria-label="Your tool"
-      className="-mx-1 flex gap-1 overflow-x-auto border-b border-line [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] sm:[mask-image:none]"
+      className="-mx-1 flex flex-wrap gap-x-1 border-b border-line sm:flex-nowrap sm:overflow-x-auto"
     >
       {tabs.map((t) => {
         const selected = t.id === tool;
@@ -468,7 +483,7 @@ function ToolTabs({ tabs, tool, onTool }: { tabs: { id: string; label: string }[
   );
 }
 
-function TestStep({ endpointId, policyId, onOpenLog }: { endpointId: string; policyId: string; onOpenLog?: (id: string) => void }) {
+function TestStep({ endpointId, policyId, policyVersionId, onOpenLog }: { endpointId: string; policyId: string; policyVersionId?: string; onOpenLog?: (id: string) => void }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<TestRoundTrip | null>(null);
   const [error, setError] = useState("");
@@ -483,7 +498,7 @@ function TestStep({ endpointId, policyId, onOpenLog }: { endpointId: string; pol
     setError("");
     setResult(null);
     try {
-      setResult(await sendTestRequest(endpointId, undefined, abort.signal));
+      setResult(await sendTestRequest(endpointId, undefined, abort.signal, policyVersionId));
     } catch (e) {
       if (!abort.signal.aborted || e instanceof Error) setError(testRecovery(e));
     } finally {
@@ -499,8 +514,10 @@ function TestStep({ endpointId, policyId, onOpenLog }: { endpointId: string; pol
       <Button variant="primary" busy={running} onClick={() => void run()} aria-describedby={result ? resultId : undefined}>
         {running ? "Sending…" : result ? "Send again" : "Send a test request"}
       </Button>
-      {/* Only the status lines are announced, not the three panes (LAB-1626). */}
-      <div>
+      {/* Only the status lines are announced, not the three panes (LAB-1626). While sending, it
+          holds about the result's height, so the result doesn't push the page down (CLS, LAB-1629);
+          that growth follows the click, which layout-shift scoring ignores. */}
+      <div className={running ? "min-h-[46rem] sm:min-h-[36rem] lg:min-h-[22rem]" : undefined}>
         {running && (
           <p role="status" className="text-sm text-muted">
             Masking, then waiting for the model. Reasoning models can take up to a minute.
@@ -529,7 +546,7 @@ function TestStep({ endpointId, policyId, onOpenLog }: { endpointId: string; pol
               </details>
             )}
             <p className="text-xs text-muted">
-              Detection can miss values: check the masked request. Every call also shows up in <a className="text-ink underline underline-offset-4" href="#logs">Logs</a>, tagged with this endpoint.
+              Detection can miss values: check the masked request. Every call also shows up in Logs, tagged with this endpoint.
             </p>
             <div role="note" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-guard/40 bg-guard-soft p-3 text-sm">
               {/* Full width on phones, so the two buttons get their own row (LAB-1626). */}
@@ -546,7 +563,7 @@ function TestStep({ endpointId, policyId, onOpenLog }: { endpointId: string; pol
                 </ButtonLink>
               )}
               {/* Straight to a new version of this endpoint's policy, its form focused (LAB-1626). */}
-              <ButtonLink size="sm" variant="ghost" href="#projects" onClick={() => requestPolicyEdit(policyId)}>
+              <ButtonLink size="sm" variant="ghost" href="#projects" onClick={() => requestPolicyEdit(policyId, endpointId)}>
                 Tune what is masked
               </ButtonLink>
             </div>
@@ -562,7 +579,8 @@ function Pane({ title, text, tone, masked = false }: { title: string; text: stri
     <div className={["min-w-0 rounded-lg border p-3", tone === "model" ? "border-line-strong bg-surface-2" : tone === "restored" ? "border-guard/40 bg-guard-soft" : "border-line bg-surface"].join(" ")}>
       <p className="text-2xs font-medium tracking-wide text-muted uppercase">{title}</p>
       {masked ? (
-        <div className="mt-1.5 text-sm break-words whitespace-pre-wrap">
+        // The same sans text as the other two panes, placeholders still chips (LAB-1629).
+        <div className="mt-1.5 text-sm break-words whitespace-pre-wrap [&_.doc]:font-sans! [&_.doc]:text-sm! [&_.doc]:leading-normal!">
           <MaskedText text={text} />
         </div>
       ) : (
