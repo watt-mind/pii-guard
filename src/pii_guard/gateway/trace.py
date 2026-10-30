@@ -117,6 +117,9 @@ class CallTrace:
         self.answer: Any = None  # restored, ``full`` only
         self.stream_masked: dict[int, str] | None = None
         self.stream_restored: dict[int, str] | None = None
+        # Streamed tool calls per choice, ``message.tool_calls`` shaped (LAB-1189).
+        self.stream_masked_tools: dict[int, list[dict[str, Any]]] = {}
+        self.stream_restored_tools: dict[int, list[dict[str, Any]]] = {}
         self.stream_chunks = 0
         self.usage: Any = None
         self.streaming = False  # the event is emitted when the stream ends
@@ -237,7 +240,7 @@ class CallTrace:
             if self.upstream_body is not None:
                 response["masked"] = upstream_answer
             elif self.stream_masked is not None:
-                response["masked"] = {"content": _by_choice(self.stream_masked)}
+                response["masked"] = _streamed(self.stream_masked, self.stream_masked_tools)
                 response["chunks"] = self.stream_chunks
             if self.full:
                 original = self.original
@@ -247,7 +250,9 @@ class CallTrace:
                 if answer is not None:
                     response["unmasked"] = answer
                 elif self.stream_restored is not None:
-                    response["unmasked"] = {"content": _by_choice(self.stream_restored)}
+                    response["unmasked"] = _streamed(
+                        self.stream_restored, self.stream_restored_tools
+                    )
             event["request"] = obs.scrub(request)
             # Added after scrubbing (which summarizes inline images): bounded WebP copies of
             # the masked images only, never the originals (LAB-1188).
@@ -258,8 +263,19 @@ class CallTrace:
         obs.record(event)
 
 
-def _by_choice(content: Mapping[int, str]) -> dict[str, str]:
+def _by_choice(content: Mapping[int, Any]) -> dict[str, Any]:
     return {str(k): v for k, v in sorted(content.items())}
+
+
+def _streamed(
+    content: Mapping[int, str], tool_calls: Mapping[int, list[dict[str, Any]]]
+) -> dict[str, Any]:
+    """A stream's collected answer: ``content`` per choice, and ``tool_calls`` per choice
+    when it streamed any (each list as in a non-streamed ``message.tool_calls``)."""
+    out: dict[str, Any] = {"content": _by_choice(content)}
+    if tool_calls:
+        out["tool_calls"] = _by_choice(tool_calls)
+    return out
 
 
 def _entities(stats: RequestStats | None) -> dict[str, Any] | None:

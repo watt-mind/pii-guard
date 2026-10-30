@@ -1183,7 +1183,9 @@ class Gateway:
             return result, stats
 
         restorer = SseRestorer(
-            session, on_ids=lambda ids: self.issued_ids.add(session.session_id, ids)
+            session,
+            on_ids=lambda ids: self.issued_ids.add(session.session_id, ids),
+            keep_restored_tools=trace.full,
         )
         trace.streaming = True
 
@@ -1312,9 +1314,11 @@ class Gateway:
                     self._seed_cache(session, language, detector, restored, stats)
                     if trace.full:
                         trace.stream_restored = {i: t for i, (t, _) in restored.items()}
+                        trace.stream_restored_tools = restorer.restored_tool_calls()
                 stats.log(outcome)
                 if trace.payloads:
                     trace.stream_masked = restorer.masked_content()
+                    trace.stream_masked_tools = restorer.masked_tool_calls()
                     trace.stream_chunks = restorer.chunks
                 if outcome == "ok":
                     trace.finish()
