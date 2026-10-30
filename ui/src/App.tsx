@@ -549,6 +549,11 @@ function HeaderBar({ route, caps }: { route: Route; caps: Capabilities }) {
           )}
         </p>
         <div className="ml-auto flex min-w-0 items-center gap-2.5">
+          {caps.accounts && (
+            <a data-header-item href="#api" aria-label="API reference" title="API reference" className="inline-flex min-h-9 shrink-0 items-center rounded-sm px-2 text-xs text-muted hover:bg-surface-2 hover:text-ink pointer-coarse:min-h-11">
+              API
+            </a>
+          )}
           <ProjectSwitcher manage={caps.projects} />
           {caps.accounts && session && <ProfileMenu session={session} />}
         </div>

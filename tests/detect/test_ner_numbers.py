@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from pii_guard.detect.ner import NerDetector, RawEntity
+from pii_guard.detect.ner import NerDetector, RawEntity, model_view
 from pii_guard.detect.ner_numbers import check_numbers, cue_before, number_verdict
 from pii_guard.types import EntityType, Span
 
@@ -18,7 +18,11 @@ E = EntityType
 
 
 class TagBackend:
-    """Tags every occurrence of each ``(value, label)`` pair."""
+    """Tags every occurrence of each ``(value, label)`` pair.
+
+    The model sees glued cell delimiters as spaces (LAB-1258), so values are looked up as the
+    model sees them.
+    """
 
     def __init__(self, tags: list[tuple[str, str]]) -> None:
         self.tags = tags
@@ -26,6 +30,7 @@ class TagBackend:
     def predict(self, text: str) -> list[RawEntity]:
         out = []
         for value, label in self.tags:
+            value = model_view(value)[0]
             start = text.find(value)
             while start >= 0:
                 out.append(RawEntity(label, start, start + len(value), 0.9))
@@ -219,6 +224,21 @@ def test_a_span_over_a_field_separator_is_split_into_fields() -> None:
     assert detect(text, ("SO2354538,94541.22", "ID_DOCUMENT")) == [(E.ID_DOCUMENT, "SO2354538")]
 
 
+def test_a_phone_span_over_a_field_separator_is_split_into_fields() -> None:
+    # LAB-1380 (en-agent-traffic-dev-0084): the NER PHONE span runs over the CSV comma
+    # between the phone and the national-id columns; each field is judged by its own header.
+    text = 'name,phone,national_id\n"Louise Petit",07700900316,703371441\n'
+    found = detect(text, ("07700900316,703", "PHONE"))
+    # The tagged span is snapped to whole tokens first, then split at the comma.
+    assert found == [(E.PHONE, "07700900316"), (E.PHONE, "703371441")]
+
+
+def test_a_single_field_phone_span_is_untouched() -> None:
+    # No separator runs through it: not even a negative label next to it drops it (LAB-1380).
+    text = '{"order": "07700900316"}'
+    assert detect(text, ("07700900316", "PHONE")) == [(E.PHONE, "07700900316")]
+
+
 def test_other_types_are_untouched() -> None:
     text = '{"order": "Ann Smith", "sku": "12"}'
     assert detect(text, ("Ann Smith", "PERSON"), ("12", "PHONE")) == [
@@ -236,3 +256,72 @@ def test_check_numbers_keeps_an_untouched_span_as_is() -> None:
 
 def test_number_verdict_is_fail_closed_on_unknown_shapes() -> None:
     assert number_verdict("Hello AB123456 bye", 6, 14) is True
+
+
+# --- reference and tracking shapes (LAB-1344, tuned on the cee-dev split) -------------------
+
+
+def _cnp(head: str) -> str:
+    """A Romanian personal number (CNP) with a valid check digit: 13 digits, may start 17/18."""
+    total = sum(int(d) * int(w) for d, w in zip(head, "279146358279", strict=True))
+    return head + str(1 if total % 11 == 10 else total % 11)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("BESZEDES ref 1761734400123 519 200 Ft", "1761734400123"),  # epoch milliseconds
+        ("reference: 20261029141749\n", "20261029141749"),  # yyyymmddhhmmss
+        ("tranzakció TR20261029141749 kész", "TR20261029141749"),
+        ("ID: PAY20251020130750", "PAY20251020130750"),
+        ("ref K-20260612013631 |", "20260612013631"),
+        ("ref 2O261029141749 x", "2O261029141749"),  # an OCR O for a 0
+        ("TRANSFER UA222O53650HU 5576", "UA222O53650HU"),  # S10 with an OCR O
+        ("ref EE459378323AT", "EE459378323AT"),
+        ("ID: 2025/098820\n", "2025/098820"),  # year / serial
+        ("invoice VSZ 2024/09146, x", "2024/09146"),
+        ("FV 2026/06039, ok", "FV 2026/06039"),
+        ("ID: 448-1813374-1068055 |", "448-1813374-1068055"),  # 3-7-7 order number
+    ],
+)
+def test_reference_and_tracking_shapes_are_dropped(text: str, value: str) -> None:
+    assert detect(text, (value, "BANK_ACCOUNT")) == []
+    assert detect(text, (value, "ID_DOCUMENT")) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("card 5247 1154 0172 4326, ID: 1ZTBVH129952639626.", "1ZTBVH129952639626"),
+        ("kártya 4699 7028 7967 2896, TR20260117040802.", "TR20260117040802"),
+        ("DIRECT DEBIT 2026-10-17 ref 1ZEF83LC8611052895 £19,647.3", "1ZEF83LC8611052895"),
+        ("Account: GB12 KQZF 9822 0076 6235 99 | reference: 1817380329666", "1817380329666"),
+    ],
+)
+def test_a_positive_cue_does_not_reach_over_another_number(text: str, value: str) -> None:
+    assert detect(text, (value, "BANK_ACCOUNT")) == []
+
+
+def test_a_span_is_cut_at_newlines_and_around_tracking_tokens() -> None:
+    iban = "GB64 DQLG 1272 1511 3909 60"
+    text = f"Account: {iban}\n1ZSB6LZX5311962777\nref x"
+    assert detect(text, (f"{iban}\n1ZSB6LZX5311962777", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, iban)]
+    text = f"TRANSFER CP279078509AT {CARD}\n"
+    assert detect(text, (f"CP279078509AT {CARD}", "BANK_ACCOUNT")) == [(E.BANK_ACCOUNT, CARD)]
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        (f"Hello {_cnp('175031512345')} bye", _cnp("175031512345")),  # a valid CNP
+        ("Hello 3761734400123 bye", "3761734400123"),  # 13 digits, no epoch
+        ("Hello 1464872278652 bye", "1464872278652"),  # 2016: too old for a fresh reference
+        ("Hello 20261399141749 bye", "20261399141749"),  # month 13: no stamp
+        ("Hello 20261029141799 bye", "20261029141799"),  # second 99: no stamp
+        ("Hello 2025/0988201234 bye", "2025/0988201234"),  # serial too long
+        ("Passport TR20261029141749", "TR20261029141749"),  # a positive label still wins
+        (f"card {_cnp('175031512345')}", _cnp("175031512345")),
+    ],
+)
+def test_near_misses_of_the_reference_shapes_are_kept(text: str, value: str) -> None:
+    assert detect(text, (value, "ID_DOCUMENT")) == [(E.ID_DOCUMENT, value)]

@@ -67,6 +67,23 @@ beforeEach(() => {
 });
 afterEach(() => { setSelectedEndpoint(null); setSelectedProject(null); });
 
+describe("API reference shortcut", () => {
+  it("is available in the hosted header with an accessible name", async () => {
+    renderHosted();
+    await switcher();
+    const link = screen.getAllByRole("link", { name: "API reference" }).find((item) => item.hasAttribute("data-header-item"));
+    expect(link).toHaveAttribute("href", "#api");
+    expect(link).toHaveTextContent("API");
+    expect(link?.querySelector("svg")).toBeNull();
+  });
+
+  it("keeps the local header free of hosted-only reference navigation", async () => {
+    renderLocal();
+    await switcher();
+    expect(screen.queryByRole("link", { name: "API reference" })).not.toBeInTheDocument();
+  });
+});
+
 describe("project switcher", () => {
   it("names the current project and lists the owner's projects with a check on it, outside the left menu", async () => {
     const user = userEvent.setup();

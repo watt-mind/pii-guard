@@ -33,6 +33,7 @@ LAB-1400) was built the same way, from the skeleton below.
 | Cue words for numbers | `cues` (`cues.tsv`) | `RuleDetector` via `languages/cues.py`: a number right after `TAJ` or `passport` is masked even when its checksum fails | only the other packs' cues |
 | Reference words | `references` (`references.tsv`) | `reference_or_amount_before` (`detect/rules/_base.py`) and `detect/ner_numbers.py`: a validated number right after `order` or `Rechnung` is a business number, an NER number right after one is dropped | the built-in fallback lists (`_REFERENCE_WORD`/`_NEGATIVE`) |
 | Brand names | `brands` (`brands.tsv`) | `NerDetector` via `detect/ner_orgs.py`: an NER `PERSON` span that is only a company or product name (`OTP Bank`, `Deutsche Bahn`) becomes `ORGANIZATION`, which policy keeps | the shared list (`languages/brands.tsv`) and the other packs' names |
+| Synthetic corpus | `identity_generator`, `corpus_templates` (`corpus.toml`) | `pii-guard eval generate`, `eval/identities.py`: fictional people, companies and institutions, and the document templates the corpus model writes from (`<code>-synth-*.jsonl`) | no synthetic corpus: the language is measured on its smoke set only |
 
 The NER and LLM passes are multilingual: a new language needs no model change, only prompt
 notes and a measurement.
@@ -206,6 +207,18 @@ rate is not measured with the code it checks.
 `lexicons=LexiconSpec(directory=..., kinds=(...))`: name and place lists for the corpus
 generator and for validating addresses, from sources whose terms allow redistribution
 ([ADR 0009](decisions/0009-third-party-lexicons.md)). German has none yet.
+
+`identity_generator=...` and `corpus_templates=files(__name__).joinpath("corpus.toml")`: the
+synthetic corpus ([ADR 0005](decisions/0005-synthetic-data-only.md)). The generator is a
+function `(random.Random) -> IdentityGenerator` (subclass
+`pii_guard.eval.identities.IdentityGenerator`: `person`, `company`, `property`,
+`institution`); the templates follow the schema of `pii_guard/eval/templates/hu.toml`, with
+the pack's `code` as `language`. Give both or neither: the conformance suite checks that every
+field a template asks for exists on the generator's records. Then
+`pii-guard eval generate --language <code> --n 10 --out eval/fixtures/<code>-synth-sample.jsonl`
+writes a sample. German is the worked example
+([`languages/de/identities.py`](../src/pii_guard/languages/de/identities.py), hand-curated
+name, street and town lists, and [`corpus.toml`](../src/pii_guard/languages/de/corpus.toml)).
 
 `captions=files(__name__).joinpath("captions.tsv")`: the field captions printed on the
 language's ID documents and forms, one `caption<TAB>ENTITY_TYPE` per line (`-` for a caption

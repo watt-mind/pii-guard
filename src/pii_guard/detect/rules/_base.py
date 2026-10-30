@@ -19,6 +19,12 @@ class _Hit(NamedTuple):
     subtype: str | None = None  # e.g. the SECRET rule that matched (``Span.subtype``)
 
 
+VALIDATED_ID_DOCUMENT = "validated"
+#: Subtype of a checksum- or label-validated ``ID_DOCUMENT`` rule hit. The resolver treats it
+#: as authoritative, so it wins an exact-range type conflict against a higher-score NER span
+#: (LAB-1380). Bare format-only hits (no checksum, no label) do not carry it.
+
+
 #: A rule takes the whole text and yields validated hits.
 Rule = Callable[[str], Iterator[_Hit]]
 

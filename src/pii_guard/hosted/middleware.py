@@ -19,7 +19,13 @@ from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_pr
 from pii_guard.hosted.images import IMAGE_COMPUTE_TOKENS, IMAGE_PATH, image_body_limit
 from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, upstream_payload_bound
 from pii_guard.hosted.runtime import HostedService
-from pii_guard.projects.middleware import endpoint_body, endpoint_path, prepare_project
+from pii_guard.projects.middleware import (
+    MUSE_CATALOG,
+    endpoint_body,
+    endpoint_path,
+    prepare_project,
+    route_to_endpoint,
+)
 from pii_guard.types import PiiGuardError
 
 # The whole body (endpoint and hosted reads together) must arrive within this many seconds
@@ -66,7 +72,7 @@ class HostedMiddleware:
             await self.app(scope, receive, send)
             return
         path = scope.get("path", "")
-        if path in {"/healthz", "/readyz"} or (
+        if path in {"/healthz", "/readyz", "/readyz/serving"} or (
             not path.startswith(
                 ("/v1", "/e/", "/s/", "/muse-code", "/metrics", "/docs", "/redoc", "/openapi")
             )
@@ -129,12 +135,25 @@ class HostedMiddleware:
                     if scheme.lower() != "bearer":
                         raise HostedUnauthorizedError("Invalid guard API key")
                 if auth.startswith("pg_ep_"):
-                    if routed is None or headers.get("x-pii-guard-token"):
+                    # Muse reads its catalog at the root of an endpoint base URL (LAB-1462).
+                    root_catalog = routed is None and path == MUSE_CATALOG
+                    if (routed is None and not root_catalog) or headers.get("x-pii-guard-token"):
                         raise HostedUnauthorizedError("Endpoint key requires its endpoint path")
                     # The only pre-authentication await: bounded by its own small pool,
                     # and no body is read while it is held.
                     self.service.enter_preauth()
                     try:
+                        if root_catalog:
+                            owner = await anyio.to_thread.run_sync(
+                                self.service.projects.store.key_endpoint, auth
+                            )
+                            if owner is None:
+                                raise HostedUnauthorizedError("Invalid or expired guard API key")
+                            scope = route_to_endpoint(scope, owner)
+                            path = scope["path"]
+                            routed = endpoint_path(path)
+                        if routed is None:
+                            raise HostedRequestError("Endpoint route is unavailable")
                         endpoint_snapshot = await anyio.to_thread.run_sync(
                             self.service.projects.store.resolve_key, auth, routed[0]
                         )

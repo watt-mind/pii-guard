@@ -18,6 +18,7 @@
     "key": "demo-which-parties:labels:mock",
     "label": "pii-guard gateway, labels images, mock upstream",
     "family": "pii-guard",
+    "role": "own",
     "tool": "pii-guard",
     "version": null,
     "detectors": [

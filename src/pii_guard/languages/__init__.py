@@ -43,6 +43,8 @@ from typing import TYPE_CHECKING, Any
 from pii_guard.types import EntityType, PiiGuardError
 
 if TYPE_CHECKING:
+    import random
+
     from pii_guard.detect.rules import Rule
     from pii_guard.languages.inflection import InflectionMatcher
 
@@ -178,6 +180,12 @@ class LanguagePack:
         order, invoice, tracking ...), so a validated number right after such a label is a
         business number in the rules check and an NER number right after one is dropped;
         ``None``: the built-in fallback lists (``_REFERENCE_WORD``/``_NEGATIVE``) apply.
+    Synthetic corpus (``eval/generate.py``, ``eval/identities.py``)
+        ``identity_generator``: a function ``(random.Random) -> IdentityGenerator`` making
+        this language's fictional people, companies, properties and institutions (ADR 0005).
+        ``corpus_templates``: a TOML resource with the document templates the corpus model
+        writes from (schema of ``pii_guard/eval/templates/hu.toml``). A corpus needs both;
+        ``None``: no synthetic corpus, the language is measured on its smoke set only.
     """
 
     code: str
@@ -196,6 +204,8 @@ class LanguagePack:
     cues: Traversable | None = None
     brands: Traversable | None = None
     references: Traversable | None = None
+    identity_generator: Callable[[random.Random], Any] | None = None
+    corpus_templates: Traversable | None = None
 
     def __repr__(self) -> str:
         return (

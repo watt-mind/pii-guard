@@ -83,5 +83,5 @@ writes `reply.md` with a heredoc of the placeholders it saw, and finishes.
 | Live, Meta Model API `muse-spark-1.3` (2026-10-28) | 4 | 0 | 0 of 14 | written, 0 placeholders left |
 
 The live model's reply didn't repeat the values, so there was nothing to restore in the file;
-what matters is that none of the 14 reached it. Names inside CSV rows are a known gap
-(2 of them upstream), as for pi and Muse Code.
+what matters is that none of the 14 reached it. Names inside CSV rows were a known gap in these
+runs (2 of them upstream), as for pi and Muse Code; the NER now sees each CSV cell (LAB-1258).

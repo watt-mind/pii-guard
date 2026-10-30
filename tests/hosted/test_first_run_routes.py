@@ -215,7 +215,9 @@ def test_sponsorship_off_needs_one_meta_key_then_never_uses_sponsored(
     assert SPONSORED_KEY not in json.dumps(upstream.calls)
 
     # A second key cannot replace it through first run.
-    assert first_run(client, meta_api_key="synthetic-other-key").status_code == 422
+    other = first_run(client, meta_api_key="synthetic-other-meta-key")
+    assert other.status_code == 422
+    assert other.json()["error"]["code"] == "invalid_project_config"
 
 
 def test_first_run_spends_no_daily_request(make_client: Any) -> None:
@@ -268,3 +270,56 @@ def test_first_run_rejects_unknown_fields(make_client: Any) -> None:
     client = make_client(sponsored=True)
     assert first_run(client, provider="custom").status_code == 422
     assert first_run(client, meta_api_key="").status_code == 422
+
+
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        "short-key",  # far shorter than any provider key
+        "synthetic own meta key 0123456789",  # spaces inside: two words, not one key
+        "Bearer synthetic-own-meta-key-9876543210",  # the header, not the key
+        '"synthetic-own-meta-key-9876543210"',  # pasted with quotes
+        "https://api.meta.ai/v1/synthetic-own-meta-key",  # a URL, not a key
+        "synthetic-own-meta-k\u00e9y-9876543210",  # not printable ASCII
+    ],
+)
+def test_malformed_meta_key_is_refused_and_never_falls_back(
+    make_client: Any, upstream: Upstream, malformed: str
+) -> None:
+    client = make_client(sponsored=False)
+    pending = first_run(client, issue_key=True).json()
+    res = first_run(client, meta_api_key=malformed)
+    assert res.status_code == 422, res.text
+    error = res.json()["error"]
+    assert error["code"] == "invalid_provider_key"
+    # The message names the expected shape, never the value.
+    assert malformed not in res.text and "printable" in error["message"]
+    # Nothing was saved: still the needs-key placeholder, never sponsored inference.
+    after = first_run(client).json()
+    assert after["state"] == "needs_key" and after["endpoint"]["provider"] == "sponsored"
+    assert after["endpoint"]["id"] == pending["endpoint"]["id"]
+    refused = client.post(
+        f"/e/{pending['endpoint']['id']}/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": "Hello"}]},
+        headers={"authorization": f"Bearer {pending['key']['key']}"},
+    )
+    assert refused.status_code == 503 and refused.json()["error"]["code"] == "sponsored_unavailable"
+    assert upstream.calls == []
+
+
+def test_well_shaped_meta_key_is_saved_without_surrounding_whitespace(
+    make_client: Any, upstream: Upstream
+) -> None:
+    client = make_client(sponsored=False)
+    guard_key = first_run(client, issue_key=True).json()["key"]["key"]
+    ready = first_run(client, meta_api_key=f"  {OWN_KEY}\n")
+    assert ready.status_code == 200, ready.text
+    body = ready.json()
+    assert body["state"] == "ready" and body["endpoint"]["provider"] == "meta"
+    res = client.post(
+        f"/e/{body['endpoint']['id']}/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": "Hello"}]},
+        headers={"authorization": f"Bearer {guard_key}"},
+    )
+    assert res.status_code == 200, res.text
+    assert upstream.calls[-1][1] == f"Bearer {OWN_KEY}"

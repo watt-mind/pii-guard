@@ -27,6 +27,7 @@
   },
   "system": {
     "family": "comparison",
+    "role": "tool",
     "tool": "privaite",
     "version": "0.7.3",
     "label": "PrivAiTe",

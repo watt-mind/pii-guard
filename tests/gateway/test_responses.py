@@ -559,25 +559,30 @@ def test_line_number_gutters_are_hidden_from_detection_and_kept_upstream() -> No
     """Muse's read_file prints ``12|text``: detectors see spaces there, the model the gutter."""
     from pii_guard.gateway.responses_request import collect_response_texts
 
-    output = "Read text file `letter.md`.\n1|Dear team,\n12|Jane Placeholder\n 3|x"
+    output = "Read text file `letter.md`.\n1|Dear team,\n2|Jane Placeholder\n 3|x"
     body = {
         "model": "m",
         "input": [
             {"type": "function_call_output", "call_id": "c", "output": output},
-            {"role": "user", "content": "<conversation>\n7|Jane Placeholder\n</conversation>"},
+            {
+                "role": "user",
+                "content": "<conversation>\n7|Hi\n8|Jane Placeholder\n</conversation>",
+            },
         ],
     }
     slots = [s for s in collect_response_texts(body).slots if s.kind in ("tool", "content")]
     assert [s.text for s in slots] == [
-        "Read text file `letter.md`.\n  Dear team,\n   Jane Placeholder\n   x",
-        "<conversation>\n  Jane Placeholder\n</conversation>",
+        "Read text file `letter.md`.\n  Dear team,\n  Jane Placeholder\n   x",
+        "<conversation>\n  Hi\n  Jane Placeholder\n</conversation>",
     ]
     for slot in slots:
         slot.write(slot.text.replace("Jane Placeholder", "[[PERSON_abcd12]]"))
     assert body["input"][0]["output"] == (
-        "Read text file `letter.md`.\n1|Dear team,\n12|[[PERSON_abcd12]]\n 3|x"
+        "Read text file `letter.md`.\n1|Dear team,\n2|[[PERSON_abcd12]]\n 3|x"
     )
-    assert body["input"][1]["content"] == "<conversation>\n7|[[PERSON_abcd12]]\n</conversation>"
+    assert (
+        body["input"][1]["content"] == "<conversation>\n7|Hi\n8|[[PERSON_abcd12]]\n</conversation>"
+    )
     # A masked value that swallowed a line break: the gutters go, nothing unmasked comes back.
     output_slot = slots[0]
     output_slot.write("[[ADDRESS_abcd12]]\n   x")

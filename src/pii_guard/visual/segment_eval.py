@@ -7,8 +7,9 @@ python -m pii_guard.visual.segment_eval --e2e-bench --set fictional --rounds 3 -
 ```
 
 Scores only what a segmenter is for, the ``portrait`` and ``signature`` regions of the
-fictional set (``eval/fixtures/visual``, committed) and of the official specimen set
-(``eval/visual``, images fetched locally and never committed), with the same image
+fictional set (``eval/fixtures/visual``, committed), of the official specimen set
+(``eval/visual``, images fetched locally and never committed) and of the synthetic prompt-study
+set (``--set prompts``, ``eval/visual/prompt-set``, committed; LAB-1118), with the same image
 preparation (longer side ≤ 1600 px), ``FACE`` growth and 2 px padding as
 ``pii-guard eval visual``. Per region type:
 
@@ -95,6 +96,13 @@ SETS: dict[str, tuple[Path, Path, Path]] = {
         Path("eval/visual/labels.json"),
         Path("data/specimens"),
     ),
+    # LAB-1118: synthetic signatures (scribble, script font, scanned look), framed ID photos
+    # and stamps, drawn with Pillow (eval/visual/generate_prompt_set.py), images committed.
+    "prompts": (
+        Path("eval/visual/prompt-set/manifest.json"),
+        Path("eval/visual/prompt-set/labels.json"),
+        Path("eval/visual/prompt-set/images"),
+    ),
 }
 
 
@@ -111,6 +119,7 @@ def set_paths(set_name: str) -> tuple[Path, Path, Path]:
 _SET_INFO = {
     "fictional": ("fictional-specimens", "generated", "muse-image"),
     "specimens": ("specimens", "specimens", None),
+    "prompts": ("prompt-set", "generated", "pillow"),
 }
 SCORED_TYPES: tuple[str, ...] = ("portrait", "signature")
 _GROUP = {
@@ -632,6 +641,8 @@ def to_record(
         "note": None,
     }
     ticket = "LAB-1245" if candidate.name == "hybrid" else "LAB-1229"
+    if set_name == "prompts":
+        ticket = "LAB-1118"
     record["title"] = f"Segmenter {candidate.name} on {set_label} ({ticket})"
     record["fixture_set"] = set_label
     record["fixtures"] = [
