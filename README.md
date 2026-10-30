@@ -70,7 +70,9 @@ client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="unused")  # mock u
 stream = client.chat.completions.create(
     model="mock",
     stream=True,
-    messages=[{"role": "user", "content": "Refund Jane Placeholder, jane.placeholder@example.net."}],
+    messages=[
+        {"role": "user", "content": "Refund Jane Placeholder, jane.placeholder@example.net."}
+    ],
 )
 for chunk in stream:  # the model saw [[PERSON_…]] and [[EMAIL_…]]; you get the real values
     print(chunk.choices[0].delta.content or "", end="")
