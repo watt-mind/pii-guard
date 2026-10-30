@@ -41,6 +41,7 @@ import httpx
 from pii_guard import __version__
 from pii_guard.bench.mock_upstream import create_mock_upstream
 from pii_guard.eval import stats
+from pii_guard.eval.record import with_role
 from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel
 from pii_guard.observability.timing import STAGES
 
@@ -456,14 +457,16 @@ def build_records(
                     "pii_guard_version": __version__,
                     "note": None,
                 },
-                "system": {
-                    "key": f"gateway-latency:{mode}:{system_detectors or 'none'}",
-                    "label": label,
-                    "family": "pii-guard",
-                    "tool": "pii-guard",
-                    "version": __version__,
-                    "detectors": detectors,
-                },
+                "system": with_role(
+                    {
+                        "key": f"gateway-latency:{mode}:{system_detectors or 'none'}",
+                        "label": label,
+                        "family": "pii-guard",
+                        "tool": "pii-guard",
+                        "version": __version__,
+                        "detectors": detectors,
+                    }
+                ),
                 "fixture_set": "latency-corpus",
                 "fixtures": [
                     {
