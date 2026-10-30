@@ -973,8 +973,7 @@ this order (`pii_guard.gateway.sessions`, LAB-1286; details in
 | 3 | `prompt_cache_key` | `HMAC(tenant key, "pck:" + identity + ":" + prompt_cache_key)` | created |
 | 4 | `default` | `HMAC(tenant key, "default:" + identity)` | created |
 
-`identity` is the SHA-256 of the request's `Authorization` value (without one, of its
-`x-api-key`, as Anthropic clients send it; LAB-1605), or `anonymous` (a single
+`identity` is the SHA-256 of the request's `Authorization` value, or `anonymous` (a single
 local principal by construction: see `gateway/sessions.py`). Every
 response carries `X-PII-Guard-Session` (the id used, including a derived `d_…` one) and
 `X-PII-Guard-Session-Source`; the traffic record has `session_source` next to `session_ref`.
@@ -1229,8 +1228,8 @@ settings (`tool_call`, text in and out, a 128k context). Upstream errors keep th
 `POST /v1/messages` is the gateway for clients that speak the Anthropic **Messages API**, such
 as Claude Code (docs/integrations/claude-code.md, LAB-1605). It gives the same guarantees as
 `/v1/chat/completions` and uses the same headers (`X-PII-Guard-Mode`, `-Language`, `-Session`,
-`-Echo`), session resolution (an `x-api-key` counts as the client identity when there is no
-`Authorization`), known values, outbound re-check, detectors, cache and vault
+`-Echo`), session resolution (an `x-api-key` alone does not derive an identity: such clients are
+`anonymous`; per-key isolation is a follow-up, LAB-1643), known values, outbound re-check, detectors, cache and vault
 (`pii_guard.gateway.messages`). The masked body goes to the upstream's own
 `{PII_GUARD_UPSTREAM_BASE_URL}/messages` (a `/chat/completions`, `/responses` or `/messages`
 suffix is dropped first; `https://api.anthropic.com/v1` is the Anthropic API). Nothing is

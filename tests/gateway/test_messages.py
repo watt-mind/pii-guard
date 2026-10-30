@@ -508,14 +508,10 @@ def test_string_system_and_content() -> None:
     assert PHONES[1] in r.json()["content"][0]["text"]
 
 
-def test_x_api_key_gives_each_key_its_own_identity() -> None:
-    anonymous = client_identity({})
-    one = client_identity({"x-api-key": "0" * 32})
-    two = client_identity({"x-api-key": "1" * 32})
-    assert len({anonymous, one, two}) == 3
-    # Authorization still wins when both are sent.
-    both = {"authorization": "Bearer " + "0" * 32, "x-api-key": "1" * 32}
-    assert client_identity(both) == client_identity({"authorization": "Bearer " + "0" * 32})
+def test_x_api_key_alone_stays_anonymous() -> None:
+    """Per-key session isolation for Anthropic clients is a follow-up (LAB-1643): only
+    ``Authorization`` derives an identity."""
+    assert client_identity({"x-api-key": "0" * 32}) == client_identity({}) == "anonymous"
 
 
 def test_messages_url() -> None:

@@ -21,11 +21,10 @@ match wins:
 4. ``default``: one session per client identity, ``HMAC(tenant key, "default:" + identity)``.
    Created on first use.
 
-The client identity is the SHA-256 of the request's ``Authorization`` value (else of its
-``x-api-key``, as Anthropic clients send it), or ``anonymous`` without either: two bearer
-tokens never share a derived session, and every id is keyed with the tenant key, so ids never
-collide across deployments. Derived ids leave the process only in the
-``X-PII-Guard-Session`` response header (a client may send it back, step 1);
+The client identity is the SHA-256 of the request's ``Authorization`` value, or ``anonymous``
+without one: two bearer tokens never share a derived session, and every id is keyed with the
+tenant key, so ids never collide across deployments. Derived ids leave the process only in
+the ``X-PII-Guard-Session`` response header (a client may send it back, step 1);
 ``X-PII-Guard-Session-Source`` says which step matched. Steps 2-4 use
 :meth:`~pii_guard.vault.Vault.session_or_create`, whose entry cap rotates a full session to a
 new generation (``PII_GUARD_VAULT_MAX_ENTRIES``).
@@ -100,27 +99,12 @@ class SessionSource(StrEnum):
     DEFAULT = "default"
 
 
-def _credential(headers: Mapping[str, str]) -> str | None:
-    """The client's credential header, as one value: ``Authorization``, else ``x-api-key``
-    (Anthropic clients, LAB-1605) marked with a NUL, which no ``Authorization`` value carries,
-    so the same value in the two headers never gives the same identity."""
-    raw = headers.get("authorization")
-    if raw is not None and raw.strip():
-        return raw.strip()
-    raw = headers.get("x-api-key")
-    if raw is not None and raw.strip():
-        return "x-api-key\x00" + raw.strip()
-    return None
-
-
 def client_identity(headers: Mapping[str, str]) -> str:
-    """SHA-256 (hex) of the ``Authorization`` value; without one, of the ``x-api-key`` value
-    (Anthropic clients, LAB-1605), so two keys never share a derived session; ``anonymous``
-    without either."""
-    credential = _credential(headers)
-    if credential is None:
+    """SHA-256 (hex) of the ``Authorization`` value, or ``anonymous`` without one."""
+    raw = headers.get("authorization")
+    if raw is None or not raw.strip():
         return "anonymous"
-    return hashlib.sha256(credential.encode("utf-8")).hexdigest()
+    return hashlib.sha256(raw.strip().encode("utf-8")).hexdigest()
 
 
 class _Conversations:

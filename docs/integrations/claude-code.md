@@ -47,6 +47,11 @@ ANTHROPIC_BASE_URL=http://127.0.0.1:8787/s/c_5f0c3a9e1b7d4f2a8c6e0b9d3a1f7e2c AN
   `x-api-key` (or `Authorization`) is passed through instead. When the gateway checks a token
   (`PII_GUARD_API_TOKEN`), the block sets `ANTHROPIC_AUTH_TOKEN="$PII_GUARD_API_TOKEN"`.
 - `anthropic-version` and `anthropic-beta` are passed on; other client headers are not.
+- **Sessions.** Only `Authorization` derives a client identity. A Claude Code that sends only
+  `x-api-key` is the `anonymous` local principal, so use the session URL from the block (or
+  `X-PII-Guard-Session`) to keep conversations apart. Per-key session isolation for Anthropic
+  clients is a follow-up (LAB-1643). A guard token sent as `x-api-key` authenticates and is
+  stripped before anything goes upstream.
 - Not offered for project endpoint URLs (`/e/<endpoint>/v1`) yet: their upstreams are
   OpenAI-compatible presets.
 
