@@ -875,3 +875,39 @@ def test_hosted_local_profile_validates_analyzer_before_bounded_wrapper():
     app.state.analyzer = UntrustedAnalyzer()
     with pytest.raises(DetectionProfileError):
         get_analyzer(request)
+
+
+def test_disconnect_during_body_read_still_completes_the_response():
+    """LAB-1468: a client that disconnects mid-body must not make the app return bare.
+
+    Uvicorn logs ``ASGI callable returned without completing response`` at ERROR when the
+    app returns without sending ``http.response.start``. The middleware now raises a handled
+    ``ClientDisconnectedError`` instead, so a (dropped) 499 goes out and the ingress slot
+    is still released.
+    """
+
+    async def exercise():
+        service = HostedService(settings())
+
+        async def downstream(*args):
+            raise AssertionError("A disconnected body must never reach the app")
+
+        calls = {"n": 0}
+
+        async def receive():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"type": "http.request", "body": b'{"model": "muse', "more_body": True}
+            return {"type": "http.disconnect"}
+
+        messages = []
+
+        async def collect(message):
+            messages.append(message)
+
+        await HostedMiddleware(downstream, service)(scope(), receive, collect)
+        assert status(messages) == 499
+        assert service._ingress == 0
+        await service.close()
+
+    asyncio.run(exercise())

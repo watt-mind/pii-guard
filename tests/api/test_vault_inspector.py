@@ -169,6 +169,22 @@ def test_detail_reports_origin_counts_variants_and_pending_known_values(
     assert any(i["forms"] >= 1 for i in items)  # Minta Máriának -> Minta Mária + nak
 
 
+def test_detail_reports_detector_and_first_last_seen(
+    masked: tuple[TestClient, VaultSession],
+) -> None:
+    client, _ = masked
+    items = client.get(f"/v1/vault/sessions/{_ref(client)}").json()["items"]
+    by_hint = {i["hint"]: i for i in items}
+    person = by_hint["T•••• E•••"]
+    assert person["detector"] == "test"  # the first span that created the entry
+    assert person["first_seen"] is not None and person["last_seen"] is not None
+    assert person["first_seen"] <= person["last_seen"]
+    assert person["count"] >= 1
+    pending = by_hint["P•••• Z••••••••"]
+    assert pending["detector"] is None
+    assert pending["first_seen"] is None and pending["last_seen"] is None
+
+
 def test_listing_reports_counts_and_source_without_extending_the_ttl() -> None:
     clock = [1000.0]
     app = create_app(Settings(tenant_key=TEST_TENANT_KEY))

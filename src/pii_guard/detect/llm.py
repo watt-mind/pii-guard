@@ -36,7 +36,7 @@ import re
 import secrets
 import threading
 import unicodedata
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import cache
 from importlib.resources import files
@@ -50,7 +50,7 @@ from pydantic import SecretStr
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect.normalize import normalize_for_detection
 from pii_guard.detect.stack import DetectionUnavailableError
-from pii_guard.languages import LanguagePack, get_pack, packs, primary_language
+from pii_guard.languages import LanguagePack, get_pack, primary_language
 from pii_guard.types import TEXT_ENTITY_TYPES, DetectionError, EntityType, Span
 from pii_guard.vault.inflection import inflection_for, variant_stems
 
@@ -60,7 +60,6 @@ __all__ = [
     "DETECTOR_CLASS",
     "ENTITY_DESCRIPTIONS",
     "GENERIC_ENTITY_TYPES",
-    "LANGUAGES",
     "NO_KEY_MESSAGE",
     "LanguageProfile",
     "LlmDetector",
@@ -219,24 +218,6 @@ def pack_profile(pack: LanguagePack) -> LanguageProfile:
     )
 
 
-class _PackProfiles(Mapping[str, LanguageProfile]):
-    """The profiles of the registered language packs, by code (read-only, always current)."""
-
-    def __getitem__(self, code: str) -> LanguageProfile:
-        pack = get_pack(code) if code == primary_language(code) else None
-        if pack is None:
-            raise KeyError(code)
-        return pack_profile(pack)
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(packs())
-
-    def __len__(self) -> int:
-        return len(packs())
-
-
-#: Profiles of the languages that have a pack (kept for compatibility; see ``languages``).
-LANGUAGES: Mapping[str, LanguageProfile] = _PackProfiles()
 # Fallback alignment for languages without a profile yet. Languages that rarely inflect the
 # end of a name require matches to end at a word boundary; all others (Finnish, Turkish,
 # Slavic languages, ...) tolerate a suffix, which favours recall. Scripts written without

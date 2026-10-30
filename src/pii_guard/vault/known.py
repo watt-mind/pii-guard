@@ -19,7 +19,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from pii_guard.types import EntityType, PiiGuardError
-from pii_guard.vault.fold import fold_value, fold_views
+from pii_guard.vault.fold import FoldedText, fold_value, fold_views
 from pii_guard.vault.inflection import inflection_for
 from pii_guard.vault.placeholders import normalize_value
 
@@ -109,6 +109,9 @@ class KnownValues:
         self._lock = threading.Lock()
         self._values: dict[tuple[EntityType, str], KnownValue] = {}
         self._patterns: dict[str, list[tuple[KnownValue, re.Pattern[str]]]] = {}
+        # Per language, the literal prefilter of each pattern (LAB-1289, like the vault's
+        # own entries in LAB-1277): one needle per pattern, ``None`` means always scan.
+        self._needles: dict[str, list[tuple[str, ...] | None]] = {}
 
     def __repr__(self) -> str:
         return f"KnownValues(count={len(self._values)})"
@@ -147,31 +150,46 @@ class KnownValues:
             if new:
                 self._values.update(new)
                 self._patterns.clear()
+                self._needles.clear()
             return len(new)
 
     def clear(self) -> None:
         with self._lock:
             self._values.clear()
             self._patterns.clear()
+            self._needles.clear()
 
-    def occurrences(self, text: str, language: str) -> list[tuple[KnownValue, int, int]]:
+    def occurrences(
+        self,
+        text: str,
+        language: str,
+        views: tuple[FoldedText, ...] | None = None,
+    ) -> list[tuple[KnownValue, int, int]]:
         """``(value, start, end)`` of every occurrence in ``text``, longest value first.
 
         Offsets are in ``text``; matches may overlap (the caller picks). The search runs over
         :func:`~pii_guard.vault.fold.fold_views`' folded views, so another casing, Unicode
-        form or ``ß``/``ss`` spelling (``WEISS`` for ``Weiß``) is found too.
+        form or ``ß``/``ss`` spelling (``WEISS`` for ``Weiß``) is found too. ``views``: the
+        caller's already-folded views of ``text`` (the session's fold memo), to skip
+        re-folding; the output is the same either way (LAB-1289).
         """
         patterns = self.patterns(language)
         if not patterns:
             return []
-        views = fold_views(text)
+        needles = self._needles.get(language, [])
+        folded = views if views is not None else fold_views(text)
         found: list[tuple[KnownValue, int, int]] = []
-        for item, pattern in patterns:
+        for index, (item, pattern) in enumerate(patterns):
+            needleset = needles[index] if index < len(needles) else None
+            if needleset is not None and not any(
+                needle in view.text for view in folded for needle in needleset
+            ):
+                continue  # same shape as the vault's own prefilter (LAB-1277)
             seen: set[tuple[int, int]] = set()
-            for folded in views:
-                for match in pattern.finditer(folded.text):
+            for view in folded:
+                for match in pattern.finditer(view.text):
                     if match.end() > match.start():
-                        span = folded.to_original(*match.span())
+                        span = view.to_original(*match.span())
                         if span not in seen:
                             seen.add(span)
                             found.append((item, *span))
@@ -190,7 +208,12 @@ class KnownValues:
         with self._lock:
             cached = self._patterns.get(language)
             if cached is None:
-                from pii_guard.vault.vault import _compile, _forms  # the vault's own rules
+                from pii_guard.vault.vault import (  # the vault's own rules
+                    _compile,
+                    _forms,
+                    _literal_forms,
+                    _needles,
+                )
 
                 matcher = inflection_for(language)
                 ordered = sorted(
@@ -201,4 +224,13 @@ class KnownValues:
                     for item in ordered
                 ]
                 self._patterns[language] = cached
+                self._needles[language] = [
+                    _needles(
+                        literal
+                        for _, literal in _literal_forms(
+                            matcher, fold_value(item.value), item.entity_type
+                        )
+                    )
+                    for item in ordered
+                ]
             return cached

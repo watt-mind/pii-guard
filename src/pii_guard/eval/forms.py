@@ -30,7 +30,6 @@ from pii_guard.vault.inflection import inflection_for
 
 __all__ = [
     "CODE_ENTITY_TYPES",
-    "HungarianForms",
     "LanguageForms",
     "PackForms",
     "find_surface_forms",
@@ -92,15 +91,6 @@ class PackForms(LanguageForms):
 
     def stem_variants(self, value: str, entity_type: EntityType) -> list[str]:
         return self._forms.stem_variants(value, entity_type)
-
-
-class HungarianForms(PackForms):
-    """Hungarian surface forms (kept for compatibility; they live in the ``hu`` pack)."""
-
-    def __init__(self) -> None:
-        from pii_guard.languages.hu.forms import HungarianSurfaceForms
-
-        super().__init__("hu", HungarianSurfaceForms())
 
 
 #: Hooks registered with :func:`register_language_forms`; they take precedence over packs.

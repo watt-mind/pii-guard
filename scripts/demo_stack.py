@@ -130,6 +130,9 @@ def plan(
     if p.upstream == "mock":
         env["PII_GUARD_UPSTREAM_BASE_URL"] = p.mock_url + "/v1"
         env["PII_GUARD_UPSTREAM_API_KEY"] = ""
+        # The API runs as plain `serve` (no up_status): mark the upstream as the mock so
+        # /v1/status and Connect report it as the mock (LAB-1311).
+        env["PII_GUARD_UPSTREAM_MOCK"] = "true"
     elif p.upstream == "baseten":
         env["PII_GUARD_UPSTREAM_BASE_URL"] = BASETEN_URL
         env["PII_GUARD_UPSTREAM_API_KEY"] = setting("BASETEN_API_KEY", env_file)

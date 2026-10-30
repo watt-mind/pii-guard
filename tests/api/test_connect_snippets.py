@@ -244,6 +244,8 @@ def test_endpoint_blocks_use_the_endpoint_url_model_and_key(tmp_path: Path) -> N
     # Muse Code reads its catalog at the root; the endpoint key gets its own there (LAB-1462).
     assert _tool(body, "muse-code")["supported"]
     assert 'META_API_KEY="$PII_GUARD_ENDPOINT_KEY" muse' in _tool(body, "muse-code")["code"]
+    # LAB-1614: no /s/<session> in front of /e/<id>/v1, which would 401 every call.
+    assert "--no-session-path" in _tool(body, "muse-code")["code"]
     compile(_tool(body, "python")["code"], "<snippet>", "exec")
     for secret in (PROVIDER_KEY, "api.openai.com", "pg_ep_"):
         assert secret not in res.text

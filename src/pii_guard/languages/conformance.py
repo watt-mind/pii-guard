@@ -155,6 +155,7 @@ def check_structure(pack: LanguagePack) -> list[Finding]:
     findings += _check_lexicons(pack)
     findings += _check_captions(pack)
     findings += _check_cues(pack)
+    findings += _check_references(pack)
     findings += _check_brands(pack)
     findings += _check_corpus(pack)
     if not pack.smoke_fixtures:
@@ -415,6 +416,30 @@ def _check_cues(pack: LanguagePack) -> list[Finding]:
                 "cues.tsv has no '-' cue (order or invoice numbers that end a cue's window)",
             )
         ]
+    return []
+
+
+def _check_references(pack: LanguagePack) -> list[Finding]:
+    if pack.references is None:
+        return [
+            _info(
+                "structure.references",
+                "no reference words (order or invoice labels fall back to the built-in "
+                "lists, so they never reach this pack's language first)",
+            )
+        ]
+    if not isinstance(pack.references, Traversable):
+        return [
+            _error("structure.references", "references must be a resource (importlib.resources)")
+        ]
+    from pii_guard.languages.references import load_references
+
+    try:
+        entries = load_references(pack.references)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        return [_error("structure.references", f"references.tsv is invalid: {exc}")]
+    if not entries:
+        return [_error("structure.references", "references.tsv has no entry")]
     return []
 
 

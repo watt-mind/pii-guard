@@ -290,13 +290,15 @@ def run_benchmark(
     progress: Any = None,
 ) -> list[CellResult]:
     """Run every cell; ``mode_requests`` caps N per mode (``{"audit": 12}``)."""
+    from pydantic import SecretStr
+
     from pii_guard.api.app import create_app
     from pii_guard.config import Settings
 
     settings = Settings(
         host="127.0.0.1",
         upstream_api_key=None,
-        tenant_key=secrets.token_hex(32),
+        tenant_key=SecretStr(secrets.token_hex(32)),
         upstream_base_url="http://127.0.0.1:1/v1",  # replaced below
     )
     mock_app = create_mock_upstream(delay_ms=delay_ms)
