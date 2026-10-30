@@ -288,6 +288,34 @@ def _usage_line(block: Mapping[str, Any]) -> str:
     return f"- LLM usage over {block['messages']} messages: " + ", ".join(parts)
 
 
+def _outbound_rows(scorecard: Mapping[str, Any]) -> list[str]:
+    """The outbound re-check replay (``--outbound-check``, LAB-1505): false blocks and time."""
+
+    def row(name: str, ob: Mapping[str, Any]) -> str:
+        ms = ob.get("check_ms") or {}
+        return (
+            f"| {name} | {ob['requests']} | {ob['checked']} | {ob['blocked']} "
+            f"| {fmt_pct(ob['rate'])} | {fmt_ms(ms.get('p50'), 3)} | {fmt_ms(ms.get('p95'), 3)} |"
+        )
+
+    lines = [
+        "",
+        "## Outbound re-check",
+        "",
+        "Each document replayed through the gateway in fast mode, in its own session. Every "
+        "block on these sets is a false block.",
+        "",
+        "| Language | Requests | Re-checked | Blocked | False-block rate | Check p50 ms "
+        "| Check p95 ms |",
+        "|---|" + "---:|" * 6,
+    ]
+    for lang, block in scorecard["languages"].items():
+        if block.get("outbound_check"):
+            lines.append(row(f"`{lang}`", block["outbound_check"]))
+    lines.append(row("**overall**", scorecard["overall"]["outbound_check"]))
+    return lines
+
+
 def render_markdown(scorecard: dict[str, Any]) -> str:
     """The scorecard as Markdown: a summary per language and overall, then per entity type."""
     meta = scorecard["meta"]
@@ -321,6 +349,8 @@ def render_markdown(scorecard: dict[str, Any]) -> str:
     for lang, block in scorecard["languages"].items():
         lines.append(_summary_row(f"`{lang}`", block))
     lines.append(_summary_row("**overall**", scorecard["overall"]))
+    if scorecard["overall"].get("outbound_check"):
+        lines += _outbound_rows(scorecard)
     sections = [*scorecard["languages"].items()]
     if len(sections) > 1:
         sections.append(("overall", scorecard["overall"]))

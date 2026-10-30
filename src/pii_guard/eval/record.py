@@ -161,7 +161,22 @@ def text_metrics(block: Mapping[str, Any], *, reversible: bool = True) -> dict[s
             "mask": None if not mask else {"p50": _r(mask["p50"], 3), "p95": _r(mask["p95"], 3)},
         },
         "per_type": per_type,
+        **(
+            {"outbound_check": outbound_check(block["outbound_check"])}
+            if block.get("outbound_check")
+            else {}
+        ),
         **({"validity": _validity(block["validity"])} if block.get("validity") else {}),
+    }
+
+
+def outbound_check(block: Mapping[str, Any]) -> dict[str, Any]:
+    """A scorecard's ``outbound_check`` block (:mod:`pii_guard.eval.outbound`), counts only."""
+    ms = block.get("check_ms")
+    return {
+        **_counts(block, ("requests", "checked", "blocked")),
+        "rate": _r(block.get("rate")),
+        "check_ms": None if not ms else {"p50": _r(ms["p50"], 3), "p95": _r(ms["p95"], 3)},
     }
 
 
@@ -857,7 +872,8 @@ def rate_errors(block: Mapping[str, Any], path: str) -> list[str]:
     """Rates in a text block that aren't their count / denominator (``null`` = not measured).
 
     A rate given for an empty denominator is an error too. Checked: precision, recall and F1
-    in both match modes, leak and partial leak, over-masking, round trip, consistency.
+    in both match modes, leak and partial leak, over-masking, round trip, consistency, the
+    outbound re-check's false-block rate.
     """
     errors: list[str] = []
 
@@ -891,6 +907,9 @@ def rate_errors(block: Mapping[str, Any], path: str) -> list[str]:
             c["multi_rate"],
             _q(c["multi_consistent"], c["multi_occurrence"]),
         )
+    if block.get("outbound_check"):
+        ob = block["outbound_check"]
+        check("outbound_check.rate", ob["rate"], _q(ob["blocked"], ob["checked"]))
     return errors
 
 

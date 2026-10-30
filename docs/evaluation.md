@@ -343,6 +343,27 @@ With the rules detector only, pre-loading takes overall overlap recall on that s
 stay lower for Hungarian because the gold spans include the case suffix, which the placeholder
 leaves outside by design.
 
+## Outbound re-check (false blocks)
+
+`pii-guard eval --outbound-check` also replays every document through the in-process gateway
+in fast mode, with the run's own `--detectors`, against a mock upstream, each document in its
+own vault session (LAB-1505). The gateway's outbound re-check (LAB-1500) refuses a masked
+request that still holds a value the session knows; on the evaluation sets every request should
+be forwarded, so every block is a false block. Each text block of the scorecard and the run
+record gets an optional `outbound_check`: `requests`, `checked` (requests the re-check read;
+refusals before it, such as a block policy, are not), `blocked`, `rate` (`blocked / checked`,
+validated like the other rates) and `check_ms` (p50 / p95 of the re-check's own time). The
+benchmark page adds a "False blocks" column to a set's table once a run of it carries the block.
+
+`pii-guard bench latency` records the re-check's time per cell as `outbound_check_ms` (p50 /
+p95 / p99 / mean of the traffic events' `outbound_check.ms`); the latency table adds a
+"Re-check p50" column once a run carries it. Both fields are optional, so older records still
+validate.
+
+```bash
+uv run pii-guard eval --fixtures eval/fixtures --detectors rules,ner --outbound-check
+```
+
 ## Lexicons: diversity and the address rule
 
 Measured when the lexicons landed ([ADR 0009](decisions/0009-third-party-lexicons.md)).

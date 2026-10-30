@@ -3,7 +3,7 @@
 ```
 pii-guard eval [PATH ...] [--fixtures PATH ...] [--detectors rules[,ner,llm]]
                [--language hu[,en]] [--json OUT] [--markdown OUT]
-               [--baselines presidio,llm-guard,privaite] [--known-values]
+               [--baselines presidio,llm-guard,privaite] [--known-values] [--outbound-check]
                [--redteam [--redteam-contexts masked-only,decoys]]
                [--price-input USD --price-cached USD --price-output USD]  # per 1M tokens
 pii-guard eval generate --language hu --n 20 --seed 42 --out DIR|FILE.jsonl  # corpus
@@ -26,6 +26,9 @@ Fixtures whose documents carry ``meta.attack`` (the prompt-injection sets) also 
 table per attack class (:mod:`pii_guard.eval.injection`).
 ``--known-values`` pre-loads each document's ``meta.known_values`` into its vault session (the
 ``known`` detector), to measure the uplift of pre-loading values an application already knows.
+``--outbound-check`` also replays the documents through the gateway in fast mode with the same
+detectors and counts the requests its outbound re-check refuses (false blocks) and its time per
+request (:mod:`pii_guard.eval.outbound`), per language and overall.
 ``--redteam`` then asks an attacker model (Muse Spark Open on Baseten by default) to recover
 the masked values from the masked text, and reports the re-identification rate and exposure
 per context, language and entity type (:mod:`pii_guard.eval.redteam`).
@@ -119,6 +122,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--known-values",
         action="store_true",
         help="pre-load each document's meta.known_values into its session (known detector)",
+    )
+    parser.add_argument(
+        "--outbound-check",
+        action="store_true",
+        help="also replay the documents through the gateway and count outbound re-check blocks",
     )
     from pii_guard.eval.redteam import add_redteam_arguments
 
@@ -263,6 +271,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         scorecard["meta"]["known_values"] = sum(
             len(d.meta.get("known_values") or ()) for d in documents
         )
+    if args.outbound_check:
+        from pii_guard.eval.outbound import outbound_blocks
+
+        try:
+            replayed = outbound_blocks(documents, analyzer.detectors)
+        except PiiGuardError as exc:
+            print(
+                f"pii-guard eval: outbound replay failed: {exc.code}: {exc.message}",
+                file=sys.stderr,
+            )
+            return 1
+        scorecard["overall"]["outbound_check"] = replayed["overall"]
+        for lang, block in replayed["languages"].items():
+            if lang in scorecard["languages"]:
+                scorecard["languages"][lang]["outbound_check"] = block
     markdown = render_markdown(scorecard)
     if any("attack" in d.meta for d in documents):
         from pii_guard.eval.injection import attack_breakdown, attack_of, render_attack_table
