@@ -8,6 +8,7 @@ const PRIMARY = [{ href: "#demo", label: "Demo" }, { href: "#how", label: "How i
 const RESOURCES = [
   { href: "#meta", label: "Model details" },
   { href: "#images", label: "Image masking" },
+  { href: "#api", label: "API reference" },
   { href: "#data", label: "Privacy" },
   { href: "#privacy", label: "Privacy limits" },
   { href: "#europe", label: "Why Europe" },

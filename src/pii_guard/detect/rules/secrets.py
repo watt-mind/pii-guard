@@ -313,7 +313,38 @@ def _is_reference_or_placeholder(value: str) -> bool:
 
 
 # A format or template field inside a string literal: ``"{password}"``, ``"%(pw)s"``.
-_FORMAT_FIELD_RE = re.compile(r"\{[\w.\[\]]*\}|%\(\w+\)[a-z]")
+_FORMAT_FIELD_RE = re.compile(r"\{(?P<name>[\w.\[\]]*)\}|%\(\w+\)[a-z]")
+# ``{}``, ``{0}``, ``{12}``: an idiomatic positional ``str.format`` field. ``{0000}`` is not.
+_POSITIONAL_FIELD_RE = re.compile(r"(?:0|[1-9]\d?)?")
+_FIELD_NAME_PART_RE = re.compile(r"[^.\[\]]+")
+_SHORT_PASSWORD_NAMES = frozenset({"pw", "pwd", "pass", "passwd", "passphrase"})
+
+
+def _names_secret(field: str) -> bool:
+    """``{db_password}``, ``{cfg.token}``, ``{creds[pw]}``: a field that names a credential."""
+    return any(
+        part.casefold() in _SHORT_PASSWORD_NAMES or _key_strength(part) > 0
+        for part in _FIELD_NAME_PART_RE.findall(field)
+    )
+
+
+def _is_template(value: str) -> bool:
+    """True if a quoted literal is a format template, not a password with braces in it.
+
+    A template when the whole value is one field (``"{password}"``, ``"%(pw)s"``), it has a
+    ``%(x)s`` or positional (``{}``, ``{0}``) field, two or more fields
+    (``"{user}:{password}@{host}"``), or a field that names a credential (``"pw-{db_password}"``).
+    ``"Fake{0000}pw"`` and ``"pre{fix}0000x"`` are literal passwords (LAB-1383).
+    """
+    fields = list(_FORMAT_FIELD_RE.finditer(value))
+    if not fields:
+        return False
+    if len(fields) >= 2 or fields[0].group(0) == value:
+        return True
+    name = fields[0].group("name")
+    if name is None:  # ``%(x)s``
+        return True
+    return bool(_POSITIONAL_FIELD_RE.fullmatch(name)) or _names_secret(name)
 
 
 def looks_like_secret_value(
@@ -323,15 +354,16 @@ def looks_like_secret_value(
 
     Numbers count only for password keys (a numeric PIN); a token is never ``30``.
     Brackets mark code (``get()``, ``env[...]``), except in a quoted literal assigned to a
-    password key: ``password="Synth9![x]pass"`` is a password with punctuation in it. A format
-    field (``"{pw}"``) is still a template there.
+    password key: ``password="Synth9![x]pass"`` is a password with punctuation in it, and
+    so is ``"Fake{0000}pw"``. A real template (``"{pw}"``, ``"{user}:{password}@{host}"``) is
+    not.
     """
     if len(value) < _MIN_LENGTH or value.casefold() in _TYPE_WORDS:
         return False
     if _is_reference_or_placeholder(value) or _entropy(value) < _MIN_ENTROPY:
         return False
     if quoted and password_key:
-        if _FORMAT_FIELD_RE.search(value):
+        if _is_template(value):
             return False
     elif any(ch in value for ch in "()[]{}"):
         return False

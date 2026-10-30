@@ -157,3 +157,17 @@ def test_changed_stems_never_leak_the_value(
         leak_check(code, value, form, f"{value}: {form} .")
 
     check()
+
+
+# --- Synthetic corpus (LAB-1143) ----------------------------------------------------------------
+
+
+def test_the_built_in_packs_with_a_corpus() -> None:
+    from pii_guard.eval.identities import LANGUAGES
+
+    with_corpus = {code for code in CODES if PACKS[code].identity_generator is not None}
+    assert {"de", "en", "hu"} <= with_corpus
+    assert set(LANGUAGES) == with_corpus
+    for code in with_corpus:
+        assert PACKS[code].corpus_templates is not None
+        assert (FIXTURES / f"{code}-synth-sample.jsonl").is_file()

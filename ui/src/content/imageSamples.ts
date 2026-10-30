@@ -11,6 +11,9 @@ export interface ImageSample {
   /** Language of the printed text: decides which rules run on its OCR text. */
   language: "hu" | "en";
   src: string;
+  thumbnail: string;
+  width: number;
+  height: number;
   alt: string;
 }
 
@@ -21,6 +24,9 @@ const HUNGARIAN_IMAGE_SAMPLES: ImageSample[] = [
     subtitle: "Face, signature, document and personal no.",
     language: "hu",
     src: "/samples/id-card.png",
+    thumbnail: "/samples/id-card-thumb.webp",
+    width: 1012,
+    height: 638,
     alt: "Fictional specimen identity card overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Fiktív Mária, a birth date, a document number, a personal number and a signature.",
   },
   {
@@ -29,6 +35,9 @@ const HUNGARIAN_IMAGE_SAMPLES: ImageSample[] = [
     subtitle: "Face, TAJ number, address",
     language: "hu",
     src: "/samples/health-card.png",
+    thumbnail: "/samples/health-card-thumb.webp",
+    width: 1012,
+    height: 638,
     alt: "Fictional specimen health card overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Képzelt Ilona, a birth date, a TAJ number and an address.",
   },
   {
@@ -37,6 +46,9 @@ const HUNGARIAN_IMAGE_SAMPLES: ImageSample[] = [
     subtitle: "Signature, company stamp, email, phone",
     language: "hu",
     src: "/samples/signed-letter.png",
+    thumbnail: "/samples/signed-letter-thumb.webp",
+    width: 1000,
+    height: 1414,
     alt: "Fictional Hungarian employer's letter overprinted MINTA / SPECIMEN, to Mintás Anna: an address, an email address, a phone number, a tax ID, a signature and a round company stamp.",
   },
   {
@@ -45,6 +57,9 @@ const HUNGARIAN_IMAGE_SAMPLES: ImageSample[] = [
     subtitle: "Face, name, email, phone",
     language: "hu",
     src: "/samples/visitor-badge.png",
+    thumbnail: "/samples/visitor-badge-thumb.webp",
+    width: 640,
+    height: 960,
     alt: "Fictional visitor badge overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Próba Levente, an email address and a phone number.",
   },
 ];
@@ -59,6 +74,9 @@ export const ENGLISH_ID_CARD: ImageSample = {
   subtitle: "Face, signature, document no., date of birth",
   language: "en",
   src: "/samples/id-card-en.png",
+  thumbnail: "/samples/id-card-en-thumb.webp",
+  width: 1012,
+  height: 638,
   alt: "Fictional specimen identity card overprinted MINTA / SPECIMEN: an AI-generated portrait, the name Jane Placeholder, a birth date, a document number and a signature.",
 };
 

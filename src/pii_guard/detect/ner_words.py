@@ -14,6 +14,13 @@ spans leave the detector, for :data:`SNAPPED_TYPES`:
   end of the word (``Teszt Pirosk|áról`` -> ``Teszt Piroskáról``), so it never masks less than
   the model did. No other stem is guessed here: a weak reading (``Kelem`` + ``en``) would cut
   the name.
+- **Surname.** A PERSON span directly after a capitalised word from the pack's ``surnames``
+  lexicon, with one space between, starts at that word (LAB-1359). The model tags the given
+  name and leaves out a surname that is also an everyday word (``Fekete [[PERSON]]ért``), so
+  the surname went upstream next to the placeholder. A hyphenated double surname joins whole
+  (``Fekete-Kerekes``). Only the pack's lexicon decides: a lowercase word (``a fekete ló``), a
+  word not in the list, or one across punctuation or a line break stays outside. A pack with
+  no ``surnames`` lexicon gets no join.
 - Spans of the same type that overlap after snapping are merged.
 
 A span extended to the end of an inflected word is then handled like any name found whole:
@@ -33,6 +40,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from pii_guard.lang import Lexicon, LexiconUnavailable, available_kinds, lexicon
 from pii_guard.types import EntityType, Span
 from pii_guard.vault.inflection import inflection_for, splits
 
@@ -81,6 +89,39 @@ def _snap_end(text: str, start: int, end: int, entity_type: EntityType, language
     return end if end - start in stems else word_end
 
 
+def _surnames(language: str) -> Lexicon | None:
+    if "surnames" not in available_kinds(language):
+        return None
+    try:
+        return lexicon("surnames", language)
+    except LexiconUnavailable:
+        return None
+
+
+def _surname_before(text: str, start: int, surnames: Lexicon) -> int:
+    """Where a PERSON span starting at ``start`` begins once it takes the surname before it.
+
+    ``start`` itself when no capitalised lexicon surname sits one space before it. Walks back
+    over a hyphenated double surname while each part is in the lexicon.
+    """
+    if start < 2 or text[start - 1] != " " or not _word(text[start - 2]):
+        return start
+    new = start
+    end = start - 1
+    while True:
+        word_start = end
+        while word_start > 0 and _word(text[word_start - 1]):
+            word_start -= 1
+        word = text[word_start:end]
+        if not word[:1].isupper() or word not in surnames:
+            return new
+        new = word_start
+        if word_start >= 2 and text[word_start - 1] == "-" and _word(text[word_start - 2]):
+            end = word_start - 1
+            continue
+        return new
+
+
 def snap_to_words(text: str, spans: Sequence[Span], language: str = "hu") -> list[Span]:
     """``spans`` with every :data:`SNAPPED_TYPES` span starting and ending on a word boundary.
 
@@ -92,6 +133,7 @@ def snap_to_words(text: str, spans: Sequence[Span], language: str = "hu") -> lis
         return list(spans)
     out: list[Span] = []
     snapped: list[Span] = []
+    surnames = _surnames(language)
     for span in spans:
         if span.entity_type not in SNAPPED_TYPES:
             out.append(span)
@@ -101,6 +143,8 @@ def snap_to_words(text: str, spans: Sequence[Span], language: str = "hu") -> lis
             start -= 1
         if _inside(text, end):
             end = _snap_end(text, start, end, span.entity_type, language)
+        if surnames is not None and span.entity_type is EntityType.PERSON:
+            start = _surname_before(text, start, surnames)
         if (start, end) == (span.start, span.end):
             snapped.append(span)
             continue
