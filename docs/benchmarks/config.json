@@ -11,7 +11,7 @@
     "privaite"
   ],
   "readme": {
-    "about": "The README results block (pii-guard eval report rewrites the block between <!-- results:start --> and <!-- results:end -->). Every column reads a fixture set's latest snapshot from the run records in eval/results/runs/ (LAB-1656: no dataset-record columns, so the README and the landing read one source). Marks are caveats explained under the table in the README; a column whose best cell is marked gets no bold, and a cell from a run missing some of the set's languages is marked § automatically. over_masking_table prints over-masking for every row; per_language prints the first row's leak per language on the headline set. model_latency names the one model-latency measurement the README quotes (LAB-1625's gateway-latency records were taken under heavy load and are too noisy to quote).",
+    "about": "The README's generated blocks (pii-guard eval report rewrites the text between <!-- intro:start --> and <!-- intro:end -->, and between <!-- results:start --> and <!-- results:end -->). Layout 'compact' (LAB-1663): one table with a row per fixture set (columns) and a column per system (rows), each cell 'leak · over-masking', read from each set's latest snapshot in eval/results/runs/. Prose is editorial and lives here; numbers enter it only through placeholders filled from the records: {leak:<set>:<system>}, {over:...}, {partial:...}, {docs:<set>}, {langs:<set>}, {codes:<set>}; a system is a run-record key or an alias. model_latency names the one model-latency measurement the README quotes (LAB-1625's gateway-latency records were taken under heavy load and are too noisy to quote).",
     "columns": [
       {
         "title": "Hand-written",
@@ -32,26 +32,13 @@
       {
         "title": "Gretel finance",
         "fixture_set": "gretel-finance"
-      },
-      {
-        "title": "Gretel finance, corrected labels",
-        "fixture_set": "gretel-finance-corrected"
-      },
-      {
-        "title": "Ai4Privacy",
-        "fixture_set": "ai4privacy"
       }
     ],
-    "over_masking_table": true,
-    "per_language": true,
     "rows": [
       {
         "system": "rules+ner:pii-guard-ner-xlmr-base-v42-b3",
-        "label": "**PII Guard fast** (rules + NER, on-device, $0)",
-        "short": "fast",
-        "marks": {
-          "ai4privacy": "†"
-        }
+        "label": "PII Guard fast",
+        "short": "**PII Guard fast**"
       },
       {
         "system": "privaite",
@@ -66,21 +53,110 @@
       {
         "system": "llm-guard",
         "label": "LLM Guard",
-        "short": "LLM Guard",
-        "marks": {
-          "ai4privacy": "‡"
-        }
-      },
-      {
-        "system": "rules",
-        "label": "PII Guard rules only (no name detection)",
-        "p50": false
+        "short": "LLM Guard"
       }
     ],
     "model_latency": {
       "file": "eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json",
       "model": "v42-b3",
-      "label": "What the NER model (v4.2) takes per message on CPU (the model's own detection time, not the whole gateway; measured alternating with v2.0 in one process on a shared machine)"
+      "label": "NER model time per message on CPU (the model alone, not the whole gateway)"
+    },
+    "layout": "compact",
+    "aliases": {
+      "own": "rules+ner:pii-guard-ner-xlmr-base-v42-b3",
+      "v20": "rules+ner:xlmr-base-v2-hn@rescore=lab-1625"
+    },
+    "intro": {
+      "bullets": [
+        "**What it does.** An OpenAI-compatible gateway for AI agents: change one base URL, and detected names, addresses, IDs and faces become reversible placeholders (`[[PERSON_7f3a]]`) before the request leaves, then come back in the answer, mid-stream and inside tool calls.",
+        "**How well.** On {docs:agent-traffic} fictional agent-traffic documents ({codes:agent-traffic}), {leak:agent-traffic:own} of personal values reached the model and {over:agent-traffic:own} of masks hit text that was not personal data. Same documents and scorer: PrivAiTe {leak:agent-traffic:privaite} / {over:agent-traffic:privaite}, Presidio {leak:agent-traffic:presidio} / {over:agent-traffic:presidio}, LLM Guard {leak:agent-traffic:llm-guard} / {over:agent-traffic:llm-guard}.",
+        "**Where your data goes.** In the default fast mode, rules and a small NER model process the original text on your machine. The hosted demo receives what you type, so use fictional data there; the optional audit and SAM 3.1 endpoints receive the original text or pixels. Anything the detectors miss passes through: pseudonymization, not anonymization or a compliance guarantee."
+      ],
+      "image": "leak-vs-overmasking",
+      "alt": "Leak rate against over-masking rate on {docs:agent-traffic} fictional agent-traffic documents; lower-left is better. PII Guard fast {leak:agent-traffic:own} leak, {over:agent-traffic:own} over-masking; PrivAiTe {leak:agent-traffic:privaite} and {over:agent-traffic:privaite}; Presidio {leak:agent-traffic:presidio} and {over:agent-traffic:presidio}; LLM Guard {leak:agent-traffic:llm-guard} and {over:agent-traffic:llm-guard}; PII Guard rules only {leak:agent-traffic:rules} and {over:agent-traffic:rules}.",
+      "caption": "Lower-left is better. {docs:agent-traffic} fictional documents ({codes:agent-traffic}), drawn by <code>pii-guard eval report</code> from the <a href=\"eval/results/runs/\">run records</a>. <a href=\"#results\">All sets</a> · <a href=\"docs/benchmarks/README.md\">shareable PNGs</a>"
+    },
+    "notes": [
+      "Leak: labeled personal values left fully readable in what the model receives. A value with only part left readable (a surname, the tail of a number) is a partial leak, counted separately: PII Guard fast {partial:agent-traffic:own} on agent traffic, {partial:smoke:own} on the hand-written set. Over-masking: masks on text that was not personal data. Lower is better for both; the lowest in each row is bold."
+    ],
+    "caveats": [
+      "The sets are small (tens to hundreds of documents per language): a point or two of difference is noise. Agent traffic is written by Muse models from fictional seeds, which can flatter a detector taught by Muse labels; that is why the hand-written and public sets sit next to it.",
+      "Finance text is the weak spot. On Gretel finance's own labels PII Guard leaks {leak:gretel-finance:own}, about level with Presidio's {leak:gretel-finance:presidio}; on corrected labels ([why](docs/datasets.md)) {leak:gretel-finance-corrected:own} against {leak:gretel-finance-corrected:presidio}. Over-masking is high on Gretel finance ({over:gretel-finance:own}) and CEE-PII ({over:cee-pii:own}), where reference numbers without a cue word come out as IDs.",
+      "NER v4.2 is behind the previous v2.0 in two places, with the rules in front: CEE-PII {leak:cee-pii:own} against {leak:cee-pii:v20}, and the Polish pl-pii-bench {leak:pl-pii-bench:own} against {leak:pl-pii-bench:v20}. Neither was a release gate; v4.2 won on the hand-written sets, agent traffic and EU languages ([model notes](docs/models.md))."
+    ],
+    "details": {
+      "summary": "How this is measured",
+      "lines": [
+        "Every tool ran on the same documents (same fixture hashes) and was scored by the same code; comparison tools use their documented defaults ([configurations](eval/results/2026-10-27-comparison/README.md#systems)). All data is fictional. PII Guard fast is rules plus the published NER `v4.2` ([model card](training/ner/model-card.md)). The hand-written set pools {codes:smoke}; the full tables, per-language numbers, Ai4Privacy (in-distribution for the NER, so not a win) and the corrected finance labels are in [docs/benchmarks.md](docs/benchmarks.md#results-by-fixture-set)."
+      ]
+    }
+  },
+  "share": {
+    "about": "The shareable images (pii-guard eval report writes docs/benchmarks/<name>[-<size>][-dark].{svg,png}, LAB-1663). Keys are run-record system.key values; names are what the images print, so no candidate ids or ticket ids reach a public image. Every number is read from the run records.",
+    "own": "rules+ner:pii-guard-ner-xlmr-base-v42-b3",
+    "rules": "rules",
+    "url": "github.com/watt-mind/pii-guard",
+    "claim": "Masks personal data before it reaches the LLM, and puts it back in the answer.",
+    "names": {
+      "rules+ner:pii-guard-ner-xlmr-base-v42-b3": "PII Guard (fast, NER v4.2)",
+      "rules": "PII Guard rules only",
+      "privaite": "PrivAiTe",
+      "presidio": "Presidio",
+      "llm-guard": "LLM Guard"
+    },
+    "short_names": {
+      "rules+ner:pii-guard-ner-xlmr-base-v42-b3": "PII Guard"
+    },
+    "headline": {
+      "fixture_set": "agent-traffic",
+      "title": "agent-traffic",
+      "systems": [
+        "rules+ner:pii-guard-ner-xlmr-base-v42-b3",
+        "privaite",
+        "presidio",
+        "llm-guard",
+        "rules"
+      ]
+    },
+    "set_systems": [
+      "rules+ner:pii-guard-ner-xlmr-base-v42-b3",
+      "privaite",
+      "presidio",
+      "llm-guard"
+    ],
+    "sets": [
+      {
+        "fixture_set": "smoke",
+        "title": "Hand-written"
+      },
+      {
+        "fixture_set": "agent-traffic",
+        "title": "Agent traffic"
+      },
+      {
+        "fixture_set": "nemotron-pii",
+        "title": "Nemotron-PII"
+      },
+      {
+        "fixture_set": "cee-pii",
+        "title": "CEE-PII"
+      },
+      {
+        "fixture_set": "gretel-finance",
+        "title": "Gretel finance"
+      }
+    ],
+    "open_ner": {
+      "fixture_set": "smoke",
+      "systems": {
+        "rules+ner:pii-guard-ner-xlmr-base-v42-b3": "PII Guard NER v4.2: watt-mind/pii-guard-ner-xlmr-base",
+        "rules+ner:bardsai-v1-fallback": "bardsai/eu-pii-anonimization-multilang (v1)",
+        "rules+ner:wismut-nym@decoder=word": "Wismut/nym-pii-multilingual",
+        "rules+ner:eu-pii-safeguard@decoder=first": "tabularisai/eu-pii-safeguard",
+        "rules+ner:bardsai-v3@decoder=word": "bardsai/eu-pii-anonimization-multilang-v3",
+        "rules+ner:horizon-small@decoder=word": "Horizon-Labs/pii-redactor-small",
+        "rules+ner:horizon-base@decoder=word": "Horizon-Labs/pii-redactor-base"
+      }
     }
   }
 }
