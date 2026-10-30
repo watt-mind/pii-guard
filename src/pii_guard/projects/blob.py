@@ -168,6 +168,9 @@ class BlobProjectStore:
     def revoke_key(self, owner: str, project: str, endpoint: str, key_id: str) -> None:
         return self._run(lambda store: store.revoke_key(owner, project, endpoint, key_id))
 
+    def key_endpoint(self, secret: str) -> str | None:
+        return self._run(lambda store: store.key_endpoint(secret))
+
     def resolve_key(self, secret: str, endpoint: str) -> EndpointSnapshot | None:
         return self._run(lambda store: store.resolve_key(secret, endpoint))
 

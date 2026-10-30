@@ -131,3 +131,31 @@ def test_perturb_and_checksum_helpers() -> None:
     assert kind in ("homoglyph", "zero-width")
     built = syn.escape_built(syn.to_json({"a": syn.Gold(EntityType.EMAIL, "x@example.com")}))
     assert built.text[built.spans[0][0] : built.spans[0][1]] == "x@example.com"
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Teszt Dávid", "nak"),  # neutral i after a back vowel: back (LAB-1597)
+        ("Minta Márti", "nak"),
+        ("Próba Zsófi", "nak"),
+        ("Minta Emil", "nek"),  # neutral i after a front vowel: front
+        ("Teszt Kitti", "nek"),  # only neutral vowels: front
+        ("Teszt Elek", "nek"),
+        ("Minta Ödön", "nek"),
+        ("Próba Anna", "nak"),
+    ],
+)
+def test_harmony_treats_i_as_neutral(name: str, expected: str) -> None:
+    assert syn._harmony(name, "nak/nek") == expected
+
+
+def test_committed_inflected_names_follow_neutral_i() -> None:
+    for path in (
+        ROOT / "eval/synthetic/hu-agent-traffic.jsonl",
+        ROOT / "eval/synthetic/dev/hu-agent-traffic-dev.jsonl",
+    ):
+        text = path.read_text(encoding="utf-8")
+        assert not re.search(
+            r"\b(?:Bálint|Jázmin|Judit|Katalin)(?:nek|n?nel|t?tel|től|ről)\b", text
+        ), path

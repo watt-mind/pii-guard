@@ -127,7 +127,7 @@ def test_tax_id_scores_are_unchanged() -> None:
     ],
 )
 def test_card_after_a_reference_is_not_masked(text: str) -> None:
-    assert E.BANK_ACCOUNT not in _types(text, cued=False)
+    assert not {E.PAYMENT_CARD, E.BANK_ACCOUNT} & set(_types(text, cued=False))
 
 
 @pytest.mark.parametrize(
@@ -145,7 +145,32 @@ def test_card_after_a_reference_is_not_masked(text: str) -> None:
     ],
 )
 def test_card_with_a_cue_or_without_a_reference_is_masked(text: str) -> None:
-    assert E.BANK_ACCOUNT in _types(text)
+    assert E.PAYMENT_CARD in _types(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"name,{VISA},x",  # a card in a CSV field (LAB-1381)
+        f"name,{make_card('37828224631000')},x",  # Amex in a CSV field
+        f"{VISA},5678",  # a comma and 4 digits is another field, not a decimal
+        "Card: 4111 1111 1111 1111",
+    ],
+)
+def test_card_in_a_csv_field_is_masked(text: str) -> None:
+    assert E.PAYMENT_CARD in _types(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1,234",  # a thousands group, not a card
+        "amount 4,111.00",  # a decimal amount
+        f"{VISA},234",  # a comma and 1-3 digits extends the number (LAB-1367)
+    ],
+)
+def test_comma_grouped_numbers_are_not_cards(text: str) -> None:
+    assert E.BANK_ACCOUNT not in _types(text, cued=False)
 
 
 # --- Hungarian postcode before a company name ------------------------------------

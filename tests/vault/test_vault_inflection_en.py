@@ -5,13 +5,11 @@ from __future__ import annotations
 import pytest
 from vault_helpers import span_of
 
+from pii_guard.languages.en.inflection import EnglishPossessiveMatcher
+from pii_guard.languages.hu.inflection import HungarianSuffixMatcher
 from pii_guard.types import EntityType
 from pii_guard.vault import PLACEHOLDER_RE, Vault, inflection_for
-from pii_guard.vault.inflection import (
-    EnglishPossessiveMatcher,
-    ExactMatcher,
-    HungarianSuffixMatcher,
-)
+from pii_guard.vault.inflection import ExactMatcher
 
 NAME = "Jane Example"
 

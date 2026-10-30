@@ -33,7 +33,6 @@ from pii_guard.eval.fixtures import (
 )
 from pii_guard.eval.forms import (
     CODE_ENTITY_TYPES,
-    HungarianForms,
     LanguageForms,
     find_surface_forms,
     language_forms,
@@ -71,7 +70,6 @@ __all__ = [
     "EntityConsistency",
     "FixtureError",
     "GoldSpan",
-    "HungarianForms",
     "LanguageForms",
     "TypeCounts",
     "ValueLeak",

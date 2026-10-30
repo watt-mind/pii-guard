@@ -21,6 +21,7 @@ __all__ = [
     "PayloadTooLargeError",
     "PiiGuardError",
     "Span",
+    "VaultNotConfiguredError",
 ]
 
 
@@ -41,6 +42,7 @@ class EntityType(StrEnum):
     NATIONAL_ID_HU_TAJ = "NATIONAL_ID_HU_TAJ"
     ID_DOCUMENT = "ID_DOCUMENT"
     BANK_ACCOUNT = "BANK_ACCOUNT"
+    PAYMENT_CARD = "PAYMENT_CARD"
     COMPANY_ID_HU = "COMPANY_ID_HU"
     ORGANIZATION = "ORGANIZATION"
     PARCEL_NUMBER_HU = "PARCEL_NUMBER_HU"
@@ -199,6 +201,13 @@ class MaskingError(PiiGuardError):
 
     code = "masking_failed"
     status_code = 500
+
+
+class VaultNotConfiguredError(PiiGuardError):
+    """The tenant key is unset, not hex or too short. Misconfiguration, not a bug."""
+
+    code = "vault_not_configured"
+    status_code = 503
 
 
 class PayloadTooLargeError(PiiGuardError):

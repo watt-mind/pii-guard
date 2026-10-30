@@ -47,7 +47,16 @@ ABOUT = (
 )
 
 #: Visual-recall bars (Okabe-Ito blue, then Paul Tol muted), assigned per system.
-PALETTE_VISUAL = ["#0072B2", "#332288", "#44AA99", "#CC6677", "#88CCEE", "#DDCC77", "#117733"]
+PALETTE_VISUAL = [
+    "#0072B2",
+    "#332288",
+    "#44AA99",
+    "#CC6677",
+    "#88CCEE",
+    "#DDCC77",
+    "#117733",
+    "#AA4499",  # 8th: Paul Tol muted purple, distinct from the Blues/Greens above (LAB-1202)
+]
 #: Latency bars, assigned per gateway-latency system.
 PALETTE_LATENCY = ["#0072B2", "#009E73", "#D55E00", "#CC79A7", "#332288", "#999933"]
 

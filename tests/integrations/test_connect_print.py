@@ -58,9 +58,11 @@ def test_print_without_a_gateway_builds_the_block_locally(
     assert "built locally" in capsys.readouterr().err
 
 
-def test_claude_code_is_not_supported_yet(capsys: pytest.CaptureFixture[str]) -> None:
+def test_claude_code_prints_its_launch_command(capsys: pytest.CaptureFixture[str]) -> None:
     code, out = run("claude-code", "--gateway", "http://127.0.0.1:9/v1")
-    assert code == 1 and out == ""
+    assert code == 0
+    assert out.startswith("ANTHROPIC_BASE_URL=http://127.0.0.1:9/s/")
+    assert "claude --model" in out
     assert "/v1/messages" in capsys.readouterr().err
 
 

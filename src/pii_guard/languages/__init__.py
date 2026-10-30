@@ -175,6 +175,11 @@ class LanguagePack:
         ``ORGANIZATION``, which policy keeps; ``None``: only the shared list
         (``languages/brands.tsv``) and the other packs' names.
 
+    Reference words (``languages/references.py``)
+        ``references``: a ``references.tsv`` resource (one business-reference word per line:
+        order, invoice, tracking ...), so a validated number right after such a label is a
+        business number in the rules check and an NER number right after one is dropped;
+        ``None``: the built-in fallback lists (``_REFERENCE_WORD``/``_NEGATIVE``) apply.
     Synthetic corpus (``eval/generate.py``, ``eval/identities.py``)
         ``identity_generator``: a function ``(random.Random) -> IdentityGenerator`` making
         this language's fictional people, companies, properties and institutions (ADR 0005).
@@ -198,6 +203,7 @@ class LanguagePack:
     captions: Traversable | None = None
     cues: Traversable | None = None
     brands: Traversable | None = None
+    references: Traversable | None = None
     identity_generator: Callable[[random.Random], Any] | None = None
     corpus_templates: Traversable | None = None
 

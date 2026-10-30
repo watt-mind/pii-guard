@@ -36,7 +36,7 @@ def _overlaps(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
 
 
 def _drop_contained_scan(hits: list[rules._Hit]) -> list[rules._Hit]:
-    ordered = sorted(set(hits), key=lambda h: (h.start, -(h.end - h.start), -h.score))
+    ordered = sorted(dict.fromkeys(hits), key=lambda h: (h.start, -(h.end - h.start), -h.score))
     kept: list[rules._Hit] = []
     for hit in ordered:
         if any(k.start <= hit.start and hit.end <= k.end for k in kept):

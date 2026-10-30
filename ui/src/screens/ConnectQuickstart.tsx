@@ -26,6 +26,8 @@ export interface ConnectQuickstartProps {
   /** Open the tool's vault session (Vault screen), by its traffic-log ref. */
   onOpenSession?: (ref: string) => void;
   load?: SnippetsLoader;
+  /** A `#connect/<client>` deep link names this tab first (LAB-1314). */
+  initialTool?: string | null;
 }
 
 /** One vault session per tool, kept across reloads, so the block stays the same and step 3
@@ -38,8 +40,9 @@ function sessionFor(tool: ToolId): string {
   return id;
 }
 
-export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSession, load = loadSnippets }: ConnectQuickstartProps) {
+export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSession, load = loadSnippets, initialTool = null }: ConnectQuickstartProps) {
   const [tool, setToolState] = useState<ToolId>(() => {
+    if (isTool(initialTool)) return initialTool;
     const saved = readPref("connect-tool");
     return isTool(saved) ? saved : "muse-code";
   });
@@ -62,6 +65,12 @@ export function ConnectQuickstart({ traffic, ner = null, onOpenLog, onOpenSessio
     setSession(sessionFor(t));
     writePref("connect-tool", t);
   };
+  // A `#connect/<client>` deep link arriving while the screen is open picks that tab.
+  const [linked, setLinked] = useState(initialTool);
+  if (initialTool !== linked) {
+    setLinked(initialTool);
+    if (isTool(initialTool)) setTool(initialTool);
+  }
   const current = result?.key === key ? result.value : null;
   const snippets = current?.state === "ok" ? current.snippets : null;
   // Until the first answer, the tabs keep their place; after it, the server's list is the list.
@@ -303,7 +312,9 @@ function FirstRequestStep({
           </>
         ) : (
           <>
-            First request from {label} was stopped ({event.error?.code ?? event.outcome}): nothing was sent to the model.
+            {event.outcome === "upstream_failed" || event.outcome === "upstream_error"
+              ? `First request from ${label} was forwarded masked, but the model's provider failed (${event.error?.code ?? event.outcome}).`
+              : `First request from ${label} was stopped (${event.error?.code ?? event.outcome}): nothing was sent to the model.`}
           </>
         )}
       </p>
@@ -372,14 +383,25 @@ function Step({ n, title, done = false, children }: { n: number; title: string; 
   );
 }
 
+/** What a block is, for its label (LAB-1626): config files are not "Terminal". */
+function blockKind(text: string): "Python" | "JSON" | "TOML" | "Terminal" {
+  if (text.startsWith("import ") || text.startsWith("from ")) return "Python";
+  const first = text.split("\n").find((line) => line.trim() !== "" && !line.trimStart().startsWith("#"))?.trim() ?? "";
+  if (first.startsWith("{")) return "JSON";
+  if (/^\[[\w."' -]+\]$/.test(first) || /^[\w.-]+ = /.test(first)) return "TOML";
+  return "Terminal";
+}
+
 export function CodeBlock({ text, label }: { text: string; label: string }) {
+  const kind = blockKind(text);
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-line bg-surface-2">
       <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-1.5 pl-3 pointer-coarse:pr-2">
-        <span className="text-2xs text-muted">{text.startsWith("import ") || text.startsWith("from ") ? "Python" : "Terminal"}</span>
+        <span className="text-2xs text-muted">{kind}</span>
         <CopyButton text={text} label={label} />
       </div>
-      <pre className="min-w-0 overflow-x-auto px-3 py-2 font-mono text-ui whitespace-pre text-ink">{text}</pre>
+      {/* Focusable, so a keyboard can scroll a long line on a phone (axe scrollable-region-focusable). */}
+      <pre tabIndex={0} aria-label={`${kind} block`} className="min-w-0 overflow-x-auto px-3 py-2 font-mono text-ui whitespace-pre text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink">{text}</pre>
     </div>
   );
 }

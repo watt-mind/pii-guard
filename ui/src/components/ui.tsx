@@ -223,11 +223,11 @@ export function SegmentedControl<T extends string>({
             "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-45",
             square
               ? size === "sm"
-                ? "size-7 pointer-coarse:size-10"
-                : "size-8 pointer-coarse:size-10"
+                ? "size-7 pointer-coarse:size-11"
+                : "size-8 pointer-coarse:size-11"
               : size === "sm"
-                ? "h-7 px-2.5 text-xs pointer-coarse:h-10"
-                : "h-8 px-3 text-sm pointer-coarse:h-10",
+                ? "h-7 px-2.5 text-xs pointer-coarse:h-11 pointer-coarse:min-h-[44px]"
+                : "h-8 px-3 text-sm pointer-coarse:h-11 pointer-coarse:min-h-[44px]",
           ].join(" ")}
         >
           <input
@@ -488,7 +488,7 @@ export function SecretReveal({
   return (
     <div role="alert" aria-labelledby={titleId} className="rounded-lg border border-warn/40 bg-warn-soft p-3 sm:p-4">
       <p id={titleId} className="text-sm font-medium text-warn">
-        Copy {label} now. It is shown only once.
+        Shown only once: copy {label} and store it now.
       </p>
       <p className="mt-1 text-sm text-ink">
         PII Guard keeps only a hash, so this value can't be shown again.{envName && <> Store it as <code className="font-mono text-xs">{envName}</code>.</>}

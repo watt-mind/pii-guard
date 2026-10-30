@@ -61,6 +61,9 @@ def test_every_built_in_pack_ships_valid_cues(code: str) -> None:
         ("123\tPHONE", "start with a letter"),
         ("tel2\tPHONE", "start with a letter"),
         ("tel\tPHONE\nTel\tPHONE", "already listed"),
+        ("számon\tPHONE\tbefore", "third column"),
+        ("számú\t-\tafter", "must name an entity type"),
+        ("számon\tPHONE\tafter\textra", "expected"),
     ],
 )
 def test_malformed_cue_files_are_rejected(line: str, message: str) -> None:
@@ -73,6 +76,17 @@ def test_comments_dashes_and_suffixes_parse() -> None:
     assert [(c.text, c.entity_type, c.suffix) for c in cues] == [
         ("kártyaszám", E.BANK_ACCOUNT, True),
         ("rendelésszám", None, True),
+    ]
+
+
+def test_a_third_column_marks_a_cue_after_its_value() -> None:
+    cues = parse_cues(
+        "számon\tPHONE\tafter\nszámú útlevél*\tID_DOCUMENT\tafter\ntel\tPHONE\n", "hu"
+    )
+    assert [(c.text, c.entity_type, c.suffix, c.after) for c in cues] == [
+        ("számon", E.PHONE, False, True),
+        ("számú útlevél", E.ID_DOCUMENT, True, True),
+        ("tel", E.PHONE, False, False),
     ]
 
 
@@ -128,6 +142,9 @@ def _fields(pack: LanguagePack) -> dict[str, object]:
         # Unknown numbering plans after a phone cue.
         ("Telefon: 0729 11192898", "hu", "0729 11192898", E.PHONE),
         ("hívja a 0136.42246 9041 számot", "hu", "0136.42246 9041", E.PHONE),
+        # Hungarian national formats without a prefix, next to a phone cue (LAB-1094).
+        ("Hívjon a 30/123-4567 számon", "hu", "30/123-4567", E.PHONE),
+        ("Telefon: 30 123 4567", "hu", "30 123 4567", E.PHONE),
         ("Handy: 0158.609.792.0528", "de", "0158.609.792.0528", E.PHONE),
         ("Tel. (95)-7613 3737", "hu", "(95)-7613 3737", E.PHONE),
         ("call us at 0198.08.725 3693", "en", "0198.08.725 3693", E.PHONE),
@@ -171,6 +188,18 @@ def test_cued_scores_are_below_every_validated_rule() -> None:
 
 
 @pytest.mark.parametrize(
+    "text",
+    [
+        "30/123-4567",  # no cue at all: left to the LLM (LAB-1094)
+        "A szám 30/123-4567 volt.",
+        "Rendelés 30/123-4567 szám",  # a reference cue: a reference, not a phone
+    ],
+)
+def test_an_uncued_prefix_less_phone_is_not_masked(cued: RuleDetector, text: str) -> None:
+    assert [s for s in cued.detect(text, "hu") if s.entity_type is E.PHONE] == []
+
+
+@pytest.mark.parametrize(
     ("text", "language"),
     [
         # A "-" cue or a conjunction ends the window.
@@ -202,6 +231,58 @@ def test_look_alikes_after_or_near_a_cue_are_not_masked(
     cued: RuleDetector, plain: RuleDetector, text: str, language: str
 ) -> None:
     assert found(cued, text, language) == found(plain, text, language)
+
+
+# --- Cues after the value (LAB-1199) -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "value", "entity_type"),
+    [
+        ("Elérhető a +36.37.393.9102 számon.", "+36.37.393.9102", E.PHONE),
+        ("Küldje a 0136-13 051 0758 számra.", "0136-13 051 0758", E.PHONE),
+        ("Hívható a (0136) 234 5678 számon", "(0136) 234 5678", E.PHONE),
+        ("a 0729 11192898 telefonszámon", "0729 11192898", E.PHONE),
+        ("a 0729 11192898 számú mobilon", "0729 11192898", E.PHONE),
+        ("a AB12345 számú útlevelére", "AB12345", E.ID_DOCUMENT),
+        ("a 12 34 567 számú személyi igazolványát", "12 34 567", E.ID_DOCUMENT),
+        ("a 1234 5678 9012 3456 számú bankkártyával", "1234 5678 9012 3456", E.BANK_ACCOUNT),
+        ("a 1177 3016 1111 1012 számú bankszámlára", "1177 3016 1111 1012", E.BANK_ACCOUNT),
+    ],
+)
+def test_a_value_right_before_a_post_value_cue_is_masked(
+    cued: RuleDetector, plain: RuleDetector, text: str, value: str, entity_type: E
+) -> None:
+    assert (value, entity_type, CUED_SCORE) in found(cued, text, "hu")
+    assert value not in [v for v, _, _ in found(plain, text, "hu")]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A bare "számú" names nothing; a phone cue needs a phone prefix.
+        "a 2026/4471 számú ügyben",
+        "A 4500123456 számú szerződés",
+        "a 2026/4471 számon iktatott beadvány",
+        "a 4500123456 számra hivatkozva",
+        # Not right before the cue, a date, inside a longer number, inside a word.
+        "a 0612345678 a számon",
+        "2026. 10. 27. számon",
+        "1234-0612345678 számon",
+        "a 0612345678számon",
+        "a 0612345678, számon",
+        "06301234567 lakásszámon",
+    ],
+)
+def test_look_alikes_before_a_post_value_cue_are_not_masked(
+    cued: RuleDetector, plain: RuleDetector, text: str
+) -> None:
+    assert found(cued, text, "hu") == found(plain, text, "hu")
+
+
+def test_a_value_with_a_cue_on_both_sides_is_found_once() -> None:
+    matcher = CueMatcher(parse_cues("telefon\tPHONE\nszámon\tPHONE\tafter\n", "hu"))
+    assert [(h.start, h.end) for h in matcher.find("telefon: 0729 11192898 számon")] == [(9, 22)]
 
 
 def test_an_empty_matcher_finds_nothing() -> None:

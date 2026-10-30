@@ -211,3 +211,26 @@ def test_fork_does_not_share_the_fold_memo() -> None:
     fork = session.fork()
     assert _memo(fork) is not _memo(session)
     assert not _memo(fork)
+
+
+def test_prefilter_matches_unfiltered_output_for_overlapping_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LAB-1298: values that contain each other resolve identically with and without the
+    occurrence prefilter (the scan path must not change first-match order). Pinned so the
+    once-seen xdist failure reproduces without the full suite."""
+
+    def run() -> list[str]:
+        session = Vault(TEST_KEY).session()
+        out = [
+            session.mask("Kiss Elek ír.", [span_of("Kiss Elek ír.", "Kiss Elek", "PERSON")]),
+            session.mask("Elek is ír.", [span_of("Elek is ír.", "Elek", "PERSON")]),
+            session.mask("Kiss Elek és Elek.", []),
+        ]
+        session.close()
+        return out
+
+    with_prefilter = run()
+    monkeypatch.setattr(vault_module, "_PREFILTER", False)
+    without = run()
+    assert _canonical(with_prefilter) == _canonical(without)

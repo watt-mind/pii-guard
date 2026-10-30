@@ -232,6 +232,15 @@ def test_predictions_on_ignore_regions_are_neither_credited_nor_charged() -> Non
 def test_a_sample_without_ignore_regions_falls_back_to_unscored_types() -> None:
     legacy = _doc(TEXT, [PERSON], {"kind": "public-ai4privacy"})
     assert unscored(legacy, _span(20, 30, EntityType.DATE_OF_BIRTH))
+    # Ai4Privacy has no label for these either, so they can be neither confirmed nor
+    # refuted there (LAB-1223).
+    for entity_type in (
+        EntityType.ORGANIZATION,
+        EntityType.VEHICLE_PLATE,
+        EntityType.PARCEL_NUMBER_HU,
+        EntityType.COMPANY_ID_HU,
+    ):
+        assert unscored(legacy, _span(32, 37, entity_type))
     assert not unscored(legacy, _span(41, 47, EntityType.ADDRESS))  # needs regions
     other = _doc(TEXT, [PERSON], {"kind": "contract"})
     assert not unscored(other, _span(20, 30, EntityType.DATE_OF_BIRTH))
@@ -302,10 +311,11 @@ def test_drop_types_recomputes_from_counts() -> None:
 
 def test_rescore_is_marked_idempotent_and_done_for_the_committed_records() -> None:
     rec = _load("2026-10-27-cued-numbers-after-ai4privacy-fast")
-    assert rec["rescored"]["by"] == "LAB-1213"
-    assert rec["rescored"]["unscored_types"] == ["DATE_OF_BIRTH"]
+    assert rec["rescored"]["by"] == "LAB-1223"
+    assert rec["rescored"]["unscored_types"] == ["ORGANIZATION"]
     assert "DATE_OF_BIRTH" not in rec["metrics"]["overall"]["per_type"]
-    assert rec["metrics"]["overall"]["unscored_predictions"] == 205
+    assert "ORGANIZATION" not in rec["metrics"]["overall"]["per_type"]
+    assert rec["metrics"]["overall"]["unscored_predictions"] == 267
     assert rescore.rescore_record(rec) is None
     assert rescore.main(["--runs-dir", str(RUNS), "--check"]) == 0
     # The pre-LAB-1213 form of a record is re-scored, and the result validates.
@@ -322,14 +332,24 @@ def test_rescore_is_marked_idempotent_and_done_for_the_committed_records() -> No
         "leak": None,
         "over_masking": {"masked": 5, "over_masked": 5},
     }
+    old["metrics"]["overall"]["per_type"]["ORGANIZATION"] = {
+        "gold": 0,
+        "pred": 7,
+        "exact_tp_gold": 0,
+        "exact_tp_pred": 0,
+        "overlap_tp_gold": 0,
+        "overlap_tp_pred": 0,
+        "leak": None,
+        "over_masking": None,
+    }
     for mode in ("exact", "overlap"):
-        old["metrics"]["overall"][mode]["pred"] += 5
+        old["metrics"]["overall"][mode]["pred"] += 12
     old["metrics"]["overall"]["over_masking"]["masked"] += 5
     old["metrics"]["overall"]["over_masking"]["over_masked"] += 5
     new = rescore.rescore_record(old)
     assert new is not None and new["rescored"]["method"] == "unscored-types"
-    assert new["metrics"]["overall"]["unscored_predictions"] == 5
-    assert new["metrics"]["overall"]["overlap"] == rec["metrics"]["overall"]["overlap"]
+    assert new["rescored"]["unscored_types"] == ["DATE_OF_BIRTH", "ORGANIZATION"]
+    assert new["metrics"]["overall"]["unscored_predictions"] == 12
     assert list(new)[list(new).index("notes") + 1] == "rescored"
     assert not validate(new, SCHEMA)
     assert rescore.rescore_record(new) is None

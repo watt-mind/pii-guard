@@ -23,8 +23,12 @@ CANDIDATES = ("v4-a", "v4-b", "v4-braw")  # selection order
 EU_LANGS = ("lv", "lt", "hr", "sl", "fr", "es", "it", "nl", "ro", "mt", "ga")
 
 
+#: The ticket whose records are read (``--ticket``; LAB-1547 reuses the LAB-1535 gates).
+TICKET = "lab-1535"
+
+
 def _record(date: str, name: str, cand: str) -> dict[str, Any] | None:
-    path = RUNS / f"{date}-lab-1535-{name}-{cand}.json"
+    path = RUNS / f"{date}-{TICKET}-{name}-{cand}.json"
     if not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))["metrics"]
@@ -119,7 +123,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--date", required=True)
     parser.add_argument("--latency", type=Path)
     parser.add_argument("--json", type=Path)
+    parser.add_argument("--ticket", default="LAB-1535", help="record slug (LAB-1547 for v4.1)")
+    parser.add_argument("--candidates", nargs="+", default=list(CANDIDATES), help="in order")
     args = parser.parse_args(argv)
+    global TICKET
+    TICKET = args.ticket.lower()
     base = metrics(args.date, "v20")
     if base is None:
         print("no v2.0 records", file=sys.stderr)
@@ -130,7 +138,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         p95 = {k: v["p95_ms"] / res["v20"]["p95_ms"] for k, v in res.items()}
     report: dict[str, Any] = {"v20": {"metrics": base}}
     winners: list[tuple[float, float, int, str]] = []
-    for i, cand in enumerate(CANDIDATES):
+    for i, cand in enumerate(args.candidates):
         m = metrics(args.date, cand)
         if m is None:
             continue

@@ -101,7 +101,11 @@ def test_python_dash_m() -> None:
 def test_healthz(client: TestClient) -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": __version__, "ner": "off"}
+    body = response.json()
+    # OCR availability depends on the host's Tesseract (LAB-1219); the rest is fixed.
+    assert body.pop("ocr") in {"on", "off"}
+    assert isinstance(body.pop("image_require_ocr"), bool)
+    assert body == {"status": "ok", "version": __version__, "ner": "off"}
 
 
 def test_unknown_route_uses_error_body(client: TestClient) -> None:

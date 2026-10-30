@@ -135,6 +135,23 @@ class RouterTests(unittest.TestCase):
         self.assertNotRegex(config, r"(?m)^\s*gzip\b")
         self.assertIn("access_log off;", config)
 
+    def test_proxy_refuses_repeated_security_headers(self):
+        # LAB-1467: nginx joins repeated lines into one $http_* value, so the app's
+        # "Duplicate security header" refusal never fires behind the router.
+        config = router.nginx_config(CONFIG["aca_fqdn"], "100.101.102.103", "/proc/123/fd/4")
+        source = config.split("map ", 1)[1].split("{", 1)[0]
+        for name in router.SINGLE_VALUE_HEADERS:
+            self.assertIn("$http_" + name.lower().replace("-", "_"), source)
+        for name in ("Authorization", "Origin", "X-PII-Guard-Token", "X-PII-Guard-Connection"):
+            self.assertIn(name, router.SINGLE_VALUE_HEADERS)
+        self.assertIn('"~," 1;', config)
+        self.assertIn("if ($piiguard_repeated_header) { return 400; }", config)
+        self.assertIn("if ($piiguard_repeated_cookie) { return 400; }", config)
+        # The guest cookie name mirrors the app's; a repeat is cookie tossing, not a client.
+        identity = Path(__file__).parents[2] / "src" / "pii_guard" / "hosted" / "identity.py"
+        self.assertIn(f'GUEST_COOKIE_NAME = "{router.GUEST_COOKIE}"', identity.read_text())
+        self.assertIn(f'"~{router.GUEST_COOKIE}=.*{router.GUEST_COOKIE}=" 1;', config)
+
     @unittest.skipUnless(hasattr(os, "memfd_create"), "Linux memfd is required")
     def test_tls_memfd_is_root_private_sealed_and_not_a_file(self):
         fd = router.sealed_pem("synthetic test bytes")
@@ -644,6 +661,53 @@ class LiveProxyTests(unittest.TestCase):
                 self.assertFalse(any(name.startswith("x-ms-") for name in headers))
                 self.assertFalse(any(root.glob("body/*")))
                 self.assertFalse(any(root.glob("proxy/*")))
+                connection = http.client.HTTPSConnection(
+                    "127.0.0.1",
+                    port,
+                    context=ssl.create_default_context(cafile=str(cert)),
+                    timeout=5,
+                )
+                seen = len(received)
+                for repeated in (
+                    [("Origin", "https://a.example"), ("Origin", "https://b.example")],
+                    [("X-PII-Guard-Token", "0" * 32), ("X-PII-Guard-Token", "1" * 32)],
+                    [("X-PII-Guard-Connection", "one"), ("X-PII-Guard-Connection", "two")],
+                    [("Authorization", "Bearer one"), ("Authorization", "Bearer two")],
+                    [
+                        ("Cookie", "__Host-pii-guard-guest=a"),
+                        ("Cookie", "__Host-pii-guard-guest=b"),
+                    ],
+                    [("Cookie", "__Host-pii-guard-guest=a; other=1; __Host-pii-guard-guest=b")],
+                ):
+                    connection = http.client.HTTPSConnection(
+                        "127.0.0.1",
+                        port,
+                        context=ssl.create_default_context(cafile=str(cert)),
+                        timeout=5,
+                    )
+                    connection.putrequest("GET", "/login")
+                    for name, value in repeated:
+                        connection.putheader(name, value)
+                    connection.endheaders()
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 400, repeated)
+                    response.read()
+                    connection.close()
+                self.assertEqual(len(received), seen)
+                connection = http.client.HTTPSConnection(
+                    "127.0.0.1",
+                    port,
+                    context=ssl.create_default_context(cafile=str(cert)),
+                    timeout=5,
+                )
+                connection.request(
+                    "GET", "/login", headers={"Cookie": "__Host-pii-guard-guest=a; other=1"}
+                )
+                response = connection.getresponse()
+                self.assertEqual(response.status, 302)
+                response.read()
+                connection.close()
+                self.assertEqual(len(received), seen + 1)
                 connection = http.client.HTTPSConnection(
                     "127.0.0.1",
                     port,

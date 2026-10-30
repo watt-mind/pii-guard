@@ -68,8 +68,11 @@ def _audit(settings: Settings) -> tuple[str | None, str | None]:
     """``(model, unavailable reason)`` of the audit mode's LLM detector."""
     try:
         from pii_guard.detect.llm import LlmDetector
+        from pii_guard.detection_profile import DetectionProfileError
 
         detector = LlmDetector(settings=settings)
+    except DetectionProfileError as exc:
+        return None, f"disabled by detection profile: {type(exc).__name__}"
     except Exception as exc:  # a status page must not fail on a bad detector config
         return None, f"the LLM detector can't be configured: {type(exc).__name__}"
     model = getattr(detector, "model", None)
@@ -98,7 +101,9 @@ def _static_status(request: Request) -> dict[str, Any]:
     model, audit_reason = _audit(settings)
     policies = gateway_policies(settings, config)
     up = getattr(state, "up_status", None)
-    mock = bool(getattr(up, "mock", False))
+    # `up --mock` marks it through up_status; `make demo` through the settings (LAB-1311):
+    # under `serve` there is no up_status, but the upstream is the separate mock process.
+    mock = bool(getattr(up, "mock", False) or settings.upstream_mock)
     origin = None if mock else upstream_origin(settings.upstream_base_url)
     gaps = _image_gaps(settings)
     return {

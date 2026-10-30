@@ -832,9 +832,14 @@ _HU_INFLECTED = (
 
 
 def _harmony(name: str, pair: str) -> str:
+    """The case ending of ``pair`` (``back/front``) in the vowel harmony of ``name``.
+
+    ``i``/``í`` are neutral: the vowel before them decides (``Dávid`` -> ``Dávidnak``,
+    ``Emil`` -> ``Emilnek``); a name with only neutral vowels is front (``Kitti`` -> ``Kittinek``).
+    """
     back, front = pair.split("/")
-    last = [ch for ch in name.lower() if ch in "aáoóuúeéiíöőüű"]
-    return back if last and last[-1] in "aáoóuú" else front
+    vowels = [ch for ch in name.lower() if ch in "aáoóuúeéöőüű"]
+    return back if vowels and vowels[-1] in "aáoóuú" else front
 
 
 def inflected(v: Values, rng: random.Random) -> Built:

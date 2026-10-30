@@ -81,11 +81,15 @@ LABELS = {
     "v4-a": "pii-guard fast, NER v4 candidate A: v2.0 + EU phase-1 data, 1 epoch (LAB-1535)",
     "v4-b": "pii-guard fast, NER v4 candidate B: 0.5 v2.0 + 0.5 B-raw soup (LAB-1535)",
     "v4-braw": "pii-guard fast, NER v4 candidate B-raw: v2.0 + EU data, 2 epochs (LAB-1535)",
+    "v41-a1": "pii-guard fast, NER v4.1 candidate A1: v4-A recipe + v4.1 data, loose ADDRESS "
+    "kept out of the loss (LAB-1547)",
+    "v41-a2": "pii-guard fast, NER v4.1 candidate A2: v4-A recipe + v4.1 data, loose ADDRESS "
+    "taught as O (LAB-1547)",
 }
 #: Tickets whose v2.0 runs are selection-only re-scores (LAB-1494): their records get a system
 #: key and label of their own, so the report's latest-per-system pick keeps the published v2.0
 #: rows (timed on a quiet machine) instead of these, timed on a loaded one.
-RESCORE_TICKETS = ("LAB-1494", "LAB-1512", "LAB-1535")
+RESCORE_TICKETS = ("LAB-1494", "LAB-1512", "LAB-1535", "LAB-1547")
 
 
 def system_extra(ticket: str, candidate: str) -> dict[str, Any]:
@@ -107,6 +111,8 @@ TICKETS = {
     "LAB-1494": "NER v3.2 candidates (soups, error-mined data) vs v2.0, v3.1 protocol",
     "LAB-1512": "NER v3.3 candidates (S30 + targeted add-on; thresholds) vs v2.0, v3.1 protocol",
     "LAB-1535": "NER v4 multilingual candidates (v2.0 + EU phase-1 data) vs v2.0, v3.1 protocol",
+    "LAB-1547": "NER v4.1 candidates (v4-A recipe, loose addresses treated, v4.1 data) vs v2.0, "
+    "LAB-1535 protocol",
 }
 
 
@@ -198,10 +204,11 @@ def _score(args: argparse.Namespace) -> int:
             "LAB-1494",
             "LAB-1512",
             "LAB-1535",
+            "LAB-1547",
         ):
             notes.append(
-                "Selection set. No v3.1, v3.2, v3.3 or v4 mix holds any agent-traffic generator "
-                "document, so it is unseen by every candidate, as it was for v2.0."
+                "Selection set. No v3.1, v3.2, v3.3, v4 or v4.1 mix holds any agent-traffic "
+                "generator document, so it is unseen by every candidate, as it was for v2.0."
             )
         records = build_records(
             card,

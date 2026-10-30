@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { configure, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignedInConsole } from "../App";
@@ -11,7 +11,12 @@ import type { BenchmarkIndex } from "../api/benchmarks";
 import bundled from "virtual:pii-guard/benchmarks-index";
 import { HostedApp } from "./HostedApp";
 import type { Account, Requester } from "./api";
-import { endpointState, parseFirstRun, resetFirstRun, testRecovery, TestRequestError, withKey } from "./firstRun";
+import { endpointState, parseFirstRun, resetFirstRun, testRecovery, TestRequestError, testSessionKey, withKey } from "./firstRun";
+
+// Slow runners get longer than the 1 s default for every async query in this file
+// (LAB-1498): the setup region appears only after a chain of account, first-run,
+// projects, endpoints and snippets calls, which flakes under full-suite parallel load.
+configure({ asyncUtilTimeout: 10_000 });
 
 // First run (LAB-1455). Fictional owner, endpoint and keys only (ADR 0005).
 const KEY = "pg_ep_exampleKey0123456789-_exampleKey0123456";
@@ -62,7 +67,7 @@ function serve() {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const u = String(input);
     if (u.includes("/v1/connect/snippets")) return new Response(JSON.stringify(snippets));
-    if (u.includes("/e/ep-default/v1/chat/completions")) return new Response(JSON.stringify(roundTrip), { headers: { "X-PII-Guard-Masked": "2" } });
+    if (u.includes("/e/ep-default/v1/chat/completions")) return new Response(JSON.stringify(roundTrip), { headers: { "X-PII-Guard-Masked": "2", "X-PII-Guard-Request-Id": "req-test-1" } });
     return new Response(JSON.stringify({ error: { code: "unavailable" } }), { status: 503 });
   });
 }
@@ -103,7 +108,7 @@ describe("first run, sponsored on", () => {
     const setup = await screen.findByRole("region", { name: "Connect your client" });
     expect(location.hash).toBe("#connect");
     expect(await within(setup).findByText("Ready")).toBeInTheDocument();
-    expect(within(setup).getByText("Copy your guard key now. It is shown only once.")).toBeInTheDocument();
+    expect(within(setup).getByText("Shown only once: store it now.")).toBeInTheDocument();
     expect(within(setup).getAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}`).length).toBeGreaterThan(0);
     // The first sign-in's single call provisions and issues the key; nothing else mints one.
     expect(call.mock.calls.filter(([p]) => p === "/v1/account/first-run")).toHaveLength(1);
@@ -120,12 +125,34 @@ describe("first run, sponsored on", () => {
     expect(python.textContent).not.toContain("import os");
     await user.click(within(setup).getByRole("tab", { name: "Muse Code" }));
     expect(within(setup).getByText("Not for endpoint URLs yet.")).toBeInTheDocument();
+    // The tools that do work come from the server's blocks (LAB-1619).
+    expect(within(setup).getByText("Codex, OpenAI SDK and cURL work with this endpoint today.")).toBeInTheDocument();
 
     await user.click(within(setup).getByRole("button", { name: "Send a test request" }));
     expect(await within(setup).findByText(/Round trip complete: 2 values masked/)).toBeInTheDocument();
-    expect(within(setup).getByText(/to \[\[EMAIL_1a2b3c\]\] \(phone/)).toBeInTheDocument();
+    // Its own vault session per policy version, so an applied Keep shows in the next test (LAB-1629).
+    const sent = vi.mocked(globalThis.fetch).mock.calls.find(([u]) => String(u).includes("/chat/completions"));
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ stream: false, prompt_cache_key: testSessionKey("pv-1") });
+    expect(testSessionKey("pv-1")).toMatch(/^pgtest_f[0-9a-f]+$/);
+    // The whole-id shape the gateway exempts from model hits (opaque_ids rule 3, LAB-1640).
+    expect(testSessionKey("pmnRn0C4txtT6QrZrleUwBaV")).toMatch(/^[A-Za-z]{1,24}_[0-9a-f]{16,128}$/);
+    // The card names the policy, as Projects does (LAB-1629).
+    expect(within(setup).getByText(/Policy · v1/)).toBeInTheDocument();
+    // What the model saw, with its placeholders as chips (LAB-1626).
+    const saw = within(setup).getByTestId("masked-text");
+    expect(saw.textContent).toContain("Write a two-line note to [[EMAIL_1a2b3c");
+    expect(saw.querySelectorAll("[data-placeholder]")).toHaveLength(2);
     expect(within(setup).getByText("Note to jane.placeholder@example.net: confirmed.")).toBeInTheDocument();
+    // Done: say so, and where to go next (LAB-1619).
+    // It says what was proven (the endpoint works), not that the owner's own client is connected (LAB-1626).
+    expect(within(setup).getByText(/^Your endpoint works\./)).toBeInTheDocument();
+    expect(within(setup).queryByText(/You're connected/)).not.toBeInTheDocument();
+    // Tuning starts a new version of this endpoint's policy in Projects, not the read-only Policy screen.
+    expect(within(setup).getByRole("link", { name: "Tune what is masked" })).toHaveAttribute("href", "#projects");
     expect(storedAnywhere(KEY)).toBe(false);
+    // This call, by its request id, not whatever Logs shows last.
+    await user.click(within(setup).getByRole("button", { name: "Open this call in Logs" }));
+    await vi.waitFor(() => expect(location.hash).toBe("#logs"));
   });
 
   it("a returning owner whose key was shown before gets one-click new key, not the old one", async () => {
@@ -141,7 +168,7 @@ describe("first run, sponsored on", () => {
     const setup = await screen.findByRole("region", { name: "Connect your client" });
     expect(within(setup).queryByText(KEY, { exact: false })).not.toBeInTheDocument();
     expect(await within(setup).findByText(/env_key="PII_GUARD_ENDPOINT_KEY"/, { selector: "pre" }, { timeout: 3000 })).toBeInTheDocument();
-    await userEvent.setup().click(within(setup).getByRole("button", { name: "Create a new guard key" }));
+    await userEvent.setup().click(within(setup).getByRole("button", { name: "Create a new endpoint key" }));
     expect(await within(setup).findAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}2`, { exact: false })).not.toHaveLength(0);
     expect(call).toHaveBeenCalledWith("/v1/projects/project-default/endpoints/ep-default/keys", { name: "Console key" });
   });
@@ -169,8 +196,8 @@ describe("first run, sponsored off", () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith("/v1/account/first-run", { meta_api_key: "example-meta-key", issue_key: true }));
     expect(await within(setup).findByText("Ready")).toBeInTheDocument();
     // The form is gone: focus moves on to step 1, not back to the page.
-    await waitFor(() => expect(document.activeElement).toHaveTextContent("Copy your guard key"));
-    // The guard key issued at sign-in is shown now, and the blocks embed it.
+    await waitFor(() => expect(document.activeElement).toHaveTextContent("Copy your endpoint key"));
+    // The endpoint key issued at sign-in is shown now, and the blocks embed it.
     expect(within(setup).getAllByText(`export PII_GUARD_ENDPOINT_KEY=${KEY}`, { exact: false }).length).toBeGreaterThan(0);
     expect(within(setup).getByText(/Your Meta API key/)).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("example-meta-key");

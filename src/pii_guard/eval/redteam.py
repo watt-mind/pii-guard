@@ -145,6 +145,7 @@ _CODE_TYPES = frozenset(
     {
         EntityType.PHONE,
         EntityType.BANK_ACCOUNT,
+        EntityType.PAYMENT_CARD,
         EntityType.ID_DOCUMENT,
         EntityType.NATIONAL_ID_HU_TAX,
         EntityType.NATIONAL_ID_HU_TAJ,
@@ -230,7 +231,7 @@ def build_targets(
         placeholders = sorted(
             {
                 ph
-                for start, end, ph in result.replacements
+                for start, end, ph in result.replacements or ()
                 if any(start < s.end and s.start < end for s in spans)
             }
         )

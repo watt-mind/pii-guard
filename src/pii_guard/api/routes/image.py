@@ -14,7 +14,7 @@ with placeholders) and ``summary`` (the document summary), with values registere
 session ``session_id`` (a new one when omitted; its id is returned), so an ID card and a
 contract masked in one session share placeholders. ``opaque`` covers regions with solid
 boxes and returns neither. Without a configured vault (``PII_GUARD_TENANT_KEY``) the default
-falls back to ``opaque``; an explicit ``labels`` is then ``500 vault_not_configured``.
+falls back to ``opaque``; an explicit ``labels`` is then ``503 vault_not_configured``.
 
 The format is sniffed from the bytes (PNG or JPEG only; anything else is ``415``). The
 response carries the masked image as base64 PNG (``image``), re-encoded from pixels with no
@@ -472,7 +472,7 @@ def _render_and_vault(request: Request, requested: Render | None) -> tuple[Rende
 
 _OPTIONS_DOC = {
     "session_id": "The vault session to mask in (`labels` only). Omitted: a new one is created "
-    "and returned. Unknown or expired: 404 `not_found`.",
+    "and returned. Unknown, expired or bound to another client identity: 404 `not_found`.",
     "render": "`labels` (default, `PII_GUARD_IMAGE_RENDER`) or `opaque`. Without a tenant key "
     "the default falls back to `opaque`; an explicit `labels` is then 500 "
     "`vault_not_configured`.",

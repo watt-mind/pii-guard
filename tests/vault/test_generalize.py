@@ -98,7 +98,8 @@ def test_harmony_only_for_hungarian_person_placeholders() -> None:
         ("Minta Ödön", "hoz", "Minta Ödönhöz"),
         ("Minta Ödön", "ot", "Minta Ödönöt"),
         ("Próba Zsófi", "nak", "Próba Zsófinak"),
-        ("Próba Zsófi", "nek", "Próba Zsófinek"),  # neutral i after a back vowel: as written
+        ("Próba Zsófi", "nek", "Próba Zsófinak"),  # neutral i after a back vowel (LAB-1597)
+        ("Teszt Dávid", "vel", "Teszt Dáviddal"),
         ("Próba Zsuzsanna", "nek", "Próba Zsuzsannának"),
         ("Teszt Elek", "val", "Teszt Elekkel"),
         ("Minta Kovács", "vel", "Minta Kováccsal"),

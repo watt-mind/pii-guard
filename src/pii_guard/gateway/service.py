@@ -79,6 +79,7 @@ from pii_guard.gateway.sessions import (
     SESSION_HEADER,
     SESSION_SOURCE_HEADER,
     SessionSource,
+    client_identity,
     resolve_session,
 )
 from pii_guard.gateway.stream import DONE, SseRestorer, error_event, iter_sse_data, sse_event
@@ -91,7 +92,13 @@ from pii_guard.gateway.trace import CallTrace
 from pii_guard.observability import Observability, RequestTimer
 from pii_guard.policy import Policy
 from pii_guard.types import DetectionError, PayloadTooLargeError, PiiGuardError, Span
-from pii_guard.vault import UnmaskOutputTooLargeError, Vault, VaultSession, normalize_value
+from pii_guard.vault import (
+    PLACEHOLDER_RE,
+    UnmaskOutputTooLargeError,
+    Vault,
+    VaultSession,
+    normalize_value,
+)
 from pii_guard.vault.known import KnownValues
 from pii_guard.visual.masking import (
     ImageMasker,
@@ -133,15 +140,25 @@ _UNSET: Any = object()
 
 #: The largest masked upstream payload (bytes) the current request was admitted for. Hosted
 #: admission charges this bound in advance (hosted/quotas.py); None means no bound (local).
+#: The vault leases (session, client identity) the current request holds, set by
+#: :meth:`Gateway._with_session_lease` (module-level, LAB-1584: a ContextVar per gateway
+#: instance is never collected).
+_REQUEST_SESSIONS: ContextVar[list[tuple[VaultSession, str]] | None] = ContextVar(
+    "pii_guard_request_sessions", default=None
+)
+
 UPSTREAM_PAYLOAD_LIMIT: ContextVar[int | None] = ContextVar(
     "pii_guard_upstream_payload_limit", default=None
 )
 
 
-def check_upstream_payload(payload: bytes) -> None:
-    """Refuse a masked payload larger than the bound its admission was charged for."""
+def check_upstream_payload(payload: bytes, image_bytes: int = 0) -> None:
+    """Refuse a masked payload larger than the bound its admission was charged for.
+
+    ``image_bytes`` (the masked images' data URLs the gateway wrote) is left out: hosted
+    admission charges each image a fixed provider price instead of its bytes (LAB-1439)."""
     limit = UPSTREAM_PAYLOAD_LIMIT.get()
-    if limit is not None and len(payload) > limit:
+    if limit is not None and len(payload) - max(0, image_bytes) > limit:
         raise PayloadTooLargeError("the masked request is larger than its admitted size bound")
 
 
@@ -170,6 +187,9 @@ class RequestStats:
     seeded: int = 0
     spans: Counter[str] = field(default_factory=Counter)
     masked: Counter[str] = field(default_factory=Counter)
+    #: Spans whose masked type a detector forced over a keep-type rule (LAB-1248, LAB-1228):
+    #: counts by entity type only, never values.
+    forced: Counter[str] = field(default_factory=Counter)
     detect_ms: float = 0.0
     detector_ms: dict[str, float] = field(default_factory=dict)
     upstream_status: int | None = None
@@ -181,6 +201,8 @@ class RequestStats:
     image_kept: Counter[str] = field(default_factory=Counter)
     image_ocr: bool | None = None
     image_ms: float = 0.0
+    #: Characters of the masked image data URLs written into the body (not rendered).
+    image_payload_bytes: int = 0
     session_source: SessionSource | None = None
     #: The placeholder note went upstream with the request (LAB-1471).
     note: bool = False
@@ -220,6 +242,7 @@ class RequestStats:
             "cache_hits": self.cache_hits,
             "cache_misses": self.cache_misses,
             "masked": _counts(self.masked),
+            "forced": _counts(self.forced),
             "detect_ms": f"{self.detect_ms:.0f}",
         }
         if self.outbound is not None:
@@ -368,9 +391,6 @@ class Gateway:
         # Session id -> the requests masking into it now (LAB-1316): a refused request drops
         # the session it created only once no other request holds it and none succeeded.
         self._session_holds: dict[str, _SessionHold] = {}
-        self._request_sessions: ContextVar[list[VaultSession] | None] = ContextVar(
-            "request_sessions", default=None
-        )
         self._holds_lock = threading.Lock()
         # Fixed headers added to every upstream call of this gateway (the hosted sponsored
         # route's attribution, LAB-1461); they never override content type or credentials.
@@ -527,15 +547,17 @@ class Gateway:
 
         The request holds the session until :meth:`_release_session`, which every caller
         must call once masking finished or failed."""
+        identity = client_identity(headers)
         with self._holds_lock:
             session, created, source = self.vault.acquire_session(
-                lambda: resolve_session(self.vault, headers, body, path_session)
+                lambda: resolve_session(self.vault, headers, body, path_session),
+                identity=identity,
             )
-            sessions = self._request_sessions.get()
+            sessions = _REQUEST_SESSIONS.get()
             if sessions is None:
-                self.vault.release_session(session)
+                self.vault.release_session(session, identity=identity)
                 raise RuntimeError("session resolution requires a request lease scope")
-            sessions.append(session)
+            sessions.append((session, identity))
             previous = self._session_incarnations.get(session.session_id)
             if previous is not None and previous() is not session:
                 # New incarnation of this id: start clean (LAB-1565).
@@ -556,12 +578,13 @@ class Gateway:
         self, work: Coroutine[Any, Any, tuple[Response, RequestStats]]
     ) -> tuple[Response, RequestStats]:
         """Keep request pins through upstream work and the stream's final cleanup."""
-        sessions: list[VaultSession] = []
-        token = self._request_sessions.set(sessions)
+        sessions: list[tuple[VaultSession, str]] = []
+        token = _REQUEST_SESSIONS.set(sessions)
 
         def release() -> None:
             while sessions:
-                self.vault.release_session(sessions.pop())
+                session, identity = sessions.pop()
+                self.vault.release_session(session, identity=identity)
 
         try:
             response, stats = await work
@@ -594,7 +617,7 @@ class Gateway:
             release()
             raise
         finally:
-            self._request_sessions.reset(token)
+            _REQUEST_SESSIONS.reset(token)
 
     def _release_session(self, session: VaultSession, created: bool, *, masked: bool) -> None:
         """End the hold :meth:`_session` took, once masking finished (``masked``) or failed.
@@ -677,7 +700,10 @@ class Gateway:
         session: VaultSession,
         language: str,
         stats: RequestStats,
+        kept: list[list[Span]] | None = None,
     ) -> list[list[Span]]:
+        """The spans to mask, per slot. ``kept``, when given, gets the spans kept by policy,
+        per slot (the echo reports them, LAB-1180). The cache holds both."""
         # Audit mode without an LLM key: 503 detection_unavailable before anything is detected,
         # cached, segmented or sent (LAB-1290). Runs first in chat and responses alike.
         detector.require_available()
@@ -715,12 +741,12 @@ class Gateway:
                 self._detect_workers[detector.mode] = workers
 
             async def run(text: str) -> tuple[list[Span], dict[str, float]]:
-                return await workers.run(detector.detect, text, language)
+                return await workers.run(detector.resolve, text, language)
 
             async def run_all(texts: list[str]) -> list[tuple[list[Span], dict[str, float]]]:
                 # Fast mode: one job for every uncached text, so the NER model batches them
                 # (LAB-1279). Timings are per job; the first output carries them.
-                found, timings = await workers.run(detector.detect_many, texts, language)
+                found, timings = await workers.run(detector.resolve_many, texts, language)
                 return [(spans, timings if i == 0 else {}) for i, spans in enumerate(found)]
 
             started = time.perf_counter()
@@ -745,7 +771,10 @@ class Gateway:
                 self.cache.put(key, spans)
                 for index in indices:
                     results[index] = spans
-        out = [r if r is not None else [] for r in results]
+        decisions = [detector.policies.apply(r or []) for r in results]
+        out = [decision.masked for decision in decisions]
+        if kept is not None:
+            kept[:] = [decision.kept for decision in decisions]
         known = session.known_values
         if known:
             # After the cache: values pre-loaded later still apply to cached detections.
@@ -756,8 +785,15 @@ class Gateway:
             ]
             elapsed = (time.perf_counter() - started) * 1000
             stats.detector_ms[KNOWN_DETECTOR] = stats.detector_ms.get(KNOWN_DETECTOR, 0) + elapsed
+        if kept is not None:
+            # A kept span that a masked one overlaps (a pre-loaded known value) is masked.
+            kept[:] = [
+                [k for k in found if not any(m.start < k.end and k.start < m.end for m in spans)]
+                for found, spans in zip(kept, out, strict=True)
+            ]
         for spans in out:
             stats.spans.update(s.entity_type.value for s in spans)
+            stats.forced.update(s.entity_type.value for s in spans if s.forced_by)
         return out
 
     @staticmethod
@@ -842,6 +878,14 @@ class Gateway:
             ):
                 text = slot.text
             slot.write(text)
+            if text != slot.text:
+                # Record each placeholder's JSON type for restore (LAB-1361): a number only
+                # when a number leaf masked to exactly it; inside a longer text, or as a whole
+                # string, it is a string (any ambiguity keeps the string form).
+                whole = slot.number is not None and PLACEHOLDER_RE.fullmatch(text)
+                for match in PLACEHOLDER_RE.finditer(text):
+                    number = (slot.text, slot.number) if whole and slot.number else None
+                    session.note_json_leaf(match.group(0), number)
 
     @staticmethod
     def _recheck(
@@ -922,7 +966,9 @@ class Gateway:
             stats.image_masked.update({t.value: n for t, n in outcome.counts(Policy.MASK).items()})
             stats.image_kept.update({t.value: n for t, n in outcome.counts(Policy.KEEP).items()})
         for number, (slot, outcome) in enumerate(zip(images, outcomes, strict=True), start=1):
-            slot.write("data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii"))
+            url = "data:image/png;base64," + base64.b64encode(outcome.image).decode("ascii")
+            slot.write(url)
+            stats.image_payload_bytes += len(url)
             if outcome.summary is not None:
                 slot.annotate(image_annotation(number, outcome))
 
@@ -936,11 +982,13 @@ class Gateway:
         max_text_chars: int | None = None,
         received_at: float | None = None,
         path_session: str | None = None,
+        request_id: str | None = None,
     ) -> tuple[Response, RequestStats]:
         """Mask, forward, restore. ``received_at`` (``perf_counter``) starts the timer;
-        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL."""
+        ``path_session`` is the session id of a ``/s/<session>/v1/...`` URL. ``request_id``
+        is the id the route assigned up front (LAB-1179); generated here when absent."""
         timer = RequestTimer(received_at)
-        trace = CallTrace(self.observability, timer, body)
+        trace = CallTrace(self.observability, timer, body, request_id=request_id)
         try:
             response, stats = await self._with_session_lease(
                 self._chat_completions(
@@ -1003,7 +1051,10 @@ class Gateway:
         timer.add("parse", time.perf_counter() - timer.started)
         try:
             with timer.span("detect"):
-                spans = await self._detect_all(collected.slots, detector, session, language, stats)
+                kept: list[list[Span]] = []
+                spans = await self._detect_all(
+                    collected.slots, detector, session, language, stats, kept
+                )
                 names = tool_names(body)
                 spans = without_tool_names(
                     [slot.text for slot in collected.slots],
@@ -1042,7 +1093,7 @@ class Gateway:
         forwarding = time.perf_counter()
         payload = self._forwarded(body, session, stats, add_chat_note)
         try:
-            check_upstream_payload(payload)
+            check_upstream_payload(payload, stats.image_payload_bytes)
         except PayloadTooLargeError:
             stats.log("blocked")
             raise
@@ -1051,6 +1102,11 @@ class Gateway:
         # The client's messages as masked: the note is a flag, not a message, so a UI that
         # picks the first system message still finds its own.
         masked_messages = _masked_messages(body)[int(stats.note) :] if echo else None
+        kept_spans = (
+            _kept_spans(collected.slots, kept, len(body["messages"]) - int(stats.note))
+            if echo
+            else None
+        )
         client = self.upstream_client()
         request = client.build_request(
             "POST",
@@ -1134,6 +1190,7 @@ class Gateway:
             if echo:
                 answer["pii_guard"] = {
                     "masked_messages": masked_messages,
+                    "kept_spans": kept_spans,
                     "placeholder_note": stats.note,
                     "masked_answer": masked_answer,
                 }
@@ -1148,7 +1205,9 @@ class Gateway:
             return result, stats
 
         restorer = SseRestorer(
-            session, on_ids=lambda ids: self.issued_ids.add(session.session_id, ids)
+            session,
+            on_ids=lambda ids: self.issued_ids.add(session.session_id, ids),
+            keep_restored_tools=trace.full,
         )
         trace.streaming = True
 
@@ -1179,12 +1238,18 @@ class Gateway:
 
         def answer_event() -> bytes:
             content = restorer.masked_content()
+            # A choice past the retention cap has no copy; mark it rather than omit it, so
+            # a truncated echo is not mistaken for a short answer (LAB-1581).
+            truncated = restorer.masked_truncated()
+            choices = [
+                {"index": i, "content": None, "truncated": True}
+                if i in truncated
+                else {"index": i, "content": content[i]}
+                for i in sorted({*content, *truncated})
+            ]
             return sse_event(
                 json.dumps(
-                    {
-                        "object": "pii_guard.masked_answer",
-                        "choices": [{"index": i, "content": content[i]} for i in sorted(content)],
-                    },
+                    {"object": "pii_guard.masked_answer", "choices": choices},
                     ensure_ascii=False,
                 )
             )
@@ -1198,6 +1263,7 @@ class Gateway:
                         {
                             "object": "pii_guard.masked_request",
                             "messages": masked_messages,
+                            "kept_spans": kept_spans,
                             "placeholder_note": stats.note,
                         },
                         ensure_ascii=False,
@@ -1270,9 +1336,11 @@ class Gateway:
                     self._seed_cache(session, language, detector, restored, stats)
                     if trace.full:
                         trace.stream_restored = {i: t for i, (t, _) in restored.items()}
+                        trace.stream_restored_tools = restorer.restored_tool_calls()
                 stats.log(outcome)
                 if trace.payloads:
                     trace.stream_masked = restorer.masked_content()
+                    trace.stream_masked_tools = restorer.masked_tool_calls()
                     trace.stream_chunks = restorer.chunks
                 if outcome == "ok":
                     trace.finish()
@@ -1311,6 +1379,22 @@ def _masked_messages(body: Mapping[str, Any]) -> list[dict[str, str]]:
             out.append(
                 {"role": str(message.get("role", "")), "content": _flatten(message.get("content"))}
             )
+    return out
+
+
+def _kept_spans(
+    slots: list[TextSlot], kept: list[list[Span]], messages: int
+) -> list[list[dict[str, object]]]:
+    """Per client message, the spans kept by policy as type and code-point offsets into the
+    message's text, for :data:`ECHO_HEADER` (LAB-1180). Never the values. Only a message
+    whose content is one string has offsets to report; any other message gets ``[]``."""
+    out: list[list[dict[str, object]]] = [[] for _ in range(messages)]
+    for slot, found in zip(slots, kept, strict=True):
+        if slot.message is not None and slot.message < messages:
+            out[slot.message] = [
+                {"type": s.entity_type.value, "start": s.start, "end": s.end}
+                for s in sorted(found, key=lambda s: (s.start, s.end))
+            ]
     return out
 
 

@@ -120,8 +120,9 @@ def test_sse_restorer_flushes_tool_calls_on_finish_into_a_new_entry() -> None:
             out.append(json.loads(payload)["choices"][0]["delta"]["tool_calls"][0])
     final = restorer.process(json.dumps({"choices": [{"index": 0, "finish_reason": "stop"}]}))
     calls = json.loads(final[0])["choices"][0]["delta"]["tool_calls"]
-    assert calls == [{"index": 2, "function": {"arguments": "[["}}]
-    joined = "".join(c["function"]["arguments"] for c in out) + "[["
+    # The quote before a possible placeholder is held too: it may open a number (LAB-1361).
+    assert calls == [{"index": 2, "function": {"arguments": '"[['}}]
+    joined = "".join(c["function"]["arguments"] for c in out) + '"[['
     assert joined == '{"a": "Teszt Elek", "b": "[['
 
 
@@ -450,6 +451,21 @@ def test_chat_gutter_multiline_mask_never_restores_original_text() -> None:
     assert message["content"].endswith("\n   safe")
     assert "|" not in message["content"]
     assert "Jane" not in message["content"] and "Placeholder" not in message["content"]
+
+
+def test_cache_hit_preserves_forced_by_and_masked_type() -> None:
+    """LAB-1248: the span cache stores ``forced_by`` (the fail-closed override), and a hit
+    restores both it and the masked type. Types only: the cache still holds no values."""
+    cache = DetectionCache(2)
+    text = "Teszt Elek írt a Kft.-ről"
+    span = Span(0, 10, EntityType.PERSON, "Teszt Elek", 0.9, "llm", forced_by="llm")
+    key = cache.key("s1", "hu", "audit", text)
+    cache.put(key, [span])
+    assert "Teszt" not in repr(cache._data)
+    (hit,) = cache.get(key, text) or []
+    assert hit.entity_type is EntityType.PERSON
+    assert hit.forced_by == "llm"
+    assert hit == span
 
 
 @pytest.mark.parametrize(

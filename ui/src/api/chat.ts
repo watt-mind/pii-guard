@@ -2,13 +2,14 @@ import { createProjectFetch } from "./project";
 // Chat through the pii-guard gateway (`POST /v1/chat/completions`, OpenAI-compatible).
 //
 // The UI asks the gateway to echo what the model saw and said (`X-PII-Guard-Echo: masked`),
-// so the screen can show both sides of the boundary. The echo carries masked text only.
+// so the screen can show both sides of the boundary. The echo carries masked text, plus the
+// type and offsets (never the values) of what was detected but kept by policy (LAB-1180).
 // The demo engine has a simulated stand-in (`createMockChat`) with the same interface.
 
 import { chunkify } from "../lib/stream";
 import { StreamBuffer, placeholderRegex } from "../lib/placeholders";
 import { ApiError, UnreachableError } from "./http";
-import type { GuardClient } from "./types";
+import type { EntityType, GuardClient } from "./types";
 
 export type ChatRole = "system" | "user" | "assistant";
 /** `audit` was called `strict` until LAB-1186; the gateway still accepts that name (deprecated). */
@@ -17,6 +18,13 @@ export type ChatMode = "fast" | "audit";
 export interface ChatMessage {
   role: ChatRole;
   content: string;
+}
+
+/** A value detected but kept by policy: its type and UTF-16 offsets into the message as sent. */
+export interface KeptSpan {
+  entityType: EntityType;
+  start: number;
+  end: number;
 }
 
 export interface ChatTurnRequest {
@@ -28,8 +36,11 @@ export interface ChatTurnRequest {
   /** The conversation's vault session; null starts one. */
   sessionId: string | null;
   signal?: AbortSignal;
-  /** The masked messages, as forwarded to the model (first event of the stream). */
-  onMaskedRequest?: (messages: ChatMessage[]) => void;
+  /**
+   * The masked messages, as forwarded to the model (first event of the stream), and per
+   * request message (`messages`, same order) the values kept by policy.
+   */
+  onMaskedRequest?: (messages: ChatMessage[], kept: KeptSpan[][]) => void;
   /** The restored answer so far. */
   onAnswer?: (restoredSoFar: string) => void;
   /** The model is streaming reasoning tokens (not shown) before its answer. */
@@ -42,6 +53,8 @@ export interface ChatTurnResult {
   /** The model's own answer, placeholders and all. */
   maskedAnswer: string;
   maskedMessages: ChatMessage[];
+  /** Per request message, the values kept by policy; absent from the demo engine. */
+  keptSpans?: KeptSpan[][];
   /** Values masked in this request (`X-PII-Guard-Masked`). */
   masked: number | null;
   /** How the gateway picked the session (`X-PII-Guard-Session-Source`, LAB-1286); null from the demo engine. */
@@ -111,6 +124,33 @@ function asMessages(v: unknown): ChatMessage[] {
       ? [{ role: m.role as ChatRole, content: m.content }]
       : [],
   );
+}
+
+/** UTF-16 index of each code-point offset into `text` (the gateway counts code points). */
+function utf16Offsets(text: string): number[] {
+  const out = [0];
+  let i = 0;
+  for (const ch of text) {
+    i += ch.length;
+    out.push(i);
+  }
+  return out;
+}
+
+/** The echo's `kept_spans`, checked against the request messages and turned into UTF-16 offsets. */
+export function asKeptSpans(v: unknown, messages: readonly ChatMessage[]): KeptSpan[][] {
+  const rows = Array.isArray(v) ? v : [];
+  return messages.map((m, i) => {
+    const row: unknown = rows[i];
+    if (!Array.isArray(row)) return [];
+    const offsets = utf16Offsets(m.content);
+    return row.flatMap((s) => {
+      if (!isRecord(s) || typeof s.type !== "string" || !Number.isInteger(s.start) || !Number.isInteger(s.end)) return [];
+      const start = offsets[s.start as number];
+      const end = offsets[s.end as number];
+      return start !== undefined && end !== undefined && start < end ? [{ entityType: s.type as EntityType, start, end }] : [];
+    });
+  });
 }
 
 async function errorFrom(res: Response): Promise<Error> {
@@ -189,6 +229,7 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
       const sessionId = res.headers.get("x-pii-guard-session") ?? req.sessionId ?? "";
       const maskedHeader = res.headers.get("x-pii-guard-masked");
       let maskedMessages: ChatMessage[] = [];
+      let keptSpans: KeptSpan[][] = req.messages.map(() => []);
       let maskedAnswer = "";
       let answer = "";
       let thinking = false;
@@ -209,7 +250,8 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
         }
         if (event.object === "pii_guard.masked_request") {
           maskedMessages = asMessages(event.messages);
-          req.onMaskedRequest?.(maskedMessages);
+          keptSpans = asKeptSpans(event.kept_spans, req.messages);
+          req.onMaskedRequest?.(maskedMessages, keptSpans);
           return;
         }
         if (event.object === "pii_guard.masked_answer") {
@@ -262,6 +304,7 @@ export function createHttpChat(options: HttpChatOptions = {}): ChatClient {
         answer,
         maskedAnswer,
         maskedMessages,
+        keptSpans,
         masked: maskedHeader === null ? null : Number(maskedHeader),
         sessionSource: res.headers.get("x-pii-guard-session-source"),
         mode: req.mode,
@@ -316,7 +359,7 @@ export function createMockChat(mock: GuardClient, options: { delayMs?: number } 
         maskedMessages.push({ role: m.role, content: r.masked_text });
         if (m === req.messages[req.messages.length - 1]) masked = r.entities.reduce((n, e) => n + e.count, 0);
       }
-      req.onMaskedRequest?.(maskedMessages);
+      req.onMaskedRequest?.(maskedMessages, req.messages.map(() => []));
       const lastUser = [...maskedMessages].reverse().find((m) => m.role === "user")?.content ?? "";
       const maskedAnswer = simulatedAnswer(lastUser, req.language);
       const buffer = new StreamBuffer();

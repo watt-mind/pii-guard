@@ -16,6 +16,7 @@ from pii_guard.integrations import pi
 from pii_guard.integrations.cli import main
 from pii_guard.integrations.common import (
     CANARY_VALUES,
+    is_endpoint_url,
     session_of,
     session_url,
     write_json,
@@ -103,6 +104,30 @@ def test_session_url_helpers() -> None:
     fresh = session_url("http://h:1/v1", "http://other:1/s/abc/v1")
     assert re.fullmatch(r"http://h:1/s/c_[0-9a-f]{32}/v1", fresh)
     assert session_url("http://h:1/v1") != session_url("http://h:1/v1")  # random
+
+
+def test_endpoint_url_is_written_without_a_session_path(tmp_path: Path) -> None:
+    # LAB-1614: /s/<session>/e/<id>/v1 is no route; the hosted gateway 401s every call on it.
+    endpoint = "http://127.0.0.1:9/e/ep_synthetic/v1"
+    code, _ = run("pi", "--agent-dir", str(tmp_path), "--model", "m1", "--gateway", endpoint)
+    assert code == 0
+    data = json.loads((tmp_path / "models.json").read_text())
+    assert data["providers"]["pii-guard"]["baseUrl"] == endpoint
+    muse = tmp_path / "muse"
+    code, _ = run("muse-code", "--muse-dir", str(muse), "--gateway", endpoint + "/")
+    assert code == 0
+    settings = json.loads((muse / "settings.json").read_text())
+    assert settings["endpoint_transport"]["base_url"] == endpoint
+
+
+def test_is_endpoint_url() -> None:
+    assert is_endpoint_url("https://guard.example/e/ep_1/v1")
+    assert is_endpoint_url("https://guard.example/e/ep_1/v1/")
+    assert is_endpoint_url("https://guard.example/prefix/e/ep-1/v1")
+    assert not is_endpoint_url("https://guard.example/v1")
+    assert not is_endpoint_url("https://guard.example/s/c_1/v1")
+    assert not is_endpoint_url("https://guard.example/e/ep_1/v1/responses")
+    assert not is_endpoint_url("https://guard.example/e//v1")
 
 
 def test_existing_file_kept_and_backed_up(tmp_path: Path, unreachable: str) -> None:

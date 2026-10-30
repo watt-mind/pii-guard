@@ -5,6 +5,7 @@ import type { EntityType } from "../api/types";
 import type { TrafficEvent, TrafficTiming } from "../api/traffic";
 import { detectorLabel } from "./entities";
 import { alignLoose, isEntityType, type RestoredSegment } from "./placeholders";
+import { clockTime } from "./time";
 
 // --- Waterfall ----------------------------------------------------------------------------
 
@@ -271,7 +272,8 @@ export interface Choice {
 
 /**
  * The answer's choices: a `chat.completion` body (non-streamed), or a stream's collected
- * content per choice (`{"content": {"0": "..."}}`, as the traffic log keeps it).
+ * content and tool calls per choice (`{"content": {"0": "..."}, "tool_calls": {"0": [...]}}`,
+ * as the traffic log keeps it; each tool-call list is shaped like `message.tool_calls`).
  */
 export function responseChoices(body: unknown): Choice[] {
   if (!isRecord(body)) return [];
@@ -288,12 +290,18 @@ export function responseChoices(body: unknown): Choice[] {
       ];
     });
   }
-  if (isRecord(body.content)) {
-    return Object.entries(body.content)
-      .filter(([, v]) => typeof v === "string")
-      .map(([k, v]) => ({ index: Number(k), content: v as string, toolCalls: [] }));
-  }
-  return [];
+  const content = isRecord(body.content) ? body.content : {};
+  const tools = isRecord(body.tool_calls) ? body.tool_calls : {};
+  if (!isRecord(body.content) && !isRecord(body.tool_calls)) return [];
+  const keys = [...new Set([...Object.keys(content), ...Object.keys(tools)])];
+  return keys
+    .map((k) => ({
+      index: Number(k),
+      content: typeof content[k] === "string" ? content[k] : null,
+      toolCalls: toolCallsOf(tools[k]),
+    }))
+    .filter((c) => c.content !== null || c.toolCalls.length)
+    .sort((a, b) => a.index - b.index);
 }
 
 /** The original / restored text with each value marked against its placeholder; null when they don't line up. */
@@ -322,6 +330,7 @@ export const OUTCOME_LABEL: Record<string, string> = {
   blocked: "Blocked",
   refused: "Refused",
   upstream_error: "Upstream error",
+  upstream_failed: "Upstream failed",
   stream_error: "Stream error",
   error: "Error",
 };
@@ -345,10 +354,8 @@ export const SESSION_SOURCE_LABEL: Record<string, string> = {
 /** Detector names as the other screens show them; "visual" is the image pipeline. */
 export const detectorName = (d: string) => (d === "visual" ? "Image pipeline" : detectorLabel(d));
 
-export const clock = (iso: string) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-};
+/** "14:05:09": the console's one clock format (lib/time, LAB-1619). */
+export const clock = (iso: string) => clockTime(iso);
 
 /** "fast: Rules + Multilingual NER" from what the calls actually ran. */
 export function modeNote(events: TrafficEvent[]): string {
@@ -389,4 +396,14 @@ export function refusalReason(code: string | undefined, image: boolean): string 
     default:
       return "PII Guard fails closed: when it can't mask a request, the request stops instead of going out unmasked.";
   }
+}
+
+/**
+ * What the Logs detail says about a refusal: the server's own message when the event
+ * carries it (types and counts only, never values, LAB-1314), else the client-side
+ * explanation of the error code.
+ */
+export function refusalDetail(error: { code?: string; message?: string | null } | null | undefined, image: boolean): string {
+  if (error?.message) return error.message;
+  return refusalReason(error?.code, image);
 }

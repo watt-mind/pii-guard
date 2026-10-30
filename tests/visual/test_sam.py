@@ -177,6 +177,21 @@ def test_settings_and_env_configuration(monkeypatch: pytest.MonkeyPatch) -> None
     assert rec.requests[0].headers["Authorization"] == "Bearer sam-specific"
 
 
+def test_empty_sam_key_disables_sam_despite_meta_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An explicitly emptied PII_GUARD_SAM_API_KEY keeps SAM unconfigured (LAB-1255): the
+    smoke stack is offline by contract even when META_API_KEY (or the repo .env) has a key."""
+    from pii_guard.config import Settings
+
+    monkeypatch.setenv("META_API_KEY", "from-meta-env")
+    monkeypatch.setenv("PII_GUARD_SAM_API_KEY", "")
+    client = SamClient(settings=Settings())
+    assert not client.configured
+    with pytest.raises(DetectionError, match="no API key"):
+        client.segment(id_card_png(), [EntityType.FACE])
+
+
 def test_full_url_is_kept() -> None:
     assert SamClient(base_url="http://x/v1/responses").url == "http://x/v1/responses"
 
@@ -242,6 +257,39 @@ def test_retryable_errors_exhaust_and_fail_closed(answer: Any, message: str) -> 
     with pytest.raises(DetectionError, match=message):
         rec.client(max_retries=2).segment(id_card_png(), [EntityType.FACE])
     assert len(rec.requests) == 3
+
+
+# --- image deadline (LAB-1234) -------------------------------------------------------------
+
+
+def test_expired_deadline_sends_nothing_and_fails_closed() -> None:
+    """Past the image deadline no SAM prompt is even attempted: the request frees its
+    image-pool slot instead of holding it for prompts x timeout x (1 + retries)."""
+    import time
+
+    from pii_guard.visual import ocr as ocr_module
+
+    rec = Recorder()
+    client = rec.client(timeout=60.0, max_retries=1)
+    with ocr_module.deadline(time.monotonic() - 1), pytest.raises(DetectionError, match="deadline"):
+        client.segment(id_card_png(), [EntityType.FACE, EntityType.ID_PHOTO])
+    assert rec.requests == []
+
+
+def test_sam_request_timeout_is_capped_at_the_deadline() -> None:
+    """Each SAM request gets at most the time the image deadline still has."""
+    import time
+
+    from pii_guard.visual import ocr as ocr_module
+
+    rec = Recorder()
+    client = rec.client(timeout=60.0, max_retries=0)
+    with ocr_module.deadline(time.monotonic() + 7):
+        client.segment(id_card_png(), [EntityType.FACE])
+    assert len(rec.requests) == 1
+    timeout = rec.requests[0].extensions["timeout"]
+    capped = max(timeout.values()) if isinstance(timeout, dict) else float(timeout)
+    assert capped <= 7.5
 
 
 def _completed(text: Any) -> dict[str, Any]:

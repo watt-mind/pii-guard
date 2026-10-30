@@ -3,11 +3,13 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/http";
 import type { ServerStatus } from "../api/status";
 import { createVaultClient, type VaultClient, type VaultSessionDetail, type VaultSessionSummary } from "../api/vault";
 import { Vault } from "./Vault";
+import { HostedSessionContext, type HostedSession } from "../hosted/session";
+import { getSelectedEndpoint, setSelectedEndpoint, setSelectedProject } from "../projects/selection";
 
 const NOW = new Date().toISOString();
 const SESSIONS: VaultSessionSummary[] = [
@@ -55,6 +57,9 @@ function detailOf(ref: string, reveal: boolean, mode: "masked" | "full"): VaultS
         forms: 1,
         variant_of: null,
         hint: "T•••• E•••",
+        detector: "rules",
+        first_seen: 12.0,
+        last_seen: 18.5,
         ...(reveal ? { original: "Teszt Elek", known_forms: ["Teszt Eleké"] } : {}),
       },
       {
@@ -65,6 +70,9 @@ function detailOf(ref: string, reveal: boolean, mode: "masked" | "full"): VaultS
         forms: 0,
         variant_of: null,
         hint: "t••••.e•••@e••••••.c••",
+        detector: "known",
+        first_seen: 12.0,
+        last_seen: 12.0,
         ...(reveal ? { original: "teszt.elek@example.com", known_forms: [] } : {}),
       },
     ],
@@ -191,10 +199,49 @@ describe("Vault", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /s_3333cccc4444dddd/ })).toBeNull());
   });
 
+  it("opens on the most recently used session, without moving focus, like Logs (LAB-1626)", async () => {
+    const client = fakeClient("masked");
+    const older = new Date(Date.now() - 60_000).toISOString();
+    client.list.mockImplementation(() => Promise.resolve({ mode: "masked", ttl_seconds: 3600, sessions: [{ ...SESSIONS[0]!, last_used: older }, { ...SESSIONS[1]!, ttl_left_seconds: 3600 }] }));
+    client.detail.mockImplementation((ref: string) => Promise.resolve({ ...detailOf(ref, false, "masked"), ttl_left_seconds: 3600 }));
+    render(<Vault status={statusOf("masked")} live active client={client} />);
+    expect(await screen.findByRole("heading", { name: /Session s_3333cccc4444dddd/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Session s_3333cccc4444dddd/ })).not.toHaveFocus();
+    // Whole hours read "1 h", not "1 h 0 min".
+    expect(screen.getByText("1 h unless used")).toBeInTheDocument();
+  });
+
   it("opens the session a Logs row links to", async () => {
     const client = fakeClient("masked");
     render(<Vault status={statusOf("masked")} live active client={client} focus={{ ref: "s_3333cccc4444dddd", nonce: 1 }} />);
     expect(await screen.findByRole("heading", { name: /Session s_3333cccc4444dddd/ })).toBeInTheDocument();
+  });
+
+  it("follows the open session in the URL hash, and a stale ref says the session is gone (LAB-1333)", async () => {
+    const client = fakeClient("masked");
+    const user = userEvent.setup();
+    const onSelectRef = vi.fn();
+    render(<Vault status={statusOf("masked")} live active client={client} onSelectRef={onSelectRef} />);
+    await user.click(await screen.findByRole("button", { name: /s_1111aaaa2222bbbb/ }));
+    expect(await screen.findByRole("heading", { name: /Session s_1111aaaa2222bbbb/ })).toBeInTheDocument();
+    expect(onSelectRef).toHaveBeenLastCalledWith("s_1111aaaa2222bbbb");
+
+    render(<Vault status={statusOf("masked")} live active client={client} focus={{ ref: "s_deadbeef", nonce: 7 }} />);
+    expect(await screen.findByText("This session is gone: it expired or was dropped.")).toBeInTheDocument();
+  });
+
+  it("clears the detail when a filter hides the open session (LAB-1333)", async () => {
+    const client = fakeClient("masked");
+    const user = userEvent.setup();
+    const onSelectRef = vi.fn();
+    render(<Vault status={statusOf("masked")} live active client={client} onSelectRef={onSelectRef} />);
+    await user.click(await screen.findByRole("button", { name: /s_1111aaaa2222bbbb/ }));
+    expect(await screen.findByRole("heading", { name: /Session s_1111aaaa2222bbbb/ })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search by session ref"), "3333");
+    await waitFor(() => expect(screen.queryByRole("heading", { name: /Session s_1111/ })).toBeNull());
+    expect(screen.getByText("Pick a session to see its placeholders.")).toBeInTheDocument();
+    expect(onSelectRef).toHaveBeenLastCalledWith(null);
   });
 
   it("says why it can't inspect: inspector off, demo mode", async () => {
@@ -204,6 +251,35 @@ describe("Vault", () => {
     rerender(<Vault status={{ state: "offline" }} live={false} active client={client} />);
     expect(screen.getByRole("status")).toHaveTextContent(/needs the live API/);
     expect(client.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("hosted Vault (LAB-1619)", () => {
+  const session = { account: {}, error: "", refresh: async () => {}, call: vi.fn() } as unknown as HostedSession;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setSelectedEndpoint(null);
+  });
+
+  it("says where an endpoint's sessions are, offers the one endpoint, and never mentions demo traffic", async () => {
+    setSelectedProject("project-one");
+    const doFetch = vi.fn(async () =>
+      new Response(JSON.stringify({ endpoints: [{ id: "ep-one", name: "Default endpoint", enabled: true }] }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", doFetch);
+    const client = { list: vi.fn(() => Promise.resolve({ mode: "masked", ttl_seconds: 3600, sessions: [] })), detail: vi.fn(), drop: vi.fn() } as unknown as VaultClient;
+    render(
+      <HostedSessionContext.Provider value={session}>
+        <Vault status={statusOf("masked")} live active client={client} />
+      </HostedSessionContext.Provider>,
+    );
+    expect(await screen.findByText(/No sessions in this view\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Send demo traffic/)).toBeNull();
+    expect(screen.getByText(/originals are never shown on the hosted service/)).toBeInTheDocument();
+    expect(screen.queryByText(/localhost/)).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: "Show the sessions of Default endpoint" }));
+    expect(getSelectedEndpoint()).toBe("ep-one");
   });
 });
 

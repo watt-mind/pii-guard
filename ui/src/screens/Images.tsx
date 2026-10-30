@@ -28,6 +28,9 @@ import {
 } from "../lib/imageRegions";
 import { toRunError, type RunError } from "../lib/run";
 
+/** Hosted builds run detection on the PII Guard server, not on the owner's device (LAB-1626). */
+const HOSTED_BUILD = import.meta.env.VITE_PII_GUARD_HOSTED === "true";
+
 type Selection =
   | { kind: "sample"; key: string; sample: ImageSample }
   | { kind: "upload"; key: string; name: string; blob: Blob; url: string };
@@ -189,7 +192,7 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-pretty text-muted">
           {hosted && !demo
-            ? "On-device detectors find faces, ID photos and signatures; OCR plus the text detectors find identifiers printed in the image."
+            ? "Detectors on the PII Guard server find faces, ID photos and signatures; OCR plus the text detectors find identifiers printed in the image."
             : serverImages && !demo
             ? serverImages.sam
               ? "SAM 3.1 segments signatures and stamps (the original image is sent to Meta's API for that), an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
@@ -538,7 +541,7 @@ function ImageLegend({ regions, activeType }: { regions: ImageRegion[]; activeTy
           <span className="tabular-nums">{row.count}</span>
           {row.sources.map((s) => (
             <span key={s} className="rounded-sm bg-surface-2 px-1 font-mono text-2xs text-muted">
-              {s === "sam" ? "SAM" : s === "local" ? "On-device" : "OCR"}
+              {s === "sam" ? "SAM" : s === "local" ? (HOSTED_BUILD ? "Server" : "On-device") : "OCR"}
             </span>
           ))}
           {row.kept && <span className="font-mono text-2xs text-kept-ink">kept</span>}
