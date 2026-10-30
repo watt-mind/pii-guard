@@ -8,9 +8,9 @@
  *   (watt-mind/pii-guard-ner-xlmr-base) run of 2026-10-28, commit 72026a5; the comparison tools
  *   are the runs of 2026-10-27 (8944f96, cd119ae).
  * - Open models: `smoke`, "rules + <model> in place of pii-guard NER", runs of 2026-10-30
- *   (3449736, LAB-1302): the same rules, only the NER differs.
+ *   (18edc24, LAB-1302): the same rules, only the NER differs.
  * - `smoke` rows (ours and the comparison tools) are the LAB-1302 re-runs of 2026-10-30
- *   (3449736), after the hu/de phones moved to the ADR 0005 fictional ranges.
+ *   (18edc24), after the hu/de phones moved to the ADR 0005 fictional ranges.
  * - Images: "Image masking", `specimens` (65 official specimen ID documents from 24 countries),
  *   runs `2026-10-27-image-baselines-specimens-*`.
  * - Latency: "Gateway latency", `2026-10-28-ner-concurrency-cpu-fast`, concurrency 1, no stream.

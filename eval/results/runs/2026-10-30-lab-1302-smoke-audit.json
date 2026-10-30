@@ -3,7 +3,7 @@
   "run_id": "2026-10-30-lab-1302-smoke-audit",
   "kind": "text",
   "date": "2026-10-30",
-  "recorded_at": "2026-10-30T01:47:26+00:00",
+  "recorded_at": "2026-10-30T01:58:17+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules + ner + llm on smoke",
@@ -12,7 +12,7 @@
     "Latency includes a remote API call per document, so it is not comparable with local detectors."
   ],
   "code": {
-    "commit": "3449736aabda5c5117f6fe3de09a7b426ef82360",
+    "commit": "18edc24fc21a08c3d8bf18bda43013d401923e61",
     "dirty": false,
     "dirty_paths": [],
     "pii_guard_version": "0.1.0",
@@ -98,16 +98,16 @@
     "python": "3.12.15"
   },
   "cost": {
-    "usd": 0.1389,
+    "usd": 0.1274,
     "estimated": true,
     "gpu_minutes": null,
     "model_calls": 51,
     "tokens": {
-      "prompt": 58970,
-      "cached": 31872,
-      "completion": 23580,
-      "reasoning": 19025,
-      "total": 82550
+      "prompt": 58910,
+      "cached": 44032,
+      "completion": 24040,
+      "reasoning": 19482,
+      "total": 82950
     },
     "shared_with": [],
     "note": "LLM detector usage priced at $1.25/$0.15/$4.25 per 1M input/cached/output tokens"
@@ -164,12 +164,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 1692.488,
-          "p95": 3113.261
+          "p50": 1567.825,
+          "p95": 3663.371
         },
         "mask": {
-          "p50": 1.43,
-          "p95": 9.217
+          "p50": 1.26,
+          "p95": 6.643
         }
       },
       "per_type": {
@@ -434,12 +434,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 1274.363,
-            "p95": 2393.864
+            "p50": 1320.634,
+            "p95": 3074.513
           },
           "mask": {
-            "p50": 0.742,
-            "p95": 2.117
+            "p50": 0.613,
+            "p95": 1.098
           }
         },
         "per_type": {
@@ -625,12 +625,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 1569.254,
-            "p95": 3996.764
+            "p50": 1448.918,
+            "p95": 3558.46
           },
           "mask": {
-            "p50": 0.639,
-            "p95": 1.691
+            "p50": 0.557,
+            "p95": 0.758
           }
         },
         "per_type": {
@@ -850,12 +850,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 1764.927,
-            "p95": 2781.78
+            "p50": 1700.71,
+            "p95": 3606.415
           },
           "mask": {
-            "p50": 2.755,
-            "p95": 11.15
+            "p50": 2.165,
+            "p95": 7.258
           }
         },
         "per_type": {

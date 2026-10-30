@@ -89,7 +89,7 @@ with 95 % intervals there.
 | LLM Guard | 45.1 % | 20.2 % | 28.8 % | 75.8 % | 59.3 % | 43.8 % ‡ |
 | PII Guard rules only (no name detection) | 41.0 % | 45.3 % | 56.0 % | 40.9 % | 80.7 % | 63.1 % |
 
-Detection p50 on the `smoke` set: fast 14 ms, PrivAiTe 55 ms, Presidio 66 ms, LLM Guard 61 ms (`*` averaged over several runs), each on the machine in its run record: compare loosely.
+Detection p50 on the `smoke` set: fast 17 ms, PrivAiTe 56 ms, Presidio 67 ms, LLM Guard 60 ms (`*` averaged over several runs), each on the machine in its run record: compare loosely.
 
 Records behind the fast row: [Hand-written](eval/results/runs/2026-10-30-lab-1302-smoke-fast.json), [Agent traffic](eval/datasets/results/2026-10-28-datasets-agent-traffic-fast.json), [Nemotron-PII](eval/datasets/results/2026-10-28-datasets-nemotron-pii-fast.json), [CEE-PII](eval/datasets/results/2026-10-28-datasets-cee-pii-fast.json), [Gretel finance](eval/datasets/results/2026-10-28-datasets-gretel-finance-fast.json), [Ai4Privacy](eval/datasets/results/2026-10-28-datasets-ai4privacy-fast.json); every other cell is in the [run log](docs/benchmarks.md#run-log) and [eval/datasets/results/](eval/datasets/results/).
 <!-- results:end -->

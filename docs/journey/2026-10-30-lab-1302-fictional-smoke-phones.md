@@ -6,7 +6,7 @@ that weren't from ranges set aside for fiction. They now follow
 drama numbers, and the Hungarian ones use a real area code with an ascending-run or
 `555 01xx` subscriber number ([`build_smoke.py`](../../eval/fixtures/build_smoke.py), 3 hu and
 5 de values). That changes the fixtures' sha256, so every older hu/de smoke result is stale.
-The rows behind the report and the landing are re-recorded from a clean commit, `3449736`, all
+The rows behind the report and the landing are re-recorded from a clean commit, `18edc24`, all
 in one pull request:
 
 - rules only, fast mode (published NER v2.0) and Presidio, LLM Guard and PrivAiTe;
@@ -40,6 +40,7 @@ Left stale with `†` (en-only snapshot): historical NER candidates and ablation
 large variants, v2.1 epochs, v3 to v4 candidates, GLiNER, the distilled checkpoints) and the
 earlier LLM rows (Muse Glimmer, Muse Spark 1.3, rules + Muse Spark Open). They were
 model-selection steps and none of them ships. Records
-`eval/results/runs/2026-10-30-lab-1302-*.json` (18). Cost: $0.14 Baseten (51 requests, 59k
-prompt tokens of which 32k cached, 24k completion, at $1.25 / $0.15 / $4.25 per million);
-everything else on local CPU.
+`eval/results/runs/2026-10-30-lab-1302-*.json` (18). Cost: $0.27 Baseten, two audit runs of
+51 requests each (the first at `3449736`, redone after LAB-1199's cue rules merged; same
+counts), about 59k prompt tokens (32k cached) and 24k completion per run, at $1.25 / $0.15 /
+$4.25 per million; everything else on local CPU.

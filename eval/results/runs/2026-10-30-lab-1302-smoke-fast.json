@@ -3,7 +3,7 @@
   "run_id": "2026-10-30-lab-1302-smoke-fast",
   "kind": "text",
   "date": "2026-10-30",
-  "recorded_at": "2026-10-30T01:43:13+00:00",
+  "recorded_at": "2026-10-30T01:54:47+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard rules + ner on smoke",
@@ -11,7 +11,7 @@
     "LAB-1302: re-recorded after the hu/de smoke phones moved to the ADR 0005 fictional ranges (fixture sha change)."
   ],
   "code": {
-    "commit": "3449736aabda5c5117f6fe3de09a7b426ef82360",
+    "commit": "18edc24fc21a08c3d8bf18bda43013d401923e61",
     "dirty": false,
     "dirty_paths": [],
     "pii_guard_version": "0.1.0",
@@ -139,12 +139,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 13.565,
-          "p95": 18.769
+          "p50": 16.628,
+          "p95": 24.838
         },
         "mask": {
-          "p50": 0.941,
-          "p95": 4.412
+          "p50": 1.115,
+          "p95": 4.845
         }
       },
       "per_type": {
@@ -409,12 +409,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 13.841,
-            "p95": 16.385
+            "p50": 16.404,
+            "p95": 79.521
           },
           "mask": {
-            "p50": 0.611,
-            "p95": 0.915
+            "p50": 0.677,
+            "p95": 1.019
           }
         },
         "per_type": {
@@ -600,12 +600,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 12.228,
-            "p95": 13.891
+            "p50": 15.997,
+            "p95": 17.372
           },
           "mask": {
-            "p50": 0.472,
-            "p95": 0.6
+            "p50": 0.555,
+            "p95": 0.826
           }
         },
         "per_type": {
@@ -825,12 +825,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 14.169,
-            "p95": 19.753
+            "p50": 18.317,
+            "p95": 24.838
           },
           "mask": {
-            "p50": 1.867,
-            "p95": 4.532
+            "p50": 2.072,
+            "p95": 5.179
           }
         },
         "per_type": {

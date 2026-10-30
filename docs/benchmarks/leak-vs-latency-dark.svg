@@ -20,36 +20,38 @@
 <text x="134" y="207" font-size="20" fill="#B8B8C0" text-anchor="end">60%</text>
 <line x1="150" y1="200" x2="150" y2="670" stroke="#33333A" stroke-width="2"/>
 <text x="150" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">0.10 ms</text>
-<line x1="610" y1="200" x2="610" y2="670" stroke="#33333A" stroke-width="2"/>
-<text x="610" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">1.0 ms</text>
-<line x1="1070" y1="200" x2="1070" y2="670" stroke="#33333A" stroke-width="2"/>
-<text x="1070" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">10 ms</text>
+<line x1="495" y1="200" x2="495" y2="670" stroke="#33333A" stroke-width="2"/>
+<text x="495" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">1.0 ms</text>
+<line x1="840" y1="200" x2="840" y2="670" stroke="#33333A" stroke-width="2"/>
+<text x="840" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">10 ms</text>
+<line x1="1185" y1="200" x2="1185" y2="670" stroke="#33333A" stroke-width="2"/>
+<text x="1185" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">100 ms</text>
 <line x1="1530" y1="200" x2="1530" y2="670" stroke="#33333A" stroke-width="2"/>
-<text x="1530" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">100 ms</text>
+<text x="1530" y="704" font-size="20" fill="#B8B8C0" text-anchor="middle">1.0 s</text>
 <line x1="150" y1="670" x2="1530" y2="670" stroke="#8A8A93" stroke-width="2"/>
 <text x="840" y="742" font-size="22" fill="#F2F2F5" text-anchor="middle">Detection latency per document, p50 (line to p95)</text>
 <text x="48" y="435" font-size="22" fill="#F2F2F5" text-anchor="middle" transform="rotate(-90 48 435)">Full leak rate</text>
 <text x="166" y="654" font-size="20" fill="#B8B8C0">better ↙</text>
-<line x1="450" y1="341.4" x2="759.3" y2="341.4" stroke="#0072B2" stroke-width="3" opacity="0.7"/>
-<line x1="759.3" y1="332.4" x2="759.3" y2="350.4" stroke="#0072B2" stroke-width="3" opacity="0.7"/>
-<line x1="1130.9" y1="647.6" x2="1195.8" y2="647.6" stroke="#009E73" stroke-width="3" opacity="0.7"/>
-<line x1="1195.8" y1="638.6" x2="1195.8" y2="656.6" stroke="#009E73" stroke-width="3" opacity="0.7"/>
-<line x1="1447.5" y1="449.2" x2="1525.7" y2="449.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
-<line x1="1525.7" y1="440.2" x2="1525.7" y2="458.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
-<line x1="1430.4" y1="311.2" x2="1473.3" y2="311.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
-<line x1="1473.3" y1="302.2" x2="1473.3" y2="320.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
-<line x1="1409.5" y1="552.7" x2="1498.8" y2="552.7" stroke="#595959" stroke-width="3" opacity="0.7"/>
-<line x1="1498.8" y1="543.7" x2="1498.8" y2="561.7" stroke="#595959" stroke-width="3" opacity="0.7"/>
-<circle cx="450" cy="341.4" r="12" fill="#0072B2" stroke="#111318" stroke-width="3"/>
-<text x="454" y="319.4" font-size="22" fill="#F2F2F5" font-weight="600">rules 41.0%</text>
-<circle cx="1130.9" cy="647.6" r="12" fill="#009E73" stroke="#111318" stroke-width="3"/>
-<text x="1126.9" y="625.6" font-size="22" fill="#F2F2F5" text-anchor="end" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) 0.0%</text>
-<rect x="1437.3" y="439" width="20.4" height="20.4" fill="#111318" stroke="#595959" stroke-width="4"/>
-<text x="1443.5" y="427.2" font-size="22" fill="#F2F2F5" text-anchor="end" font-weight="600">Presidio 26.6%</text>
-<polygon points="1430.4,297.4 1443.6,320.8 1417.2,320.8" fill="#111318" stroke="#595959" stroke-width="4"/>
-<text x="1426.4" y="289.2" font-size="22" fill="#F2F2F5" text-anchor="end" font-weight="600">LLM Guard 45.1%</text>
-<polygon points="1409.5,537.7 1424.5,552.7 1409.5,567.7 1394.5,552.7" fill="#111318" stroke="#595959" stroke-width="4"/>
-<text x="1405.5" y="530.7" font-size="22" fill="#F2F2F5" text-anchor="end" font-weight="600">PrivAiTe 12.7%</text>
+<line x1="371.3" y1="341.4" x2="628.8" y2="341.4" stroke="#0072B2" stroke-width="3" opacity="0.7"/>
+<line x1="628.8" y1="332.4" x2="628.8" y2="350.4" stroke="#0072B2" stroke-width="3" opacity="0.7"/>
+<line x1="916.2" y1="647.6" x2="976.3" y2="647.6" stroke="#009E73" stroke-width="3" opacity="0.7"/>
+<line x1="976.3" y1="638.6" x2="976.3" y2="656.6" stroke="#009E73" stroke-width="3" opacity="0.7"/>
+<line x1="1125.6" y1="449.2" x2="1189.7" y2="449.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
+<line x1="1189.7" y1="440.2" x2="1189.7" y2="458.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
+<line x1="1108.6" y1="311.2" x2="1149.5" y2="311.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
+<line x1="1149.5" y1="302.2" x2="1149.5" y2="320.2" stroke="#595959" stroke-width="3" opacity="0.7"/>
+<line x1="1098.6" y1="552.7" x2="1162.3" y2="552.7" stroke="#595959" stroke-width="3" opacity="0.7"/>
+<line x1="1162.3" y1="543.7" x2="1162.3" y2="561.7" stroke="#595959" stroke-width="3" opacity="0.7"/>
+<circle cx="371.3" cy="341.4" r="12" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<text x="375.3" y="319.4" font-size="22" fill="#F2F2F5" font-weight="600">rules 41.0%</text>
+<circle cx="916.2" cy="647.6" r="12" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<text x="920.2" y="625.6" font-size="22" fill="#F2F2F5" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306) 0.0%</text>
+<rect x="1115.4" y="439" width="20.4" height="20.4" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="1129.6" y="427.2" font-size="22" fill="#F2F2F5" font-weight="600">Presidio 26.6%</text>
+<polygon points="1108.6,297.4 1121.8,320.8 1095.4,320.8" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="1112.6" y="289.2" font-size="22" fill="#F2F2F5" font-weight="600">LLM Guard 45.1%</text>
+<polygon points="1098.6,537.7 1113.6,552.7 1098.6,567.7 1083.6,552.7" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="1102.6" y="530.7" font-size="22" fill="#F2F2F5" font-weight="600">PrivAiTe 12.7%</text>
 <circle cx="66" cy="151" r="10" fill="#0072B2" stroke="#111318" stroke-width="3"/>
 <text x="86" y="158" font-size="20" fill="#B8B8C0">pii-guard (filled, one color per configuration)</text>
 <rect x="527.5" y="142.5" width="17" height="17" fill="#111318" stroke="#595959" stroke-width="4"/>
@@ -57,5 +59,5 @@
 <text x="56" y="780" font-size="20" fill="#B8B8C0">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs), de + en + hu pooled (micro-averaged). Small sets: a few points of difference is noise.</text>
 <text x="56" y="810" font-size="20" fill="#B8B8C0">Not shown, not run on every current fixture file (de + en + hu): rules + Muse Spark Open (Baseten), rules + Muse Glimmer (low).</text>
 <text x="56" y="840" font-size="20" fill="#B8B8C0">Latency measured where each system ran (remote API, H100, laptop CPU): see docs/benchmarks.md; not a like-for-like speed test.</text>
-<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-30 · commits 3449736 · generated by `pii-guard eval report` from eval/results/runs/</text>
+<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-30 · commits 18edc24 · generated by `pii-guard eval report` from eval/results/runs/</text>
 </svg>

@@ -3,17 +3,17 @@
   "run_id": "2026-10-30-lab-1302-smoke-wismut-nym",
   "kind": "text",
   "date": "2026-10-30",
-  "recorded_at": "2026-10-30T01:45:20+00:00",
+  "recorded_at": "2026-10-30T01:56:23+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "pii-guard ner (wismut-nym, decoder word) on smoke",
   "notes": [
     "LAB-1391: public PII encoders benchmarked against pii-guard NER v2.0 on one commit, CPU (PII_GUARD_NER_DEVICE=cpu), every model through pii-guard's NER post-processing; labels without a pii-guard type are dropped before scoring (docs/evaluation.md, 'NER comparison: public encoders').",
-    "Wall time 3.2 s, load average at end 7.8.",
+    "Wall time 6.0 s, load average at end 10.8.",
     "comparison-model labels dropped (no pii-guard type): ADDRESS_PART_ALONE 3, AGE 1, DATE 15, LICENSE_PLATE 6, ROUTING_NUMBER 1, TIME 2"
   ],
   "code": {
-    "commit": "3449736aabda5c5117f6fe3de09a7b426ef82360",
+    "commit": "18edc24fc21a08c3d8bf18bda43013d401923e61",
     "dirty": false,
     "dirty_paths": [],
     "pii_guard_version": "0.1.0",
@@ -135,12 +135,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 59.234,
-          "p95": 78.271
+          "p50": 111.879,
+          "p95": 179.104
         },
         "mask": {
-          "p50": 0.41,
-          "p95": 1.675
+          "p50": 0.433,
+          "p95": 1.943
         }
       },
       "per_type": {
@@ -396,12 +396,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 57.295,
-            "p95": 67.952
+            "p50": 110.274,
+            "p95": 194.218
           },
           "mask": {
-            "p50": 0.318,
-            "p95": 0.433
+            "p50": 0.374,
+            "p95": 0.445
           }
         },
         "per_type": {
@@ -587,12 +587,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 57.573,
-            "p95": 60.629
+            "p50": 84.792,
+            "p95": 125.126
           },
           "mask": {
-            "p50": 0.22,
-            "p95": 0.319
+            "p50": 0.253,
+            "p95": 0.493
           }
         },
         "per_type": {
@@ -806,12 +806,12 @@
         },
         "latency_ms": {
           "detect": {
-            "p50": 64.959,
-            "p95": 87.879
+            "p50": 119.062,
+            "p95": 179.104
           },
           "mask": {
-            "p50": 0.59,
-            "p95": 2.145
+            "p50": 0.659,
+            "p95": 2.441
           }
         },
         "per_type": {

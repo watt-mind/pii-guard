@@ -3,7 +3,7 @@
   "run_id": "2026-10-30-lab-1302-smoke-llm-guard",
   "kind": "text",
   "date": "2026-10-30",
-  "recorded_at": "2026-10-30T01:41:14+00:00",
+  "recorded_at": "2026-10-30T01:53:16+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "LLM Guard (comparison) on smoke",
@@ -11,7 +11,7 @@
     "unmapped tool labels: CRYPTO"
   ],
   "code": {
-    "commit": "3449736aabda5c5117f6fe3de09a7b426ef82360",
+    "commit": "18edc24fc21a08c3d8bf18bda43013d401923e61",
     "dirty": false,
     "dirty_paths": [],
     "pii_guard_version": "0.1.0",
@@ -169,12 +169,12 @@
       "consistency": null,
       "latency_ms": {
         "detect": {
-          "p50": 60.733,
-          "p95": 75.274
+          "p50": 60.069,
+          "p95": 78.909
         },
         "mask": {
           "p50": 0.024,
-          "p95": 0.051
+          "p95": 0.046
         }
       },
       "per_type": {
@@ -411,12 +411,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 58.219,
-            "p95": 62.523
+            "p50": 58.096,
+            "p95": 69.356
           },
           "mask": {
-            "p50": 0.023,
-            "p95": 0.028
+            "p50": 0.02,
+            "p95": 0.027
           }
         },
         "per_type": {
@@ -586,12 +586,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 57.927,
-            "p95": 64.102
+            "p50": 54.301,
+            "p95": 89.921
           },
           "mask": {
-            "p50": 0.018,
-            "p95": 0.026
+            "p50": 0.019,
+            "p95": 0.024
           }
         },
         "per_type": {
@@ -789,12 +789,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 63.745,
-            "p95": 81.55
+            "p50": 61.314,
+            "p95": 78.909
           },
           "mask": {
-            "p50": 0.035,
-            "p95": 0.054
+            "p50": 0.031,
+            "p95": 0.048
           }
         },
         "per_type": {

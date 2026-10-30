@@ -3,7 +3,7 @@
   "run_id": "2026-10-30-lab-1302-smoke-presidio",
   "kind": "text",
   "date": "2026-10-30",
-  "recorded_at": "2026-10-30T01:41:14+00:00",
+  "recorded_at": "2026-10-30T01:53:16+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "Presidio (comparison) on smoke",
@@ -11,7 +11,7 @@
     "unmapped tool labels: NRP, URL"
   ],
   "code": {
-    "commit": "3449736aabda5c5117f6fe3de09a7b426ef82360",
+    "commit": "18edc24fc21a08c3d8bf18bda43013d401923e61",
     "dirty": false,
     "dirty_paths": [],
     "pii_guard_version": "0.1.0",
@@ -193,12 +193,12 @@
       "consistency": null,
       "latency_ms": {
         "detect": {
-          "p50": 66.176,
-          "p95": 97.862
+          "p50": 67.288,
+          "p95": 103.169
         },
         "mask": {
           "p50": 0.071,
-          "p95": 0.097
+          "p95": 0.126
         }
       },
       "per_type": {
@@ -443,12 +443,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 6.989,
-            "p95": 9.269
+            "p50": 6.769,
+            "p95": 9.058
           },
           "mask": {
-            "p50": 0.073,
-            "p95": 0.087
+            "p50": 0.068,
+            "p95": 0.118
           }
         },
         "per_type": {
@@ -623,12 +623,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 7.686,
-            "p95": 9.419
+            "p50": 7.49,
+            "p95": 10.517
           },
           "mask": {
-            "p50": 0.07,
-            "p95": 0.094
+            "p50": 0.073,
+            "p95": 0.117
           }
         },
         "per_type": {
@@ -834,12 +834,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 75.221,
-            "p95": 114.493
+            "p50": 76.991,
+            "p95": 117.224
           },
           "mask": {
-            "p50": 0.071,
-            "p95": 0.11
+            "p50": 0.072,
+            "p95": 0.108
           }
         },
         "per_type": {

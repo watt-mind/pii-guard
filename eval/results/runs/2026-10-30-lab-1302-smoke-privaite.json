@@ -3,7 +3,7 @@
   "run_id": "2026-10-30-lab-1302-smoke-privaite",
   "kind": "text",
   "date": "2026-10-30",
-  "recorded_at": "2026-10-30T01:41:14+00:00",
+  "recorded_at": "2026-10-30T01:53:16+00:00",
   "source": "recorded",
   "imported_from": null,
   "title": "PrivAiTe (comparison) on smoke",
@@ -11,7 +11,7 @@
     "unmapped tool labels: SECRET, URL"
   ],
   "code": {
-    "commit": "3449736aabda5c5117f6fe3de09a7b426ef82360",
+    "commit": "18edc24fc21a08c3d8bf18bda43013d401923e61",
     "dirty": false,
     "dirty_paths": [],
     "pii_guard_version": "0.1.0",
@@ -168,12 +168,12 @@
       "consistency": null,
       "latency_ms": {
         "detect": {
-          "p50": 54.718,
-          "p95": 85.541
+          "p50": 56.191,
+          "p95": 85.93
         },
         "mask": {
-          "p50": 0.019,
-          "p95": 0.032
+          "p50": 0.02,
+          "p95": 0.034
         }
       },
       "per_type": {
@@ -419,12 +419,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 49.849,
-            "p95": 66.574
+            "p50": 53.867,
+            "p95": 70.12
           },
           "mask": {
-            "p50": 0.02,
-            "p95": 0.023
+            "p50": 0.019,
+            "p95": 0.024
           }
         },
         "per_type": {
@@ -600,12 +600,12 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 48.874,
-            "p95": 53.927
+            "p50": 51.549,
+            "p95": 69.388
           },
           "mask": {
-            "p50": 0.017,
-            "p95": 0.021
+            "p50": 0.019,
+            "p95": 0.024
           }
         },
         "per_type": {
@@ -812,11 +812,11 @@
         "consistency": null,
         "latency_ms": {
           "detect": {
-            "p50": 60.352,
-            "p95": 96.559
+            "p50": 62.261,
+            "p95": 102.122
           },
           "mask": {
-            "p50": 0.02,
+            "p50": 0.021,
             "p95": 0.035
           }
         },
