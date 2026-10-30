@@ -181,7 +181,7 @@ dependencies; the test and type-check jobs keep their development dependencies.
 | `gitleaks` | a secret in the commits the change adds ([`.gitleaks.toml`](.gitleaks.toml)) | `make gitleaks` |
 | `links` | a broken relative link in `README.md` or `docs/` ([`lychee.toml`](lychee.toml)) | `make links` |
 | `ci-ok` | any job it needs failing or being cancelled (skipped-on-purpose jobs pass) | — (aggregator only) |
-| `pii-in-diff` | **report-only for now.** pii-guard's own rules find a real-looking value on a line the PR adds: an e-mail outside the reserved example domains, or a validated identifier (tax, TAJ, IBAN, card, ID document, company number) not in `scripts/ci/pii-allowlist.txt` | `make pii-diff` |
+| `pii-in-diff` | pii-guard's own rules find a real-looking value on a line the PR adds: an e-mail outside the reserved example domains, or a validated identifier (tax, TAJ, IBAN, card, ID document, company number) not in `scripts/ci/pii-allowlist.txt` | `make pii-diff` |
 
 Separately, [`codeql.yml`](.github/workflows/codeql.yml) runs CodeQL on Python,
 JavaScript/TypeScript and the workflows (results under Security, code scanning),

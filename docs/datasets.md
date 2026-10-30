@@ -49,6 +49,7 @@ set here and every `dev` set, which NER candidates are selected on, by text wher
 | `tab-echr` | [TAB](https://github.com/NorskRegnesentral/text-anonymization-benchmark), `echr_test.json` @ `558e09e` | MIT (annotations) | en | 40 | test | **no**: real court documents |
 | `agent-traffic` | PII Guard's seeded generator ([below](#synthetic-agent-traffic)) | Apache-2.0 | hu, en, de | 990 | test | yes (generated) |
 | `agent-traffic-dev` | the same generator, another seed | Apache-2.0 | hu, en, de | 300 | dev | yes (generated) |
+| `cee-dev` | PII Guard's CEE reference generator ([below](#synthetic-cee-references)) | Apache-2.0 | hu, en | 240 | dev | yes (generated) |
 
 Attribution, as the licenses require:
 
@@ -191,6 +192,25 @@ rebuilds them and compares.
 - **No LLM-written prose.** The ticket allowed it within free credits, but template text keeps
   the gold exact.
 
+## Synthetic CEE references
+
+`cee-pii` over-masks reference and tracking numbers, but it is a test split, so its spans must
+not be read to tune against (LAB-1344). [`cee_dev.py`](../src/pii_guard/eval/datasets/cee_dev.py)
+writes a dev split to tune on instead: 120 Hungarian and 120 English documents in the same
+kinds of register (bank statement lines, chats, support tickets, emails, form fields, OCR-ish
+fragments without accents, shipping notices, SMS), written from scratch.
+`python -m pii_guard.eval.datasets check cee-dev` rebuilds it and compares.
+
+- **Real identifiers**, gold from construction, from the agent-traffic values: names, emails,
+  phones, IBANs and giro accounts, cards, TAJ and tax numbers, UK national insurance and
+  passport numbers, with the same checksum failures and perturbations.
+- **Hard negatives**, never labeled, listed per document in `meta.negatives`: 13-digit epoch
+  milliseconds and 14-digit `yyyymmddhhmmss` stamps (also after a short letter prefix, such as
+  `TR…`), UPS `1Z…` and UPU S10 tracking numbers with valid check digits, GLS- and DPD-style
+  parcel numbers, and CEE order and invoice formats (`SZLA-2026-004812`, `2026/004812`,
+  `HU-260412-8812`). Half follow a label that names them; the rest follow a neutral word
+  (`ref`, `hivatkozás`, `közlemény`) or none. In the OCR register some get an `O` for a `0`.
+
 ## Corrected labels
 
 Some gold labels in a public set are plainly wrong, and every system pays for them as leaks.
@@ -268,7 +288,7 @@ translated; a role word is. Its 8.5 % leak is model error, mostly lone surnames
 ```bash
 python -m pii_guard.eval.datasets list                      # also: pii-guard eval datasets list
 uv run --with pyarrow python -m pii_guard.eval.datasets fetch gretel-finance nemotron-pii
-python -m pii_guard.eval.datasets fetch cee-pii tab-echr agent-traffic agent-traffic-dev
+python -m pii_guard.eval.datasets fetch cee-pii tab-echr agent-traffic agent-traffic-dev cee-dev
 python -m pii_guard.eval.datasets check NAME ...            # rebuild, compare, write nothing
 python -m pii_guard.eval.datasets paths NAME                # fixture files, for pii-guard eval --fixtures
 

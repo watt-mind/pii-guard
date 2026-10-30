@@ -30,7 +30,7 @@ from pii_guard.hosted.connections import PROVIDERS
 from pii_guard.hosted.egress import validate_destination
 from pii_guard.hosted.identity import IdentityError, Principal
 from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS
-from pii_guard.projects.first_run import META_BASE_URL, ensure_first_run
+from pii_guard.projects.first_run import META_BASE_URL, check_meta_key, ensure_first_run
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import PLACEHOLDER_RE, VaultSession
 
@@ -192,11 +192,13 @@ async def first_run(body: FirstRunRequest, request: Request) -> dict[str, Any]:
 
     ``issue_key`` returns one endpoint key, shown once, while the endpoint has none.
     ``meta_api_key`` converts a ``needs_key`` default endpoint to the owner's own Meta key.
+    A malformed key is ``422 invalid_provider_key`` before anything is saved (LAB-1463).
     """
     principal = _signed_in(request)
     hosted = request.app.state.hosted
     sponsored = hosted.sponsored_enabled
-    if body.meta_api_key is not None:
+    meta_api_key = None if body.meta_api_key is None else check_meta_key(body.meta_api_key)
+    if meta_api_key is not None:
         # The same public-HTTPS preflight as an endpoint form save; checked again at use.
         await validate_destination(META_BASE_URL)
     result = await anyio.to_thread.run_sync(
@@ -207,7 +209,7 @@ async def first_run(body: FirstRunRequest, request: Request) -> dict[str, Any]:
             model=hosted.settings.hosted_models[0],
             sponsored_enabled=sponsored,
             issue_key=body.issue_key,
-            meta_api_key=body.meta_api_key,
+            meta_api_key=meta_api_key,
         )
     )
     endpoint = result["endpoint"]

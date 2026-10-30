@@ -55,6 +55,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from pii_guard.config import DEFAULT_DETECTORS
+from pii_guard.eval.record import system_role
 from pii_guard.eval.report_colours import PALETTE_LATENCY, PALETTE_VISUAL, SECTIONS, assign
 from pii_guard.types import EntityType
 
@@ -505,6 +506,7 @@ def _systems(
                 "label": system["label"],
                 "short_label": _short_label(system["label"]),
                 "family": system["family"],
+                "role": system.get("role") or system_role(system),
                 "tool": system["tool"],
                 "kind": latest[key]["kind"],
                 "detectors": [d["name"] for d in system["detectors"]],
@@ -660,9 +662,19 @@ def build_index(
                 entry["generators"].add(f["generator"])
     for rec in text:  # sets whose files aren't committed: take document counts from metrics
         current = versions[rec["fixture_set"]]
+        entry = fixture_sets.setdefault(
+            rec["fixture_set"],
+            {
+                "origin": {f["origin"] for f in rec["fixtures"]},
+                "languages": {f["language"] for f in rec["fixtures"] if f["language"]},
+                "documents": {},
+                "generators": {f["generator"] for f in rec["fixtures"] if f["generator"]},
+                "kind": rec["kind"],
+            },
+        )
         for lang, block in rec["metrics"]["languages"].items():
             if fixture_shas(rec)[lang] == current[lang]:
-                fixture_sets[rec["fixture_set"]]["documents"].setdefault(lang, block["documents"])
+                entry["documents"].setdefault(lang, block["documents"])
     fixture_sets = {
         name: {
             "origin": _origin(v["origin"]),

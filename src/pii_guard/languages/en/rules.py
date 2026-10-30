@@ -33,6 +33,7 @@ from pii_guard.detect.rules._base import (
     NOT_IN_WORD_AFTER,
     NUM_END,
     NUM_START,
+    VALIDATED_ID_DOCUMENT,
     Rule,
     _Hit,
     context_before,
@@ -67,7 +68,7 @@ def _find_ssn(text: str) -> Iterator[_Hit]:
     for m in _SSN_DASHED_RE.finditer(text):
         if is_valid_ssn(m.group(1), m.group(2), m.group(3)):
             score = 0.95 if context_before(text, m.start(), _SSN_CONTEXT) else 0.85
-            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score)
+            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score, VALIDATED_ID_DOCUMENT)
 
 
 def _find_ssn_in_context(text: str) -> Iterator[_Hit]:
@@ -109,7 +110,7 @@ def _find_nino(text: str) -> Iterator[_Hit]:
         compact = "".join(ch for ch in m.group() if ch.isalnum())
         if is_valid_nino(compact):
             score = 0.95 if context_before(text, m.start(), _NINO_CONTEXT) else 0.9
-            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score)
+            yield _Hit(m.start(), m.end(), EntityType.ID_DOCUMENT, score, VALIDATED_ID_DOCUMENT)
 
 
 # --- Phone numbers (national formats) ---------------------------------------
@@ -218,7 +219,7 @@ _ID_DOCUMENT_RE = re.compile(
 
 def _find_id_document(text: str) -> Iterator[_Hit]:
     for m in _ID_DOCUMENT_RE.finditer(text):
-        yield _Hit(m.start("id"), m.end("id"), EntityType.ID_DOCUMENT, 0.85)
+        yield _Hit(m.start("id"), m.end("id"), EntityType.ID_DOCUMENT, 0.85, VALIDATED_ID_DOCUMENT)
 
 
 EVERYWHERE: tuple[Rule, ...] = (_find_ssn, _find_nino)

@@ -879,3 +879,30 @@ def test_real_model_detect_batch_equals_detect() -> None:
         # Padding changes the float sums slightly: scores agree to 1e-4, not bit for bit.
         for b, s in zip(batched, singles, strict=True):
             assert all(abs(x.score - y.score) <= 1e-4 for x, y in zip(b, s, strict=True))
+
+
+def test_bucket_padded_width_buckets_on_mps_only() -> None:
+    """LAB-1329: on MPS micro-batches pad to a multiple of 32 (capped at max_length), so
+    a new width does not compile a new kernel mid-traffic. No model needed."""
+    assert ner.bucket_padded_width(17, 512, None) == 17  # CPU: no bucketing
+    assert ner.bucket_padded_width(17, 512, ner.MPS_PAD_BUCKET) == 32
+    assert ner.bucket_padded_width(32, 512, ner.MPS_PAD_BUCKET) == 32
+    assert ner.bucket_padded_width(33, 512, ner.MPS_PAD_BUCKET) == 64
+    assert ner.bucket_padded_width(33, 40, ner.MPS_PAD_BUCKET) == 40  # capped
+    assert ner.bucket_padded_width(512, 512, ner.MPS_PAD_BUCKET) == 512
+    assert ner.bucket_padded_width(600, 512, ner.MPS_PAD_BUCKET) == 600
+
+
+def test_bucketed_padding_changes_no_span(tiny_model_dir) -> None:
+    """LAB-1329: the extra bucket padding is attention-masked, so spans are identical to
+    the unbucketed run and every micro-batch width is a multiple of the bucket."""
+    path, vocab = tiny_model_dir
+    backend = ner.TransformersBackend(str(path), device="cpu")
+    assert backend.pad_bucket is None
+    backend.model, shapes = _counting(_stub_forward(vocab))
+    texts = _batch_texts()
+    plain = backend.predict_batch(texts)
+    backend.pad_bucket = ner.MPS_PAD_BUCKET  # as on MPS
+    shapes.clear()
+    assert backend.predict_batch(texts) == plain
+    assert shapes and all(width % ner.MPS_PAD_BUCKET == 0 for _, width in shapes)

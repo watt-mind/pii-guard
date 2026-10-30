@@ -41,6 +41,7 @@ import httpx
 from pii_guard import __version__
 from pii_guard.bench.mock_upstream import create_mock_upstream
 from pii_guard.eval import stats
+from pii_guard.eval.record import with_role
 from pii_guard.observability import Observability, ObservabilitySettings, TrafficLevel
 from pii_guard.observability.timing import STAGES
 
@@ -289,13 +290,15 @@ def run_benchmark(
     progress: Any = None,
 ) -> list[CellResult]:
     """Run every cell; ``mode_requests`` caps N per mode (``{"audit": 12}``)."""
+    from pydantic import SecretStr
+
     from pii_guard.api.app import create_app
     from pii_guard.config import Settings
 
     settings = Settings(
         host="127.0.0.1",
         upstream_api_key=None,
-        tenant_key=secrets.token_hex(32),
+        tenant_key=SecretStr(secrets.token_hex(32)),
         upstream_base_url="http://127.0.0.1:1/v1",  # replaced below
     )
     mock_app = create_mock_upstream(delay_ms=delay_ms)
@@ -456,14 +459,16 @@ def build_records(
                     "pii_guard_version": __version__,
                     "note": None,
                 },
-                "system": {
-                    "key": f"gateway-latency:{mode}:{system_detectors or 'none'}",
-                    "label": label,
-                    "family": "pii-guard",
-                    "tool": "pii-guard",
-                    "version": __version__,
-                    "detectors": detectors,
-                },
+                "system": with_role(
+                    {
+                        "key": f"gateway-latency:{mode}:{system_detectors or 'none'}",
+                        "label": label,
+                        "family": "pii-guard",
+                        "tool": "pii-guard",
+                        "version": __version__,
+                        "detectors": detectors,
+                    }
+                ),
                 "fixture_set": "latency-corpus",
                 "fixtures": [
                     {

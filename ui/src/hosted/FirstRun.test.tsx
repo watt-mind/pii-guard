@@ -1,9 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { configure, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignedInConsole } from "../App";
 import { createMockChat } from "../api/chat";
-import type { HttpGuardClient } from "../api/http";
+import { ApiError, type HttpGuardClient } from "../api/http";
 import { createMockClient } from "../api/mock";
 import type { StatusResult } from "../api/status";
 import { setSelectedEndpoint, setSelectedProject } from "../projects/selection";
@@ -12,6 +12,11 @@ import bundled from "virtual:pii-guard/benchmarks-index";
 import { HostedApp } from "./HostedApp";
 import type { Account, Requester } from "./api";
 import { endpointState, parseFirstRun, resetFirstRun, testRecovery, TestRequestError, withKey } from "./firstRun";
+
+// Slow runners get longer than the 1 s default for every async query in this file
+// (LAB-1498): the setup region appears only after a chain of account, first-run,
+// projects, endpoints and snippets calls, which flakes under full-suite parallel load.
+configure({ asyncUtilTimeout: 10_000 });
 
 // First run (LAB-1455). Fictional owner, endpoint and keys only (ADR 0005).
 const KEY = "pg_ep_exampleKey0123456789-_exampleKey0123456";
@@ -176,6 +181,28 @@ describe("first run, sponsored off", () => {
     expect(container.innerHTML).not.toContain("example-meta-key");
     expect(storedAnywhere("example-meta-key")).toBe(false);
     expect(storedAnywhere(KEY)).toBe(false);
+  });
+
+  it("a malformed Meta key gets a message next to the field, and the endpoint still needs a key", async () => {
+    history.replaceState(null, "", "#connect");
+    serve();
+    const call = requester(false, {
+      "/v1/account/first-run": (body) => {
+        if ((body as { meta_api_key?: string })?.meta_api_key) throw new ApiError(422, "invalid_provider_key", "The request could not complete.");
+        return firstRun(false);
+      },
+    });
+    renderConsole(call);
+    const setup = await screen.findByRole("region", { name: "Connect your client" });
+    const form = await within(setup).findByRole("form", { name: "Add your Meta API key" });
+    const user = userEvent.setup();
+    const field = within(form).getByLabelText("Meta API key");
+    await user.type(field, "short-key");
+    await user.click(within(form).getByRole("button", { name: "Save key and continue" }));
+    expect(await within(form).findByText(/doesn.t look like a Meta API key/)).toBeInTheDocument();
+    expect(field).toHaveAccessibleDescription(expect.stringMatching(/doesn.t look like a Meta API key/));
+    expect(within(setup).getByText("Needs a key")).toBeInTheDocument();
+    expect(within(setup).queryByText("Ready")).not.toBeInTheDocument();
   });
 
   it("a refused test request says why, and never claims a fallback", () => {

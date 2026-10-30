@@ -20,8 +20,6 @@ Rules are organised by language pack (ADR 0008, ADR 0010):
 A language without a pack gets the language-independent rules and every pack's
 ``everywhere`` rules. Add a language with a :class:`~pii_guard.languages.LanguagePack`
 (``docs/languages.md``); :func:`register_rule_pack` still overrides the rules of one language.
-``pii_guard.detect.rules.hu`` and ``.en`` are aliases of the packs' rule modules, kept for one
-release.
 
 Look-alikes are rejected on purpose: wrong check digits, digits that are part of a longer
 digit run (``12345678901`` contains no 10-digit tax ID), and dates.

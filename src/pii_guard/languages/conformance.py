@@ -155,7 +155,9 @@ def check_structure(pack: LanguagePack) -> list[Finding]:
     findings += _check_lexicons(pack)
     findings += _check_captions(pack)
     findings += _check_cues(pack)
+    findings += _check_references(pack)
     findings += _check_brands(pack)
+    findings += _check_corpus(pack)
     if not pack.smoke_fixtures:
         findings.append(
             _error(
@@ -417,6 +419,30 @@ def _check_cues(pack: LanguagePack) -> list[Finding]:
     return []
 
 
+def _check_references(pack: LanguagePack) -> list[Finding]:
+    if pack.references is None:
+        return [
+            _info(
+                "structure.references",
+                "no reference words (order or invoice labels fall back to the built-in "
+                "lists, so they never reach this pack's language first)",
+            )
+        ]
+    if not isinstance(pack.references, Traversable):
+        return [
+            _error("structure.references", "references must be a resource (importlib.resources)")
+        ]
+    from pii_guard.languages.references import load_references
+
+    try:
+        entries = load_references(pack.references)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        return [_error("structure.references", f"references.tsv is invalid: {exc}")]
+    if not entries:
+        return [_error("structure.references", "references.tsv has no entry")]
+    return []
+
+
 def _check_brands(pack: LanguagePack) -> list[Finding]:
     if pack.brands is None:
         return [
@@ -435,6 +461,84 @@ def _check_brands(pack: LanguagePack) -> list[Finding]:
     except (OSError, UnicodeDecodeError, ValueError) as exc:
         return [_error("structure.brands", f"brands.tsv is invalid: {exc}")]
     return []
+
+
+def _check_corpus(pack: LanguagePack) -> list[Finding]:
+    """``identity_generator`` + ``corpus_templates``: both or neither, and they fit together."""
+    check = "structure.corpus"
+    generator_factory, templates = pack.identity_generator, pack.corpus_templates
+    if generator_factory is None and templates is None:
+        return [_info(check, "no synthetic corpus: the language is measured on its smoke set only")]
+    if templates is None:
+        return [_error(check, "identity_generator without corpus_templates: add both")]
+    if generator_factory is None:
+        return [_error(check, "corpus_templates without identity_generator: add both")]
+    if not isinstance(templates, Traversable):
+        return [_error(check, "corpus_templates must be a resource (importlib.resources)")]
+    import random
+    import tomllib
+
+    from pii_guard.eval.identities import IdentityGenerator
+
+    try:
+        raw = tomllib.loads(templates.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        return [_error(check, f"corpus_templates cannot be read: {type(exc).__name__}")]
+    findings: list[Finding] = []
+    declared = raw.get("language")
+    if declared != pack.code:
+        findings.append(
+            _error(check, f"corpus_templates declare language {declared!r}, expected {pack.code!r}")
+        )
+    missing_keys = [k for k in ("language_name", "inflection_rule", "field_labels") if k not in raw]
+    if missing_keys:
+        findings.append(_error(check, f"corpus_templates lack {', '.join(missing_keys)}"))
+    kinds = raw.get("kinds") or []
+    if not kinds:
+        findings.append(_error(check, "corpus_templates define no [[kinds]]"))
+    try:
+        generator = generator_factory(random.Random(f"conformance/{pack.code}"))  # noqa: S311
+    except Exception as exc:
+        return [*findings, _error(check, f"identity_generator raises {type(exc).__name__}")]
+    if not isinstance(generator, IdentityGenerator):
+        return [
+            *findings,
+            _error(
+                check,
+                f"identity_generator returns a {type(generator).__name__}, not an "
+                "IdentityGenerator (pii_guard.eval.identities)",
+            ),
+        ]
+    labels = raw.get("field_labels") or {}
+    unlabelled: set[str] = set()
+    for kind in kinds:
+        kind_id = kind.get("id", "?")
+        for party in kind.get("parties", ()):
+            where = f"kind {kind_id!r}, party {party.get('role', '?')!r}"
+            try:
+                record = generator.make(party.get("kind", ""))
+            except ValueError:
+                findings.append(_error(check, f"{where}: unknown identity kind"))
+                continue
+            except Exception as exc:
+                findings.append(_error(check, f"{where}: the generator raises {exc!r}"))
+                continue
+            for name in party.get("fields", ()):
+                try:
+                    record.values([name])
+                except KeyError:
+                    findings.append(
+                        _error(
+                            check,
+                            f"{where}: the generator's {party.get('kind')} has no field {name!r}",
+                        )
+                    )
+                if name not in labels and name not in unlabelled:
+                    unlabelled.add(name)
+                    findings.append(
+                        _warning(check, f"field {name!r} has no entry in [field_labels]")
+                    )
+    return findings
 
 
 # --- Fixtures -------------------------------------------------------------------------------

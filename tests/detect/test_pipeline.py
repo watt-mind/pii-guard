@@ -250,6 +250,23 @@ def test_non_structured_rule_spans_are_not_authoritative() -> None:
     assert [(s.text, s.detector) for s in spans] == [("6720 Szeged", "llm")]
 
 
+def test_validated_rule_id_document_beats_higher_score_ner_span_on_exact_range() -> None:
+    # LAB-1380: after token-snapping, the NER PHONE/BANK_ACCOUNT span covers the same range
+    # as a checksum-validated rule ID_DOCUMENT span but scores higher; masking is complete
+    # either way, only the type label (and per-type recall) is wrong.
+    text = "Steuer-ID: 86095742719"
+    rule = Span(11, 22, E.ID_DOCUMENT, "86095742719", 0.85, "rules", subtype="validated")
+    ner = span(text, "86095742719", E.PHONE, "ner", 0.95)
+    spans = resolve_spans(text, [rule, ner], detector_order=["rules", "ner"])
+    assert [(s.entity_type, s.text, s.detector) for s in spans] == [
+        (E.ID_DOCUMENT, "86095742719", "rules")
+    ]
+    # Without the validated subtype the higher-score NER span still wins.
+    bare = Span(11, 22, E.ID_DOCUMENT, "86095742719", 0.85, "rules")
+    spans = resolve_spans(text, [bare, ner], detector_order=["rules", "ner"])
+    assert [(s.entity_type, s.detector) for s in spans] == [(E.PHONE, "ner")]
+
+
 def test_adjudicator_wins_type_disagreement() -> None:
     text = "Átvette: Bárány Kft képviseletében Bárány."
     ner = span(text, "Bárány", E.ADDRESS, "ner", 0.9, nth=1)

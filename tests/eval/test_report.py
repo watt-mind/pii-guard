@@ -242,3 +242,23 @@ def test_old_strict_records_display_as_audit_and_stay_untouched(
     assert display_mode("strict") == "audit" and display_mode("fast") == "fast"
     page = render_page(index, headline_set=CONFIG["headline_set"], featured=index["featured"])
     assert "pii-guard strict" not in page and "strict mode" not in page
+
+
+def test_combined_fixture_sets_do_not_crash(records: list[dict[str, Any]]) -> None:
+    """LAB-1582: a recorded run over combined sets has an aggregate fixture_set key."""
+    import copy
+
+    base = next(r for r in records if r["kind"] == "text")
+    rec = copy.deepcopy(base)
+    # Give it a second fixture entry under another set name, with an aggregate key.
+    second = copy.deepcopy(rec["fixtures"][0])
+    second["set"] = "synth-sample" if rec["fixtures"][0]["set"] != "synth-sample" else "smoke"
+    second["path"] = f"eval/fixtures/{second['set']}.jsonl"
+    rec["fixtures"] = [rec["fixtures"][0], second]
+    sets = sorted({f["set"] for f in rec["fixtures"]})
+    rec["fixture_set"] = "+".join(sets)
+    rec["run_id"] = "2099-01-01-combined-probe"
+    index = build_index([*records, rec])
+    assert rec["fixture_set"] in index["fixture_sets"]
+    docs = index["fixture_sets"][rec["fixture_set"]]["documents"]
+    assert docs, "the aggregate set carries document counts"
