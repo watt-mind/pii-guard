@@ -892,11 +892,16 @@ class NerDetector:
         return guard_spans(text, found, language)
 
 
-# A ``,`` or ``;`` with a capital letter right after it: a cell boundary before a name in a
+# A ``,`` or ``;`` with a capitalised word right after it: a cell boundary before a name in a
 # delimited row ("2,Teszt Elek,teszt.elek@example.com"). Prose puts a space after them,
 # decimals ("1,5") have a digit, and header rows (``id,name,tax_id``) stay as they are: the
-# model reads number types from them.
+# model reads number types from them. An all-caps cell (``ORD-2024-544367``, ``SO7466927``) is
+# a reference, not a name: spacing it glued the reference to the ID before it
+# ("610456508 ORD-…") and the model dropped the ID (LAB-1648).
 _GLUED_DELIMITER = re.compile(r"[,;](?=[^\W\d_])")
+#: What may follow a cell's capital for it to start a name: a lower-case letter (``Teszt``,
+#: ``Ádám``), an apostrophe (``O'Brien``) or an initial's period (``J. Smith``).
+_NAME_SECOND = frozenset("'\u2019.")
 
 
 def model_view(text: str) -> tuple[str, tuple[int, ...]]:
@@ -906,13 +911,21 @@ def model_view(text: str) -> tuple[str, tuple[int, ...]]:
     model mis-spans it ("Elek,teszt.elek@example.com,+36") or misses it. Each glued delimiter
     becomes a space: same length, so model offsets are offsets into ``text``.
     """
-    cuts = tuple(m.start() for m in _GLUED_DELIMITER.finditer(text) if text[m.end()].isupper())
+    cuts = tuple(m.start() for m in _GLUED_DELIMITER.finditer(text) if _starts_name(text, m.end()))
     if not cuts:
         return text, ()
     chars = list(text)
     for cut in cuts:
         chars[cut] = " "
     return "".join(chars), cuts
+
+
+def _starts_name(text: str, pos: int) -> bool:
+    """A capital at ``pos`` followed by a lower-case letter, ``'`` or ``.``: a name's start."""
+    if not text[pos].isupper():
+        return False
+    nxt = text[pos + 1 : pos + 2]
+    return nxt.islower() or nxt in _NAME_SECOND
 
 
 def _cut_at_cells(start: int, end: int, cuts: Sequence[int]) -> list[tuple[int, int]]:
