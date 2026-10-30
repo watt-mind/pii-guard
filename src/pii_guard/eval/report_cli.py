@@ -18,9 +18,9 @@ function of the inputs so ``--check`` compares them byte for byte:
 - ``docs/benchmarks.md``: tables, embedded charts and method notes;
 - the results block of ``README.md`` (:mod:`pii_guard.eval.report_readme`), when the config
   has a ``readme`` section;
-- ``docs/benchmarks/colours.json``: the append-only colour registry
+- ``docs/benchmarks/colours.json``: the append-only color registry
   (:mod:`pii_guard.eval.report_colours`), read first and rewritten only when a new system
-  needs a colour;
+  needs a color;
 - with ``--journey``, the generated block of ``docs/journey.md``.
 
 The index (:mod:`pii_guard.eval.report_index`) is a build output, never committed: the report
@@ -589,7 +589,7 @@ def _run_log(index: Mapping[str, Any]) -> str:
 _METHOD = """\
 ## How to read this
 
-- **Leak rate** is the share of labelled values that still appear, in any surface form, in
+- **Leak rate** is the share of labeled values that still appear, in any surface form, in
   the text the model would receive after masking (case- and whitespace-insensitive, through
   the language's inflected forms, structured identifiers by their letters and digits with any
   separators). Lower is safer; it is the number that matters most. **Partial leak** counts
@@ -604,9 +604,10 @@ _METHOD = """\
   (comparison tools that can't unmask show —).
 - **Hand-written vs generated sets.** `smoke` is written by hand with inline labels and has
   adversarial look-alikes; `synth-*` sets are written by a Meta Muse model around fictional
-  identities and labelled automatically. **Generated sets flatter Muse-based detectors**: the
+  identities and labeled automatically. **Muse-generated sets flatter Muse-based detectors**: the
   same model family wrote the text and reads it, so its phrasing and its idea of what an
-  entity is match. The headline charts use the hand-written set for that reason.
+  entity is match. Converted third-party (`public`) sets carry no such advantage.
+  The headline charts use the hand-written set for that reason.
 - **Small sets.** The sets have tens of documents per language: differences of a few points
   are noise. Every number below says which set, which run date and which commit it came from.
 - **Latency** is detection time per document (p50) on the hardware in the run log; it is not
@@ -675,7 +676,7 @@ def render_page(
     if index["visual"]:
         out.append("## Image masking\n")
         out.append(
-            "Share of labelled regions masked with IoU >= 0.5. `specimens` are official "
+            "Share of labeled regions masked with IoU >= 0.5. `specimens` are official "
             "specimen ID documents published by their issuers; `fictional-specimens` are "
             "specimen-style documents built from Muse Image output (LAB-1121). The two sets "
             "hold different documents, so compare runs within a set.\n"
@@ -751,8 +752,8 @@ def build_outputs(
 ) -> dict[Path, str]:
     """Every generated file and its content, from the records in ``runs_dir``.
 
-    ``colours`` is the append-only colour registry; it is an output too, so a new system's
-    colour is committed with it and ``--check`` fails until it is. ``readme`` is an output
+    ``colours`` is the append-only color registry; it is an output too, so a new system's
+    color is committed with it and ``--check`` fails until it is. ``readme`` is an output
     only when the config has a ``readme`` section: its results block is rewritten.
     """
     records = load_records(runs_dir)
@@ -775,10 +776,16 @@ def build_outputs(
     for name, _, render in CHARTS:
         if not _drawn(index, name):
             continue
-        outputs[docs_dir / "benchmarks" / name] = render(index, headline, systems)
+        svg = render(index, headline, systems)
+        outputs[docs_dir / "benchmarks" / name] = svg
+        outputs[docs_dir / "benchmarks" / name.replace(".svg", "-dark.svg")] = charts.dark_variant(
+            svg
+        )
     for name in validity_sets(index):
-        outputs[docs_dir / "benchmarks" / validity_chart(name)] = charts.number_validity(
-            index, fixture_set=name
+        svg = charts.number_validity(index, fixture_set=name)
+        outputs[docs_dir / "benchmarks" / validity_chart(name)] = svg
+        outputs[docs_dir / "benchmarks" / validity_chart(name).replace(".svg", "-dark.svg")] = (
+            charts.dark_variant(svg)
         )
     counts = _dataset_counts(runs_dir)
     outputs[docs_dir / "benchmarks.md"] = render_page(

@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-labelledby="t d" font-family="Inter, &#x27;Helvetica Neue&#x27;, Helvetica, Arial, sans-serif">
+<title id="t">F1 and leak rate by language</title>
+<desc id="d">Grouped bars of overlap F1 and full leak rate per language for each system on the smoke fixtures.</desc>
+<rect width="1600" height="900" fill="#111318"/>
+<text x="56" y="70" font-size="40" fill="#F2F2F5" font-weight="700">F1 and leak rate by language</text>
+<text x="56" y="112" font-size="24" fill="#B8B8C0">Per language, per system: the same fixture set in each language</text>
+<rect x="56" y="140" width="22" height="22" fill="#332288"/>
+<text x="86" y="159" font-size="21" fill="#F2F2F5">de (10 docs)</text>
+<rect x="234.35000000000002" y="140" width="22" height="22" fill="#44AA99"/>
+<text x="264.4" y="159" font-size="21" fill="#F2F2F5">en (10 docs)</text>
+<rect x="412.70000000000005" y="140" width="22" height="22" fill="#DDCC77"/>
+<text x="442.7" y="159" font-size="21" fill="#F2F2F5">hu (31 docs)</text>
+<text x="866.8" y="196" font-size="22" fill="#F2F2F5" font-weight="600">Overlap F1 (higher is better)</text>
+<line x1="866.8" y1="210" x2="866.8" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="866.8" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">0%</text>
+<line x1="934.7" y1="210" x2="934.7" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="934.7" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">25%</text>
+<line x1="1002.6" y1="210" x2="1002.6" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1002.6" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">50%</text>
+<line x1="1070.5" y1="210" x2="1070.5" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1070.5" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">75%</text>
+<line x1="1138.4" y1="210" x2="1138.4" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1138.4" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">100%</text>
+<text x="1248.4" y="196" font-size="22" fill="#F2F2F5" font-weight="600">Full leak rate (lower is safer)</text>
+<line x1="1248.4" y1="210" x2="1248.4" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1248.4" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">0%</text>
+<line x1="1316.3" y1="210" x2="1316.3" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1316.3" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">25%</text>
+<line x1="1384.2" y1="210" x2="1384.2" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1384.2" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">50%</text>
+<line x1="1452.1" y1="210" x2="1452.1" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1452.1" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">75%</text>
+<line x1="1520" y1="210" x2="1520" y2="740" stroke="#33333A" stroke-width="2"/>
+<text x="1520" y="770" font-size="20" fill="#B8B8C0" text-anchor="middle">100%</text>
+<circle cx="66" cy="247.9" r="9" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<text x="84" y="255.9" font-size="21" fill="#F2F2F5" font-weight="600">rules</text>
+<rect x="866.8" y="219" width="187" height="16.6" fill="#332288"/>
+<text x="1061.8" y="231.6" font-size="19" fill="#F2F2F5">68.8</text>
+<rect x="1248.4" y="219" width="117.4" height="16.6" fill="#332288"/>
+<text x="1373.8" y="231.6" font-size="19" fill="#F2F2F5">43.2</text>
+<rect x="866.8" y="239.6" width="173.8" height="16.6" fill="#44AA99"/>
+<text x="1048.6" y="252.1" font-size="19" fill="#F2F2F5">64.0</text>
+<rect x="1248.4" y="239.6" width="126.7" height="16.6" fill="#44AA99"/>
+<text x="1383.2" y="252.1" font-size="19" fill="#F2F2F5">46.7</text>
+<rect x="866.8" y="260.1" width="196.5" height="16.6" fill="#DDCC77"/>
+<text x="1071.3" y="272.7" font-size="19" fill="#F2F2F5">72.3</text>
+<rect x="1248.4" y="260.1" width="107.6" height="16.6" fill="#DDCC77"/>
+<text x="1364" y="272.7" font-size="19" fill="#F2F2F5">39.6</text>
+<circle cx="66" cy="323.6" r="9" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<text x="84" y="331.6" font-size="21" fill="#F2F2F5" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
+<rect x="866.8" y="294.7" width="264.6" height="16.6" fill="#332288"/>
+<text x="1139.5" y="307.3" font-size="19" fill="#F2F2F5">97.4</text>
+<rect x="1248.4" y="294.7" width="2" height="16.6" fill="#332288"/>
+<text x="1258.4" y="307.3" font-size="19" fill="#F2F2F5">0.0</text>
+<rect x="866.8" y="315.3" width="255.8" height="16.6" fill="#44AA99"/>
+<text x="1130.7" y="327.9" font-size="19" fill="#F2F2F5">94.2</text>
+<rect x="1248.4" y="315.3" width="2" height="16.6" fill="#44AA99"/>
+<text x="1258.4" y="327.9" font-size="19" fill="#F2F2F5">0.0</text>
+<rect x="866.8" y="335.9" width="253.4" height="16.6" fill="#DDCC77"/>
+<text x="1128.2" y="348.4" font-size="19" fill="#F2F2F5">93.3</text>
+<rect x="1248.4" y="335.9" width="2" height="16.6" fill="#DDCC77"/>
+<text x="1258.4" y="348.4" font-size="19" fill="#F2F2F5">0.0</text>
+<circle cx="66" cy="399.3" r="9" fill="#D55E00" stroke="#111318" stroke-width="3"/>
+<text x="84" y="407.3" font-size="21" fill="#F2F2F5" font-weight="600">rules + Muse Spark Open (Baseten)</text>
+<text x="872.8" y="384" font-size="18" fill="#B8B8C0">no current run</text>
+<text x="1254.4" y="384" font-size="18" fill="#B8B8C0">no current run</text>
+<rect x="866.8" y="391" width="271.6" height="16.6" fill="#44AA99"/>
+<text x="1146.4" y="403.6" font-size="19" fill="#F2F2F5">100.0</text>
+<rect x="1248.4" y="391" width="2" height="16.6" fill="#44AA99"/>
+<text x="1258.4" y="403.6" font-size="19" fill="#F2F2F5">0.0</text>
+<rect x="866.8" y="411.6" width="267.1" height="16.6" fill="#DDCC77"/>
+<text x="1142" y="424.1" font-size="19" fill="#F2F2F5">98.4</text>
+<rect x="1248.4" y="411.6" width="2.6" height="16.6" fill="#DDCC77"/>
+<text x="1259" y="424.1" font-size="19" fill="#F2F2F5">0.9</text>
+<circle cx="66" cy="475" r="9" fill="#CC79A7" stroke="#111318" stroke-width="3"/>
+<text x="84" y="483" font-size="21" fill="#F2F2F5" font-weight="600">rules + Muse Glimmer (low)</text>
+<text x="872.8" y="459.7" font-size="18" fill="#B8B8C0">no current run</text>
+<text x="1254.4" y="459.7" font-size="18" fill="#B8B8C0">no current run</text>
+<rect x="866.8" y="466.7" width="271.6" height="16.6" fill="#44AA99"/>
+<text x="1146.4" y="479.3" font-size="19" fill="#F2F2F5">100.0</text>
+<rect x="1248.4" y="466.7" width="2" height="16.6" fill="#44AA99"/>
+<text x="1258.4" y="479.3" font-size="19" fill="#F2F2F5">0.0</text>
+<text x="872.8" y="500.9" font-size="18" fill="#B8B8C0">no current run</text>
+<text x="1254.4" y="500.9" font-size="18" fill="#B8B8C0">no current run</text>
+<rect x="58.4" y="543.1" width="15.3" height="15.3" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="84" y="558.7" font-size="21" fill="#F2F2F5" font-weight="600">Presidio</text>
+<rect x="866.8" y="521.9" width="150.3" height="16.6" fill="#332288"/>
+<text x="1025.2" y="534.4" font-size="19" fill="#F2F2F5">55.4</text>
+<rect x="1248.4" y="521.9" width="29.4" height="16.6" fill="#332288"/>
+<text x="1285.8" y="534.4" font-size="19" fill="#F2F2F5">10.8</text>
+<rect x="866.8" y="542.4" width="185.8" height="16.6" fill="#44AA99"/>
+<text x="1060.6" y="555" font-size="19" fill="#F2F2F5">68.4</text>
+<rect x="1248.4" y="542.4" width="27.2" height="16.6" fill="#44AA99"/>
+<text x="1283.6" y="555" font-size="19" fill="#F2F2F5">10.0</text>
+<rect x="866.8" y="563" width="183.6" height="16.6" fill="#DDCC77"/>
+<text x="1058.4" y="575.6" font-size="19" fill="#F2F2F5">67.6</text>
+<rect x="1248.4" y="563" width="89.7" height="16.6" fill="#DDCC77"/>
+<text x="1346.1" y="575.6" font-size="19" fill="#F2F2F5">33.0</text>
+<polygon points="66,616.1 75.9,633.6 56.1,633.6" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="84" y="634.4" font-size="21" fill="#F2F2F5" font-weight="600">LLM Guard</text>
+<rect x="866.8" y="597.6" width="179.3" height="16.6" fill="#332288"/>
+<text x="1054.1" y="610.1" font-size="19" fill="#F2F2F5">66.0</text>
+<rect x="1248.4" y="597.6" width="117.4" height="16.6" fill="#332288"/>
+<text x="1373.8" y="610.1" font-size="19" fill="#F2F2F5">43.2</text>
+<rect x="866.8" y="618.1" width="207.4" height="16.6" fill="#44AA99"/>
+<text x="1082.2" y="630.7" font-size="19" fill="#F2F2F5">76.4</text>
+<rect x="1248.4" y="618.1" width="81.5" height="16.6" fill="#44AA99"/>
+<text x="1337.9" y="630.7" font-size="19" fill="#F2F2F5">30.0</text>
+<rect x="866.8" y="638.7" width="126.7" height="16.6" fill="#DDCC77"/>
+<text x="1001.6" y="651.3" font-size="19" fill="#F2F2F5">46.7</text>
+<rect x="1248.4" y="638.7" width="135.8" height="16.6" fill="#DDCC77"/>
+<text x="1392.2" y="651.3" font-size="19" fill="#F2F2F5">50.0</text>
+<polygon points="66,690.9 77.2,702.1 66,713.4 54.8,702.1" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="84" y="710.1" font-size="21" fill="#F2F2F5" font-weight="600">PrivAiTe</text>
+<rect x="866.8" y="673.3" width="179.4" height="16.6" fill="#332288"/>
+<text x="1054.2" y="685.9" font-size="19" fill="#F2F2F5">66.0</text>
+<rect x="1248.4" y="673.3" width="22" height="16.6" fill="#332288"/>
+<text x="1278.4" y="685.9" font-size="19" fill="#F2F2F5">8.1</text>
+<rect x="866.8" y="693.9" width="203.2" height="16.6" fill="#44AA99"/>
+<text x="1078" y="706.4" font-size="19" fill="#F2F2F5">74.8</text>
+<rect x="1248.4" y="693.9" width="2" height="16.6" fill="#44AA99"/>
+<text x="1258.4" y="706.4" font-size="19" fill="#F2F2F5">0.0</text>
+<rect x="866.8" y="714.4" width="126.2" height="16.6" fill="#DDCC77"/>
+<text x="1001" y="727" font-size="19" fill="#F2F2F5">46.5</text>
+<rect x="1248.4" y="714.4" width="48.7" height="16.6" fill="#DDCC77"/>
+<text x="1305.1" y="727" font-size="19" fill="#F2F2F5">17.9</text>
+<text x="56" y="810" font-size="20" fill="#B8B8C0">Fixture set &#x27;smoke&#x27; (hand-written; de 10 docs + en 10 docs + hu 31 docs). Bars: runs on the current fixture files only.</text>
+<text x="56" y="840" font-size="20" fill="#B8B8C0">Full leak = labeled values of mask-policy types surviving masking in any surface form. F1 = span overlap match, micro.</text>
+<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-27 to 2026-10-29 · commits 6d02b8d, 8944f96, 9fad0fa, c759b54, f7b384f · generated by `pii-guard eval report` from eval/results/runs/</text>
+</svg>

@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.12.*"
 resolution-markers = [
     "sys_platform == 'linux' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner'",
@@ -363,6 +363,14 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/58/53/fcf98d3608376e86fb160cc5faee16b82af7593fea7e2acfb76a9e97ba46/cymem-2.0.16-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:b7e1c15f48687e094df890ec172492a36c022e20a2d65629348c122c9e0d47be", size = 271376, upload-time = "2026-10-24T17:49:44.73Z" },
     { url = "https://files.pythonhosted.org/packages/0b/40/4973a49bf303bff9b2432b2cc708df80dfa7f6ce52313a787c46ddff1a8d/cymem-2.0.16-cp312-cp312-win_amd64.whl", hash = "sha256:89854b2d81f7f7e4673225ec21fd39bb42a6e9a4de4bf50def9ccc6a0a01882b", size = 41753, upload-time = "2026-10-24T17:49:45.948Z" },
     { url = "https://files.pythonhosted.org/packages/5e/71/eb9d355054af44210d789828ed9de04d3400f4985f5e4745a952b42acb4b/cymem-2.0.16-cp312-cp312-win_arm64.whl", hash = "sha256:514237218f0ab92f20b7f0c9503edfd6325026999b462009dc9a10aefb543418", size = 40161, upload-time = "2026-10-24T17:49:46.989Z" },
+]
+
+[[package]]
+name = "de-core-news-lg"
+version = "3.8.0"
+source = { url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" }
+wheels = [
+    { url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl", hash = "sha256:36fda650e476b54d5e87803635e36dadd1e8e034c4b5962088586d684f4c9fed" },
 ]
 
 [[package]]
@@ -1807,6 +1815,7 @@ dependencies = [
 
 [package.optional-dependencies]
 baselines = [
+    { name = "de-core-news-lg" },
     { name = "en-core-web-lg" },
     { name = "huggingface-hub", version = "2.3.0", source = { registry = "https://pypi.org/simple" } },
     { name = "presidio-analyzer" },
@@ -1855,6 +1864,7 @@ requires-dist = [
     { name = "azure-identity", marker = "extra == 'hosted-azure'", specifier = ">=1.27.0" },
     { name = "azure-storage-blob", marker = "extra == 'hosted-azure'", specifier = ">=12.31.0" },
     { name = "cryptography", specifier = ">=46.0.0" },
+    { name = "de-core-news-lg", marker = "extra == 'baselines'", url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" },
     { name = "en-core-web-lg", marker = "extra == 'baselines'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = ">=0.162.0" },
     { name = "gliner", marker = "extra == 'gliner'", specifier = "==0.2.29" },

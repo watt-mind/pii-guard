@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-labelledby="t d" font-family="Inter, &#x27;Helvetica Neue&#x27;, Helvetica, Arial, sans-serif">
+<title id="t">Leak rate by number validity</title>
+<desc id="d">Grouped bars of the full leak rate per system on the tab-echr fixtures: all values, numbers that pass their validators, numbers that fail them, and every other value.</desc>
+<rect width="1600" height="900" fill="#111318"/>
+<text x="56" y="70" font-size="40" fill="#F2F2F5" font-weight="700">Leak rate by number validity</text>
+<text x="56" y="112" font-size="24" fill="#B8B8C0">Full leak rate per system, split by whether a number passes the language packs&#x27; validators</text>
+<rect x="56" y="140" width="22" height="22" fill="#B8B8C0"/>
+<text x="86" y="159" font-size="21" fill="#F2F2F5">All values (headline)</text>
+<rect x="319.61" y="140" width="22" height="22" fill="#117733"/>
+<text x="349.6" y="159" font-size="21" fill="#F2F2F5">Valid numbers</text>
+<rect x="521.0600000000001" y="140" width="22" height="22" fill="#CC6677"/>
+<text x="551.1" y="159" font-size="21" fill="#F2F2F5">Invalid numbers</text>
+<rect x="745.61" y="140" width="22" height="22" fill="#332288"/>
+<text x="775.6" y="159" font-size="21" fill="#F2F2F5">Other values (names, addresses, e-mail)</text>
+<line x1="866.8" y1="210" x2="866.8" y2="730" stroke="#33333A" stroke-width="2"/>
+<text x="866.8" y="760" font-size="20" fill="#B8B8C0" text-anchor="middle">0%</text>
+<line x1="1015.1" y1="210" x2="1015.1" y2="730" stroke="#33333A" stroke-width="2"/>
+<text x="1015.1" y="760" font-size="20" fill="#B8B8C0" text-anchor="middle">25%</text>
+<line x1="1163.4" y1="210" x2="1163.4" y2="730" stroke="#33333A" stroke-width="2"/>
+<text x="1163.4" y="760" font-size="20" fill="#B8B8C0" text-anchor="middle">50%</text>
+<line x1="1311.7" y1="210" x2="1311.7" y2="730" stroke="#33333A" stroke-width="2"/>
+<text x="1311.7" y="760" font-size="20" fill="#B8B8C0" text-anchor="middle">75%</text>
+<line x1="1460" y1="210" x2="1460" y2="730" stroke="#33333A" stroke-width="2"/>
+<text x="1460" y="760" font-size="20" fill="#B8B8C0" text-anchor="middle">100%</text>
+<circle cx="66" cy="262" r="9" fill="#0072B2" stroke="#111318" stroke-width="3"/>
+<text x="84" y="270" font-size="21" fill="#F2F2F5" font-weight="600">rules</text>
+<rect x="866.8" y="218" width="593.2" height="19" fill="#B8B8C0"/>
+<text x="1468" y="233" font-size="19" fill="#F2F2F5">100.0</text>
+<text x="872.8" y="257" font-size="18" fill="#B8B8C0">no values</text>
+<text x="872.8" y="280" font-size="18" fill="#B8B8C0">no values</text>
+<rect x="866.8" y="287" width="593.2" height="19" fill="#332288"/>
+<text x="1468" y="302" font-size="19" fill="#F2F2F5">100.0</text>
+<circle cx="66" cy="366" r="9" fill="#009E73" stroke="#111318" stroke-width="3"/>
+<text x="84" y="374" font-size="21" fill="#F2F2F5" font-weight="600">fast, NER v2.0 (published watt-mind/pii-guard-ner-xlmr-base, LAB-1306)</text>
+<rect x="866.8" y="322" width="19.6" height="19" fill="#B8B8C0"/>
+<text x="894.4" y="337" font-size="19" fill="#F2F2F5">3.3</text>
+<text x="872.8" y="361" font-size="18" fill="#B8B8C0">no values</text>
+<text x="872.8" y="384" font-size="18" fill="#B8B8C0">no values</text>
+<rect x="866.8" y="391" width="19.6" height="19" fill="#332288"/>
+<text x="894.4" y="406" font-size="19" fill="#F2F2F5">3.3</text>
+<rect x="58.4" y="462.4" width="15.3" height="15.3" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="84" y="478" font-size="21" fill="#F2F2F5" font-weight="600">Presidio</text>
+<rect x="866.8" y="426" width="28.2" height="19" fill="#B8B8C0"/>
+<text x="903.1" y="441" font-size="19" fill="#F2F2F5">4.8</text>
+<text x="872.8" y="465" font-size="18" fill="#B8B8C0">no values</text>
+<text x="872.8" y="488" font-size="18" fill="#B8B8C0">no values</text>
+<rect x="866.8" y="495" width="28.2" height="19" fill="#332288"/>
+<text x="903.1" y="510" font-size="19" fill="#F2F2F5">4.8</text>
+<polygon points="66,563.6 75.9,581.2 56.1,581.2" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="84" y="582" font-size="21" fill="#F2F2F5" font-weight="600">LLM Guard</text>
+<rect x="866.8" y="530" width="221.6" height="19" fill="#B8B8C0"/>
+<text x="1096.4" y="545" font-size="19" fill="#F2F2F5">37.4</text>
+<text x="872.8" y="569" font-size="18" fill="#B8B8C0">no values</text>
+<text x="872.8" y="592" font-size="18" fill="#B8B8C0">no values</text>
+<rect x="866.8" y="599" width="221.6" height="19" fill="#332288"/>
+<text x="1096.4" y="614" font-size="19" fill="#F2F2F5">37.4</text>
+<polygon points="66,666.8 77.2,678 66,689.2 54.8,678" fill="#111318" stroke="#595959" stroke-width="4"/>
+<text x="84" y="686" font-size="21" fill="#F2F2F5" font-weight="600">PrivAiTe</text>
+<rect x="866.8" y="634" width="89.1" height="19" fill="#B8B8C0"/>
+<text x="963.9" y="649" font-size="19" fill="#F2F2F5">15.0</text>
+<text x="872.8" y="673" font-size="18" fill="#B8B8C0">no values</text>
+<text x="872.8" y="696" font-size="18" fill="#B8B8C0">no values</text>
+<rect x="866.8" y="703" width="89.1" height="19" fill="#332288"/>
+<text x="963.9" y="718" font-size="19" fill="#F2F2F5">15.0</text>
+<text x="56" y="810" font-size="20" fill="#B8B8C0">Fixture set &#x27;tab-echr&#x27; (hand-written; en 40 docs), en only.</text>
+<text x="56" y="840" font-size="20" fill="#B8B8C0">Valid = a validated rule of the type recognises the value (checksum, numbering plan, format). Invalid numbers stay in the headline.</text>
+<text x="56" y="870" font-size="20" fill="#B8B8C0">Runs 2026-10-27 · commits 18b15fa, cd119ae · generated by `pii-guard eval report` from eval/results/runs/</text>
+</svg>
