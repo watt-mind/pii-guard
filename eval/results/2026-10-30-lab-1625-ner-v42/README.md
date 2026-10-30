@@ -252,3 +252,52 @@ returned.
 - Weights sha256: B1 `458be3c9…`, B2 `439a9034…`, B3 `40e8406c…`, B4 `c1ec9758…`.
 - The checkpoints are on the `pii-guard-ner-runs` volume (`pii-guard-ner-xlmr-base-v42-b1`
   to `-b3`). B4 is local only. None is published.
+
+## B3 on every published set (LAB-1656)
+
+Measured for the v4.2 model card and the public benchmark pages, on this branch (records at
+commit `40accd52`), CPU, one process at a time, v2.0 and B3 back to back. Same scorer and
+configurations as v2.0's earlier records: fast mode (`eval_v3.py score`, rules + NER) and the
+model alone (`--detectors ner`). Leak / over-masking %:
+
+| Set (documents) | v2.0 fast | B3 fast | v2.0 alone | B3 alone |
+|---|--:|--:|--:|--:|
+| smoke hu/en/de (51) + pl-smoke (11), pooled (62) | 0.00 / 0.87 | 0.00 / 1.32 | 3.70 / 0.87 | 3.24 / 1.35 |
+| agent-traffic-dev (300) | 0.13 / 1.66 | 0.13 / 0.66 | 0.39 / 1.67 | 0.26 / 0.66 |
+| agent-traffic (990) | 0.31 / 1.40 | 0.21 / 0.74 | 0.48 / 1.41 | 0.35 / 0.75 |
+| ai4privacy (600) | 0.37 / 0.37 | 0.37 / 0.28 | 0.41 / 0.37 | 0.41 / 0.28 |
+| nemotron-pii (300) | 0.72 / 1.36 | 0.57 / 1.51 | 1.29 / 1.23 | 0.86 / 1.40 |
+| cee-pii (451) | 0.40 / 12.44 | 0.79 / 7.30 | 1.59 / 12.20 | **10.52** / 7.62 |
+| gretel-finance (400) | 19.07 / 21.78 | 19.07 / 24.38 | 20.44 / 21.88 | 20.23 / 24.46 |
+| gretel-finance-corrected (400) | 2.44 / 21.83 | 2.44 / 24.41 | 4.11 / 21.93 | 3.86 / 24.49 |
+| pl-pii-bench (346) | 3.52 / 11.21 | 4.24 / 10.79 | 22.67 / 10.55 | 13.33 / 9.53 |
+| tab-echr (40), local only | 4.03 / 0.44 | 5.13 / 1.12 | 4.03 / 0.44 | 5.13 / 1.12 |
+| mapa-eur-lex (42), local only, report-only | 8.24 / 55.46 | 8.51 / 44.72 | 8.24 / 55.44 | 8.51 / 44.69 |
+
+Records: `runs/2026-10-30-lab-1625-<set>-{v20,v42-b3,ner-v20,ner-v42-b3}.json`. The B3 fast
+records use the gate-record checkpoint path (key `rules+ner:pii-guard-ner-xlmr-base-v42-b3`);
+the model-alone records load the identical weights (sha256 `40e8406c…`) from the data-eu backup
+(key `ner:v42-b3`). TAB and MAPA text stays on this Mac (git-ignored fixtures).
+
+**The one large regression is the model alone on CEE-PII** (1.59 → 10.52 % leak). With the rules,
+the supported setup, it is 0.40 → 0.79 % with over-masking 12.44 → 7.30 %. It is not a gate set.
+
+**Agent traffic by construction** (`datasets run`, per-document counts in
+`eval/datasets/results/`; B3 through `training/ner/datasets_candidate.py`, which only relabels
+the record): leak on valid-checksum / invalid-checksum / perturbed values.
+
+| Set | v2.0 | B3 |
+|---|--:|--:|
+| agent-traffic | 0.13 / 0.78 / 0.47 | 0.00 / 0.00 / 0.35 |
+| agent-traffic-dev | 0.00 / 0.00 / 0.35 | 0.00 / 0.00 / 0.35 |
+
+**Latency.** Per ~400-character message, the two models alternating in one process
+(`eval_v3.py latency`, `latency-cpu-local.json`), M1 Max shared with other agents: v2.0 p50 42.3
+/ p95 48.8 ms, B3 42.8 / 49.6 ms. Gateway overhead (`pii-guard bench latency`, the method of
+`2026-10-28-ner-concurrency-cpu-fast`; records `runs/2026-10-30-lab-1656-gateway-latency-cpu-*`):
+the machine's load average was 33-72 during these runs, against 7-22 for the 2026-10-28 record,
+so they are not comparable with it, and v2.0 and B3 ran one after the other, not alternating.
+At concurrency 1, no stream, overhead p50 was 71.0 ms (v2.0) and 54.8 ms (B3); treat both as
+noisy. The idle-Modal-container gate run (Result, above) is the clean comparison.
+
+Cost: $0 (all local).

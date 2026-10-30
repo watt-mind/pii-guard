@@ -1,0 +1,26 @@
+{
+  "pl-smoke": {
+    "documents": 11,
+    "leak": 0.0,
+    "over_masking": 0.022222,
+    "f1": 0.989691
+  },
+  "pl-pii-bench": {
+    "documents": 346,
+    "leak": 0.042424,
+    "over_masking": 0.107921,
+    "f1": 0.896049
+  },
+  "gretel-finance-corrected": {
+    "documents": 400,
+    "leak": 0.024422,
+    "over_masking": 0.244128,
+    "f1": 0.804352
+  },
+  "tab-echr": {
+    "documents": 40,
+    "leak": 0.051282,
+    "over_masking": 0.011186,
+    "f1": 0.65511
+  }
+}

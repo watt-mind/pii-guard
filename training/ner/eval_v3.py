@@ -50,6 +50,15 @@ SETS: dict[str, list[str]] = {
         f"eval/datasets/gretel-finance/{lang}-gretel-finance.jsonl" for lang in ("de", "en")
     ],
     "pl-pii-bench": ["eval/datasets/pl-pii-bench/pl-pl-pii-bench.jsonl"],
+    # LAB-1656: the rest of the published card and benchmark sets. pl-smoke completes the
+    # 62-document hand-written set (LAB-1589); the two below are fetch-only and git-ignored
+    # (`python -m pii_guard.eval.datasets fetch <name>`); TAB text never leaves the machine.
+    "pl-smoke": ["eval/fixtures/pl-smoke.jsonl"],
+    "gretel-finance-corrected": [
+        f"data/datasets/fixtures/gretel-finance-corrected/{lang}-gretel-finance-corrected.jsonl"
+        for lang in ("de", "en")
+    ],
+    "tab-echr": ["data/datasets/fixtures/tab-echr/en-tab-echr.jsonl"],
     "mapa-eur-lex": ["data/datasets/fixtures/mapa-eur-lex/*-mapa-eur-lex.jsonl"],
     # LAB-1525 fictional gate sets for the new languages (LAB-1535 gates, read per language).
     "eu-smoke": [f"eval/fixtures/eu/{lang}-smoke.jsonl" for lang in EU_GATE_LANGS],
@@ -92,6 +101,8 @@ LABELS = {
     "v42-b3": "pii-guard fast, NER v4.2 candidate B3: B1 with the v4.2 targeted data twice "
     "(LAB-1625)",
     "v42-b4": "pii-guard fast, NER v4.2 candidate B4: soup 0.5 v2.0 + 0.5 B1 (LAB-1625)",
+    "ner-v20": "pii-guard NER v2.0 alone (no rules)",
+    "ner-v42-b3": "pii-guard NER v4.2 (B3) alone (no rules) (LAB-1625)",
     "v42-b3t": "pii-guard fast, NER v4.2 B3 with dev-calibrated thresholds, post-hoc, not a "
     "protocol candidate (LAB-1625)",
 }
@@ -174,16 +185,18 @@ def _score(args: argparse.Namespace) -> int:
     from pii_guard.eval.report import build_scorecard
     from pii_guard.eval.scorer import DetectorAnalyzer, run_documents
 
-    analyzer = DetectorAnalyzer(["rules", "ner"])
+    names = args.detectors.split(",")
+    analyzer = DetectorAnalyzer(names)
     if analyzer.skipped:
         print(f"detector unavailable: {analyzer.skipped}", file=sys.stderr)
         return 2
     analyzer.analyze("Warm-up text without personal data.", "en")
-    detectors = [{"name": "rules"}, _detector(args.candidate, args.model)]
+    detectors = [{"name": "rules"}] if "rules" in names else []
+    detectors.append(_detector(args.candidate, args.model))
     if thresholds:
         from pii_guard.eval.stats import sha256_file
 
-        detectors[1]["settings"] = {
+        detectors[-1]["settings"] = {
             "thresholds_file": str(args.thresholds),
             "thresholds_sha256": sha256_file(args.thresholds),
         }
@@ -198,7 +211,8 @@ def _score(args: argparse.Namespace) -> int:
         wall = time.perf_counter() - started
         card = build_scorecard(results, detectors=analyzer.loaded, fixture_paths=paths)
         notes = [
-            f"{args.ticket}: {TICKETS[args.ticket]}, fast mode (rules + NER), CPU "
+            f"{args.ticket}: {TICKETS[args.ticket]}, "
+            f"{'fast mode (rules + NER)' if 'rules' in names else 'NER alone (no rules)'}, CPU "
             "(PII_GUARD_NER_DEVICE=cpu), one commit.",
             f"Wall time {wall:.1f} s, load average at end {os.getloadavg()[0]:.1f}.",
         ]
@@ -335,6 +349,9 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument("--scorecards", type=Path)
     score.add_argument("--summary", type=Path)
     score.add_argument("--thresholds", type=Path, help="thresholds_v33.py JSON (candidate H)")
+    score.add_argument(
+        "--detectors", default="rules,ner", help="rules,ner (fast mode) or ner (model alone)"
+    )
     lat = sub.add_parser("latency")
     lat.add_argument("--model", action="append", required=True, help="name=dir (empty: v2.0)")
     lat.add_argument("--n", type=int, default=150)

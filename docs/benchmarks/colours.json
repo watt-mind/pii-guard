@@ -6,6 +6,7 @@
     "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base": "#332288",
     "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base@cpu": "#999933",
     "gateway-latency:fast:rules+ner:hdkiller/pii-guard-ner-xlmr-base@mps": "#0072B2",
+    "gateway-latency:fast:rules+ner:pii-guard-ner-v42-b3@cpu": "#009E73",
     "gateway-latency:fast:rules+ner:pii-guard-ner-xlmr-large-distilled": "#009E73",
     "gateway-latency:fast:rules+ner:watt-mind/pii-guard-ner-xlmr-base": "#332288",
     "gateway-latency:fast:rules+ner:watt-mind/pii-guard-ner-xlmr-base@cpu": "#999933",
@@ -67,6 +68,10 @@
     },
     "ner:horizon-small@decoder=word": {
       "color": "#009E73",
+      "shape": "circle"
+    },
+    "ner:v42-b3": {
+      "color": "#CC79A7",
       "shape": "circle"
     },
     "ner:wismut-nym@decoder=word": {
@@ -219,6 +224,10 @@
     },
     "rules+ner:pii-guard-ner-xlmr-base-v42-b4": {
       "color": "#009E73",
+      "shape": "circle"
+    },
+    "rules+ner:v42-b3": {
+      "color": "#999933",
       "shape": "circle"
     },
     "rules+ner:wismut-nym@decoder=word": {
