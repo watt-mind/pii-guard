@@ -83,6 +83,12 @@ about the words of a language, and drops a hit only when that shape rules person
    person. A name a language pack's lexicon knows (``Kovács``) and a hit that is part of a
    longer name (``Hans Luhn test``) are kept, like the software-name shortcuts.
 
+9. **Family words in firm names (LAB-1220).** A ``PERSON`` hit that is just the family word of
+   a Hungarian firm name (``Fia``, ``Fiai``, ``Lánya``, ``Társa`` in ``Balogh és Fia Kkt.``,
+   ``Simon & Társa Bt.``) goes: it says "and son" or "and partner", not who. It needs the
+   connector before it and the legal form after it (``languages/hu/companies.py``); the
+   member's surname (``Balogh``) is a separate hit and stays.
+
 Fail closed: anything else passes untouched. The rules, the LLM detector and the values a
 client pre-loaded (known values) are not checked here: they are validated or explicit.
 
@@ -577,6 +583,13 @@ def _eponym(text: str, start: int, end: int, persons: Sequence[Span]) -> bool:
     return not _part_of_name(text, probe, [p for p in persons if (p.start, p.end) != (start, end)])
 
 
+def _family_firm_word(text: str, start: int, end: int) -> bool:
+    """``Fia`` in ``Balogh és Fia Kkt.``: a firm's family word (module rule 9)."""
+    from pii_guard.languages.hu.companies import family_word_in_firm
+
+    return family_word_in_firm(text, start, end)
+
+
 def _vetoed(
     text: str,
     start: int,
@@ -626,7 +639,9 @@ def _vetoed(
         ):
             return True
     return entity_type is EntityType.PERSON and (
-        _software_context(text, start, end, language, persons) or _eponym(text, start, end, persons)
+        _software_context(text, start, end, language, persons)
+        or _eponym(text, start, end, persons)
+        or _family_firm_word(text, start, end)
     )
 
 
