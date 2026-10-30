@@ -169,6 +169,74 @@ class CallTrace:
             error = {"code": type(exc).__name__, "status": 500}
         self.finish(outcome=outcome, error=error)
 
+    def _resolve_model(self, model_checked: bool) -> str | None:
+        if not isinstance(self.model, str):
+            return None
+        if model_checked:
+            return _model_id(self.model)
+        return MODEL_WITHHELD
+
+    def _record_detectors(self) -> list[str]:
+        stats = self.stats
+        detectors = sorted((stats.detector_ms if stats else {}).keys())
+        if stats is not None and stats.images:
+            detectors.append("visual")
+        self.timer.add_detectors(dict(stats.detector_ms) if stats else {})
+        if stats is not None and stats.image_ms:
+            self.timer.add_detectors({"visual": stats.image_ms})
+        return detectors
+
+    def _apply_upstream_answer(self, event: dict[str, Any], model_checked: bool) -> tuple[Any, Any]:
+        upstream_answer = _json(self.upstream_body) if self.upstream_body is not None else None
+        answer = self.answer
+        if isinstance(upstream_answer, dict):
+            reported = _model_id(upstream_answer.get("model"))
+            if reported is not None and not model_checked:
+                reported = MODEL_WITHHELD
+            event["upstream"]["model"] = reported
+            if reported is not None and reported != upstream_answer.get("model"):
+                upstream_answer = {**upstream_answer, "model": reported}
+                if isinstance(answer, dict) and "model" in answer:
+                    answer = {**answer, "model": reported}
+            self.usage = upstream_answer.get("usage", self.usage)
+        if isinstance(self.usage, dict):
+            event["usage"] = {
+                k: v
+                for k, v in self.usage.items()
+                if isinstance(v, int) and not isinstance(v, bool)
+            }
+        return upstream_answer, answer
+
+    def _attach_payloads(
+        self,
+        obs: Observability,
+        event: dict[str, Any],
+        model: str | None,
+        upstream_answer: Any,
+        answer: Any,
+    ) -> None:
+        request: dict[str, Any] = {"masked": _json(self.masked_request)}
+        response: dict[str, Any] = {}
+        if self.upstream_body is not None:
+            response["masked"] = upstream_answer
+        elif self.stream_masked is not None:
+            response["masked"] = _streamed(self.stream_masked, self.stream_masked_tools)
+            response["chunks"] = self.stream_chunks
+        if self.full:
+            original = self.original
+            if isinstance(original, dict) and model is not None and model != self.model:
+                original = {**original, "model": model}
+            request["original"] = original
+            if answer is not None:
+                response["unmasked"] = answer
+            elif self.stream_restored is not None:
+                response["unmasked"] = _streamed(self.stream_restored, self.stream_restored_tools)
+        event["request"] = obs.scrub(request)
+        thumbnails = masked_thumbnails(self.masked_request)
+        if thumbnails:
+            event["request"]["thumbnails"] = thumbnails
+        event["response"] = obs.scrub(response) if response else None
+
     def finish(self, outcome: str = "ok", error: dict[str, Any] | None = None) -> None:
         if self._done:
             return
@@ -181,21 +249,10 @@ class CallTrace:
         if outcome == "ok" and stats is not None and (stats.upstream_status or 0) >= 400:
             outcome = "upstream_error"
             error = {"code": "upstream_error", "status": stats.upstream_status}
-        # The model passed its identifier check only if the outbound re-check ran clean.
         outbound = getattr(stats, "outbound", None)
         model_checked = outbound is not None and not outbound.hits
-        if not isinstance(self.model, str):
-            model = None
-        elif model_checked:
-            model = _model_id(self.model)
-        else:
-            model = MODEL_WITHHELD
-        detectors = sorted((stats.detector_ms if stats else {}).keys())
-        if stats is not None and stats.images:
-            detectors.append("visual")
-        self.timer.add_detectors(dict(stats.detector_ms) if stats else {})
-        if stats is not None and stats.image_ms:
-            self.timer.add_detectors({"visual": stats.image_ms})
+        model = self._resolve_model(model_checked)
+        detectors = self._record_detectors()
         event: dict[str, Any] = {
             "id": self.request_id,
             "time": datetime.now(UTC).isoformat(timespec="milliseconds"),
@@ -231,50 +288,9 @@ class CallTrace:
             "request": None,
             "response": None,
         }
-        upstream_answer = _json(self.upstream_body) if self.upstream_body is not None else None
-        answer = self.answer
-        if isinstance(upstream_answer, dict):
-            reported = _model_id(upstream_answer.get("model"))
-            if reported is not None and not model_checked:
-                reported = MODEL_WITHHELD
-            event["upstream"]["model"] = reported
-            if reported is not None and reported != upstream_answer.get("model"):
-                upstream_answer = {**upstream_answer, "model": reported}
-                if isinstance(answer, dict) and "model" in answer:
-                    answer = {**answer, "model": reported}
-            self.usage = upstream_answer.get("usage", self.usage)
-        if isinstance(self.usage, dict):
-            event["usage"] = {
-                k: v
-                for k, v in self.usage.items()
-                if isinstance(v, int) and not isinstance(v, bool)
-            }
+        upstream_answer, answer = self._apply_upstream_answer(event, model_checked)
         if self.payloads:
-            request: dict[str, Any] = {"masked": _json(self.masked_request)}
-            response: dict[str, Any] = {}
-            if self.upstream_body is not None:
-                response["masked"] = upstream_answer
-            elif self.stream_masked is not None:
-                response["masked"] = _streamed(self.stream_masked, self.stream_masked_tools)
-                response["chunks"] = self.stream_chunks
-            if self.full:
-                original = self.original
-                if isinstance(original, dict) and model is not None and model != self.model:
-                    original = {**original, "model": model}
-                request["original"] = original
-                if answer is not None:
-                    response["unmasked"] = answer
-                elif self.stream_restored is not None:
-                    response["unmasked"] = _streamed(
-                        self.stream_restored, self.stream_restored_tools
-                    )
-            event["request"] = obs.scrub(request)
-            # Added after scrubbing (which summarizes inline images): bounded WebP copies of
-            # the masked images only, never the originals (LAB-1188).
-            thumbnails = masked_thumbnails(self.masked_request)
-            if thumbnails:
-                event["request"]["thumbnails"] = thumbnails
-            event["response"] = obs.scrub(response) if response else None
+            self._attach_payloads(obs, event, model, upstream_answer, answer)
         obs.record(event)
 
 
