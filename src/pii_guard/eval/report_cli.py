@@ -186,9 +186,20 @@ def _marks(s: Mapping[str, Any]) -> str:
     return ("" if s.get("complete", True) else " †") + (" ‡" if s.get("rescored") else "")
 
 
+def _false_blocks(m: Mapping[str, Any]) -> str:
+    """``0.0% (0/120)``: the outbound re-check's false blocks of a snapshot, else ``—``."""
+    ob = m.get("outbound_check")
+    if not ob:
+        return "—"
+    return f"{fmt_pct(ob['rate'], sign=True)} ({ob['blocked']}/{ob['checked']})"
+
+
 def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
+    snaps = _ordered_snapshots(index, fixture_set)
+    # The outbound re-check column only once a run of the set measured it (LAB-1505).
+    outbound = any(s["all"].get("outbound_check") for s in snaps)
     rows = []
-    for s in _ordered_snapshots(index, fixture_set):
+    for s in snaps:
         m = s["all"]
         rows.append(
             [
@@ -202,6 +213,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
                 fmt_pct(m["over_masking"], sign=True),
                 fmt_pct(m["roundtrip"], sign=True),
                 fmt_duration(m["detect_p50_ms"]) + ("*" if m["latency_pooled"] else ""),
+                *([_false_blocks(m)] if outbound else []),
                 ", ".join(s["dates"]),
                 _commits(s),
             ]
@@ -218,6 +230,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             "Over-masking",
             "Round trip",
             "Detect p50",
+            *(["False blocks"] if outbound else []),
             "Run",
             "Commit",
         ],
@@ -232,6 +245,7 @@ def _set_table(index: Mapping[str, Any], fixture_set: str) -> str:
             "---:",
             "---:",
             "---:",
+            *(["---:"] if outbound else []),
             "---",
             "---",
         ],
@@ -495,8 +509,11 @@ def _segmenter_table(index: Mapping[str, Any]) -> str:
 
 
 def _latency_table(index: Mapping[str, Any]) -> str:
+    runs = charts.latest_latency(index)
+    # The re-check column only once a run recorded it (LAB-1505).
+    outbound = any(c.get("outbound_check_ms") for r in runs for c in r["cells"])
     rows = []
-    for run in charts.latest_latency(index):
+    for run in runs:
         for c in run["cells"]:
             o, t = c["overhead_ms"] or {}, c.get("added_ttft_ms") or {}
             det = c.get("stages_ms", {}).get("detect") or {}
@@ -512,6 +529,11 @@ def _latency_table(index: Mapping[str, Any]) -> str:
                     fmt_duration(det.get("p50")),
                     fmt_duration(t.get("p50")) if c["stream"] else "—",
                     fmt_duration(t.get("p95")) if c["stream"] else "—",
+                    *(
+                        [fmt_duration((c.get("outbound_check_ms") or {}).get("p50"))]
+                        if outbound
+                        else []
+                    ),
                     f"{run['upstream_delay_ms']:g}",
                     f"`{run['run_id']}`",
                 ]
@@ -528,6 +550,7 @@ def _latency_table(index: Mapping[str, Any]) -> str:
             "Detect p50",
             "Added TTFT p50",
             "p95",
+            *(["Re-check p50"] if outbound else []),
             "Upstream delay ms",
             "Run",
         ],
@@ -542,6 +565,7 @@ def _latency_table(index: Mapping[str, Any]) -> str:
             "---:",
             "---:",
             "---:",
+            *(["---:"] if outbound else []),
             "---:",
             "---",
         ],
