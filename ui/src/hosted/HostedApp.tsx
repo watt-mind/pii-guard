@@ -71,7 +71,7 @@ const NAV: readonly { href: string; label: string; wide?: boolean }[] = [
   { href: "#results", label: "Results" },
   { href: "#how", label: "How it works" },
   { href: "#data", label: "Your data", wide: true },
-  { href: "#api", label: "API", wide: true },
+  { href: "#api", label: "API" },
 ];
 /** Every section, for the nav's current-section marker: between two nav entries none is marked. */
 const SECTIONS = ["why", "demo", "meta", "europe", "images", "results", "how", "data", "privacy", "account"] as const;
@@ -208,7 +208,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:h-12 lg:px-10">
         <a href="#" className="flex h-11 shrink-0 items-center gap-2.5 rounded-sm whitespace-nowrap text-base font-medium text-ink"><Logo />PII Guard</a>
         <nav aria-label="Main navigation" className="flex min-w-0 items-center gap-1 sm:gap-2 md:gap-5">
-          {NAV.map((item) => <a key={item.href} aria-current={current === item.href.slice(1) ? "location" : undefined} className={["hidden text-muted hover:text-ink aria-[current]:text-ink aria-[current]:underline aria-[current]:decoration-guard aria-[current]:decoration-2 aria-[current]:underline-offset-[6px]", item.wide ? "lg:inline" : "md:inline"].join(" ")} href={item.href}>{item.label}</a>)}
+          {NAV.map((item) => <a key={item.href} aria-current={current === item.href.slice(1) ? "location" : undefined} className={["hidden min-h-9 items-center gap-1.5 whitespace-nowrap text-muted hover:text-ink aria-[current]:text-ink aria-[current]:underline aria-[current]:decoration-guard aria-[current]:decoration-2 aria-[current]:underline-offset-[6px]", item.wide ? "lg:inline-flex" : "md:inline-flex"].join(" ")} href={item.href}>{item.label}</a>)}
           <a className="hidden text-muted hover:text-ink md:inline" href={SELF_HOST}>Self-host</a>
           <SectionMenu current={current} />
           {signedIn ? <ButtonLink href={hasConsole ? "#overview" : "#account"}>{hasConsole ? "Console" : "Your account"}</ButtonLink> : <ButtonLink href={loginUrl}>Console</ButtonLink>}
@@ -466,7 +466,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <a className="text-ink hover:underline" href={SOURCE}>Source code</a>
           <a className="text-ink hover:underline" href={SELF_HOST}>Self-host</a>
           <a className="text-ink hover:underline" href={`${DOCS}/integrations/README.md`}>Integrate</a>
-          <a className="text-ink hover:underline" href="#api">API reference</a>
+          <a className="inline-flex items-center gap-1.5 whitespace-nowrap text-ink hover:underline" href="#api">API reference</a>
           <a className="text-ink hover:underline" href="#data">Your data</a>
           <a className="text-ink hover:underline" href={`${DOCS}/benchmarks.md`}>Benchmarks</a>
           {PRIVACY_NOTICE_URL && <a className="text-ink hover:underline" href={PRIVACY_NOTICE_URL}>Privacy notice</a>}
@@ -529,7 +529,7 @@ function SectionMenu({ current }: { current: string | null }) {
           const at = document.activeElement;
           if (at === link || at === document.body || at === null) document.querySelector<HTMLElement>(`${item.href} h2`)?.focus({ preventScroll: true });
         });
-      }} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2 aria-[current]:font-medium aria-[current]:text-guard">{item.label}</a></li>)}
+      }} className="flex min-h-11 items-center gap-1.5 rounded-md px-3 text-ink hover:bg-surface-2 aria-[current]:font-medium aria-[current]:text-guard">{item.label}</a></li>)}
       <li><a href={SELF_HOST} onClick={() => ref.current?.removeAttribute("open")} className="flex min-h-11 items-center rounded-md px-3 text-ink hover:bg-surface-2">Self-host ↗</a></li>
     </ul>
   </details>;

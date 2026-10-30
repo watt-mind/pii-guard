@@ -107,6 +107,15 @@ class Settings(BaseSettings):
     hosted_image_timeout: float = Field(default=60, gt=0, le=120)
     hosted_user_images_per_day: int = Field(default=20, ge=1, le=1000)
     hosted_global_images_per_day: int = Field(default=500, ge=1, le=100_000)
+    # Inline images in hosted chat and Responses (LAB-1439): off unless the operator opts in,
+    # and only with hosted_images on. Signed-in Google owners, on their own connection only
+    # (never the sponsored route), through the same local pipeline and one-job pool. Each
+    # image counts once against the daily image count and reserves this many provider input
+    # tokens on top of the text bound: well above what common vision tokenizers charge for
+    # one image at the hosted pixel cap (a few thousand at most).
+    hosted_chat_images: bool = False
+    hosted_chat_max_images: int = Field(default=1, ge=1, le=4)
+    hosted_image_input_tokens: int = Field(default=16_384, ge=1024, le=131_072)
 
     # Detection and policies for the REST API (/v1/analyze, /v1/mask).
     # Comma-separated registry names, run through the DetectionPipeline: "rules,llm". Unset:
@@ -176,6 +185,10 @@ class Settings(BaseSettings):
     image_max_pixels: int = Field(default=16_000_000, ge=1)
     image_concurrency: int = Field(default=2, ge=1)
     image_timeout: float = Field(default=120.0, gt=0)
+    # Whole request-body read deadline in seconds for the REST API (LAB-1566, LAB-1581): bytes
+    # alone don't stop a slow-loris client. Past it, 408 request_timeout and nothing is
+    # processed; raise it for large image bodies on slow links.
+    body_read_timeout: float = Field(default=30.0, gt=0)
 
     # Most live vault sessions; one more evicts the least recently used (docs/operations.md).
     vault_max_sessions: int = Field(default=10_000, ge=1)

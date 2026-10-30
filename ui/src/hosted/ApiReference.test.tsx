@@ -60,6 +60,7 @@ describe("the renderer's configuration (LAB-1586)", () => {
       agent: { disabled: true },
       forceDarkModeState: "light",
       hideDarkModeToggle: true,
+      documentDownloadType: "none",
     });
     expect(config).not.toHaveProperty("proxyUrl");
     expect(config).not.toHaveProperty("proxy");

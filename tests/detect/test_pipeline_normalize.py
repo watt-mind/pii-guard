@@ -113,7 +113,8 @@ def test_detectors_see_normalised_text_and_spans_map_back() -> None:
     text = f"Kedves Te{ZWSP}szt Elek!"
     stub = Recording("stub", {"Teszt Elek": E.PERSON})
     spans = DetectionPipeline([stub]).detect(text, "hu")
-    assert stub.seen == ["Kedves Teszt Elek!"]
+    # The same-case separator also runs a spaced view past the detectors (LAB-1252).
+    assert stub.seen == ["Kedves Teszt Elek!", "Kedves Te szt Elek!"]
     start = text.index("Te")
     assert triples(spans) == [(start, start + len(f"Te{ZWSP}szt Elek"), E.PERSON)]
     assert spans[0].text == f"Te{ZWSP}szt Elek"
@@ -130,6 +131,23 @@ def test_zero_width_space_between_words_is_seen_as_a_space() -> None:
     assert_fits(text, spans)
 
 
+def test_same_case_split_words_are_found_through_the_spaced_view() -> None:
+    # LAB-1252: ``teszt\u200belek`` reaches detectors as one token, so a first sighting
+    # written that way is found through the second, spaced view and mapped back over it.
+    text = f"Kedves teszt{ZWSP}elek!"
+    stub = Recording("stub", {"teszt elek": E.PERSON})
+    spans = DetectionPipeline([stub]).detect(text, "hu")
+    assert stub.seen == ["Kedves tesztelek!", "Kedves teszt elek!"]
+    assert [(sp.text, sp.start, sp.end) for sp in spans] == [(f"teszt{ZWSP}elek", 7, 17)]
+    assert_fits(text, spans)
+
+
+def test_clean_text_takes_no_second_detector_pass() -> None:
+    stub = Recording("stub", {"Teszt Elek": E.PERSON})
+    DetectionPipeline([stub]).detect("Kedves Teszt Elek!", "hu")
+    assert stub.seen == ["Kedves Teszt Elek!"]
+
+
 def test_clean_text_is_passed_through_identically() -> None:
     text = "Kedves Teszt Elek!"
     stub = Recording("stub", {"Teszt Elek": E.PERSON})
@@ -143,7 +161,16 @@ def test_every_detector_gets_the_same_normalised_text() -> None:
     text = f"Te{ZWSP}szt Elek, +36 30 555{ZWSP}0168"
     first, second = Recording("first"), Recording("second")
     DetectionPipeline([first, second]).detect(text, "hu")
-    assert first.seen == second.seen == ["Teszt Elek, +36 30 5550168"]
+    # Plus the spaced second view for the same-case separator (LAB-1252); the digit pair
+    # keeps its dropped reading there.
+    assert (
+        first.seen
+        == second.seen
+        == [
+            "Teszt Elek, +36 30 5550168",
+            "Te szt Elek, +36 30 5550168",
+        ]
+    )
 
 
 def test_a_span_that_does_not_fit_the_normalised_text_fails_closed() -> None:

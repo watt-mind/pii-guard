@@ -104,8 +104,9 @@ const ENTITY_DEFS: Record<EntityType, EntityDef> = {
     group: "identifier",
   },
   BANK_ACCOUNT: {
-    label: "Bank account",
-    short: "IBN",
+    // Covers IBANs and payment cards (docs/entities.md): never read as IBAN-only (LAB-1187).
+    label: "Bank account / card",
+    short: "BNK",
     policy: "mask",
     group: "identifier",
   },
