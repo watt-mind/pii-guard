@@ -4,12 +4,28 @@
 export type Section = "overview" | "playground" | "logs" | "vault" | "connect" | "policy" | "projects" | "evaluation";
 export type PlaygroundTab = "text" | "chat" | "images";
 
+/**
+ * `#cli-auth` (LAB-1708). With `port` and `state`: a CLI waits on its loopback callback.
+ * With neither: paste mode (`pii-guard login --code -`). `malformed`: a port or state was
+ * sent but is invalid, or only one of them was; the card then refuses the request.
+ */
+export interface CliHandoffParams {
+  port?: number;
+  state?: string;
+  telemetry?: "masked" | "stats";
+  /** A project id to preselect. */
+  project?: string;
+  malformed?: boolean;
+}
+
 export interface Route {
   section: Section;
   /** The Playground's sub-tab; only meaningful when `section` is "playground". */
   tab: PlaygroundTab;
   /** The Connect screen's client tab; only meaningful when `section` is "connect". */
   client?: string;
+  /** CLI browser-handoff parameters when opened via `#cli-auth` (LAB-1708). */
+  cliHandoff?: CliHandoffParams;
   /** The open vault session's ref; only meaningful when `section` is "vault". */
   ref?: string;
   /** The Evaluation screen's filters; only meaningful when `section` is "evaluation". */
@@ -70,8 +86,48 @@ const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 const TAB_IDS = new Set<string>(PLAYGROUND_TABS.map((t) => t.id));
 const CLIENT_IDS = new Set<string>(CONNECT_CLIENTS);
 
+export function cliHandoffQuery(params: CliHandoffParams | undefined): string {
+  if (!params) return "";
+  const query = new URLSearchParams();
+  if (params.port !== undefined) query.set("port", String(params.port));
+  if (params.state) query.set("state", params.state);
+  if (params.telemetry) query.set("telemetry", params.telemetry);
+  if (params.project) query.set("project", params.project);
+  if (params.malformed) query.set("invalid", "1");
+  return query.toString();
+}
+
+export function parseCliHandoffQuery(query: string): CliHandoffParams {
+  const params: CliHandoffParams = {};
+  const search = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+  const rawPort = search.get("port");
+  if (rawPort && /^\d+$/.test(rawPort)) {
+    const port = Number(rawPort);
+    if (port >= 1 && port <= 65535) params.port = port;
+  }
+  const state = search.get("state");
+  if (state && /^[A-Za-z0-9_-]{1,128}$/.test(state)) params.state = state;
+  const telemetry = search.get("telemetry");
+  if (telemetry === "masked" || telemetry === "stats") params.telemetry = telemetry;
+  const project = search.get("project");
+  if (project && /^[A-Za-z0-9_-]{1,128}$/.test(project)) params.project = project;
+  const sentPort = search.has("port");
+  const sentState = search.has("state");
+  const broken =
+    search.has("invalid") ||
+    sentPort !== sentState ||
+    (sentPort && params.port === undefined) ||
+    (sentState && params.state === undefined);
+  if (broken) params.malformed = true;
+  return params;
+}
+
 export function hashOf(route: Route): string {
   if (route.section === "playground") return `#playground/${route.tab}`;
+  if (route.section === "connect" && route.cliHandoff !== undefined) {
+    const query = cliHandoffQuery(route.cliHandoff);
+    return query ? `#cli-auth?${query}` : "#cli-auth";
+  }
   if (route.section === "connect" && route.client && CLIENT_IDS.has(route.client)) return `#connect/${route.client}`;
   if (route.section === "evaluation") {
     const query = evaluationQuery(route.evaluation);
@@ -118,6 +174,13 @@ export function parseHash(hash: string): { route: Route; redirect: boolean } | n
   if (legacy) return { route: legacy, redirect: true };
   // No hash, and the skip link's #main, are not routes: the section stays as it is.
   if (hash === "" || hash === "#" || hash === "#main") return null;
+  const cliMatch = /^#cli-auth(\?[^#]*)?$/.exec(hash);
+  if (cliMatch) {
+    return {
+      route: { section: "connect", tab: "text", cliHandoff: parseCliHandoffQuery(cliMatch[1] ?? "") },
+      redirect: false,
+    };
+  }
   // Client ids contain hyphens (`muse-code`); section ids don't. A vault ref is `s_<hex>`.
   const m = /^#([a-z]+)(?:\/([^/?#]+))?(\?[^#]*)?$/.exec(hash);
   // Any other unknown hash lands on the Overview, with the URL cleaned up.
@@ -157,6 +220,9 @@ export function routeFromLocation(): Route {
 export const sameRoute = (a: Route, b: Route) =>
   a.section === b.section &&
   (a.section !== "playground" || a.tab === b.tab) &&
-  (a.section !== "connect" || a.client === b.client) &&
+  (a.section !== "connect" ||
+    (a.client === b.client &&
+      Boolean(a.cliHandoff) === Boolean(b.cliHandoff) &&
+      cliHandoffQuery(a.cliHandoff) === cliHandoffQuery(b.cliHandoff))) &&
   (a.section !== "evaluation" || evaluationQuery(a.evaluation) === evaluationQuery(b.evaluation)) &&
   (a.section !== "vault" || a.ref === b.ref);

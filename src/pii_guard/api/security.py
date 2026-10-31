@@ -72,6 +72,9 @@ def _base64_decodings(field: bytes) -> list[bytes]:
 
 _WILDCARD_BINDS = {"0.0.0.0", "::", "[::]", ""}  # noqa: S104 - names, not a bind
 _PUBLIC_PATHS = frozenset({"/healthz"})
+#: Authenticated by the route itself, never by the API token: the one-time CLI login code
+#: exchange and the telemetry key's own logout (LAB-1708).
+_SELF_AUTHENTICATING_PATHS = frozenset({"/v1/cli/token"})
 
 
 def _host_pattern(host: str) -> str:
@@ -211,7 +214,8 @@ class BearerTokenMiddleware:
         return found, authenticates
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope.get("path") in _PUBLIC_PATHS:
+        path = scope.get("path", "")
+        if scope["type"] != "http" or path in _PUBLIC_PATHS or path in _SELF_AUTHENTICATING_PATHS:
             await self.app(scope, receive, send)
             return
         headers: list[tuple[bytes, bytes]] = list(scope.get("headers") or [])
@@ -223,7 +227,6 @@ class BearerTokenMiddleware:
             scheme, _, credential = value.partition(b" ")
             return credential.strip() if scheme.lower() == b"bearer" else None
 
-        path = scope.get("path", "")
         if (path.startswith("/e/") or path == "/muse-code/models") and any(
             name.lower() == b"authorization"
             and (credential := bearer_credential(value)) is not None
