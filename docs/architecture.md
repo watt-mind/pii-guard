@@ -1,18 +1,18 @@
 # Architecture
 
-> Status: implemented (v0.1.0 release). Architectural specification for the hackathon release.
+> Status: implemented on develop. Version 0.1.0 is planned as the first tagged release; nothing is tagged or published yet (see [CHANGELOG](../CHANGELOG.md)).
 
 ## Overview
 
 ```
-                ┌─────────────────────────── pii-guard ───────────────────────────┐
- request  ────► │ documents ──► detect ──────────► vault ──────► gateway (outbound)   │ ────► LLM
+                ┌───────────────────────────── pii-guard ──────────────────────────────┐
+ request  ────► │ documents ──► detect ──────────► vault ──────► gateway (outbound)    │ ────► LLM
  (text,         │  text+layout   rules → NER → LLM   keyed          masked request     │
   files,        │                    │               pseudonyms                        │
   images)       │ visual ────────────┘                  ▲                              │
                 │  OCR + YuNet + SAM 3.1 masks          │ mapping (never leaves)       │
  response ◄──── │ gateway (inbound) ◄── re-identify ────┘                              │ ◄──── stream
-                └─────────────────────────────────────────────────────────────────────┘
+                └──────────────────────────────────────────────────────────────────────┘
 ```
 
 Each stage is a separate module with a narrow interface, so it can be tested and benchmarked
@@ -45,7 +45,7 @@ confidence, detector)`:
    (`v4.2`; see [models.md](models.md#ner-detector)).
 3. **LLM detector** *(optional audit mode)*: **Muse Spark Open** (`meta-models/muse-spark-open-1026`)
    or **Muse Spark 1.3** via the Baseten or Meta Model API, used for offline/sampled quality
-   measurement, re-identification red-teaming, benchmark upper bounds, and teacher labeling.
+   measurement, re-identification red-teaming, and benchmark upper bounds.
    The LLM only returns candidate surface strings as JSON and never rewrites user text.
 
 A deterministic **resolver** merges overlapping spans (giving checksum-validated rules
@@ -94,6 +94,8 @@ remote/self-hosted signature segmentation:
 - **Signatures (`Meta SAM 3.1`):** **Meta SAM 3.1** (via the Meta Model API or a configured GPU
   endpoint, decoded with `meta-sam-parser`) segments handwritten signatures (and faces when
   `PII_GUARD_SEGMENTER=sam-api` is selected).
+- **Hosted:** Hosted deployments run `local` only: YuNet faces and a pinned YOLOS-tiny signature
+  detector, no SAM ([hosted.md](hosted.md)).
 - **Pixel-level sanitization:** The output image is re-encoded from pixels (no layers, no
   original metadata; EXIF is stripped) and masked regions carry the text session's placeholder
   labels where linked, so masked content cannot be recovered.
@@ -140,13 +142,14 @@ The synthetic corpus generator, the scorer, and the end-to-end leak test. Descri
 
 ## Deployment shape
 
-- **Fast mode (`fast`, default) runs 100% self-hosted on CPU:** A single container runs the API,
-  gateway, checksum rules, distilled XLM-RoBERTa NER (`watt-mind/pii-guard-ner-xlmr-base`
-  `v4.2`), Tesseract OCR, and YuNet face detection locally in-process. Zero GPU hardware and
-  zero external detector API calls are required on the production request path.
-- **Opt-in remote / GPU endpoints:** Audit mode (**Muse Spark Open** on Baseten or Meta Model
-  API, or self-hosted vLLM) and **Meta SAM 3.1** signature segmentation are opt-in remote or
-  GPU endpoints configured via environment variables.
+- **Text in fast mode (default) runs self-hosted on CPU:** one container runs the API, gateway,
+  checksum rules and the NER (`watt-mind/pii-guard-ner-xlmr-base` `v4.2`); no GPU and no
+  detector API call for text. Images add Tesseract OCR and YuNet on the CPU; the default
+  `hybrid` segmenter sends signatures to SAM 3.1 (unmasked pixels), and
+  `PII_GUARD_SEGMENTER=local` keeps images on the machine.
+- **Remote / GPU endpoints:** audit mode (Muse Spark Open on Baseten, or self-hosted vLLM) is
+  opt-in; SAM 3.1 is used by the default `hybrid` image segmenter for signatures (or for every
+  type with `sam-api`).
 - **Configuration and state boundaries:** Runtime settings are configured via environment
   variables (`.env.example`), while project, policy, and endpoint configurations are persisted
   separately from ephemeral in-memory vault state ([projects.md](projects.md)).
@@ -187,23 +190,24 @@ Using the gateway from a client: [architecture-gateway.md](architecture-gateway.
 
 ## Architectural decisions & resolved choices
 
-The initial design questions from the start of the hackathon were resolved and verified in the
-`v0.1.0` architecture:
+The initial design questions from the start of the hackathon were resolved in the implemented
+design:
 
 - **NER baseline resolved:** Instead of relying on an off-the-shelf checkpoint that over-masked
-  up to 23% of text, we distilled **Meta Muse Glimmer 30B** (combined with multilingual PII
+  23.1% on en-smoke, we distilled **Meta Muse Glimmer 30B** (combined with multilingual PII
   corpora and synthetic hard negatives) into an **XLM-RoBERTa base** student
   ([`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
   `v4.2`), achieving **0.0% leak** on the 4-language hand-written smoke set at **43 ms p50** on
-  CPU ([models.md](models.md#ner-detector)).
+  CPU (NER alone) ([models.md](models.md#ner-detector)).
 - **Hybrid vision resolved:** Visual masking uses a hybrid pipeline (`PII_GUARD_SEGMENTER=hybrid`)
   combining local **YuNet** for fast, zero-API face/ID-photo detection on CPU, **Meta SAM 3.1**
   for signature segmentation, and **Tesseract OCR** (plus caption and MRZ layout rules) for
   text in images ([models.md](models.md#which-model-does-what)).
-- **Mismatched or hallucinated placeholders:** The gateway rejects caller-supplied placeholder
-  syntax on ingress (preventing probing attacks) and fails closed on malformed or unrecognized
-  placeholder keys rather than leaking or guessing mappings
-  ([ADR 0006](decisions/0006-fail-closed.md)).
+- **Mismatched or invented placeholders:** A placeholder the model invents or mangles is left as
+  written and counted (`X-PII-Guard-Unresolved`); it is never guessed into a value. Input that
+  already contains a placeholder this session issued is refused (`placeholder_in_input`, 422),
+  and other placeholder-shaped tokens are reserved so they are never issued later
+  ([api.md](api.md)).
 - **Persistence and multi-project isolation:** Ephemeral placeholder-to-PII mappings live only
   in the in-memory session vault with a strict TTL and never touch disk, while project policies,
   immutable policy versions, and endpoint credentials are persisted separately in SQLite

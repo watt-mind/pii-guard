@@ -1,6 +1,6 @@
 # Documentation Portal
 
-Welcome to the **PII Guard** documentation (`v0.1.0`). Use the audience-oriented sections below
+Welcome to the **PII Guard** documentation. Use the audience-oriented sections below
 to navigate the hackathon evaluation materials, developer integration guides, system
 architecture, benchmarks, and operational runbooks.
 
@@ -40,7 +40,7 @@ regulatory alignment.*
 
 | Document | What it covers |
 |---|---|
-| [architecture.md](architecture.md) | Implemented `v0.1.0` specification: `documents`, `detect`, `visual`, `vault`, `gateway`, `api`, and resolved architectural decisions |
+| [architecture.md](architecture.md) | Implemented design: `documents`, `detect`, `visual`, `vault`, `gateway`, `api`, and resolved architectural decisions |
 | [privacy-model.md](privacy-model.md) | Threat model, trust boundaries, what PII Guard guarantees, and residual risks (including indirect re-identification) |
 | [eu-regulation.md](eu-regulation.md) | EU regulatory context: GDPR pseudonymization, cross-border transfers, sector rules, and the EU AI Act mapped to primary sources |
 | [contracts.md](contracts.md) | Public interfaces between internal modules: types, detector protocols, language registry, and REST API error contracts |
@@ -82,7 +82,7 @@ publishing releases.*
 
 | Document | What it covers |
 |---|---|
-| [journey.md](journey.md) | Dated engineering log: every PR milestone with before/after leak metrics, latency charts, and itemized ~$22 compute spend |
+| [journey.md](journey.md) | Dated engineering log: every PR milestone with before/after metrics, cost and decisions |
 | [roadmap.md](roadmap.md) | Hackathon execution record (Days 1–6 completed), the Glimmer → XLM-RoBERTa distillation pivot, and post-hackathon roadmap |
 
 ---

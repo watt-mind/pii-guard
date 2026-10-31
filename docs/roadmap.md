@@ -1,24 +1,13 @@
 # Execution Record & Roadmap
 
-> Status: Days 1–6 completed ahead of schedule (`v0.1.0` shipped). Detailed dated PR and
-> benchmark records live in [journey.md](journey.md).
+> Status: execution record. Dated PR and benchmark records live in [journey.md](journey.md).
 
 ## Hackathon Execution: October 26 – November 4, 2026
 
 Submission deadline: **November 4, 21:00 ET** (03:00 Budapest time on November 5).
 
-| Status | Day | Date | Milestone & Shipped Outcome |
-|---|---|---|---|
-| [x] | 1 | Mon Oct 26 | **Foundation, Rules, Vault & Gateway:** Clean-room repo scaffold, CI, checksum-validated rules (`hu`, `en`), HMAC-keyed session vault, streaming re-identification proxy, and initial scorer baselines. |
-| [x] | 2 | Tue Oct 27 | **Synthetic Corpus & Distillation Pivot:** Fictional identity generator, Muse Spark 1.3 document generator (5,004-call distillation corpus), and zero-shot **Meta Muse Glimmer 30B** teacher labeling on Modal H100. |
-| [x] | 3 | Wed Oct 28 | **Benchmark Suite & Head-to-Head Evaluation:** Open evaluation CLI, bootstrap CIs, decontamination gates, and head-to-head benchmarks against Presidio, LLM Guard, and PrivAiTe across 6 datasets. |
-| [x] | 4 | Thu Oct 29 | **Audit Detector, Red-Teaming & Language Packs:** **Muse Spark Open** detector on Baseten Model APIs, deterministic span-grounding resolver, prompt-injection & re-identification red-team harness, and German (`de`) + Polish (`pl`) language packs. |
-| [x] | 5 | Fri Oct 30 | **Multilingual NER v4.2 Release & Visual Pipeline:** Published [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2` (0.0% leak on the 4-language smoke set at 43 ms CPU p50), plus hybrid visual masking (local YuNet faces + Meta SAM 3.1 signatures + Tesseract OCR/MRZ). |
-| [x] | 6 | Sat Oct 31 | **Console, Hosted Multi-Project Runtime & v0.1.0 Release:** Unified owner-scoped console (*what the model saw* vs *what you got back*), immutable policy versions, endpoint keys, coding-agent integrations (Claude Code, Codex, OpenCode, pi, Muse Code), and `v0.1.0` release automation. |
-| [ ] | 7 | Sun Nov 1 | **Visual & Hosted Hardening:** Additional visual regression passes on multi-page scans and hosted deployment smoke verification. |
-| [ ] | 8 | Mon Nov 2 | **End-to-End Walkthrough Verification:** Repeatable judge walkthrough rehearsal ([demo-story.md](demo-story.md)) and final red-team/leak-gate audit across all fixture sets. |
-| [ ] | 9 | Tue Nov 3 | **Submission Polish & Demo Video:** Final 3-minute submission video recording ([demo-script.md](demo-script.md)) and submission package verification ([submission.md](submission.md)). |
-| [ ] | — | Wed Nov 4 | **Final Submission:** Submit before 21:00 ET deadline. |
+Dated milestones, with before/after metrics, are in [journey.md](journey.md); the original 9-day
+plan is kept in git history.
 
 ### Key Architectural Pivot: Teacher–Student Distillation over LLM Request-Path Fine-Tuning
 
@@ -39,21 +28,20 @@ design:
    ([`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
    `v4.2`).
 3. **Result:** Fast mode (`rules + distilled NER v4.2`) achieves **0.0% leak** and **1.3%
-   over-masking** across the 62-document hand-written test set (`hu`, `en`, `de`, `pl`) at
-   **43 ms p50 on CPU** with **$0 inference cost**. **Muse Spark Open** remains available in
-   opt-in `audit` mode for offline quality checks, teacher labeling, and red-team evaluation
+   over-masking** across the 62-document hand-written test set (`hu`, `en`, `de`, `pl`) with
+   **43 ms p50 of NER time per message on CPU** and **$0 inference cost**. **Muse Spark Open** remains available in
+   opt-in `audit` mode for offline quality checks and red-team evaluation
    ([models.md](models.md)).
 
-## Verified Day-1 through Day-6 Readiness Checks
+## Verified Readiness Checks
 
 - [x] **Meta Model API access & tiers verified:** Tested with live calls on fictional text;
       **Muse Spark 1.3** used for synthetic corpus generation ($1.05 for 5,004 billed calls)
       and downstream gateway demos ([models.md](models.md)).
 - [x] **Partner credits activated & metered (Baseten, Modal):** Baseten Model APIs ($100
       credit) used for **Muse Spark Open** (`meta-models/muse-spark-open-1026`) audit-mode
-      evaluation and red-teaming; Modal GPU credits used for **Muse Glimmer 30B** teacher
-      labeling and XLM-RoBERTa student training (~$22 total compute spend; itemized in
-      [journey.md](journey.md#spend-so-far)).
+      evaluation and red-teaming; Modal GPU credits used for Muse Glimmer 30B teacher
+      labeling and XLM-RoBERTa student training (costs per milestone in [journey.md](journey.md)).
 - [x] **Multilingual NER baseline selected & distilled:** Evaluated zero-shot encoders and
       shipped our own distilled checkpoint (`watt-mind/pii-guard-ner-xlmr-base` `v4.2`,
       Apache-2.0) with SHA-256 weight verification ([models.md](models.md#ner-detector)).
