@@ -13,8 +13,10 @@ const takeRefocus = () => { const wanted = refocusAfterSwitch; refocusAfterSwitc
 
 function useProjectSwitcherData(selected: string | null, enabled: boolean, triggerRef: RefObject<HTMLButtonElement | null>) {
   const [revision, setRevision] = useState(0);
+  const [attempt, setAttempt] = useState(0);
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [list, setList] = useState<ProjectList | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -23,9 +25,15 @@ function useProjectSwitcherData(selected: string | null, enabled: boolean, trigg
       if (!active || !Array.isArray(data.projects)) return;
       setList(data);
       if (!selected) setSelectedProject(data.default_project_id);
-    }).catch(() => { /* Older/offline guards keep their existing local console. */ });
+    }).catch(() => {
+      // Older/offline guards keep their existing local console, but the failure is shown
+      // (LAB-1714): it must never read as "no projects".
+      if (active) setFailed(true);
+    });
     return () => { active = false; };
-  }, [selected, enabled]);
+  }, [selected, enabled, attempt]);
+
+  const retry = () => { setFailed(false); setAttempt((n) => n + 1); };
 
   useEffect(() => {
     const update = () => setRevision((n) => n + 1);
@@ -47,7 +55,7 @@ function useProjectSwitcherData(selected: string | null, enabled: boolean, trigg
     triggerRef.current?.focus();
   }, [list, triggerRef]);
 
-  return { list, endpoints };
+  return { list, endpoints, failed, retry };
 }
 
 function ProjectMenuContent({
@@ -152,7 +160,21 @@ export function ProjectSwitcher({ manage = true, enabled = true }: { manage?: bo
   const selected = useSelectedProject();
   const endpoint = useSelectedEndpoint();
   const { open, close, triggerProps, menuProps } = useMenu();
-  const { list, endpoints } = useProjectSwitcherData(selected, enabled, triggerProps.ref);
+  const { list, endpoints, failed, retry } = useProjectSwitcherData(selected, enabled, triggerProps.ref);
+
+  // A fetch failure is shown, never swallowed: non-hosted used to render null, so a failure
+  // read as "no projects" (LAB-1714). The indicator holds the same header height as the menu;
+  // role=status keeps it polite so it never competes with the screen's assertive error alert.
+  if (!list && failed) {
+    return (
+      <div data-header-item role="status" className="inline-flex h-9 max-w-full min-w-0 items-center gap-2 rounded-lg border border-warn/40 bg-warn-soft px-3 text-sm text-warn pointer-coarse:h-11">
+        <span className="truncate">Projects unavailable</span>
+        <button type="button" onClick={retry} className="shrink-0 font-medium underline underline-offset-2 hover:text-ink">
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   // Hosted, the switcher always arrives: hold its place meanwhile, so the header doesn't shift (CLS, LAB-1626).
   if (!list) {

@@ -643,6 +643,11 @@ export function EmptyState({ title, body, children }: { title: string; body: str
  * refusal says the masked request did reach the upstream). Inbound: the answer could not be
  * restored, so nothing is shown. The hosted console never prints server text, which could echo
  * input; it shows the code and the mapped copy only.
+ *
+ * `onRetry` is required from every fetch-driven caller: an error with no recovery action
+ * strands the user (LAB-1714). Omit it only when the failure is terminal or the screen
+ * renders its own recovery control next to the notice, e.g. RoundTrip's "Mask the document
+ * again" for an expired session.
  */
 export function BlockedNotice({ error, phase = "outbound", onRetry }: { error: RunError; phase?: "outbound" | "inbound"; onRetry?: () => void }) {
   // Outbound copy depends on the code: an upstream refusal is not pii-guard failing closed (LAB-1335).
