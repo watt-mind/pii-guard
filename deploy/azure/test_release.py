@@ -459,7 +459,10 @@ class ReleaseTemplateTests(unittest.TestCase):
         template = self.resource("Microsoft.App/containerApps")["properties"]["template"]
         self.assertEqual(
             template["scale"],
-            {"minReplicas": "[if(equals(parameters('environmentName'), 'prod'), 1, 0)]", "maxReplicas": 1},
+            {
+                "minReplicas": "[if(equals(parameters('environmentName'), 'prod'), 1, 0)]",
+                "maxReplicas": 1,
+            },
         )
         self.assertNotIn("volumes", template)
         container = template["containers"][0]
