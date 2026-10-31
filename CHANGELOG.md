@@ -7,17 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-## [0.1.0] - 2026-10-31
-
-Initial open-source release of PII Guard (`wattmind-pii-guard`).
+Planned as the first tagged release, `0.1.0` (the version in `pyproject.toml`). Nothing is
+tagged or published yet; move these entries under `## [0.1.0] - <date>` when the tag is pushed.
 
 ### Added
 
 - **Reverse PII Masking Gateway**:
   - OpenAI-compatible reverse proxy with SSE streaming re-identification and request/response masking.
-  - In-memory and persisted HMAC-SHA256 pseudonym vault ensuring zero raw PII leaks to upstream LLM providers.
+  - Pseudonym vault with placeholders derived from a keyed HMAC-SHA256, in memory or persisted, so detected values are replaced before anything reaches the upstream LLM provider.
   - Fail-closed security architecture stopping requests when detection or masking cannot complete safely.
   - Mock upstream mode (`--mock`) enabling local offline development and demonstrations without third-party API keys.
 - **Multi-Model Detection Engine**:
@@ -32,9 +29,7 @@ Initial open-source release of PII Guard (`wattmind-pii-guard`).
   - One-command integration via `pii-guard connect` for coding agents: Codex, Claude Code, OpenCode, and Pi.
   - Direct execution via `uvx wattmind-pii-guard` and `uvx --from wattmind-pii-guard pii-guard`.
 - **Packaging & Delivery**:
-  - Python package published to PyPI as `wattmind-pii-guard` via GitHub Actions OpenID Connect (OIDC) Trusted Publishing.
-  - Container images published to GitHub Container Registry (`ghcr.io/watt-mind/pii-guard`).
+  - Tag-driven release workflow (`.github/workflows/release.yml`) for PyPI as `wattmind-pii-guard` via OIDC Trusted Publishing and for container images on `ghcr.io/watt-mind/pii-guard`, behind a CI provenance gate.
   - Size-budgeted wheel builds with automated isolated smoke tests (`scripts/ci/wheel_smoke.sh`).
 
-[Unreleased]: https://github.com/watt-mind/pii-guard/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/watt-mind/pii-guard/releases/tag/v0.1.0
+[Unreleased]: https://github.com/watt-mind/pii-guard/commits/develop
