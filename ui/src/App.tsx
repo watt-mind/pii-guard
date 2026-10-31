@@ -434,7 +434,7 @@ function PlaygroundTextPanel({ hidden, opened, playground, engine, chatClient, o
       {textView === "roundtrip" && (
         <PageLoadBoundary>
           <Suspense fallback={<p role="status">Loading round trip…</p>}>
-            <RoundTrip key={result?.mask.session_id ?? "none"} client={engine.client} result={result} answer={answer} onAnswer={setAnswer} running={running} onRun={() => void run()} />
+            <RoundTrip key={result?.mask.session_id ?? "none"} client={engine.client} result={result} answer={answer} onAnswer={setAnswer} running={running} onRun={() => void run()} maskError={error} />
           </Suspense>
         </PageLoadBoundary>
       )}
