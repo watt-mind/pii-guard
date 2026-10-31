@@ -554,10 +554,12 @@ class Attacker:
         for client in clients:
             client.close()
 
-    def _count(self, **deltas: int) -> None:
+    def count(self, **deltas: int) -> None:
         with self._lock:
             for key, delta in deltas.items():
                 self.usage[key] += delta
+
+    _count = count
 
     def _record_usage(self, usage: object) -> None:
         deltas = {"requests": 1}
@@ -572,7 +574,7 @@ class Attacker:
                 value = (usage.get(details) or {}).get(key)
                 if isinstance(value, int):
                     deltas[key] = value
-        self._count(**deltas)
+        self.count(**deltas)
 
     def complete(self, messages: list[dict[str, str]]) -> str:
         """The answer content. Raises :class:`RedTeamError` after the retries are spent."""
@@ -582,7 +584,7 @@ class Attacker:
         ).hexdigest()
         cached = self.cache_dir / f"{digest}.json" if self.cache_dir else None
         if cached is not None and cached.is_file():
-            self._count(cache_hits=1)
+            self.count(cache_hits=1)
             return json.loads(cached.read_text(encoding="utf-8"))["content"]
         last = "no attempt made"
         for _ in range(self.max_retries + 1):
@@ -737,10 +739,10 @@ def run_redteam(
         try:
             guesses = parse_guesses(attacker.complete(messages))
         except RedTeamError as exc:
-            attacker._count(failures=1)
+            attacker.count(failures=1)
             return _score(targets, None, context, candidates, error=exc.message)
         except ValueError:
-            attacker._count(failures=1)
+            attacker.count(failures=1)
             return _score(targets, None, context, candidates, error="unparseable answer")
         if progress:
             progress(f"{context} {result.document.id}")

@@ -25,6 +25,7 @@ bootstrap confidence intervals in ``docs/benchmarks.md`` are computed from those
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from collections import Counter
@@ -198,26 +199,9 @@ def _run_tool(name: str, documents: list[Document]) -> tuple[list[DocumentResult
     return results, {"section": section, "wall_s": round(time.perf_counter() - started, 1)}
 
 
-def run_dataset(
-    ds: Dataset,
-    systems: Sequence[str],
-    *,
-    record: bool = False,
-    limit: int | None = None,
-    runs_dir: Path = Path("eval/results/runs"),
-    counts_dir: Path = COUNTS_DIR,
-    day: str | None = None,
-    tag: str | None = None,
-) -> list[dict[str, Any]]:
-    """Run each system; returns one summary per system. Writes records when ``record``.
-
-    ``tag`` (``--tag``) appends a slug-safe suffix to the run slug
-    (``datasets-<set>-<system>[-<tag>]``), so a second fast-mode run on the same day gets
-    its own record instead of refusing to overwrite (LAB-1347).
-    """
-    from pii_guard.eval.record import build_records, host_info, write_records
-    from pii_guard.eval.report import build_scorecard
-
+def _prepare_dataset_documents(
+    ds: Dataset, systems: Sequence[str], limit: int | None
+) -> tuple[list[Path], list[Document]]:
     paths = ds.fixture_paths()
     missing = [p for p in paths if not p.is_file()]
     if missing:
@@ -238,42 +222,82 @@ def run_dataset(
         raise ValueError("audit calls a remote model: pass --limit N (documents per language)")
     if any(s == "audit" for s in systems) and not ds.synthetic:
         raise ValueError(f"{ds.name}: real documents are never sent to a remote model")
+    return paths, documents
+
+
+def _run_system_records(
+    ds: Dataset,
+    system: str,
+    slug_system: str,
+    documents: list[Document],
+    paths: list[Path],
+    limit: int | None,
+    day: str | None,
+) -> tuple[list[DocumentResult], list[dict[str, Any]]]:
+    from pii_guard.eval.record import build_records, host_info
+    from pii_guard.eval.report import build_scorecard
+
+    if system in PII_GUARD_SYSTEMS:
+        results, info = _run_pii_guard(system, documents)
+        card = build_scorecard(results, detectors=info["loaded"], fixture_paths=paths)
+        notes = [f"One warm-up call before timing; wall time {info['wall_s']} s."]
+        if info["blocked"]:
+            notes.append(f"{info['blocked']} document(s) blocked (fail closed); not scored.")
+        if ds.name == "ai4privacy" and "ner" in PII_GUARD_SYSTEMS[system]:
+            notes.append("NER v2 trained on OpenPII train rows: in distribution here.")
+        records = build_records(
+            card,
+            slug=f"datasets-{ds.name}-{slug_system}",
+            day=day,
+            detectors=info["detectors"],
+            hardware=host_info(),
+            extra={"system": {"label": _LABELS[system]}},
+            notes=[*notes, *_dataset_notes(ds, limit)],
+        )[:1]
+        return results, records
+
+    results, info = _run_tool(system, documents)
+    card = build_scorecard(results, detectors=[], fixture_paths=paths)
+    card["baselines"] = {system: info["section"]}
+    records = build_records(
+        card, slug=f"datasets-{ds.name}" + ("" if limit is None else f"-n{limit}"), day=day
+    )[1:]
+    for rec in records:
+        rec["notes"].append(f"Wall time {info['wall_s']} s.")
+        rec["notes"].extend(_dataset_notes(ds, limit))
+    return results, records
+
+
+def run_dataset(
+    ds: Dataset,
+    systems: Sequence[str],
+    *,
+    record: bool = False,
+    limit: int | None = None,
+    runs_dir: Path = Path("eval/results/runs"),
+    counts_dir: Path = COUNTS_DIR,
+    day: str | None = None,
+    tag: str | None = None,
+) -> list[dict[str, Any]]:
+    """Run each system; returns one summary per system. Writes records when ``record``.
+
+    ``tag`` (``--tag``) appends a slug-safe suffix to the run slug
+    (``datasets-<set>-<system>[-<tag>]``), so a second fast-mode run on the same day gets
+    its own record instead of refusing to overwrite (LAB-1347).
+    """
+    from pii_guard.eval.record import write_records
+
+    paths, documents = _prepare_dataset_documents(ds, systems, limit)
     summaries = []
     for system in systems:
         slug_system = system if limit is None else f"{system}-n{limit}"
         if tag:
-            import re as _re
-
-            if not _re.match(r"^[a-z0-9][a-z0-9.-]*$", tag):
+            if not re.match(r"^[a-z0-9][a-z0-9.-]*$", tag):
                 raise ValueError(f"--tag {tag!r} must be lower-case letters, digits, '.' and '-'")
             slug_system = f"{slug_system}-{tag}"
-        if system in PII_GUARD_SYSTEMS:
-            results, info = _run_pii_guard(system, documents)
-            card = build_scorecard(results, detectors=info["loaded"], fixture_paths=paths)
-            notes = [f"One warm-up call before timing; wall time {info['wall_s']} s."]
-            if info["blocked"]:
-                notes.append(f"{info['blocked']} document(s) blocked (fail closed); not scored.")
-            if ds.name == "ai4privacy" and "ner" in PII_GUARD_SYSTEMS[system]:
-                notes.append("NER v2 trained on OpenPII train rows: in distribution here.")
-            records = build_records(
-                card,
-                slug=f"datasets-{ds.name}-{slug_system}",
-                day=day,
-                detectors=info["detectors"],
-                hardware=host_info(),
-                extra={"system": {"label": _LABELS[system]}},
-                notes=[*notes, *_dataset_notes(ds, limit)],
-            )[:1]
-        else:
-            results, info = _run_tool(system, documents)
-            card = build_scorecard(results, detectors=[], fixture_paths=paths)
-            card["baselines"] = {system: info["section"]}
-            records = build_records(
-                card, slug=f"datasets-{ds.name}" + ("" if limit is None else f"-n{limit}"), day=day
-            )[1:]
-            for rec in records:
-                rec["notes"].append(f"Wall time {info['wall_s']} s.")
-                rec["notes"].extend(_dataset_notes(ds, limit))
+        results, records = _run_system_records(
+            ds, system, slug_system, documents, paths, limit, day
+        )
         rec = records[0]
         counts = {
             "run_id": rec["run_id"],
