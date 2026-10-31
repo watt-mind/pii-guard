@@ -5,7 +5,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { localRequest } from "./request";
-import { setSelectedProject } from "./selection";
+import { getSelectedProject, setSelectedProject } from "./selection";
 
 vi.mock("./request", () => ({ localRequest: vi.fn() }));
 const mockRequest = vi.mocked(localRequest);
@@ -41,4 +41,11 @@ it("recovers on retry after a transient failure", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByRole("button", { name: "Project: Example support desk" })).toBeInTheDocument();
   expect(screen.queryByRole("status")).toBeNull();
+});
+
+it("drops a selection the owner no longer has and uses the default project (LAB-1730)", async () => {
+  setSelectedProject("project-gone");
+  mockRequest.mockImplementation(async (path: string) => (path === "/v1/projects" ? projects : { endpoints: [] }));
+  render(<ProjectSwitcher />);
+  await vi.waitFor(() => expect(getSelectedProject()).toBe("project-one"));
 });
