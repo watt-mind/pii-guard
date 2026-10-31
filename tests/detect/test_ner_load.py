@@ -65,7 +65,8 @@ def fake_model(monkeypatch: pytest.MonkeyPatch) -> Iterator[type[FakeModel]]:
     FakeModel.fail_next = False
     monkeypatch.setattr(ner, "TransformersBackend", FakeModel)
     monkeypatch.setattr(ner, "dependencies_available", lambda: True)
-    # Without the ner extra (CI) the module defines no DETECTOR_CLASS; the registry needs one.
+    # Without torch/transformers (the rules-only image) the module defines no DETECTOR_CLASS;
+    # the registry needs one.
     monkeypatch.setattr(ner, "DETECTOR_CLASS", NerDetector, raising=False)
     monkeypatch.setattr(ner, "_shared_backends", {})
     for name in ("PII_GUARD_NER_DEVICE", "PII_GUARD_NER_BACKEND", "PII_GUARD_NER_REVISION"):

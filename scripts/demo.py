@@ -4,7 +4,7 @@ Fast mode by default: rules + the NER model (the public fallback is downloaded o
 ~/.cache/pii-guard/models; needs the ``ner`` extra). ``--mode rules`` is rules only, offline,
 nothing downloaded. Mock upstream unless one is configured. See docs/operations.md.
 
-    uv run --extra ner python scripts/demo.py [--mode fast|rules] [--no-ui] [--mock]
+    uv run python scripts/demo.py [--mode fast|rules] [--no-ui] [--mock]
         [--traffic-log masked|full]
 """
 

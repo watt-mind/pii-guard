@@ -85,9 +85,9 @@ baselines: ## compare with Presidio, LLM Guard and PrivAiTe (first run downloads
 
 # `make demo` runs fast mode: rules + NER. Without PII_GUARD_NER_MODEL the NER is the public
 # fallback model (docs/models.md), downloaded once (about 1.1 GB) into ~/.cache/pii-guard/models.
-# MODE=rules: rules only, offline, no NER extra and no model download.
+# MODE=rules: rules only, offline, no model download (torch/transformers stay installed, unused).
 MODE ?= fast
-DEMO_EXTRAS := --extra local-vision $(if $(filter rules,$(MODE)),,--extra ner)
+DEMO_EXTRAS := --extra local-vision
 
 demo: ## start API + gateway + UI on a mock upstream, fast mode (rules + NER); MODE=rules: offline
 	uv run --no-sync $(DEMO_EXTRAS) python -m pii_guard.visual.segment fetch
@@ -100,7 +100,7 @@ smoke: ## rules only (CI): start the stack on the mock upstream, send the demo t
 	uv run --no-sync python scripts/smoke.py --mode rules
 
 smoke-fast: ## fast mode (local): as smoke with rules + NER, the NER-only scenario must be masked
-	uv run --no-sync --extra ner python scripts/smoke.py --mode fast
+	uv run --no-sync python scripts/smoke.py --mode fast
 
 bench: ## gateway latency benchmark on the mock upstream (fast mode, concurrency 1 and 8)
 	uv run --no-sync pii-guard bench latency

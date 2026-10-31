@@ -10,7 +10,7 @@ what they return, so ``/v1/mask`` and gateway fast mode can't drift apart:
   rules only. Without a configured model it falls back to rules and logs one WARNING.
 - :func:`rest_detector_names` -- an explicit ``PII_GUARD_DETECTORS``, else the default stack.
 - :func:`warm_up` -- load the NER model before serving (LAB-1274), when ``PII_GUARD_NER_MODEL``
-  is set and the ``ner`` extra is installed.
+  is set and the NER dependencies are installed.
 - :class:`NerWarmup` -- without ``PII_GUARD_NER_MODEL``, load the resolved NER (download
   included) in a background thread at startup (LAB-1303); requests that need it wait for it,
   bounded, and get ``503 detector_loading`` or ``503 detection_unavailable`` only when it is
@@ -59,7 +59,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-NER_EXTRA_MISSING = "ner configured but the 'ner' extra is not installed"
+NER_EXTRA_MISSING = "ner configured but torch and transformers are not installed"
 
 
 class DetectionUnavailableError(DetectionError):
@@ -102,7 +102,7 @@ _warned_no_ner = False
 
 
 def _ner_available() -> bool:
-    """Whether the ``ner`` detector resolves (the ``ner`` extra is installed)."""
+    """Whether the ``ner`` detector resolves (torch and transformers are installed)."""
     try:
         resolve_detector("ner")
     except DetectionError:
@@ -141,9 +141,9 @@ def _warn_no_ner_once(reason: str) -> None:
 def default_detector_names(settings: Settings) -> tuple[str, ...]:
     """The default stack: gateway fast mode, and the REST API without ``PII_GUARD_DETECTORS``.
 
-    ``rules`` plus ``ner`` when the ``ner`` extra is installed and a model resolves
-    (:func:`ner_choice`). Raises :class:`DetectionError` when ``PII_GUARD_NER_MODEL`` is set
-    but the extra is missing.
+    ``rules`` plus ``ner`` when torch and transformers are installed (the default install;
+    the rules-only base Docker image skips them) and a model resolves (:func:`ner_choice`).
+    Raises :class:`DetectionError` when ``PII_GUARD_NER_MODEL`` is set but they are missing.
     """
     from pii_guard.detection_profile import is_local_only, require_detector
 
@@ -162,7 +162,7 @@ def default_detector_names(settings: Settings) -> tuple[str, ...]:
         return ("rules",)
     if settings.ner_model:
         raise DetectionError(NER_EXTRA_MISSING)
-    _warn_no_ner_once("the 'ner' extra is not installed")
+    _warn_no_ner_once("torch and transformers are not installed")
     return ("rules",)
 
 
@@ -212,7 +212,7 @@ def build_detectors(names: Sequence[str], settings: Settings | None = None) -> l
 def warm_up(settings: Settings) -> bool:
     """Load the configured NER model now, so the first requests don't race to load it.
 
-    Runs only when ``PII_GUARD_NER_MODEL`` is set and the ``ner`` extra is installed; returns
+    Runs only when ``PII_GUARD_NER_MODEL`` is set and torch/transformers are installed; returns
     whether it loaded. The REST API's and the gateway's NER detectors share the loaded model
     (:mod:`pii_guard.detect.ner`). A model that can't be loaded raises
     :class:`DetectionError` (fail closed: startup stops).

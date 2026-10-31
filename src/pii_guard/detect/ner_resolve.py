@@ -26,8 +26,8 @@ reused. Nothing here goes through a ``uv`` source.
 
 ::
 
-    uv run --extra ner python -m pii_guard.detect.ner_resolve status   # what would run
-    uv run --extra ner python -m pii_guard.detect.ner_resolve fetch    # download it now
+    uv run python -m pii_guard.detect.ner_resolve status   # what would run
+    uv run python -m pii_guard.detect.ner_resolve fetch    # download it now
 """
 
 from __future__ import annotations
@@ -46,6 +46,7 @@ from pii_guard.types import DetectionError
 
 __all__ = [
     "FALLBACK_ENV_VAR",
+    "NER_DEPS_MISSING",
     "PREVIOUS_PUBLISHED",
     "PREVIOUS_PUBLISHED_REPOS",
     "PREVIOUS_RELEASE",
@@ -67,6 +68,12 @@ REVISION_ENV_VAR = "PII_GUARD_NER_REVISION"
 PUBLISHED_ENV_VAR = "PII_GUARD_NER_PUBLISHED_MODEL"
 FALLBACK_ENV_VAR = "PII_GUARD_NER_FALLBACK"
 FALLBACK_MODES = ("download", "cached", "off")
+#: Why the NER can't run when torch/transformers don't import. They are core dependencies
+#: (LAB-1733); the rules-only base Docker image skips them on purpose.
+NER_DEPS_MISSING = (
+    "torch and transformers are not installed (the rules-only Docker image skips them); "
+    "reinstall wattmind-pii-guard to get the NER"
+)
 
 Source = Literal["configured", "published", "fallback", "none"]
 
@@ -142,8 +149,9 @@ def _sha256(path: Path) -> str:
 
 #: The public fallback (LAB-1192): bards.ai's EU PII detector v1, XLM-RoBERTa base fine-tuned
 #: for PII in the 24 EU languages (Hungarian, English and German among them). Apache-2.0 per
-#: its model card at this revision. It runs on the ``ner`` extra's transformers, unlike GLiNER
-#: (``gliner`` pins an older transformers); measured in eval/results/2026-10-27-fast-demo-ner/.
+#: its model card at this revision. It runs on the default install's transformers, unlike
+#: GLiNER (``gliner`` pins an older transformers); measured in
+#: eval/results/2026-10-27-fast-demo-ner/.
 PUBLIC_FALLBACK = PinnedModel(
     repo_id="bardsai/eu-pii-anonimization-multilang",
     revision="62ca5712368705bac11b8fea19e42e65cce088dd",
@@ -318,7 +326,9 @@ def ensure(
     try:
         from huggingface_hub import snapshot_download
     except ImportError:
-        raise DetectionError("ner download needs huggingface_hub (the 'ner' extra)") from None
+        raise DetectionError(
+            "ner download needs huggingface_hub (comes with transformers)"
+        ) from None
     try:
         snapshot_download(
             pinned.repo_id,
@@ -342,7 +352,7 @@ def ensure(
 
 
 def extra_installed() -> bool:
-    """The ``ner`` extra (torch, transformers) is importable."""
+    """The NER dependencies (torch, transformers) are importable."""
     return all(importlib.util.find_spec(m) is not None for m in ("torch", "transformers"))
 
 
@@ -376,7 +386,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if choice.model is None:
         return 0
     if not extra_installed():
-        print("ner: install the 'ner' extra first: uv sync --extra ner", file=sys.stderr)
+        print(f"ner: {NER_DEPS_MISSING}", file=sys.stderr)
         return 2
     try:
         print(f"ner: model directory {ensure(choice)}")

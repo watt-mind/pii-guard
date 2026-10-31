@@ -155,7 +155,7 @@ network; it carries no request content. The profile does not automatically fetch
 weights or fall back to another detector during startup or inference.
 
 ```bash
-uv sync --extra ner
+uv sync
 export PII_GUARD_DETECTION_PROFILE=local-only
 export PII_GUARD_NER_MODEL=/absolute/path/to/provisioned/checkpoint
 export PII_GUARD_NER_BACKEND=transformers
@@ -215,16 +215,17 @@ What it does:
   variable that holds its key (the value is never printed). Without one, a built-in mock
   upstream (the one below, on a random loopback port) echoes the masked text, and both the
   banner and a strip above the UI say so. `--mock` forces it.
-- **Mode.** Fast: rules, plus NER when the `ner` extra is installed (it pulls torch). The
+- **Mode.** Fast: rules plus NER (torch and transformers are in the default install). The
   NER model resolves as in [models.md](models.md#which-ner-model-fast-mode-runs): on the
   first run the published checkpoint or the public fallback is downloaded once (about 1.1 GB).
   The server answers at once and loads (or downloads) it in the background: `/healthz` and
   `/v1/status` say `"ner": "loading"`, and requests that need detection wait for it (up to
   `PII_GUARD_NER_WARMUP_TIMEOUT`, 120 s, then `503 detector_loading` with `Retry-After`;
   LAB-1303). The strip and the banner list the active detectors, the banner
-  names the NER model (`NER model  …@… (public fallback, Apache-2.0)`), and without the extra
-  it prints the exact `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up`
-  line to add NER.
+  names the NER model (`NER model  …@… (public fallback, Apache-2.0)`). Where torch and
+  transformers are missing (an install that skipped them) it says so and prints the exact
+  `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up` line to reinstall
+  (`[ner]` is now a no-op alias, kept so the line works on older releases too).
   `PII_GUARD_GATEWAY_MODE` overrides the mode.
 - **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and face detection (the
   `local-vision` extra with its model, or `META_API_KEY` for SAM 3.1; see
@@ -268,7 +269,7 @@ make smoke            # start, send the traffic, assert, stop; rules only (what 
 make smoke-fast       # the same in fast mode with the NER (local)
 ```
 
-**First run of `make demo`.** It installs the `ner` extra (torch, transformers) and, unless
+**First run of `make demo`.** It needs the default install (torch, transformers; `uv sync`) and, unless
 `PII_GUARD_NER_MODEL` is set, downloads the NER model before the API starts, printing
 `ner: downloading … (Apache-2.0, about 1110 MB, first run only)`. The model is the published
 PII Guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
@@ -295,8 +296,8 @@ It prints a banner with the URLs and what it found:
 - **Fast mode** uses rules + the NER model that resolves (`PII_GUARD_NER_MODEL`, else the
   published PII Guard checkpoint once it is pinned, else the public fallback) and names it,
   for example `fast mode  rules + NER: bardsai/eu-pii-anonimization-multilang@62ca57123687
-  (public fallback, Apache-2.0)`. Rules only with `MODE=rules`, or when the `ner` extra is
-  missing (the banner says so).
+  (public fallback, Apache-2.0)`. Rules only with `MODE=rules`, or when torch and
+  transformers are missing (the banner says so).
 - **Audit mode** (opt in with the header `X-PII-Guard-Mode: audit`) is available when an LLM
   detector key is set (`PII_GUARD_LLM_DETECTOR_API_KEY`, or `BASETEN_API_KEY`).
 
@@ -368,8 +369,8 @@ docker compose --profile demo up --build
 starts the same stack in containers: `mock-upstream`, `demo-api` on
 `http://127.0.0.1:8788` (traffic log `masked`, `fast` mode with the NER) and `ui` on
 `http://localhost:5173`, next to the plain `api` service on 8787. The demo services use their
-own image, `pii-guard:demo`, built with the `ner` extra (`PII_GUARD_EXTRAS` build argument;
-the plain `pii-guard:dev` image stays without torch). On Linux, torch comes from the PyTorch
+own image, `pii-guard:demo`, built with torch and transformers (`PII_GUARD_SKIP_PACKAGES=""`
+build argument; the plain `pii-guard:dev` image skips them and stays rules-only). On Linux, torch comes from the PyTorch
 CPU index (`[tool.uv.sources]` in `pyproject.toml`), so the image has no CUDA libraries
 (`nvidia-*`, `triton`): 1.9 GB on arm64 in `docker image ls` (424 MB content, a 1.2 GB
 virtualenv), down from 9.6 GB (3.42 GB content, a 5.6 GB virtualenv) with the PyPI wheel

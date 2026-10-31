@@ -33,3 +33,12 @@ tagged or published yet; move these entries under `## [0.1.0] - <date>` when the
   - Size-budgeted wheel builds with automated isolated smoke tests (`scripts/ci/wheel_smoke.sh`).
 
 [Unreleased]: https://github.com/watt-mind/pii-guard/commits/develop
+
+### Changed
+
+- The on-device NER is installed by default (LAB-1733): `torch`, `transformers` (>= 5.21), `sentencepiece` and `protobuf` are core dependencies, so `uvx wattmind-pii-guard` and `pii-guard up` run rules + NER without `[ner]`. The `ner` extra stays as an empty alias for existing commands.
+- The base Docker image stays rules-only and inside its size budget: it skips the NER packages (`PII_GUARD_SKIP_PACKAGES`). The compose demo image and the hosted image keep them.
+
+### Removed
+
+- The `gliner` extra and the `[tool.uv] conflicts` it needed (`gliner` pins `transformers < 5.17`). The GLiNER comparison (LAB-1150) can be reproduced from commit `13e2aaf` or earlier.

@@ -24,6 +24,13 @@ dependencies = [
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
     "uvicorn>=0.54.0",
+    # On-device NER is part of the default install (LAB-1733): fast mode is rules + NER. The
+    # model itself is fetched once, pinned by revision and SHA-256, on first use; the rules-only
+    # base Docker image skips these packages (Dockerfile) and falls back to rules.
+    "protobuf>=7.36.2",
+    "sentencepiece>=0.2.2",
+    "torch>=2.14.1",
+    "transformers>=5.21.0",
 ]
 
 [project.urls]
@@ -65,21 +72,10 @@ sam = [
 local-vision = [
     "opencv-python-headless>=4.10",
 ]
-ner = [
-    "protobuf>=7.36.2",
-    "sentencepiece>=0.2.2",
-    "torch>=2.14.1",
-    "transformers>=5.21.0",
-]
-# GLiNER (LAB-1150 comparison, docs/models.md): gliner 0.2.29 needs transformers < 5.17, so
-# it conflicts with `ner`; use its own environment (UV_PROJECT_ENVIRONMENT=.venv-gliner).
-gliner = [
-    "gliner==0.2.29",
-    "protobuf>=7.36.2",
-    "sentencepiece>=0.2.2",
-    "torch>=2.14.1",
-    "transformers>=4.51.3,<5.17",
-]
+# Kept so `wattmind-pii-guard[ner]` and `--extra ner` still work; the NER is a core dependency
+# now (LAB-1733). GLiNER (LAB-1150 comparison) needs transformers < 5.17 and was dropped from
+# this lock; reproduce it from commit 13e2aaf or earlier (docs/models.md).
+ner = []
 hosted-azure = [
     "azure-identity>=1.27.0",
     "azure-storage-blob>=12.31.0",
@@ -204,7 +200,7 @@ no_implicit_optional = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-# Optional extras (ner, ocr, baselines, local segmentation) and comparison tools without stubs.
+# NER deps, optional extras (ocr, baselines, local segmentation) and comparison tools without stubs.
 module = [
     "cv2.*",
     "gliner.*",
@@ -224,15 +220,6 @@ module = [
     "transformers.*",
 ]
 ignore_missing_imports = true
-
-[tool.uv]
-# presidio-analyzer caps numpy below 2.5; resolve the baselines extra on its own so it never
-# holds back another extra's numpy.
-conflicts = [
-    [{ extra = "baselines" }, { extra = "ner" }],
-    [{ extra = "gliner" }, { extra = "ner" }],
-    [{ extra = "gliner" }, { extra = "baselines" }],
-]
 
 [tool.uv.sources]
 de-core-news-lg = { url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" }
