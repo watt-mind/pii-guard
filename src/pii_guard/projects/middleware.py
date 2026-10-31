@@ -25,6 +25,9 @@ ENDPOINT_PATH = re.compile(
 #: (``/e/<id>/v1``) sends the endpoint key here; it is served as ``/e/<id>/muse-code/models``
 #: (LAB-1462). No other root route takes an endpoint key.
 MUSE_CATALOG = "/muse-code/models"
+#: The CLI login exchange and logout (LAB-1708): authenticated by a one-time code or by the
+#: telemetry key itself in the route, so both middlewares pass it through untouched.
+CLI_TOKEN_PATH = "/v1/cli/token"  # noqa: S105 - a route path
 
 
 class EndpointModelRequiredError(PiiGuardError):
@@ -37,6 +40,23 @@ class EndpointModelRequiredError(PiiGuardError):
 def endpoint_path(path: str) -> tuple[str, str] | None:
     match = ENDPOINT_PATH.fullmatch(path)
     return (match[1], match[2]) if match else None
+
+
+def key_scope_allows(snapshot: Any, routed: tuple[str, str] | None, method: str | None) -> bool:
+    """Whether the presenting endpoint key's scope admits this request (LAB-1708).
+
+    A ``telemetry`` key may only ``POST /e/<endpoint>/v1/traffic`` (and revoke itself at
+    :data:`CLI_TOKEN_PATH`, which never reaches this check); any other scope but ``full``
+    is refused everywhere."""
+    scope = getattr(snapshot, "key_scope", "full") if snapshot is not None else "full"
+    if scope == "full":
+        return True
+    return (
+        scope == "telemetry"
+        and routed is not None
+        and routed[1] == "/v1/traffic"
+        and method == "POST"
+    )
 
 
 def route_to_endpoint(scope: Scope, endpoint: str) -> Scope:
@@ -279,7 +299,11 @@ class ProjectMiddleware:
             raise ProjectAccessError("Project requests require the same origin")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or self.service.settings.hosted:
+        if (
+            scope["type"] != "http"
+            or self.service.settings.hosted
+            or scope.get("path") == CLI_TOKEN_PATH
+        ):
             await self.app(scope, receive, send)
             return
         headers = Headers(scope=scope)
@@ -288,6 +312,8 @@ class ProjectMiddleware:
         state: dict[str, Any] = {}
         try:
             scope, routed, snapshot = await self._authenticate_request(scope, headers)
+            if not key_scope_allows(snapshot, routed, scope.get("method")):
+                raise ProjectAccessError("A telemetry key can only post traffic events")
             path = scope.get("path", "")
             management = path == "/v1/projects" or path.startswith("/v1/projects/")
             selected = bool(

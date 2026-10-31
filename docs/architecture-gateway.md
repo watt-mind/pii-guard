@@ -1,5 +1,11 @@
 # Using the gateway
 
+> [!NOTE]
+> **Related guides:** For the REST & OpenAI-compatible route reference, authentication tokens,
+> and error code table, see [api.md](api.md) (and [openapi.json](openapi.json)). For runnable
+> client examples and coding agent setups (Claude Code, Codex, OpenCode, `pi`, Muse Code), see
+> [integrations.md](integrations.md) and [integrations/README.md](integrations/README.md).
+
 PII Guard's gateway is a drop-in for any OpenAI-compatible client: point the client at
 PII Guard instead of the provider. Every message is masked when it arrives, the masked request
 is forwarded, and the answer (streamed or not) comes back with the real values restored. How it

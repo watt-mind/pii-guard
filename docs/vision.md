@@ -45,11 +45,12 @@ personal data never has to leave your infrastructure either.
 
 ## Goals for the hackathon
 
-1. A working gateway that masks text and images and re-identifies streamed responses.
-2. Measured detection quality on an open synthetic Hungarian benchmark, with a clear
-   improvement from the open-weights LLM detector over a rules + NER baseline.
-3. Visual masking of scans and photos with OCR and SAM 3.1.
-4. A demo that shows *what the model saw* next to *what the user got back*.
+1. A working gateway that masks text, tool calls, and images, and re-identifies streamed responses.
+2. Measured detection quality across synthetic agent traffic and hand-written benchmarks in 4 languages
+   (`hu`, `en`, `de`, `pl`), with published leak rates, over-masking, and CPU latency.
+3. Hybrid visual masking of scans and document photos with Tesseract OCR, local YuNet face detection,
+   and Meta SAM 3.1 signature segmentation.
+4. A unified console and live demo that shows *what the model saw* next to *what the user got back*.
 
 ## Non-goals (for now)
 
@@ -59,5 +60,5 @@ personal data never has to leave your infrastructure either.
   rare event). Quasi-identifiers are out of scope for the first version; see
   [privacy-model.md](privacy-model.md).
 - **Audio and video.**
-- **Every EU language at once.** Hungarian first, built so other languages can be added
-  through configuration and their own rules.
+- **Every EU language at once.** Built-in support for Hungarian, English, German, and Polish today,
+  with a documented checklist and conformance suite to add more ([languages.md](languages.md)).

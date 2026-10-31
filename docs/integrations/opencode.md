@@ -18,13 +18,20 @@ export META_API_KEY=<your-key>              # or OPENAI_API_KEY, OPENROUTER_API_
 pii-guard run opencode                      # or: uvx --from wattmind-pii-guard pii-guard run opencode
 ```
 
-To also monitor masked traffic and stats on a remote dashboard (`https://guard.watt-mind.com` by
-default when a key is set, or any self-hosted PII Guard URL):
+To link a remote dashboard (`https://guard.watt-mind.com` by default, or any self-hosted PII Guard
+URL), sign in once with `pii-guard login`: the browser asks you to approve the CLI for a project,
+and the CLI saves that project's telemetry-only key in `~/.config/pii-guard/cli.json` (`0600`).
+`pii-guard logout` revokes the key on the dashboard and deletes the file
+([details](README.md#pii-guard-login-saved-telemetry-profile)).
 
 ```bash
-export PII_GUARD_DASHBOARD_KEY=<your-endpoint-or-dashboard-key>
-pii-guard run opencode --endpoint ep_abc123
+pii-guard login                             # browser approval, saves ~/.config/pii-guard/cli.json
+pii-guard run opencode                      # uses the saved profile
+# Local-only modes:
+pii-guard run opencode --dashboard off      # headless local gateway, zero remote telemetry
+pii-guard run opencode --dashboard local    # serves embedded local UI at http://127.0.0.1:<port>/#traffic
 # Self-hosted dashboard:
+pii-guard login --dashboard https://pii-guard.internal.example.com
 pii-guard run opencode --dashboard https://pii-guard.internal.example.com
 ```
 

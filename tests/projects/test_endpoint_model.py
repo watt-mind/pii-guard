@@ -164,7 +164,11 @@ def test_live_schema_is_still_the_pre_lab_1451_schema():
 
     from pii_guard.projects import store as module
 
-    assert master(module._SCHEMA) == master(PRE_LAB_1451_SCHEMA)
+    # LAB-1708 only adds tables; the frozen tables and their DDL are untouched, so a snapshot
+    # of this schema is recognised and upgraded on load.
+    assert master(module._SCHEMA_V1) == master(PRE_LAB_1451_SCHEMA)
+    assert module._SCHEMA == module._SCHEMA_V1 + module._SCHEMA_UPGRADE
+    assert set(master(PRE_LAB_1451_SCHEMA)) <= set(master(module._SCHEMA))
 
 
 def _old_snapshot() -> tuple[bytes, dict[str, str]]:

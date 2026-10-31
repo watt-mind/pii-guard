@@ -45,6 +45,8 @@ NON_DETECTING_POSTS = frozenset(
         "/v1/projects/{project_id}/endpoints",
         "/v1/projects/{project_id}/endpoints/models",
         "/v1/projects/{project_id}/endpoints/{endpoint_id}/keys",
+        "/v1/projects/{project_id}/cli-codes",
+        "/v1/cli/token",
     }
 )
 #: POST routes hosted mode adds (``pii_guard.hosted.routes``) that never run a detector.

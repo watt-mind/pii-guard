@@ -1,5 +1,11 @@
 # API guide
 
+> [!NOTE]
+> **Related guides:** Looking to connect a coding agent or SDK with runnable scripts? See
+> [integrations.md](integrations.md) and the [client harness guides](integrations/README.md).
+> For gateway detection modes (`fast` vs. `audit`), session continuity headers, and outbound
+> re-checks, see [architecture-gateway.md](architecture-gateway.md).
+
 PII Guard speaks the OpenAI API. Point an OpenAI SDK at the guard instead of the provider: it
 masks personal data in the request, sends only placeholders upstream, and restores them in the
 answer, streamed or not. Native routes mask, analyze and restore text without a model.

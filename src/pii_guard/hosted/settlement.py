@@ -267,7 +267,7 @@ _PARAMETERIZED_ROUTE_RE = re.compile(
 )
 _PROJECT_SUBPATH_RE = re.compile(
     r"/v1/projects/[A-Za-z0-9_-]+(?:/(?:policies|endpoints)"
-    r"(?:/[A-Za-z0-9_-]+(?:/keys(?:/[A-Za-z0-9_-]+)?)?)?)?"
+    r"(?:/[A-Za-z0-9_-]+(?:/keys(?:/[A-Za-z0-9_-]+)?)?)?|/cli-codes)?"
 )
 _PROJECT_POLICY_VERSION_RE = re.compile(
     r"/v1/projects/[A-Za-z0-9_-]+/policies/versions/[A-Za-z0-9_-]+"
@@ -449,10 +449,20 @@ def _classify_route(
     method: str | None,
     hosted_images: bool,
     expected_origin: str,
+    key_scope: str = "full",
 ) -> _RoutePlan:
     canonical = routed[1] if routed else _SESSION_PREFIX_RE.sub("", path)
     if routed is not None and canonical == "/v1/traffic" and method != "POST":
         raise HostedRequestError("Endpoint traffic route accepts POST only")
+    if key_scope != "full" and not (
+        key_scope == "telemetry"
+        and routed is not None
+        and canonical == "/v1/traffic"
+        and method == "POST"
+    ):
+        # A CLI login key (LAB-1708) writes the project's Logs and nothing else: no
+        # sponsored model call, catalog or other route, whatever the endpoint allows.
+        raise HostedRequestError("A telemetry key can only post traffic events")
     # Hosted images (ADR 0014): signed-in Google owners only, never by key or as a
     # guest, never through an endpoint path, and only while the operator offers them.
     image = canonical == IMAGE_PATH and hosted_images

@@ -33,7 +33,9 @@ export const SETUP_STEPS: readonly Step[] = [
 /** Reads the current (or default) project's policies, endpoints and their keys. */
 export async function loadSetup(call: Requester, account: Account): Promise<SetupState> {
   const list = await call<ProjectList>("/v1/projects");
-  const projectId = getSelectedProject() ?? list.default_project_id ?? list.projects[0]?.id;
+  const selected = getSelectedProject();
+  // A stale selection would read another project's 404s as a broken setup (LAB-1730).
+  const projectId = (selected && list.projects.some((p) => p.id === selected) ? selected : null) ?? list.default_project_id ?? list.projects[0]?.id;
   let policy = false;
   let endpoint = false;
   let key = false;

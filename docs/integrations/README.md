@@ -28,7 +28,7 @@ no gold value reached the upstream and that the files the agent wrote hold the r
 again. With `META_API_KEY` in the environment the Codex and OpenCode tests also run live
 against the Meta Model API.
 
-## One-command runner (`pii-guard run`)
+## One-command runner (`pii-guard run` & `pii-guard login`)
 
 To start an in-process local gateway on `127.0.0.1` and launch a coding agent immediately in a
 single terminal:
@@ -38,14 +38,55 @@ export META_API_KEY=<your-key>              # or OPENAI_API_KEY, OPENROUTER_API_
 pii-guard run opencode                      # also: codex, claude-code, pi, muse-code
 ```
 
-With a remote dashboard key set, the local gateway filters and forwards LLM traffic on-device
-while shipping scrubbed `masked` or `stats` telemetry to `https://guard.watt-mind.com` (or any
-self-hosted `--dashboard` URL):
+`run` picks where scrubbed telemetry goes, in this order: `--dashboard` / dashboard flags and the
+real environment (never a project's `./.env`), then the profile saved by `pii-guard login`. With
+neither, an interactive first run asks once (hosted, local only, or self-hosted) and saves the
+answer; a non-interactive run sends nothing.
+
+| Mode | How |
+| --- | --- |
+| Hosted dashboard | `pii-guard login`, then `pii-guard run opencode` |
+| Self-hosted dashboard | `pii-guard login --dashboard https://pii-guard.internal.example.com` |
+| Local web UI | `pii-guard run opencode --dashboard local` (serves `http://127.0.0.1:<port>/#traffic`) |
+| Off | `pii-guard run opencode --dashboard off` (or `pii-guard login --local` to make it the default) |
+
+An endpoint key can still be passed without logging in:
 
 ```bash
-export PII_GUARD_DASHBOARD_KEY=<your-endpoint-or-dashboard-key>
-pii-guard run opencode --endpoint ep_abc123
+export PII_GUARD_DASHBOARD_KEY=<your-endpoint-key>
+pii-guard run opencode --dashboard https://pii-guard.internal.example.com --endpoint ep_abc123
 ```
+
+Every dashboard URL, from a flag, the environment, a saved profile or a login response, must be
+`https://` (`http://` only for a loopback host) with no `user:pass@`; anything else is refused
+before a key or a masked body is sent.
+
+### `pii-guard login`: saved telemetry profile
+
+1. The CLI listens on a random port on `127.0.0.1` and opens
+   `<dashboard>/#cli-auth?port=<port>&state=<random>` (plus `&project=<id>` with `--project`).
+2. You approve the CLI for a project in the browser. The dashboard then sends the browser to
+   `http://127.0.0.1:<port>/callback?state=<state>&code=<code>`: a short-lived, single-use
+   code, never the key. A callback with a missing or wrong `state` is ignored and the CLI keeps
+   waiting (until `--timeout`, 180 s by default); the code is never logged.
+3. The CLI redeems the code with `POST <dashboard>/v1/cli/token` and receives the project's
+   endpoint and a **telemetry-only** key: the server accepts it only for posting telemetry to
+   that project's endpoint (and for revoking itself). If the response names
+   a different dashboard origin than the one the CLI opened, nothing is saved.
+4. The profile is written to `~/.config/pii-guard/cli.json` (or `$PII_GUARD_CLI_CONFIG`), created
+   with mode `0600` and replaced atomically. `pii-guard login --status` shows it without the key.
+   `run` only turns it into `PII_GUARD_REMOTE_URL` / `PII_GUARD_REMOTE_KEY` /
+   `PII_GUARD_REMOTE_LEVEL` for its in-process gateway; the agent never sees it.
+
+Headless or over SSH, `pii-guard login --no-browser` prints the URL and prompts for the code the
+dashboard shows, and `--code -` reads it from stdin. Before saving, the CLI prints the origin
+the telemetry will go to. `--code <value>` also works but leaves the code in your shell history.
+`--telemetry-level stats` keeps the CLI to counts and timings even if the project allows masked
+bodies.
+
+`pii-guard logout` revokes the key on the dashboard (`DELETE <dashboard>/v1/cli/token`) and then
+deletes `cli.json`. If the dashboard cannot be reached, the file is still deleted, the command
+exits 1, and you should revoke the key in the dashboard yourself.
 
 ## Quickstart (the Connect page)
 

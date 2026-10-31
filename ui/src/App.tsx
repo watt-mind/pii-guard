@@ -434,7 +434,7 @@ function PlaygroundTextPanel({ hidden, opened, playground, engine, chatClient, o
       {textView === "roundtrip" && (
         <PageLoadBoundary>
           <Suspense fallback={<p role="status">Loading round trip…</p>}>
-            <RoundTrip key={result?.mask.session_id ?? "none"} client={engine.client} result={result} answer={answer} onAnswer={setAnswer} running={running} onRun={() => void run()} />
+            <RoundTrip key={result?.mask.session_id ?? "none"} client={engine.client} result={result} answer={answer} onAnswer={setAnswer} running={running} onRun={() => void run()} maskError={error} />
           </Suspense>
         </PageLoadBoundary>
       )}
@@ -564,13 +564,20 @@ interface ConnectViewProps {
   onOpenSession: (ref: string) => void;
 }
 
+function connectRouteProps(route: Route) {
+  if (route.section !== "connect") return { initialClient: null, cliHandoff: null };
+  return { initialClient: route.client ?? null, cliHandoff: route.cliHandoff ?? null };
+}
+
 function ConnectView({ route, caps, status, server, hosted, hostedSnippets, trafficOpened, trafficHandle, onOpenLog, onOpenSession }: ConnectViewProps) {
-  const initialClient = route.section === "connect" ? (route.client ?? null) : null;
+  const { initialClient, cliHandoff } = connectRouteProps(route);
   const serverSnippets = !caps.accounts || (server !== null && hostedSnippets !== undefined);
   return (
     <Connect
       status={status}
       initialClient={initialClient}
+      cliHandoff={cliHandoff}
+      call={hosted?.call}
       serverSnippets={serverSnippets}
       loadSnippets={hostedSnippets}
       gatewayLine={!caps.accounts}

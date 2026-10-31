@@ -13,6 +13,7 @@ actions (:mod:`pii_guard.projects.visual`).
 from __future__ import annotations
 
 import base64
+import dataclasses
 import hashlib
 import hmac
 import json
@@ -21,6 +22,7 @@ import secrets
 import sqlite3
 import stat
 import threading
+import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -42,7 +44,9 @@ VISUAL_POLICY_ACTIONS = frozenset({Policy.MASK, Policy.KEEP})
 #: ``visual_detection`` values; the first is the default.
 VISUAL_DETECTIONS = ("local", "sam")
 
-_SCHEMA = """
+#: The schema every store had before LAB-1708; frozen, so a snapshot of it is recognised and
+#: upgraded by :data:`_SCHEMA_UPGRADE` (purely additive tables, no existing table changes).
+_SCHEMA_V1 = """
                 CREATE TABLE IF NOT EXISTS store_metadata (
                     name TEXT PRIMARY KEY, value BLOB NOT NULL
                 );
@@ -72,6 +76,28 @@ _SCHEMA = """
                     created_at TEXT NOT NULL, revoked_at TEXT
                 );
                 """
+#: LAB-1708: a key's scope (no row is ``full``; ``telemetry`` may only post ``/v1/traffic``
+#: and revoke itself) and one-time CLI login codes (SHA-256 digests only, single use).
+_SCHEMA_UPGRADE = """
+                CREATE TABLE IF NOT EXISTS endpoint_key_scopes (
+                    key_id TEXT PRIMARY KEY REFERENCES endpoint_keys(id) ON DELETE CASCADE,
+                    scope TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS cli_codes (
+                    digest BLOB PRIMARY KEY, owner_id TEXT NOT NULL,
+                    project_id TEXT NOT NULL REFERENCES projects(id),
+                    telemetry_level TEXT NOT NULL, hostname TEXT,
+                    expires_at REAL NOT NULL, created_at TEXT NOT NULL
+                );
+                """
+_SCHEMA = _SCHEMA_V1 + _SCHEMA_UPGRADE
+
+#: Key scopes: ``full`` (every endpoint route) or ``telemetry`` (LAB-1708).
+KEY_SCOPES = ("full", "telemetry")
+#: One-time CLI login codes: lifetime, live codes per owner (the oldest is evicted) and overall.
+CLI_CODE_TTL_SECONDS = 300
+CLI_CODES_PER_OWNER = 5
+CLI_CODES_TOTAL = 4096
 
 
 class ProjectNotFoundError(PiiGuardError):
@@ -114,6 +140,22 @@ class EndpointSnapshot:
     policy_version_id: str
     policy_version: int
     policy: Mapping[str, Any]
+    #: The presenting key's scope when resolved from an endpoint key (LAB-1708).
+    key_scope: str = "full"
+
+
+def _schema_master(schema: str) -> list[tuple[Any, ...]]:
+    reference = sqlite3.connect(":memory:")
+    try:
+        reference.executescript(schema)
+        return [
+            tuple(row)
+            for row in reference.execute(
+                "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name"
+            ).fetchall()
+        ]
+    finally:
+        reference.close()
 
 
 def _now() -> str:
@@ -227,19 +269,20 @@ class ProjectStore:
                 if not isinstance(snapshot, bytes) or not 0 < len(snapshot) <= 8 * 1024 * 1024:
                     raise ProjectStorageError()
                 db.deserialize(snapshot)
-                # No extension loading, triggers, views or implicit migrations are accepted.
-                reference = sqlite3.connect(":memory:")
-                try:
-                    reference.executescript(_SCHEMA)
-                    expected = reference.execute(
-                        "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name"
-                    ).fetchall()
-                finally:
-                    reference.close()
-                actual = db.execute(
-                    "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name"
-                ).fetchall()
-                if [tuple(row) for row in actual] != expected:
+
+                # No extension loading, triggers or views are accepted, and the only migration
+                # is the explicit, additive one from the exact previous schema (LAB-1708).
+                def actual() -> list[tuple[Any, ...]]:
+                    return [
+                        tuple(row)
+                        for row in db.execute(
+                            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name"
+                        ).fetchall()
+                    ]
+
+                if actual() == _schema_master(_SCHEMA_V1):
+                    db.executescript(_SCHEMA_UPGRADE)
+                if actual() != _schema_master(_SCHEMA):
                     raise ProjectStorageError()
                 if [tuple(row) for row in db.execute("PRAGMA integrity_check")] != [("ok",)]:
                     raise ProjectStorageError()
@@ -271,7 +314,7 @@ class ProjectStore:
         detection_profile: str,
         snapshot: bytes | None = None,
     ) -> ProjectStore:
-        """Build a bounded private in-memory engine; existing snapshots are never migrated."""
+        """Build a bounded private in-memory engine; only a previous-schema snapshot is upgraded."""
         if len(key) < 32 or detection_profile not in {"standard", "local-only"}:
             raise ProjectStorageError()
         instance = cls.__new__(cls)
@@ -721,9 +764,18 @@ class ProjectStore:
 
     @staticmethod
     def _key_metadata(row: sqlite3.Row) -> dict[str, Any]:
-        return {key: row[key] for key in ("id", "name", "created_at", "revoked_at")}
+        return {key: row[key] for key in ("id", "name", "created_at", "revoked_at", "scope")}
 
-    def issue_key(self, owner: str, project: str, endpoint: str, name: str) -> dict[str, Any]:
+    _KEY_ROWS = (
+        "SELECT k.*, COALESCE(s.scope, 'full') AS scope FROM endpoint_keys k "
+        "LEFT JOIN endpoint_key_scopes s ON s.key_id = k.id"
+    )
+
+    def issue_key(
+        self, owner: str, project: str, endpoint: str, name: str, *, scope: str = "full"
+    ) -> dict[str, Any]:
+        if scope not in KEY_SCOPES:
+            raise InvalidProjectConfigError()
         with self._transaction() as db:
             self._project(db, owner, project)
             row = self._endpoint(db, project, endpoint)
@@ -757,7 +809,9 @@ class ProjectStore:
                 "INSERT INTO endpoint_keys VALUES (?, ?, ?, ?, ?, NULL)",
                 (key_id, endpoint, _name(name), hashlib.sha256(secret.encode()).digest(), _now()),
             )
-            row = db.execute("SELECT * FROM endpoint_keys WHERE id = ?", (key_id,)).fetchone()
+            if scope != "full":
+                db.execute("INSERT INTO endpoint_key_scopes VALUES (?, ?)", (key_id, scope))
+            row = db.execute(self._KEY_ROWS + " WHERE k.id = ?", (key_id,)).fetchone()
             return {**self._key_metadata(row), "key": secret}
 
     def list_keys(self, owner: str, project: str, endpoint: str) -> list[dict[str, Any]]:
@@ -767,7 +821,7 @@ class ProjectStore:
             return [
                 self._key_metadata(row)
                 for row in db.execute(
-                    "SELECT * FROM endpoint_keys WHERE endpoint_id = ? ORDER BY created_at",
+                    self._KEY_ROWS + " WHERE k.endpoint_id = ? ORDER BY k.created_at",
                     (endpoint,),
                 )
             ]
@@ -803,14 +857,90 @@ class ProjectStore:
             return None
         with self._transaction() as db:
             row = db.execute(
-                "SELECT e.project_id, p.owner_id FROM endpoint_keys k "
+                "SELECT e.project_id, p.owner_id, COALESCE(s.scope, 'full') AS scope "
+                "FROM endpoint_keys k "
                 "JOIN endpoints e ON e.id = k.endpoint_id JOIN projects p ON p.id = e.project_id "
+                "LEFT JOIN endpoint_key_scopes s ON s.key_id = k.id "
                 "WHERE k.digest = ? AND k.endpoint_id = ? AND k.revoked_at IS NULL AND e.enabled=1",
                 (hashlib.sha256(secret.encode()).digest(), endpoint),
             ).fetchone()
             if row is None:
                 return None
-            return self._snapshot(row["owner_id"], self._endpoint(db, row["project_id"], endpoint))
+            snapshot = self._snapshot(
+                row["owner_id"], self._endpoint(db, row["project_id"], endpoint)
+            )
+            # An unknown stored scope is never widened to full access.
+            scope = row["scope"] if row["scope"] in KEY_SCOPES else "telemetry"
+            return dataclasses.replace(snapshot, key_scope=scope)
+
+    def revoke_presented_key(self, secret: str) -> bool:
+        """Revoke the live ``telemetry``-scoped key ``secret`` itself (CLI logout, LAB-1708)."""
+        if not isinstance(secret, str) or not secret.startswith("pg_ep_") or len(secret) > 128:
+            return False
+        with self._transaction() as db:
+            cursor = db.execute(
+                "UPDATE endpoint_keys SET revoked_at = ? WHERE digest = ? AND revoked_at IS NULL "
+                "AND id IN (SELECT key_id FROM endpoint_key_scopes WHERE scope = 'telemetry')",
+                (_now(), hashlib.sha256(secret.encode()).digest()),
+            )
+            return cursor.rowcount == 1
+
+    def create_cli_code(
+        self,
+        owner: str,
+        project: str,
+        telemetry_level: str,
+        hostname: str | None,
+        *,
+        now: float | None = None,
+    ) -> dict[str, Any]:
+        """Store a one-time CLI login code's SHA-256 digest and return the code once."""
+        if telemetry_level not in ("masked", "stats"):
+            raise InvalidProjectConfigError()
+        if hostname is not None:
+            hostname = _name(hostname, maximum=57)
+        moment = time.time() if now is None else now
+        code = secrets.token_urlsafe(32)
+        with self._transaction() as db:
+            self._project(db, owner, project)
+            db.execute("DELETE FROM cli_codes WHERE expires_at <= ?", (moment,))
+            db.execute(
+                "DELETE FROM cli_codes WHERE digest IN (SELECT digest FROM cli_codes "
+                "WHERE owner_id = ? ORDER BY expires_at DESC LIMIT -1 OFFSET ?)",
+                (owner, CLI_CODES_PER_OWNER - 1),
+            )
+            if db.execute("SELECT COUNT(*) FROM cli_codes").fetchone()[0] >= CLI_CODES_TOTAL:
+                raise InvalidProjectConfigError()
+            db.execute(
+                "INSERT INTO cli_codes VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    hashlib.sha256(code.encode()).digest(),
+                    owner,
+                    project,
+                    telemetry_level,
+                    hostname,
+                    moment + CLI_CODE_TTL_SECONDS,
+                    _now(),
+                ),
+            )
+        return {"code": code, "expires_in": CLI_CODE_TTL_SECONDS}
+
+    def redeem_cli_code(self, code: str, *, now: float | None = None) -> dict[str, Any] | None:
+        """Consume a CLI login code: deleted on first use even if expired; ``None`` if invalid."""
+        if not isinstance(code, str) or not 32 <= len(code) <= 128:
+            return None
+        digest = hashlib.sha256(code.encode()).digest()
+        moment = time.time() if now is None else now
+        with self._transaction() as db:
+            row = db.execute("SELECT * FROM cli_codes WHERE digest = ?", (digest,)).fetchone()
+            if row is None or not hmac.compare_digest(bytes(row["digest"]), digest):
+                return None
+            db.execute("DELETE FROM cli_codes WHERE digest = ?", (digest,))
+            if row["expires_at"] <= moment:
+                return None
+            return {
+                key: row[key] for key in ("owner_id", "project_id", "telemetry_level", "hostname")
+            }
 
     def close(self) -> None:
         with self._lock:

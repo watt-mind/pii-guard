@@ -47,7 +47,7 @@ describe("Playground Text (LAB-1441)", () => {
   it("keeps Mask document focusable while it runs", async () => {
     const user = userEvent.setup();
     const { onRun, rerender, ...props } = renderPlayground();
-    const button = screen.getByRole("button", { name: /mask document/i });
+    const button = topRunButton();
     await user.click(button);
     expect(onRun).toHaveBeenCalledTimes(1);
     rerender(<Playground {...props} onRun={onRun} running />);
@@ -67,7 +67,7 @@ describe("Playground Text (LAB-1441)", () => {
     expect(within(header).queryByRole("combobox")).toBeNull();
     expect(within(header).queryByRole("button")).toBeNull();
     expect(screen.getByRole("combobox", { name: "Document language" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /mask document/i })).toBeInTheDocument();
+    expect(topRunButton()).toBeInTheDocument();
     expect(within(footer).getByRole("button", { name: "Clear" })).toBeInTheDocument();
   });
 
@@ -78,5 +78,31 @@ describe("Playground Text (LAB-1441)", () => {
     const alert = screen.getByRole("alert");
     await user.click(within(alert).getByRole("button", { name: "Retry" }));
     expect(onRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** The Mask document button above the panes, not the empty-state CTA in the model pane (LAB-1713). */
+function topRunButton() {
+  const pane = screen.getByRole("region", { name: "What the model saw" });
+  return screen.getAllByRole("button", { name: /mask document/i }).find((b) => !pane.contains(b))!;
+}
+
+function emptyStateCta() {
+  return within(screen.getByRole("region", { name: "What the model saw" })).getByRole("button", { name: /mask this document/i });
+}
+
+describe("Playground empty-state CTA (LAB-1713)", () => {
+  it("masks the document through the same handler as the top button", async () => {
+    const user = userEvent.setup();
+    const { onRun } = renderPlayground();
+    expect(screen.getByText("Nothing has been sent yet")).toBeInTheDocument();
+    await user.click(emptyStateCta());
+    expect(onRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("is disabled with no text, like the top button", () => {
+    renderPlayground({ text: "   " });
+    expect(emptyStateCta()).toBeDisabled();
+    expect(topRunButton()).toBeDisabled();
   });
 });
