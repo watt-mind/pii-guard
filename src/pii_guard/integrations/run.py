@@ -1,0 +1,703 @@
+"""``pii-guard run <client>``: start a local on-device gateway and launch a coding agent.
+
+```
+pii-guard run opencode [--upstream meta|openai|fireworks|openrouter] [--model ID]
+                       [--dashboard URL] [--dashboard-key KEY] [--endpoint ID]
+                       [--telemetry-level masked|stats] [-- <agent_args>...]
+pii-guard run codex|claude-code|pi|muse-code [options] [-- <agent_args>...]
+```
+
+All PII detection and masking run locally in-process on ``127.0.0.1`` and the masked prompt goes
+straight from the local machine to the upstream LLM provider. When a remote dashboard key or URL
+is supplied (defaulting to ``https://guard.watt-mind.com`` when a key is present, or any
+self-hosted ``--dashboard`` URL), scrubbed ``masked`` or ``stats`` telemetry is shipped in the
+background via ``PII_GUARD_REMOTE_URL`` / ``PII_GUARD_REMOTE_KEY`` / ``PII_GUARD_REMOTE_LEVEL``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import os
+import re
+import secrets
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
+
+from pydantic import SecretStr
+
+from pii_guard.app_bundle import MockServer
+from pii_guard.config import Settings, get_settings
+from pii_guard.gateway import GatewayConfig, Mode
+from pii_guard.gateway.config import cli_mode
+from pii_guard.integrations import snippets
+from pii_guard.integrations.common import ConnectError, fetch_models
+from pii_guard.upstreams import PRESETS, Upstream, by_url
+
+__all__ = [
+    "AUTO_UPSTREAM_ORDER",
+    "DEFAULT_DASHBOARD_URL",
+    "RUNNABLE_CLIENTS",
+    "DashboardTarget",
+    "ResolvedUpstream",
+    "build_agent_invocation",
+    "build_parser",
+    "main",
+    "resolve_dashboard",
+    "resolve_upstream",
+    "split_agent_argv",
+]
+
+RUNNABLE_CLIENTS = ("opencode", "codex", "claude-code", "pi", "muse-code")
+AUTO_UPSTREAM_ORDER = ("meta", "openai", "openrouter", "fireworks")
+DEFAULT_DASHBOARD_URL = "https://guard.watt-mind.com"
+ANTHROPIC_UPSTREAM_URL = "https://api.anthropic.com/v1"
+ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-5"
+MOCK_DEFAULT_MODEL = "pii-guard-mock"
+_ENDPOINT_ID_RE = re.compile(r"^(?:/?e/)?([A-Za-z0-9_-]{1,64})(?:/v1(?:/traffic)?)?/?$")
+
+
+@dataclass(frozen=True)
+class ResolvedUpstream:
+    """The upstream provider URL, API key value, and optional preset."""
+
+    base_url: str
+    api_key: str
+    label: str
+    preset: Upstream | None = None
+    mock: bool = False
+
+
+@dataclass(frozen=True)
+class DashboardTarget:
+    """Resolved remote dashboard ingestion settings and display URL."""
+
+    remote_url: str | None
+    remote_key: str | None
+    remote_level: str
+    display_url: str | None
+
+
+def split_agent_argv(argv: Sequence[str]) -> tuple[list[str], list[str]]:
+    """Split ``argv`` at ``--`` into ``(run_args, agent_args)``."""
+    items = list(argv)
+    if "--" in items:
+        idx = items.index("--")
+        return items[:idx], items[idx + 1 :]
+    return items, []
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="pii-guard run",
+        description=(
+            "Start a local on-device PII Guard gateway and launch a coding agent "
+            "(opencode, codex, claude-code, pi, muse-code) with optional remote dashboard "
+            "telemetry."
+        ),
+    )
+    parser.add_argument("client", choices=RUNNABLE_CLIENTS, help="coding agent to launch")
+    parser.add_argument(
+        "--upstream",
+        choices=sorted(PRESETS),
+        default=None,
+        help="upstream provider preset: "
+        + ", ".join(f"{p.id} ({p.label}, key in ${p.key_env})" for p in PRESETS.values()),
+    )
+    parser.add_argument(
+        "--upstream-url",
+        default=None,
+        help="OpenAI-compatible or Anthropic upstream base URL (env: PII_GUARD_UPSTREAM_BASE_URL)",
+    )
+    parser.add_argument(
+        "--api-key-env",
+        default=None,
+        metavar="VAR",
+        help="environment variable holding the upstream API key, e.g. OPENAI_API_KEY",
+    )
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="use the offline mock model even if an upstream key is set",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        metavar="ID",
+        help="model ID to pass to the coding agent (default: discovered from GET /v1/models)",
+    )
+    parser.add_argument(
+        "--mode",
+        type=lambda v: cli_mode(v, "pii-guard run"),
+        choices=("fast", "audit"),
+        default="fast",
+        help="gateway masking mode (default: fast, local rules + NER)",
+    )
+    parser.add_argument(
+        "--language",
+        default="en",
+        help="default language pack for detection (default: en)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=0,
+        help="loopback port for the local gateway on 127.0.0.1 (default: 0, ephemeral free port)",
+    )
+    parser.add_argument(
+        "--traffic-log",
+        choices=("off", "masked", "full"),
+        default="masked",
+        help="local traffic log level (default: masked)",
+    )
+    parser.add_argument(
+        "--dashboard",
+        default=None,
+        metavar="URL",
+        help=(
+            "remote dashboard URL for telemetry (env: PII_GUARD_DASHBOARD_URL or "
+            f"PII_GUARD_REMOTE_URL; default: {DEFAULT_DASHBOARD_URL} when a key is set; "
+            "'off' disables remote reporting)"
+        ),
+    )
+    parser.add_argument(
+        "--dashboard-key",
+        default=None,
+        metavar="KEY",
+        help=(
+            "remote dashboard API token or pg_ep_ endpoint key "
+            "(env: PII_GUARD_DASHBOARD_KEY, PII_GUARD_ENDPOINT_KEY, or PII_GUARD_REMOTE_KEY)"
+        ),
+    )
+    parser.add_argument(
+        "--dashboard-key-env",
+        default=None,
+        metavar="VAR",
+        help="environment variable holding the remote dashboard / endpoint key",
+    )
+    parser.add_argument(
+        "--endpoint",
+        default=None,
+        metavar="ID",
+        help="project endpoint ID (e.g. ep_abc123) on the remote dashboard",
+    )
+    parser.add_argument(
+        "--telemetry-level",
+        choices=("masked", "stats"),
+        default=None,
+        help="remote telemetry detail level: masked (default) or stats (counts/timings only)",
+    )
+    parser.add_argument(
+        "--agent-bin",
+        default=None,
+        metavar="PATH",
+        help="override the coding agent executable path or name",
+    )
+    parser.add_argument(
+        "--agent-dir",
+        default=None,
+        help="pi's agent dir (default: $PI_CODING_AGENT_DIR or ~/.pi/agent)",
+    )
+    parser.add_argument(
+        "--muse-dir",
+        default=None,
+        help="Muse Code's config dir (default: $XDG_CONFIG_HOME/muse or ~/.config/muse)",
+    )
+    parser.add_argument(
+        "--print-env",
+        action="store_true",
+        help="print the resolved gateway URL, environment, and command without running the agent",
+    )
+    return parser
+
+
+def _env_or_dotenv(name: str) -> str | None:
+    """Read ``name`` from ``os.environ`` or ``./.env``."""
+    val = os.environ.get(name)
+    if val:
+        return val
+    try:
+        from dotenv import dotenv_values
+    except ImportError:  # pragma: no cover
+        return None
+    raw = dotenv_values(".env").get(name)
+    return raw if raw else None
+
+
+def _resolve_preset_upstream(args: argparse.Namespace) -> ResolvedUpstream:
+    if args.upstream_url:
+        raise ConnectError("pass --upstream or --upstream-url, not both")
+    preset = PRESETS[args.upstream]
+    key_env = args.api_key_env or preset.key_env
+    key = _env_or_dotenv(key_env)
+    if not key:
+        raise ConnectError(
+            f"--upstream {preset.id} needs the {preset.label} key in ${key_env}: "
+            f"export {key_env}=<your-key> (or put it in .env)"
+        )
+    return ResolvedUpstream(
+        base_url=preset.base_url,
+        api_key=key,
+        label=f"{preset.id} ({preset.base_url})",
+        preset=preset,
+    )
+
+
+def _resolve_explicit_url_upstream(args: argparse.Namespace, url: str) -> ResolvedUpstream:
+    preset = by_url(url)
+    key = ""
+    if args.api_key_env:
+        found = _env_or_dotenv(args.api_key_env)
+        if not found:
+            raise ConnectError("the variable named by --api-key-env is not set")
+        key = found
+    else:
+        key = (
+            _env_or_dotenv("PII_GUARD_UPSTREAM_API_KEY")
+            or (preset and _env_or_dotenv(preset.key_env))
+            or ""
+        )
+    return ResolvedUpstream(base_url=url, api_key=key, label=url, preset=preset)
+
+
+def resolve_upstream(args: argparse.Namespace) -> ResolvedUpstream:
+    """Resolve the upstream LLM provider from CLI flags or environment variables."""
+    if args.mock:
+        return ResolvedUpstream(base_url="mock", api_key="", label="mock", mock=True)
+    if args.upstream is not None:
+        return _resolve_preset_upstream(args)
+    explicit_url = args.upstream_url or _env_or_dotenv("PII_GUARD_UPSTREAM_BASE_URL")
+    if explicit_url:
+        return _resolve_explicit_url_upstream(args, explicit_url)
+    if args.client == "claude-code":
+        key_env = args.api_key_env or "ANTHROPIC_API_KEY"
+        key = _env_or_dotenv(key_env)
+        if key:
+            return ResolvedUpstream(
+                base_url=ANTHROPIC_UPSTREAM_URL,
+                api_key=key,
+                label=f"anthropic ({ANTHROPIC_UPSTREAM_URL})",
+            )
+        raise ConnectError(
+            f"claude-code needs ${key_env} set (or pass --upstream-url / --mock): "
+            f"export {key_env}=<your-key>"
+        )
+    for preset_id in AUTO_UPSTREAM_ORDER:
+        preset = PRESETS[preset_id]
+        key = _env_or_dotenv(preset.key_env)
+        if key:
+            return ResolvedUpstream(
+                base_url=preset.base_url,
+                api_key=key,
+                label=f"{preset.id} ({preset.base_url})",
+                preset=preset,
+            )
+    envs = ", ".join(f"${PRESETS[p].key_env}" for p in AUTO_UPSTREAM_ORDER)
+    raise ConnectError(
+        f"no upstream provider configured; export one of {envs}, pass --upstream <name>, "
+        "or pass --mock for the offline mock model"
+    )
+
+
+def _normalize_endpoint_id(endpoint: str) -> str:
+    match = _ENDPOINT_ID_RE.fullmatch(endpoint.strip())
+    if match is None:
+        raise ConnectError(f"--endpoint {endpoint!r} is not a valid endpoint id")
+    return match.group(1)
+
+
+def _display_dashboard_url(remote_url: str) -> str:
+    parts = urlsplit(remote_url)
+    origin = f"{parts.scheme}://{parts.hostname or ''}" + (f":{parts.port}" if parts.port else "")
+    return f"{origin}/#traffic"
+
+
+def resolve_dashboard(args: argparse.Namespace) -> DashboardTarget:
+    """Resolve remote dashboard telemetry settings from CLI flags and environment."""
+    level = (
+        args.telemetry_level
+        or _env_or_dotenv("PII_GUARD_REMOTE_LEVEL")
+        or _env_or_dotenv("PII_GUARD_TELEMETRY_LEVEL")
+        or "masked"
+    )
+    raw_url = (
+        args.dashboard
+        or _env_or_dotenv("PII_GUARD_DASHBOARD_URL")
+        or _env_or_dotenv("PII_GUARD_REMOTE_URL")
+    )
+    if raw_url and raw_url.strip().lower() in ("off", "none", "false", "0"):
+        return DashboardTarget(
+            remote_url=None, remote_key=None, remote_level=level, display_url=None
+        )
+    if args.dashboard_key_env:
+        key = _env_or_dotenv(args.dashboard_key_env)
+        if not key:
+            raise ConnectError("the variable named by --dashboard-key-env is not set")
+    else:
+        key = (
+            args.dashboard_key
+            or _env_or_dotenv("PII_GUARD_DASHBOARD_KEY")
+            or _env_or_dotenv("PII_GUARD_REMOTE_KEY")
+            or _env_or_dotenv("PII_GUARD_ENDPOINT_KEY")
+        )
+    endpoint = args.endpoint or _env_or_dotenv("PII_GUARD_ENDPOINT_ID")
+    if not raw_url and not key and not endpoint:
+        return DashboardTarget(
+            remote_url=None, remote_key=None, remote_level=level, display_url=None
+        )
+    base = (raw_url or DEFAULT_DASHBOARD_URL).strip().rstrip("/")
+    parts = urlsplit(base)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ConnectError(f"--dashboard {base!r} must be an http:// or https:// URL")
+    if endpoint and "/e/" not in parts.path:
+        ep_id = _normalize_endpoint_id(endpoint)
+        remote_url = f"{base}/e/{ep_id}/v1"
+    else:
+        remote_url = base
+    return DashboardTarget(
+        remote_url=remote_url,
+        remote_key=key,
+        remote_level=level,
+        display_url=_display_dashboard_url(remote_url),
+    )
+
+
+def _resolve_binary(client: str, override: str | None) -> str:
+    if override:
+        found = shutil.which(override)
+        if found:
+            return found
+        if Path(override).is_file():
+            return str(Path(override).resolve())
+        raise ConnectError(f"executable {override!r} was not found")
+    candidates = {
+        "opencode": ("opencode",),
+        "codex": ("codex",),
+        "claude-code": ("claude", "claude-code"),
+        "pi": ("pi",),
+        "muse-code": ("muse",),
+    }[client]
+    for name in candidates:
+        found = shutil.which(name)
+        if found:
+            return found
+    raise ConnectError(
+        f"{client} executable ({candidates[0]!r}) was not found on PATH; install it or pass "
+        "--agent-bin"
+    )
+
+
+def _opencode_config_json(
+    session_url: str, model: str, existing_raw: str | None, *, token_env: str | None
+) -> str:
+    base: dict[str, Any] = {}
+    if existing_raw:
+        try:
+            loaded = json.loads(existing_raw)
+            if isinstance(loaded, dict):
+                base = dict(loaded)
+        except ValueError:
+            base = {}
+    raw_providers = base.get("provider")
+    providers = dict(raw_providers) if isinstance(raw_providers, dict) else {}
+    options: dict[str, Any] = {"baseURL": session_url}
+    if token_env:
+        options["apiKey"] = "{env:" + token_env + "}"
+    providers["pii-guard"] = {
+        "npm": "@ai-sdk/openai-compatible",
+        "name": "pii-guard",
+        "options": options,
+        "models": {model: {}},
+    }
+    base["provider"] = providers
+    base["model"] = f"pii-guard/{model}"
+    return json.dumps(base, separators=(",", ":"))
+
+
+def build_agent_invocation(
+    client: str,
+    binary: str,
+    session_url: str,
+    model: str,
+    agent_args: Sequence[str],
+    *,
+    base_env: dict[str, str] | None = None,
+    token: str | None = None,
+    agent_dir: str | None = None,
+    muse_dir: str | None = None,
+) -> tuple[list[str], dict[str, str]]:
+    """Build ``(command_argv, child_env)`` to launch ``client`` behind ``session_url``."""
+    env = dict(os.environ if base_env is None else base_env)
+    extra = list(agent_args)
+    if client == "opencode":
+        token_env = snippets.TOKEN_ENV if token else None
+        env["OPENCODE_CONFIG_CONTENT"] = _opencode_config_json(
+            session_url, model, env.get("OPENCODE_CONFIG_CONTENT"), token_env=token_env
+        )
+        return [binary, *extra], env
+    if client == "codex":
+        provider = f'name="pii-guard", base_url="{session_url}", wire_api="responses"'
+        if token:
+            provider += f', env_key="{snippets.TOKEN_ENV}"'
+        cmd = [
+            binary,
+            "-m",
+            model,
+            "-c",
+            "model_provider=pii-guard",
+            "-c",
+            f"model_providers.pii-guard={{{provider}}}",
+            "-c",
+            "web_search=disabled",
+            *extra,
+        ]
+        return cmd, env
+    if client == "claude-code":
+        base = session_url[: -len("/v1")] if session_url.endswith("/v1") else session_url
+        env["ANTHROPIC_BASE_URL"] = base
+        if token:
+            env["ANTHROPIC_AUTH_TOKEN"] = token
+        else:
+            env["ANTHROPIC_API_KEY"] = "unused"
+        return [binary, "--model", model, *extra], env
+    if client == "pi":
+        from pii_guard.integrations.cli import main as connect_main
+
+        c_args = ["pi", "--gateway", session_url, "--model", model]
+        if agent_dir:
+            c_args += ["--agent-dir", agent_dir]
+        if connect_main(c_args, stdout=io.StringIO()) != 0:
+            raise ConnectError("failed to configure pi models.json")
+        return [binary, "--provider", "pii-guard", "--model", model, *extra], env
+    from pii_guard.integrations.cli import main as connect_main
+
+    c_args = ["muse-code", "--gateway", session_url]
+    if muse_dir:
+        c_args += ["--muse-dir", muse_dir]
+    if connect_main(c_args, stdout=io.StringIO()) != 0:
+        raise ConnectError("failed to configure Muse Code settings.json")
+    env.setdefault("META_API_KEY", "pii-guard-local")
+    return [binary, *extra], env
+
+
+def _discover_model(
+    args: argparse.Namespace,
+    upstream: ResolvedUpstream,
+    gateway_base_url: str,
+    token: str | None,
+) -> str:
+    if args.model:
+        if snippets.safe_model(args.model) is None:
+            raise ConnectError(f"--model {args.model!r} is not a valid model id")
+        return str(args.model)
+    if upstream.mock:
+        return MOCK_DEFAULT_MODEL
+    if args.client == "claude-code":
+        return ANTHROPIC_DEFAULT_MODEL
+    try:
+        models = fetch_models(gateway_base_url, token=token)
+    except ConnectError:
+        models = []
+    if models:
+        return snippets.pick_model(models, upstream.preset, mock_model=None)
+    if upstream.preset and upstream.preset.default_model:
+        return upstream.preset.default_model
+    return snippets.FALLBACK_MODEL
+
+
+@contextmanager
+def _TemporaryEnv(overrides: dict[str, str | None]) -> Iterator[None]:
+    saved = {k: os.environ.get(k) for k in overrides}
+    try:
+        for k, v in overrides.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        get_settings.cache_clear()
+        yield
+    finally:
+        for k, old in saved.items():
+            if old is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = old
+        get_settings.cache_clear()
+
+
+@contextmanager
+def _local_gateway(
+    args: argparse.Namespace,
+    upstream: ResolvedUpstream,
+    dashboard: DashboardTarget,
+) -> Iterator[tuple[str, Any]]:
+    import uvicorn
+
+    from pii_guard.api.app import create_app
+
+    mock_server: MockServer | None = None
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind(("127.0.0.1", args.port))
+    except OSError as exc:
+        sock.close()
+        raise ConnectError(f"port {args.port} on 127.0.0.1 is in use ({exc})") from exc
+    actual_port = int(sock.getsockname()[1])
+
+    if upstream.mock:
+        mock_server = MockServer()
+        mock_server.start()
+        upstream_url = mock_server.base_url
+    else:
+        upstream_url = upstream.base_url
+
+    tenant_key = _env_or_dotenv("PII_GUARD_TENANT_KEY") or secrets.token_hex(32)
+    env_overrides: dict[str, str | None] = {
+        "PII_GUARD_HOST": "127.0.0.1",
+        "PII_GUARD_PORT": str(actual_port),
+        "PII_GUARD_GATEWAY_MODE": args.mode,
+        "PII_GUARD_TRAFFIC_LOG": args.traffic_log,
+        "PII_GUARD_REMOTE_URL": dashboard.remote_url,
+        "PII_GUARD_REMOTE_KEY": dashboard.remote_key,
+        "PII_GUARD_REMOTE_LEVEL": dashboard.remote_level if dashboard.remote_url else None,
+    }
+    with _TemporaryEnv(env_overrides):
+        settings = Settings(
+            host="127.0.0.1",
+            port=actual_port,
+            tenant_key=SecretStr(tenant_key),
+            upstream_base_url=upstream_url,
+            upstream_api_key=SecretStr(upstream.api_key) if upstream.api_key else None,
+            default_language=args.language,
+        )
+        app = create_app(settings)
+        app.state.gateway_config = GatewayConfig(mode=Mode(args.mode))
+        config = uvicorn.Config(
+            app,
+            host="127.0.0.1",
+            port=actual_port,
+            log_level="warning",
+            lifespan="auto",
+            timeout_graceful_shutdown=2,
+        )
+        server = uvicorn.Server(config)
+        thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
+        thread.start()
+        deadline = time.monotonic() + 15.0
+        while not server.started:
+            if time.monotonic() > deadline or not thread.is_alive():
+                server.should_exit = True
+                sock.close()
+                if mock_server is not None:
+                    mock_server.stop()
+                raise ConnectError("local gateway did not start")
+            time.sleep(0.02)
+        try:
+            yield f"http://127.0.0.1:{actual_port}", app
+        finally:
+            obs = getattr(app.state, "observability", None)
+            flush = getattr(obs, "flush", None)
+            if callable(flush):
+                flush()
+            server.should_exit = True
+            thread.join(timeout=5.0)
+            sock.close()
+            if mock_server is not None:
+                mock_server.stop()
+
+
+def _print_banner(
+    client: str,
+    gateway_root: str,
+    model: str,
+    mode: str,
+    upstream: ResolvedUpstream,
+    dashboard: DashboardTarget,
+    *,
+    stderr: Any,
+) -> None:
+    print(
+        f"pii-guard run {client}: gateway {gateway_root}/v1 "
+        f"(mode={mode}, model={model}, upstream={upstream.label})",
+        file=stderr,
+    )
+    if dashboard.display_url:
+        print(
+            f"pii-guard run {client}: remote dashboard {dashboard.display_url} "
+            f"(telemetry={dashboard.remote_level})",
+            file=stderr,
+        )
+
+
+def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any = None) -> int:
+    stdout = stdout or sys.stdout
+    stderr = stderr or sys.stderr
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    own_argv, agent_args = split_agent_argv(raw_argv)
+    parser = build_parser()
+    args, trailing = parser.parse_known_args(own_argv)
+    if trailing:
+        if trailing[0].startswith("-"):
+            parser.error(
+                f"unrecognized arguments: {' '.join(trailing)} (pass '--' before agent flags)"
+            )
+        agent_args = [*trailing, *agent_args]
+
+    try:
+        upstream = resolve_upstream(args)
+        dashboard = resolve_dashboard(args)
+        binary = "dry-run" if args.print_env else _resolve_binary(args.client, args.agent_bin)
+        with _local_gateway(args, upstream, dashboard) as (gateway_root, _app):
+            session_id = f"c_{secrets.token_hex(16)}"
+            session_url = f"{gateway_root}/s/{session_id}/v1"
+            token_secret = get_settings().api_token
+            token = token_secret.get_secret_value() if token_secret is not None else None
+            model = _discover_model(args, upstream, f"{gateway_root}/v1", token)
+            cmd, child_env = build_agent_invocation(
+                args.client,
+                binary,
+                session_url,
+                model,
+                agent_args,
+                token=token,
+                agent_dir=args.agent_dir,
+                muse_dir=args.muse_dir,
+            )
+            if args.print_env:
+                info = {
+                    "client": args.client,
+                    "gateway_url": f"{gateway_root}/v1",
+                    "session_url": session_url,
+                    "upstream": upstream.base_url,
+                    "model": model,
+                    "mode": args.mode,
+                    "remote_url": dashboard.remote_url,
+                    "remote_level": dashboard.remote_level if dashboard.remote_url else None,
+                    "dashboard_url": dashboard.display_url,
+                    "command": cmd,
+                }
+                print(json.dumps(info, indent=2), file=stdout)
+                return 0
+            _print_banner(
+                args.client, gateway_root, model, args.mode, upstream, dashboard, stderr=stderr
+            )
+            try:
+                completed = subprocess.run(cmd, env=child_env, check=False)  # noqa: S603
+                return int(completed.returncode)
+            except KeyboardInterrupt:
+                return 130
+    except ConnectError as exc:
+        print(f"pii-guard run: {exc}", file=stderr)
+        return 2

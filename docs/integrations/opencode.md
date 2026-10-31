@@ -8,7 +8,30 @@ Checked on OpenCode **1.19.3** (`OPENCODE_VERSION` in
 [`snippets.py`](../../src/pii_guard/integrations/snippets.py)), end to end in
 [`tests/integrations/test_opencode_e2e.py`](../../tests/integrations/test_opencode_e2e.py).
 
-## Setup
+## One-command launch (`pii-guard run`)
+
+To run OpenCode with local, on-device PII masking and direct upstream forwarding in a single
+terminal:
+
+```bash
+export META_API_KEY=<your-key>              # or OPENAI_API_KEY, OPENROUTER_API_KEY, FIREWORKS_API_KEY
+pii-guard run opencode                      # or: uvx --from wattmind-pii-guard pii-guard run opencode
+```
+
+To also monitor masked traffic and stats on a remote dashboard (`https://guard.watt-mind.com` by
+default when a key is set, or any self-hosted PII Guard URL):
+
+```bash
+export PII_GUARD_DASHBOARD_KEY=<your-endpoint-or-dashboard-key>
+pii-guard run opencode --endpoint ep_abc123
+# Self-hosted dashboard:
+pii-guard run opencode --dashboard https://pii-guard.internal.example.com --dashboard-key <key>
+```
+
+Extra arguments after `--` are passed straight to `opencode` (e.g.
+`pii-guard run opencode -- run --auto "summarise client-letter.md"`).
+
+## Two-terminal setup (`pii-guard up` + `connect`)
 
 ```bash
 export META_API_KEY=<your-key>
