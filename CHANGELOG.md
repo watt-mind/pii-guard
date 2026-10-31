@@ -13,7 +13,7 @@ tagged or published yet; move these entries under `## [0.1.0] - <date>` when the
 ### Added
 
 - **Reverse PII Masking Gateway**:
-  - OpenAI-compatible reverse proxy with SSE streaming re-identification and request/response masking.
+  - OpenAI-compatible (`/v1/chat/completions`, `/v1/responses`) and Anthropic-compatible (`/v1/messages`) reverse proxy with SSE streaming re-identification and request/response masking.
   - Pseudonym vault with placeholders derived from a keyed HMAC-SHA256, in memory or persisted, so detected values are replaced before anything reaches the upstream LLM provider.
   - Fail-closed security architecture stopping requests when detection or masking cannot complete safely.
   - Mock upstream mode (`--mock`) enabling local offline development and demonstrations without third-party API keys.
@@ -26,7 +26,7 @@ tagged or published yet; move these entries under `## [0.1.0] - <date>` when the
   - Interactive web console bundled directly into the distribution wheel and served on port 8787.
   - Interactive playground, live traffic viewer, masking scorecard, and audit inspector.
 - **Agent Integrations & CLI**:
-  - One-command integration via `pii-guard connect` for coding agents: Codex, Claude Code, OpenCode, and Pi.
+  - One-command integration via `pii-guard connect` for coding agents: Muse Code, pi, Codex, and OpenCode, with Anthropic `/v1/messages` proxying for Claude Code.
   - Direct execution via `uvx wattmind-pii-guard` and `uvx --from wattmind-pii-guard pii-guard`.
 - **Packaging & Delivery**:
   - Tag-driven release workflow (`.github/workflows/release.yml`) for PyPI as `wattmind-pii-guard` via OIDC Trusted Publishing and for container images on `ghcr.io/watt-mind/pii-guard`, behind a CI provenance gate.
