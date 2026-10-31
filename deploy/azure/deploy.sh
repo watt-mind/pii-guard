@@ -159,9 +159,10 @@ if [[ "$operator" != true ]]; then
   : "${META_KEY_SECRET_URI:?Set versioned Meta reference}"
   : "${TENANT_KEY_SECRET_URI:?Set versioned tenant key reference}"
   : "${GOOGLE_SECRET_URI:?Set versioned Google reference}"
+  : "${METRICS_TOKEN_SECRET_URI:?Set versioned metrics scrape token reference}"
   [[ "$HOSTED_IMAGE" =~ ^[a-z0-9]+\.azurecr\.io/pii-guard@sha256:[a-f0-9]{64}$ && "$HOSTED_PUBLIC_ORIGIN" =~ ^https://[a-z0-9.-]+$ ]] || { echo 'Canonical HTTPS origin and immutable ACR digest required' >&2; exit 2; }
   vault_uri=$(az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name hosted-foundation --query properties.outputs.vaultUri.value --output tsv)
-  for uri in "$META_KEY_SECRET_URI" "$TENANT_KEY_SECRET_URI" "$GOOGLE_SECRET_URI"; do
+  for uri in "$META_KEY_SECRET_URI" "$TENANT_KEY_SECRET_URI" "$GOOGLE_SECRET_URI" "$METRICS_TOKEN_SECRET_URI"; do
     [[ "$uri" == "${vault_uri}secrets/"* && "$uri" =~ /secrets/[a-zA-Z0-9-]+/[a-f0-9]{32}$ ]] || { echo 'Use versioned secrets from this foundation vault' >&2; exit 2; }
   done
   registry=$(az deployment group show --resource-group "$AZURE_RESOURCE_GROUP" --name hosted-foundation --query properties.outputs.registryServer.value --output tsv)
@@ -253,7 +254,7 @@ print('true' if value is True else 'false')
 PYINGRESS
 )
   fi
-  params+=(--parameters "privateDevReviewed=$private" "publicEnabled=$public" "preserveExternalIngress=$preserve_external" "image=$HOSTED_IMAGE" "publicOrigin=$HOSTED_PUBLIC_ORIGIN" "googleClientId=$GOOGLE_CLIENT_ID" "metaKeySecretUri=$META_KEY_SECRET_URI" "tenantKeySecretUri=$TENANT_KEY_SECRET_URI" "googleSecretUri=$GOOGLE_SECRET_URI" "ledgerAccountUrl=$ledger" "projectAccountUrl=$projects" "customDomains=$domains" "clientIpSource=${HOSTED_CLIENT_IP_SOURCE:-off}")
+  params+=(--parameters "privateDevReviewed=$private" "publicEnabled=$public" "preserveExternalIngress=$preserve_external" "image=$HOSTED_IMAGE" "publicOrigin=$HOSTED_PUBLIC_ORIGIN" "googleClientId=$GOOGLE_CLIENT_ID" "metaKeySecretUri=$META_KEY_SECRET_URI" "tenantKeySecretUri=$TENANT_KEY_SECRET_URI" "googleSecretUri=$GOOGLE_SECRET_URI" "metricsTokenSecretUri=$METRICS_TOKEN_SECRET_URI" "ledgerAccountUrl=$ledger" "projectAccountUrl=$projects" "customDomains=$domains" "clientIpSource=${HOSTED_CLIENT_IP_SOURCE:-off}")
 fi
 name=hosted-release
 [[ "$operator" != true ]] || name=hosted-foundation
