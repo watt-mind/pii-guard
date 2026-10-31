@@ -97,7 +97,7 @@ def models_dir() -> Path:
 
 def _fetch_wheel(model: PinnedSpacyWheel) -> Path:
     try:
-        from huggingface_hub import snapshot_download  # type: ignore[import-not-found]
+        from huggingface_hub import snapshot_download
     except ImportError:
         raise BaselineUnavailable(
             "huggingface_hub is not installed (install the extra: uv sync --extra baselines)"

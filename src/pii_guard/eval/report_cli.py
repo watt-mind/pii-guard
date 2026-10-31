@@ -771,6 +771,28 @@ def load_config(path: Path) -> tuple[str, list[str]]:
     return headline, [str(k) for k in featured]
 
 
+def _build_readme_output(
+    index: Mapping[str, Any],
+    counts: Sequence[Mapping[str, Any]],
+    raw_readme: Any,
+    config: Path,
+    readme: Path,
+) -> str:
+    spec = parse_readme_spec(raw_readme, str(config))
+    if "model_latency" in spec:
+        ml = spec["model_latency"]
+        path = Path(config).resolve().parents[2] / ml["file"]
+        try:
+            ml["data"] = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise RecordError(f"{config}: model_latency {ml['file']!r}: {exc}") from exc
+    try:
+        doc = readme.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RecordError(f"{readme}: {exc}") from exc
+    return render_readme(doc, index, counts, spec, str(readme))
+
+
 def build_outputs(
     runs_dir: Path = DEFAULT_RUNS_DIR,
     *,
@@ -831,19 +853,7 @@ def build_outputs(
             outputs[docs_dir / "benchmarks" / f"{stem}.png"] = Raster(svg, fonts)
     raw_readme = _read_config(config).get("readme")
     if raw_readme is not None:
-        spec = parse_readme_spec(raw_readme, str(config))
-        if "model_latency" in spec:
-            ml = spec["model_latency"]
-            path = Path(config).resolve().parents[2] / ml["file"]
-            try:
-                ml["data"] = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, ValueError) as exc:
-                raise RecordError(f"{config}: model_latency {ml['file']!r}: {exc}") from exc
-        try:
-            doc = readme.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise RecordError(f"{readme}: {exc}") from exc
-        outputs[readme] = render_readme(doc, index, counts, spec, str(readme))
+        outputs[readme] = _build_readme_output(index, counts, raw_readme, config, readme)
     return outputs
 
 

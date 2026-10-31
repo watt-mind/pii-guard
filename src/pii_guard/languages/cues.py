@@ -418,7 +418,8 @@ class CueMatcher:
         shape = SHAPES[entity_type]
         words = 0
         while pos <= limit:
-            pos = _SPACE_RE.match(text, pos).end()  # type: ignore[union-attr]  # matches ""
+            if space := _SPACE_RE.match(text, pos):
+                pos = space.end()  # matches ""
             if pos >= limit:
                 return None
             hit = self._value_at(text, pos, shape, entity_type)

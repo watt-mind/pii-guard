@@ -70,7 +70,8 @@ def main() -> int:
         captured["mask_ms"] = ms_since(started)
         return result
 
-    engine.anonymizer.anonymize = capturing  # type: ignore[method-assign]
+    anonymizer: Any = engine.anonymizer
+    anonymizer.anonymize = capturing
 
     def handle(text: str, language: str) -> tuple[list[list[Any]], str, str | None, float, float]:
         captured.clear()

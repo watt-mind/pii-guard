@@ -200,6 +200,10 @@ class ProjectService:
                     SessionDirectory(self.settings.vault_max_sessions),
                 )
                 self._runtimes[namespace] = runtime
+            if endpoint is not None:
+                runtime.observability.traffic.labels = {
+                    "endpoint": {"id": endpoint.id, "name": endpoint.name}
+                }
             runtime.active += 1
             runtime.touched = now
             return runtime
@@ -294,6 +298,7 @@ class ProjectService:
             if self.settings.hosted
             else getattr(app_obs, "metrics", None)
         )
+        observability.remote = None if self.settings.hosted else getattr(app_obs, "remote", None)
         gateway = Gateway(
             settings=settings,
             vault=runtime.vault,

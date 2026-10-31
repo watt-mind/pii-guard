@@ -21,6 +21,30 @@ from pii_guard.visual.segment_eval import E2E_MODES, _CountingTransport, e2e_sum
 __all__ = ["e2e_bench"]
 
 
+def _build_bench_apps(
+    settings: Any, sam: Any, modes: Sequence[str]
+) -> dict[str, Any]:  # pragma: no cover
+    from fastapi.testclient import TestClient
+
+    from pii_guard.api.app import create_app
+    from pii_guard.visual.sam import SamClient
+    from pii_guard.visual.segmenters import HybridSegmenter, build_segmenter
+
+    apps: dict[str, Any] = {}
+    for mode in modes:
+        built = build_segmenter(settings, mode=mode)
+        if isinstance(built, HybridSegmenter):
+            if built.local is None:
+                raise DetectionError("hybrid bench needs YuNet (uv sync --extra local-vision)")
+            built = HybridSegmenter(sam=sam, local=built.local)
+        elif isinstance(built, SamClient):
+            built = sam
+        app = create_app(settings)
+        app.state.sam_client = built
+        apps[mode] = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000))
+    return apps
+
+
 def e2e_bench(
     set_name: str,
     *,
@@ -29,14 +53,11 @@ def e2e_bench(
     log: Callable[[str], None] = lambda _m: None,
 ) -> dict[str, Any]:  # pragma: no cover - live SAM calls and the data sets
     """``POST /v1/mask/image`` per image, ``modes`` alternating; see the module docstring."""
-    from fastapi.testclient import TestClient
 
-    from pii_guard.api.app import create_app
     from pii_guard.config import Settings
     from pii_guard.eval.visual import DEFAULT_MAX_SIDE, load_specimens, prepare_image
     from pii_guard.visual.ocr import tesseract_available
     from pii_guard.visual.sam import SamClient
-    from pii_guard.visual.segmenters import HybridSegmenter, build_segmenter
 
     if not tesseract_available():
         raise DetectionError("the end-to-end bench needs Tesseract (OCR on, as served)")
@@ -47,21 +68,7 @@ def e2e_bench(
     settings = Settings()
     transport = _CountingTransport()
     sam = SamClient(settings=settings, transport=transport, max_retries=2)
-    segmenters: dict[str, Any] = {}
-    for mode in modes:
-        built = build_segmenter(settings, mode=mode)
-        if isinstance(built, HybridSegmenter):
-            if built.local is None:
-                raise DetectionError("hybrid bench needs YuNet (uv sync --extra local-vision)")
-            built = HybridSegmenter(sam=sam, local=built.local)
-        elif isinstance(built, SamClient):
-            built = sam
-        segmenters[mode] = built
-    apps = {}
-    for mode in modes:
-        app = create_app(settings)
-        app.state.sam_client = segmenters[mode]
-        apps[mode] = TestClient(app, base_url="http://127.0.0.1", client=("127.0.0.1", 50000))
+    apps = _build_bench_apps(settings, sam, modes)
     per_mode: dict[str, list[list[float]]] = {m: [] for m in modes}
     calls: dict[str, list[int]] = {m: [] for m in modes}
     errors: dict[str, int] = {}

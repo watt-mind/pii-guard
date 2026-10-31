@@ -185,22 +185,29 @@ def _duplicate_labels(
         if rects[i] is not None and items[i].label:
             groups.setdefault(root(i), []).append(i)
     for members in groups.values():
-        if len(members) < 2:
-            continue
-        member_rects = [r for i in members if (r := rects[i]) is not None]
-        union = (
-            min(r[0] for r in member_rects),
-            min(r[1] for r in member_rects),
-            max(r[2] for r in member_rects),
-            max(r[3] for r in member_rects),
-        )
-        outer = [i for i in members if rects[i] == union]
-        if not outer:
-            for i in members:
-                rects[i] = union
-            outer = members
-        out.update(i for i in members if i != outer[0])
+        if len(members) >= 2:
+            _merge_duplicate_group(members, rects, out)
     return out
+
+
+def _merge_duplicate_group(
+    members: list[int],
+    rects: list[tuple[int, int, int, int] | None],
+    out: set[int],
+) -> None:
+    member_rects = [r for i in members if (r := rects[i]) is not None]
+    union = (
+        min(r[0] for r in member_rects),
+        min(r[1] for r in member_rects),
+        max(r[2] for r in member_rects),
+        max(r[3] for r in member_rects),
+    )
+    outer = [i for i in members if rects[i] == union]
+    if not outer:
+        for i in members:
+            rects[i] = union
+        outer = members
+    out.update(i for i in members if i != outer[0])
 
 
 def _extend(

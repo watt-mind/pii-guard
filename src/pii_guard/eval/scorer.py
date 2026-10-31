@@ -683,9 +683,9 @@ def _ratio(num: int, den: int) -> float | None:
     return num / den if den else None
 
 
-def summarize(results: Sequence[DocumentResult]) -> dict[str, Any]:
-    """One score block for ``results`` (all documents, or one language)."""
-    scored = [[p for p in r.predicted if not unscored(r.document, p)] for r in results]
+def _summarize_detection(
+    results: Sequence[DocumentResult], scored: Sequence[Sequence[Span]]
+) -> dict[str, Any]:
     detection: dict[str, Any] = {}
     for mode in ("exact", "overlap"):
         total: dict[EntityType, TypeCounts] = defaultdict(TypeCounts)
@@ -693,6 +693,13 @@ def summarize(results: Sequence[DocumentResult]) -> dict[str, Any]:
             for t, c in match_counts(r.document.spans, preds, mode).items():
                 total[t] += c
         detection[mode] = prf(total)
+    return detection
+
+
+def summarize(results: Sequence[DocumentResult]) -> dict[str, Any]:
+    """One score block for ``results`` (all documents, or one language)."""
+    scored = [[p for p in r.predicted if not unscored(r.document, p)] for r in results]
+    detection = _summarize_detection(results, scored)
 
     leak_total: Counter[str] = Counter()
     leak_by_type: dict[str, Counter[str]] = defaultdict(Counter)

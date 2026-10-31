@@ -104,7 +104,11 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
         "Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of "
         "original values (one `/v1/unmask` text, or one gateway response).",
     ),
-    "unsupported_media_type": (415, "The image is not a PNG or JPEG (sniffed from its bytes)."),
+    "unsupported_media_type": (
+        415,
+        "The image is not a PNG or JPEG (sniffed from its bytes), or `POST /v1/traffic` "
+        "got a body that is not `application/json`.",
+    ),
     "invalid_request": (
         422,
         "The request fails validation. The message lists field locations only, never values.",
