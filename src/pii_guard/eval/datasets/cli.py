@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 from pii_guard.eval.datasets import REGISTRY, get
 from pii_guard.eval.datasets._common import dump_json
@@ -40,7 +41,7 @@ def _fetch_one(ds: Dataset) -> list[Path]:
     return fetch(ds)
 
 
-def _lang_order(ds: Dataset):
+def _lang_order(ds: Dataset) -> Callable[[tuple[str, Any]], int]:
     return lambda item: ds.languages.index(item[0])
 
 
