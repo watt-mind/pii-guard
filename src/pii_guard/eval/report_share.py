@@ -261,7 +261,7 @@ def _snap(index: Mapping[str, Any], fixture_set: str, system: str) -> Mapping[st
                 raise RecordError(
                     f"share: {system!r} on {fixture_set!r} misses some of the set's languages"
                 )
-            return s  # type: ignore[no-any-return]
+            return s
     raise RecordError(f"share: no snapshot of {system!r} on {fixture_set!r}")
 
 

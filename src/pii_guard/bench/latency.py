@@ -153,7 +153,7 @@ class _Collector(Observability):
         self.events: dict[str, dict[str, Any]] = {}
 
     @property
-    def recording(self) -> bool:  # type: ignore[override]
+    def recording(self) -> bool:
         return True
 
     def record(self, event: dict[str, Any]) -> None:

@@ -152,19 +152,9 @@ max-statements = 60
 "examples/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
 "scripts/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
 "training/**" = ["SLF001", "DTZ", "PTH", "C901", "PLR0912", "PLR0915"]
-# Legacy complexity / private-member / async-timeout exemptions in src/ (to be burned down in follow-up PRs):
+# Legacy async-timeout exemptions in src/:
 "src/pii_guard/detect/stack.py" = ["ASYNC109"]
 "src/pii_guard/eval/baselines/workers/llm_guard_worker.py" = ["SLF001"]
-"src/pii_guard/eval/cli.py" = ["C901", "PLR0912", "PLR0915"]
-"src/pii_guard/eval/datasets/_common.py" = ["C901", "PLR0912"]
-"src/pii_guard/eval/datasets/run.py" = ["C901", "PLR0912"]
-"src/pii_guard/eval/record.py" = ["C901", "PLR0912"]
-"src/pii_guard/eval/redteam.py" = ["SLF001"]
-"src/pii_guard/eval/report_charts.py" = ["C901", "PLR0912", "PLR0915"]
-"src/pii_guard/eval/report_index.py" = ["C901", "PLR0912"]
-"src/pii_guard/eval/report_readme.py" = ["C901", "PLR0912"]
-"src/pii_guard/eval/report_share.py" = ["PLR0915"]
-"src/pii_guard/eval/visual_labels.py" = ["C901", "PLR0912", "PLR0915"]
 "src/pii_guard/hosted/egress.py" = ["ASYNC109"]
 "src/pii_guard/visual/masking.py" = ["ASYNC109"]
 
@@ -200,10 +190,12 @@ exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
 # Type checking for src/ (CI job "types"). Errors that existed when it was introduced are in
 # scripts/ci/mypy-baseline.txt; scripts/ci/mypy_baseline.py fails on any error not listed there.
 python_version = "3.12"
+mypy_path = ["src"]
 files = ["src"]
 # Baseline workers run in their own virtualenvs with sibling-module imports (ADR 0004).
 exclude = ["src/pii_guard/eval/baselines/workers/"]
 warn_unused_configs = true
+warn_unused_ignores = true
 warn_redundant_casts = true
 check_untyped_defs = true
 disallow_untyped_defs = true
@@ -216,6 +208,7 @@ strict_equality = true
 module = [
     "cv2.*",
     "gliner.*",
+    "meta_sam_parser.*",
     "numpy.*",
     "onnxruntime.*",
     "presidio_analyzer.*",

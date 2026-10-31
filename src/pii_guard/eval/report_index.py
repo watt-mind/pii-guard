@@ -296,10 +296,7 @@ def pool(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         parts = [(b["latency_ms"][stage], n) for b, n in zip(blocks, docs, strict=True)]
         if any(p is None or p.get("p50") is None for p, _ in parts) or not sum(docs):
             return None
-        return {
-            q: sum(p[q] * n for p, n in parts) / sum(docs)  # type: ignore[index]
-            for q in ("p50", "p95")
-        }
+        return {q: sum(p[q] * n for p, n in parts) / sum(docs) for q in ("p50", "p95")}
 
     return {
         "documents": sum(docs),
@@ -321,11 +318,11 @@ def pool(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             None
             if any(r is None for r in roundtrips)
             else {
-                "documents": sum(r["documents"] for r in roundtrips),  # type: ignore[index]
-                "exact": sum(r["exact"] for r in roundtrips),  # type: ignore[index]
+                "documents": sum(r["documents"] for r in roundtrips),
+                "exact": sum(r["exact"] for r in roundtrips),
                 "rate": _ratio(
                     sum(r["exact"] for r in roundtrips), sum(r["documents"] for r in roundtrips)
-                ),  # type: ignore[index]
+                ),
             }
         ),
         "consistency": (
@@ -335,13 +332,13 @@ def pool(blocks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 "rate": _ratio(
                     sum(c["consistent"] for c in consistency),
                     sum(c["entities"] for c in consistency),
-                ),  # type: ignore[index]
+                ),
                 "multi_rate": _ratio(
-                    sum(c["multi_consistent"] for c in consistency),  # type: ignore[index]
-                    sum(c["multi_occurrence"] for c in consistency),  # type: ignore[index]
+                    sum(c["multi_consistent"] for c in consistency),
+                    sum(c["multi_occurrence"] for c in consistency),
                 ),
                 **{
-                    k: sum(c[k] for c in consistency)  # type: ignore[index]
+                    k: sum(c[k] for c in consistency)
                     for k in ("entities", "consistent", "multi_occurrence", "multi_consistent")
                 },
             }

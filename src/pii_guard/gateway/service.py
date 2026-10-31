@@ -179,7 +179,7 @@ def _leased_class(cls: type[StreamingResponse]) -> type[StreamingResponse]:
 
         async def __call__(self: Any, scope: Any, receive: Any, send: Any) -> None:
             try:
-                await super(leased, self).__call__(scope, receive, send)  # type: ignore[arg-type]
+                await cls.__call__(self, scope, receive, send)
             finally:
                 self.pii_guard_release()
 
@@ -467,7 +467,8 @@ class Gateway:
 
                 response.body_iterator = leased_stream()
                 response.__class__ = _leased_class(type(response))
-                response.pii_guard_release = release  # type: ignore[attr-defined]
+                leased_response: Any = response
+                leased_response.pii_guard_release = release
                 weakref.finalize(response, release)
             else:
                 release()

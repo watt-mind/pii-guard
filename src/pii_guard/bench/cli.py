@@ -83,7 +83,7 @@ def _fmt(p: dict[str, float] | None, key: str) -> str:
 
 
 def _latency(args: argparse.Namespace) -> int:
-    from pii_guard.bench.latency import build_records, run_benchmark
+    from pii_guard.bench.latency import CellResult, build_records, run_benchmark
 
     streams = {"both": [False, True], "off": [False], "on": [True]}[args.stream]
     args.modes = [cli_mode(m, "pii-guard bench latency") for m in args.modes]
@@ -98,15 +98,15 @@ def _latency(args: argparse.Namespace) -> int:
             print(f"pii-guard bench latency: unknown mode {mode!r}", file=sys.stderr)
             return 2
 
-    def progress(cell: object) -> None:
-        s = cell.summary()  # type: ignore[attr-defined]
+    def progress(cell: CellResult) -> None:
+        s = cell.summary()
         print(
             f"{s['mode']:<6} c={s['concurrency']:<2} stream={'on ' if s['stream'] else 'off'} "
             f"n={s['requests']:<4} err={s['errors']:<3} "
             f"overhead p50={_fmt(s['overhead_ms'], 'p50')}"
             f" p95={_fmt(s['overhead_ms'], 'p95')} p99={_fmt(s['overhead_ms'], 'p99')} ms"
             + (f"  added TTFT p50={_fmt(s['added_ttft_ms'], 'p50')} ms" if s["stream"] else "")
-            + f"  [{', '.join(cell.detectors) or '-'}]",  # type: ignore[attr-defined]
+            + f"  [{', '.join(cell.detectors) or '-'}]",
             flush=True,
         )
 

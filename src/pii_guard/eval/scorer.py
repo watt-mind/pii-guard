@@ -57,7 +57,7 @@ import time
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from pii_guard.detect.normalize import normalize_for_detection
 from pii_guard.detect.pipeline import DetectionPipeline
@@ -168,7 +168,7 @@ class TypeCounts:
             return 0.0
         return 2 * p * r / (p + r)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "gold": self.gold,
             "pred": self.pred,
@@ -205,7 +205,7 @@ def match_counts(
     return dict(counts)
 
 
-def prf(counts: Mapping[EntityType, TypeCounts]) -> dict[str, object]:
+def prf(counts: Mapping[EntityType, TypeCounts]) -> dict[str, Any]:
     """Per-type, micro and macro precision/recall/F1 for accumulated counts."""
     micro = TypeCounts()
     for c in counts.values():
@@ -249,7 +249,7 @@ class ValueLeak:
     #: ``repr`` or :meth:`to_dict`.
     value: str = field(default="", repr=False, compare=False)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "entity_type": self.entity_type.value,
             "occurrences": self.occurrences,
@@ -411,7 +411,7 @@ class EntityConsistency:
     occurrences: int
     consistent: bool
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "entity_type": self.entity_type.value,
             "occurrences": self.occurrences,
@@ -683,10 +683,10 @@ def _ratio(num: int, den: int) -> float | None:
     return num / den if den else None
 
 
-def summarize(results: Sequence[DocumentResult]) -> dict[str, object]:
+def summarize(results: Sequence[DocumentResult]) -> dict[str, Any]:
     """One score block for ``results`` (all documents, or one language)."""
     scored = [[p for p in r.predicted if not unscored(r.document, p)] for r in results]
-    detection: dict[str, object] = {}
+    detection: dict[str, Any] = {}
     for mode in ("exact", "overlap"):
         total: dict[EntityType, TypeCounts] = defaultdict(TypeCounts)
         for r, preds in zip(results, scored, strict=True):
