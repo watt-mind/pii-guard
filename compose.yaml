@@ -3,7 +3,7 @@
 # Demo stack (docs/operations.md): docker compose --profile demo up --build
 #   UI http://localhost:5173, demo API + gateway http://127.0.0.1:8788 (traffic log on),
 #   mock upstream (offline). Set PII_GUARD_DEMO_UPSTREAM_URL / _API_KEY for a real upstream.
-#   Fast mode with the NER: the demo image adds the `ner` extra, and the first start downloads
+#   Fast mode with the NER: the demo image keeps torch + transformers, and the first start downloads
 #   the public fallback NER model (about 1.1 GB, docs/models.md) into the pii-guard-models
 #   volume; demo-api turns healthy once it is loaded. Rules only, offline, no download:
 #   PII_GUARD_DEMO_NER_FALLBACK=off docker compose --profile demo up --build
@@ -16,13 +16,15 @@ x-healthcheck: &healthcheck
   start_period: 10s
   retries: 12
 
-# The demo services share one image with the `ner` extra (torch, transformers).
+# The demo services share one image with the NER's torch + transformers: the base image skips
+# them (PII_GUARD_SKIP_PACKAGES in the Dockerfile) to stay rules-only and small.
 x-demo-image: &demo-image
   image: pii-guard:demo
   build:
     context: .
     args:
-      PII_GUARD_EXTRAS: "ocr local-vision ner sam"
+      PII_GUARD_EXTRAS: "ocr local-vision sam"
+      PII_GUARD_SKIP_PACKAGES: ""
 
 services:
   api:

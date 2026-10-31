@@ -22,7 +22,9 @@ IMAGE="${1:-pii-guard:dev}"
 # LAB-1407 adds vetted authenticated encryption for persisted provider credentials.
 # The first amd64 CI build with cryptography measured 541 MB; reserve 9 MB headroom.
 # Keep OCR/vision in the image rather than dropping protection to meet the old footprint.
-IMAGE_BUDGET_MB="${IMAGE_BUDGET_MB:-550}"
+# LAB-1733 made the NER a core dependency; this image skips it and measured 544 MB. LAB-1734
+# raises the budget to 650 MB for ordinary growth; torch leaking in (+1 GB) still fails here.
+IMAGE_BUDGET_MB="${IMAGE_BUDGET_MB:-650}"
 NET="pii-guard-smoke-$$"
 API_PORT="${SMOKE_API_PORT:-18797}"
 MOCK_PORT="${SMOKE_MOCK_PORT:-18798}"

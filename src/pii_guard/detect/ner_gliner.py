@@ -16,8 +16,10 @@ is how that comparison runs, and how to use a GLiNER checkpoint anyway:
   pinned to :data:`DEFAULT_REVISION`); a local directory with a ``gliner_config.json`` given
   as ``PII_GUARD_NER_MODEL`` makes the plain ``ner`` detector use this backend too.
 
-Needs the ``gliner`` extra, which conflicts with ``ner`` (gliner 0.2.29 pins
-``transformers < 5.17``): ``UV_PROJECT_ENVIRONMENT=.venv-gliner uv sync --extra gliner``.
+Needs the ``gliner`` package, which pins ``transformers < 5.17`` (gliner 0.2.29) and so can't
+share the default install's transformers: its extra was dropped from the lock in LAB-1733. To
+run it, check out commit ``13e2aaf`` (or earlier) and use
+``UV_PROJECT_ENVIRONMENT=.venv-gliner uv sync --extra gliner``.
 Without it the module imports but defines no ``DETECTOR_CLASS``. Fail closed, as the NER
 detector: load and inference errors raise :class:`~pii_guard.types.DetectionError` with the
 exception type only. Only ``model.safetensors`` weights are loaded (:func:`safetensors_checkpoint`,
@@ -46,6 +48,7 @@ __all__ = [
     "DEFAULT_MODEL",
     "DEFAULT_REVISION",
     "GLINER_LABELS",
+    "GLINER_MISSING",
     "GlinerBackend",
     "GlinerDetector",
     "dependencies_available",
@@ -53,6 +56,11 @@ __all__ = [
     "safetensors_checkpoint",
     "word_windows",
 ]
+
+#: Why GLiNER can't run: ``gliner`` is not installed (it pins transformers < 5.17).
+GLINER_MISSING = (
+    "the gliner package (not in the lock since LAB-1733; reproduce from commit 13e2aaf)"
+)
 
 #: GLiNER multi v2.1: mDeBERTa-v3-base span model, multilingual, Apache-2.0.
 DEFAULT_MODEL = "urchade/gliner_multi-v2.1"
@@ -78,7 +86,7 @@ _WORD = re.compile(r"\S+")
 
 
 def dependencies_available() -> bool:
-    """True if the ``gliner`` extra (gliner, torch) is installed."""
+    """True if ``gliner`` and ``torch`` are importable."""
     return all(importlib.util.find_spec(m) is not None for m in ("gliner", "torch"))
 
 
@@ -219,7 +227,7 @@ class GlinerDetector(NerDetector):
 
         def factory() -> GlinerBackend:
             if not dependencies_available():
-                raise DetectionError("ner_gliner detector needs the 'gliner' extra")
+                raise DetectionError(f"ner_gliner detector needs {GLINER_MISSING}")
             return GlinerBackend(chosen, revision=rev, device=device, labels=labels)
 
         super().__init__(

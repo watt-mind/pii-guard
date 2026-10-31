@@ -28,14 +28,14 @@ in-process (CPU, Apple MPS or CUDA), so the text never leaves the guard. See ``d
   inference error raise :class:`~pii_guard.types.DetectionError`. Messages carry exception
   types only, never text.
 
-The optional dependencies are the ``ner`` extra (``uv sync --extra ner``). Without them the
-module still imports (the classes are testable with an injected backend) but defines no
-``DETECTOR_CLASS``, so the registry reports ``ner`` as unavailable and the gateway's fast mode
-stays rules-only.
+The dependencies (torch, transformers) are part of the default install (LAB-1733); the
+rules-only base Docker image skips them. Without them the module still imports (the classes
+are testable with an injected backend) but defines no ``DETECTOR_CLASS``, so the registry
+reports ``ner`` as unavailable and the gateway's fast mode stays rules-only.
 
 Download / warm the model cache (Hugging Face cache, ``HF_HOME``)::
 
-    uv run --extra ner python -m pii_guard.detect.ner download [--model ID_OR_PATH]
+    uv run python -m pii_guard.detect.ner download [--model ID_OR_PATH]
 """
 
 from __future__ import annotations
@@ -197,7 +197,7 @@ _shared_backends: dict[tuple[object, ...], NerBackend] = {}
 
 
 def dependencies_available() -> bool:
-    """True if the ``ner`` extra (torch, transformers) is installed."""
+    """True if the NER dependencies (torch, transformers) are importable."""
     return all(importlib.util.find_spec(m) is not None for m in _REQUIRED_MODULES)
 
 
@@ -774,13 +774,13 @@ class NerDetector:
             from pii_guard.detect import ner_gliner
 
             if not ner_gliner.dependencies_available():
-                raise DetectionError("ner gliner backend needs the 'gliner' extra")
+                raise DetectionError(f"ner gliner backend needs {ner_gliner.GLINER_MISSING}")
             backend = ner_gliner.GlinerBackend(
                 self.model, revision=self.revision, device=self.device
             )
         else:
             if not dependencies_available():
-                raise DetectionError("ner detector needs the 'ner' extra (torch, transformers)")
+                raise DetectionError(f"ner detector unavailable: {ner_resolve.NER_DEPS_MISSING}")
             if self.choice is not None and self.choice.model is None:
                 raise DetectionError(f"no ner model: {self.choice.reason}")
             if self.choice is not None and not self.choice.ready:
@@ -962,7 +962,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     download.add_argument("--revision")
     args = parser.parse_args(list(argv) if argv is not None else None)
     if not dependencies_available():
-        print("install the 'ner' extra first: uv sync --extra ner", file=sys.stderr)
+        print(f"ner: {ner_resolve.NER_DEPS_MISSING}", file=sys.stderr)
         return 2
     detector = NerDetector(model=args.model, revision=args.revision, device="cpu")
     try:

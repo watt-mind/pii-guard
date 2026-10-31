@@ -86,7 +86,7 @@ def test_fast_mode_without_the_extra_says_how_to_get_it(monkeypatch: pytest.Monk
     p = demo_stack.plan(force_mock=True, ui=False)
     assert p.ner is None
     assert p.env["PII_GUARD_NER_FALLBACK"] == "off"
-    assert "`make demo` installs it" in demo_stack.banner(p)
+    assert "`uv sync` installs them" in demo_stack.banner(p)
 
 
 def test_configured_model_and_fallback_off(monkeypatch: pytest.MonkeyPatch) -> None:

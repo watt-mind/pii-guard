@@ -35,7 +35,7 @@ Regenerate after editing (a test fails if the committed files are stale)::
 
 Measure (fast mode)::
 
-    uv run --extra ner pii-guard eval --detectors rules,ner --fixtures eval/fixtures/agent-text
+    uv run pii-guard eval --detectors rules,ner --fixtures eval/fixtures/agent-text
 """
 
 from __future__ import annotations

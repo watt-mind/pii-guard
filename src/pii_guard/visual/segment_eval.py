@@ -34,7 +34,7 @@ Candidates (the extra packages are needed only for the candidate that uses them)
 - ``local``: :class:`~pii_guard.visual.segment.LocalSegmenter` (YuNet; ``local-vision``);
 - ``small-detectors``: ``local`` plus a YOLOS-tiny signature detector run on the whole image
   and 2x2 overlapping tiles (``mdefrance/yolos-tiny-signature-detection``, Apache-2.0;
-  needs ``torch`` + ``transformers``, the ``ner`` extra);
+  needs ``torch`` + ``transformers``, in the default install);
 - ``efficientsam``: ``local`` with each ID-photo box replaced by the bounding box of an
   EfficientSAM-ViT-T mask prompted with it (``yformer/EfficientSAM`` ONNX export,
   Apache-2.0; needs ``onnxruntime``).

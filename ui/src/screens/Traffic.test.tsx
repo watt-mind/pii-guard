@@ -440,7 +440,7 @@ describe("Live traffic", () => {
     expect(await screen.findByText(/This call ran Rules only/)).toBeInTheDocument();
     expect(screen.getByText("not names")).toBeInTheDocument();
     // NER first (LAB-1291): the fix is the on-device NER, not audit mode.
-    expect(screen.getByTestId("masked-request")).toHaveTextContent(/names need the on-device NER: install the ner extra/);
+    expect(screen.getByTestId("masked-request")).toHaveTextContent(/names need the on-device NER: it ships with wattmind-pii-guard/);
   });
 
   it("doesn't claim there was nothing to restore in a streamed tool call", async () => {

@@ -53,7 +53,7 @@ For the automatic free-text-name demonstration, prepare the NER ahead of time us
 [the fast-mode setup](../README.md#try-it), then start:
 
 ```bash
-uv sync --locked --extra ner
+uv sync --locked
 uv run --no-sync python scripts/demo.py --mode fast --mock --traffic-log masked
 ```
 

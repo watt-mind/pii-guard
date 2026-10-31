@@ -1,7 +1,7 @@
 """Over-masking check: what fast mode (rules + NER) masks in source code.
 
 ```
-uv run --extra ner python -m pii_guard.integrations.overmask FILE... [--record PATH]
+uv run python -m pii_guard.integrations.overmask FILE... [--record PATH]
 ```
 
 Coding agents send code, paths and URLs. A placeholder in place of an identifier, a path or a

@@ -15,7 +15,7 @@ revision (see each spec). Results: ``eval/results/2026-10-28-new-encoders/``.
 
 Download (about 4.3 GB in all, once, into the pii-guard model cache, checked against the pins)::
 
-    uv run --extra ner python -m pii_guard.eval.baselines.new_encoders download
+    uv run python -m pii_guard.eval.baselines.new_encoders download
 """
 
 from __future__ import annotations

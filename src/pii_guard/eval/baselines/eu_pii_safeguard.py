@@ -39,7 +39,7 @@ The label adapter (:func:`adapt`, documented in ``docs/evaluation.md``):
 
 Download (about 2.2 GB, once, into the pii-guard model cache, checked against the pin)::
 
-    uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
+    uv run python -m pii_guard.eval.baselines.eu_pii_safeguard download
 """
 
 from __future__ import annotations
