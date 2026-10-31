@@ -35,6 +35,7 @@ from pii_guard.observability import (
     Observability,
     ObservabilitySettings,
     TrafficLevel,
+    build_remote_exporter,
     check_bind,
     is_loopback,
 )
@@ -141,6 +142,9 @@ def _build_lifespan(
             close = getattr(getattr(app.state, "gateway", None), "aclose", None)
             if close is not None:
                 await close()
+            obs_close = getattr(getattr(app.state, "observability", None), "close", None)
+            if obs_close is not None:
+                obs_close()
             if settings.hosted:
                 await app.state.hosted.close()
             app.state.projects.close()
@@ -343,6 +347,8 @@ def create_app(
     app.state.observability = Observability(
         obs_settings,
         secrets=[upstream_key.get_secret_value()] if upstream_key is not None else [],
+        # Hosted only ingests remote telemetry; it never ships its tenants' traffic anywhere.
+        remote=None if settings.hosted else build_remote_exporter(obs_settings),
     )
     install_error_handlers(app)
     _register_healthz(app, settings, warmup)
