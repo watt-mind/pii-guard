@@ -24,7 +24,8 @@ function useProjectSwitcherData(selected: string | null, enabled: boolean, trigg
     void request<ProjectList>("/v1/projects").then((data) => {
       if (!active || !Array.isArray(data.projects)) return;
       setList(data);
-      if (!selected) setSelectedProject(data.default_project_id);
+      // A selection this owner no longer has (deleted, or from another account) falls back too (LAB-1730).
+      if (!selected || !data.projects.some((p) => p.id === selected)) setSelectedProject(data.default_project_id);
     }).catch(() => {
       // Older/offline guards keep their existing local console, but the failure is shown
       // (LAB-1714): it must never read as "no projects".
