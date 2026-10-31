@@ -440,6 +440,70 @@ def _leaks(text: str, value: str) -> bool:
     return leaks(text, [value])
 
 
+def _score_phase(
+    *,
+    doc: str,
+    language: str,
+    data: bytes,
+    values: dict[str, str],
+    namesakes: dict[tuple[str, str], list[str]],
+    phase: str,
+    matcher: str,
+    masker: ImageMasker,
+    vault: Vault,
+    total: _Tally,
+    tally: _Tally,
+) -> None:
+    session = vault.session()
+    seeds: list[tuple[str, EntityType]] = []
+    owners: list[tuple[str, str]] = []
+    for key, value in sorted(values.items()):
+        entity_type = GOLD_TYPES[key]
+        if phase == "with-true":
+            seeds.append((value, entity_type))
+            owners.append((key, "true"))
+        for name in namesakes.get((doc, key), []):
+            seeds.append((name, entity_type))
+            owners.append((key, "namesake"))
+    placeholders = _seed(session, seeds)
+    vault_matcher = (ExactMatcher if matcher == "exact" else VaultMatcher)(session, language)
+    started = time.perf_counter()
+    outcome = masker.mask(data, language, render="labels", matcher=vault_matcher)
+    elapsed = (time.perf_counter() - started) * 1000
+    found = _image_placeholders(outcome)
+    in_transcript = _transcript_placeholders(outcome)
+    uncertain = outcome.matches.get("uncertain", 0)
+    for t in (total, tally):
+        t.uncertain += uncertain if phase == "with-true" else 0
+        t.match_ms.append(elapsed)
+    for (key, owner), placeholder in zip(owners, placeholders, strict=True):
+        hit = placeholder in found
+        type_name = GOLD_TYPES[key].value
+        for t in (total, tally):
+            row = t.by_type.setdefault(type_name, [0, 0, 0])
+            if owner == "true":
+                t.gold += 1
+                row[0] += 1
+                if hit:
+                    t.matched += 1
+                    row[1] += 1
+                elif placeholder in in_transcript:
+                    t.swept += 1
+            elif hit:
+                t.false_merges += 1
+                row[2] += 1
+        if owner == "true" and GOLD_TYPES[key] is EntityType.PERSON:
+            total.people.setdefault((values[key], key), []).append(hit)
+    if phase == "with-true":
+        for t in (total, tally):
+            t.transcripts += 1
+            restored = session.unmask_with_report(outcome.transcript or "")
+            t.transcripts_resolved += not restored.unresolved
+            text = (outcome.transcript or "") + json.dumps(outcome.summary or {})
+            t.leaked += sum(_leaks(text, v) for v in values.values())
+    vault.drop(session.session_id)
+
+
 def evaluate(
     *,
     matcher: str = "fuzzy",
@@ -462,60 +526,22 @@ def evaluate(
             continue
         data = (root / "images" / entry["file"]).read_bytes()
         image = load_image(data)
-        noisy = CachedOcr({pixel_key(image): noisy_words(ocr.words(image), noise, doc)})
-        masker.ocr = noisy
+        masker.ocr = CachedOcr({pixel_key(image): noisy_words(ocr.words(image), noise, doc)})
         tally = total.by_language.setdefault(language, _Tally())
         for phase in ("with-true", "namesakes-only"):
-            session = vault.session()
-            seeds: list[tuple[str, EntityType]] = []
-            owners: list[tuple[str, str]] = []  # (key, "true"|"namesake")
-            for key, value in sorted(values.items()):
-                entity_type = GOLD_TYPES[key]
-                if phase == "with-true":
-                    seeds.append((value, entity_type))
-                    owners.append((key, "true"))
-                for name in namesakes.get((doc, key), []):
-                    seeds.append((name, entity_type))
-                    owners.append((key, "namesake"))
-            placeholders = _seed(session, seeds)
-            vault_matcher = (ExactMatcher if matcher == "exact" else VaultMatcher)(
-                session, language
+            _score_phase(
+                doc=doc,
+                language=language,
+                data=data,
+                values=values,
+                namesakes=namesakes,
+                phase=phase,
+                matcher=matcher,
+                masker=masker,
+                vault=vault,
+                total=total,
+                tally=tally,
             )
-            started = time.perf_counter()
-            outcome = masker.mask(data, language, render="labels", matcher=vault_matcher)
-            elapsed = (time.perf_counter() - started) * 1000
-            found = _image_placeholders(outcome)
-            in_transcript = _transcript_placeholders(outcome)
-            uncertain = outcome.matches.get("uncertain", 0)
-            for t in (total, tally):
-                t.uncertain += uncertain if phase == "with-true" else 0
-                t.match_ms.append(elapsed)
-            for (key, owner), placeholder in zip(owners, placeholders, strict=True):
-                hit = placeholder in found
-                type_name = GOLD_TYPES[key].value
-                for t in (total, tally):
-                    row = t.by_type.setdefault(type_name, [0, 0, 0])
-                    if owner == "true":
-                        t.gold += 1
-                        row[0] += 1
-                        if hit:
-                            t.matched += 1
-                            row[1] += 1
-                        elif placeholder in in_transcript:
-                            t.swept += 1
-                    elif hit:
-                        t.false_merges += 1
-                        row[2] += 1
-                if owner == "true" and GOLD_TYPES[key] is EntityType.PERSON:
-                    total.people.setdefault((values[key], key), []).append(hit)
-            if phase == "with-true":
-                for t in (total, tally):
-                    t.transcripts += 1
-                    restored = session.unmask_with_report(outcome.transcript or "")
-                    t.transcripts_resolved += not restored.unresolved
-                    text = (outcome.transcript or "") + json.dumps(outcome.summary or {})
-                    t.leaked += sum(_leaks(text, v) for v in values.values())
-            vault.drop(session.session_id)
     report = _report(total, matcher=matcher, noise=noise)
     report["wall_s"] = round(time.perf_counter() - started_all, 2)
     return report

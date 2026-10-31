@@ -624,29 +624,7 @@ def _systems(
     return out
 
 
-def build_index(
-    records: Sequence[Mapping[str, Any]],
-    *,
-    featured: Sequence[str] = (),
-    digests: Mapping[str, str] | None = None,
-    colours: dict[str, dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    """The index (see the module docstring) from validated run records.
-
-    ``colours`` is the colour registry (:func:`~pii_guard.eval.report_colours.load_registry`);
-    systems it lacks are appended to it in place. Without one, colours are assigned as if the
-    registry were empty.
-    """
-    records = [display_record(r) for r in records]
-    if colours is None:
-        colours = {}
-    for name in SECTIONS:
-        colours.setdefault(name, {})
-    records = sorted(records, key=run_order)
-    text = [r for r in records if r["kind"] == "text"]
-    scored = [r for r in records if r["kind"] != "latency"]
-    systems = _systems(scored, featured, colours["systems"])
-
+def _build_runs(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     runs = []
     for rec in records:
         cost = rec.get("cost")
@@ -683,29 +661,13 @@ def build_index(
                 "imported_from": (rec.get("imported_from") or {}).get("path"),
             }
         )
+    return runs
 
-    versions = current_versions(text)
-    rows = []
-    for rec in text:
-        origin = {f["language"]: f["origin"] for f in rec["fixtures"]}
-        shas = fixture_shas(rec)
-        for lang, block in rec["metrics"]["languages"].items():
-            rows.append(
-                {
-                    "run_id": rec["run_id"],
-                    "system": rec["system"]["key"],
-                    "fixture_set": rec["fixture_set"],
-                    "origin": origin.get(lang) or _origin(origin.values()),
-                    "language": lang,
-                    "fixture": shas[lang],
-                    "current": shas[lang] == versions[rec["fixture_set"]][lang],
-                    "date": rec["date"],
-                    "commit": rec["code"]["commit"],
-                    "metrics": compact(block),
-                }
-            )
 
-    # History: same system + set + commit + date merged (one run per language counts once).
+def _build_history(
+    text: Sequence[Mapping[str, Any]],
+    versions: Mapping[str, Mapping[str, str | None]],
+) -> list[dict[str, Any]]:
     groups: dict[tuple[str, str, str, str], list[Mapping[str, Any]]] = defaultdict(list)
     for rec in text:
         groups[
@@ -729,8 +691,6 @@ def build_index(
                 "order": run_order(recs[0]),
                 "run_ids": [r["run_id"] for r in recs],
                 "fixtures": shas,
-                # Same documents as the set's current snapshots: every current language, on
-                # the current file. Other points are not directly comparable with them.
                 "comparable": shas == versions[fixture_set],
                 "rescored": any(bool(r.get("rescored")) for r in recs),
                 "languages": {lang: compact(b) for lang, (_, b) in sorted(by_lang.items())},
@@ -740,9 +700,14 @@ def build_index(
     history.sort(key=lambda h: (h["order"], h["system"]))
     for h in history:
         del h["order"]
+    return history
 
-    snapshots, stale_snapshots = _snapshots(text, versions)
 
+def _build_fixture_sets(
+    scored: Sequence[Mapping[str, Any]],
+    text: Sequence[Mapping[str, Any]],
+    versions: Mapping[str, Mapping[str, str | None]],
+) -> dict[str, Any]:
     fixture_sets: dict[str, Any] = {}
     for rec in scored:
         for f in rec["fixtures"]:
@@ -782,7 +747,7 @@ def build_index(
         for lang, block in rec["metrics"]["languages"].items():
             if fixture_shas(rec)[lang] == current_set[lang]:
                 entry["documents"].setdefault(lang, block["documents"])
-    fixture_sets = {
+    return {
         name: {
             "origin": _origin(v["origin"]),
             "kind": v["kind"],
@@ -794,6 +759,10 @@ def build_index(
         for name, v in sorted(fixture_sets.items())
     }
 
+
+def _build_visual_and_latency(
+    records: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     visual = []
     for rec in records:
         if rec["kind"] != "visual":
@@ -819,7 +788,6 @@ def build_index(
                 "cost_usd": (rec.get("cost") or {}).get("usd"),
             }
         )
-
     latency = [
         {
             "run_id": rec["run_id"],
@@ -841,6 +809,58 @@ def build_index(
         for rec in records
         if rec["kind"] == "latency"
     ]
+    return visual, latency
+
+
+def build_index(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    featured: Sequence[str] = (),
+    digests: Mapping[str, str] | None = None,
+    colours: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """The index (see the module docstring) from validated run records.
+
+    ``colours`` is the colour registry (:func:`~pii_guard.eval.report_colours.load_registry`);
+    systems it lacks are appended to it in place. Without one, colours are assigned as if the
+    registry were empty.
+    """
+    records = [display_record(r) for r in records]
+    if colours is None:
+        colours = {}
+    for name in SECTIONS:
+        colours.setdefault(name, {})
+    records = sorted(records, key=run_order)
+    text = [r for r in records if r["kind"] == "text"]
+    scored = [r for r in records if r["kind"] != "latency"]
+    systems = _systems(scored, featured, colours["systems"])
+    runs = _build_runs(records)
+
+    versions = current_versions(text)
+    rows = []
+    for rec in text:
+        origin = {f["language"]: f["origin"] for f in rec["fixtures"]}
+        shas = fixture_shas(rec)
+        for lang, block in rec["metrics"]["languages"].items():
+            rows.append(
+                {
+                    "run_id": rec["run_id"],
+                    "system": rec["system"]["key"],
+                    "fixture_set": rec["fixture_set"],
+                    "origin": origin.get(lang) or _origin(origin.values()),
+                    "language": lang,
+                    "fixture": shas[lang],
+                    "current": shas[lang] == versions[rec["fixture_set"]][lang],
+                    "date": rec["date"],
+                    "commit": rec["code"]["commit"],
+                    "metrics": compact(block),
+                }
+            )
+
+    history = _build_history(text, versions)
+    snapshots, stale_snapshots = _snapshots(text, versions)
+    fixture_sets = _build_fixture_sets(scored, text, versions)
+    visual, latency = _build_visual_and_latency(records)
 
     digest = hashlib.sha256(
         json.dumps(sorted((digests or {}).items()), separators=(",", ":")).encode()

@@ -53,9 +53,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from pii_guard.eval.fixtures import FixtureError, load_fixtures
+from pii_guard.eval.fixtures import Document, FixtureError, load_fixtures
 from pii_guard.eval.report import build_scorecard, render_markdown
-from pii_guard.eval.scorer import DetectorAnalyzer, run_documents
+from pii_guard.eval.scorer import DetectorAnalyzer, DocumentResult, run_documents
 from pii_guard.types import PiiGuardError
 
 __all__ = ["DEFAULT_FIXTURES", "build_parser", "main"]
@@ -175,40 +175,159 @@ def _expand_fixture_paths(raw: Sequence[str]) -> list[Path]:
     return paths
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    argv = list(argv) if argv is not None else sys.argv[1:]
-    if argv[:1] == ["generate"]:  # ``pii-guard eval generate``: the corpus generator
+def _dispatch_subcommand(argv: list[str]) -> int | None:
+    if not argv:
+        return None
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "generate":  # ``pii-guard eval generate``: the corpus generator
         from pii_guard.eval.generate import main as generate_main
 
-        return generate_main(argv[1:])
-    if argv[:1] == ["visual"]:  # ``pii-guard eval visual``: image masking on specimens
+        return generate_main(rest)
+    if cmd == "visual":  # ``pii-guard eval visual``: image masking on specimens
         from pii_guard.eval.visual import main as visual_main
 
-        return visual_main(argv[1:])
-    if argv[:1] == ["injection"]:  # ``pii-guard eval injection``: red team per attack class
+        return visual_main(rest)
+    if cmd == "injection":  # ``pii-guard eval injection``: red team per attack class
         from pii_guard.eval.injection import main as injection_main
 
-        return injection_main(argv[1:])
-    if argv[:1] == ["datasets"]:  # ``pii-guard eval datasets``: registry, fetch, run
+        return injection_main(rest)
+    if cmd == "datasets":  # ``pii-guard eval datasets``: registry, fetch, run
         from pii_guard.eval.datasets.cli import main as datasets_main
 
-        return datasets_main(argv[1:])
-    if argv[:1] == ["record"]:  # ``pii-guard eval record``: run records from a scorecard
+        return datasets_main(rest)
+    if cmd == "record":  # ``pii-guard eval record``: run records from a scorecard
         from pii_guard.eval.record import main as record_main
 
-        return record_main(argv[1:])
-    if argv[:1] == ["report"]:  # ``pii-guard eval report``: index, charts, benchmarks.md
+        return record_main(rest)
+    if cmd == "report":  # ``pii-guard eval report``: index, charts, benchmarks.md
         from pii_guard.eval.report_cli import main as report_main
 
-        return report_main(argv[1:])
-    if argv[:1] == ["gate"]:  # ``pii-guard eval gate``: quality regression gate vs run records
+        return report_main(rest)
+    if cmd == "gate":  # ``pii-guard eval gate``: quality regression gate vs run records
         from pii_guard.eval.gate import main as gate_main
 
-        return gate_main(argv[1:])
-    args = build_parser().parse_args(argv)
+        return gate_main(rest)
+    return None
+
+
+def _load_selected_documents(args: argparse.Namespace) -> tuple[list[Path], list[Document]] | None:
+    fixture_paths = _expand_fixture_paths(
+        [*args.paths, *(args.fixtures or [])] or [DEFAULT_FIXTURES]
+    )
+    try:
+        documents = load_fixtures(fixture_paths)
+    except (FixtureError, OSError) as exc:
+        print(f"pii-guard eval: {exc}", file=sys.stderr)
+        return None
+    if args.language:
+        wanted = set(args.language)
+        documents = [d for d in documents if d.language in wanted or d.primary_language in wanted]
+    if not documents:
+        print("pii-guard eval: no fixture documents selected", file=sys.stderr)
+        return None
+    return fixture_paths, documents
+
+
+def _apply_outbound_check(
+    scorecard: dict[str, Any], documents: Sequence[Document], analyzer: DetectorAnalyzer
+) -> int:
+    from pii_guard.eval.outbound import outbound_blocks
+
+    try:
+        replayed = outbound_blocks(documents, analyzer.detectors)
+    except PiiGuardError as exc:
+        print(
+            f"pii-guard eval: outbound replay failed: {exc.code}: {exc.message}",
+            file=sys.stderr,
+        )
+        return 1
+    scorecard["overall"]["outbound_check"] = replayed["overall"]
+    for lang, block in replayed["languages"].items():
+        if lang in scorecard["languages"]:
+            scorecard["languages"][lang]["outbound_check"] = block
+    return 0
+
+
+def _enrich_scorecard(
+    scorecard: dict[str, Any],
+    markdown: str,
+    *,
+    args: argparse.Namespace,
+    documents: Sequence[Document],
+    results: Sequence[DocumentResult],
+    analyzer: DetectorAnalyzer,
+    attacker: Any,
+) -> tuple[str, int]:
+    if args.known_values:
+        scorecard["meta"]["known_values"] = sum(
+            len(d.meta.get("known_values") or ()) for d in documents
+        )
+    if args.outbound_check and _apply_outbound_check(scorecard, documents, analyzer) != 0:
+        return markdown, 1
+    markdown = render_markdown(scorecard)
+    if any("attack" in d.meta for d in documents):
+        from pii_guard.eval.injection import attack_breakdown, attack_of, render_attack_table
+
+        order = list(dict.fromkeys(attack_of(d) for d in documents))
+        scorecard["attacks"] = attack_breakdown(results, order=order)
+        markdown += "\n## Per attack class\n\n" + render_attack_table(scorecard["attacks"])
+    if args.known_values:
+        markdown += (
+            f"\nKnown values pre-loaded from fixture meta: {scorecard['meta']['known_values']} "
+            "(`known` detector).\n"
+        )
+    if attacker is not None:
+        from pii_guard.eval.redteam import redteam_section
+
+        try:
+            scorecard["redteam"], section = redteam_section(
+                results, args, attacker, analyzer=analyzer
+            )
+        except PiiGuardError as exc:
+            print(f"pii-guard eval: red team failed: {exc.code}: {exc.message}", file=sys.stderr)
+            return markdown, 1
+        markdown += section
+    if args.baselines:
+        from pii_guard.eval.baselines import render_comparison, run_baselines
+
+        try:
+            scorecard["baselines"], skipped = run_baselines(documents, args.baselines)
+        except PiiGuardError as exc:
+            print(f"pii-guard eval: baseline failed: {exc.code}: {exc.message}", file=sys.stderr)
+            return markdown, 1
+        scorecard["meta"]["skipped_baselines"] = [{"name": n, "reason": r} for n, r in skipped]
+        for name, reason in skipped:
+            print(f"pii-guard eval: warning: skipping baseline {name!r}: {reason}", file=sys.stderr)
+        markdown += "\n" + render_comparison([scorecard])
+    return markdown, 0
+
+
+def _write_outputs(
+    scorecard: dict[str, Any],
+    markdown: str,
+    args: argparse.Namespace,
+    extra: dict[str, Any] | None,
+) -> int:
+    sys.stdout.write(markdown)
+    if args.markdown:
+        args.markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.markdown.write_text(markdown, encoding="utf-8")
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(scorecard, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+    if args.record:
+        return _record(scorecard, args.record, _with_usage_cost(extra, scorecard), args.runs_dir)
+    return 0
+
+
+def _parse_extra_and_attacker(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any] | None, Any] | None:
     if args.record_extra and not args.record:
         print("pii-guard eval: --record-extra needs --record SLUG", file=sys.stderr)
-        return 2
+        return None
     extra = None
     if args.record:
         from pii_guard.eval.record import RecordError, load_extra
@@ -217,22 +336,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             extra = load_extra(args.record_extra)
         except RecordError as exc:
             print(f"pii-guard eval: {exc}", file=sys.stderr)
-            return 2
-    fixture_paths = _expand_fixture_paths(
-        [*args.paths, *(args.fixtures or [])] or [DEFAULT_FIXTURES]
-    )
-    try:
-        documents = load_fixtures(fixture_paths)
-    except (FixtureError, OSError) as exc:
-        print(f"pii-guard eval: {exc}", file=sys.stderr)
-        return 2
-    if args.language:
-        wanted = set(args.language)
-        documents = [d for d in documents if d.language in wanted or d.primary_language in wanted]
-    if not documents:
-        print("pii-guard eval: no fixture documents selected", file=sys.stderr)
-        return 2
-
+            return None
     attacker = None
     if args.redteam:  # configuration errors before any detector or model call
         from pii_guard.eval.redteam import attacker_from_args
@@ -241,7 +345,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             attacker = attacker_from_args(args)
         except PiiGuardError as exc:
             print(f"pii-guard eval: {exc.message}", file=sys.stderr)
-            return 2
+            return None
+    return extra, attacker
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    argv = list(argv) if argv is not None else sys.argv[1:]
+    dispatched = _dispatch_subcommand(argv)
+    if dispatched is not None:
+        return dispatched
+    args = build_parser().parse_args(argv)
+    if (options := _parse_extra_and_attacker(args)) is None:
+        return 2
+    extra, attacker = options
+    loaded = _load_selected_documents(args)
+    if loaded is None:
+        return 2
+    fixture_paths, documents = loaded
 
     analyzer = DetectorAnalyzer(args.detectors)
     for name, reason in analyzer.skipped:
@@ -267,72 +387,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         usage=usage,
         price={"input": args.price_input, "cached": args.price_cached, "output": args.price_output},
     )
-    if args.known_values:
-        scorecard["meta"]["known_values"] = sum(
-            len(d.meta.get("known_values") or ()) for d in documents
-        )
-    if args.outbound_check:
-        from pii_guard.eval.outbound import outbound_blocks
-
-        try:
-            replayed = outbound_blocks(documents, analyzer.detectors)
-        except PiiGuardError as exc:
-            print(
-                f"pii-guard eval: outbound replay failed: {exc.code}: {exc.message}",
-                file=sys.stderr,
-            )
-            return 1
-        scorecard["overall"]["outbound_check"] = replayed["overall"]
-        for lang, block in replayed["languages"].items():
-            if lang in scorecard["languages"]:
-                scorecard["languages"][lang]["outbound_check"] = block
-    markdown = render_markdown(scorecard)
-    if any("attack" in d.meta for d in documents):
-        from pii_guard.eval.injection import attack_breakdown, attack_of, render_attack_table
-
-        order = list(dict.fromkeys(attack_of(d) for d in documents))
-        scorecard["attacks"] = attack_breakdown(results, order=order)
-        markdown += "\n## Per attack class\n\n" + render_attack_table(scorecard["attacks"])
-    if args.known_values:
-        markdown += (
-            f"\nKnown values pre-loaded from fixture meta: {scorecard['meta']['known_values']} "
-            "(`known` detector).\n"
-        )
-    if attacker is not None:
-        from pii_guard.eval.redteam import redteam_section
-
-        try:
-            scorecard["redteam"], section = redteam_section(
-                results, args, attacker, analyzer=analyzer
-            )
-        except PiiGuardError as exc:
-            print(f"pii-guard eval: red team failed: {exc.code}: {exc.message}", file=sys.stderr)
-            return 1
-        markdown += section
-    if args.baselines:
-        from pii_guard.eval.baselines import render_comparison, run_baselines
-
-        try:
-            scorecard["baselines"], skipped = run_baselines(documents, args.baselines)
-        except PiiGuardError as exc:
-            print(f"pii-guard eval: baseline failed: {exc.code}: {exc.message}", file=sys.stderr)
-            return 1
-        scorecard["meta"]["skipped_baselines"] = [{"name": n, "reason": r} for n, r in skipped]
-        for name, reason in skipped:
-            print(f"pii-guard eval: warning: skipping baseline {name!r}: {reason}", file=sys.stderr)
-        markdown += "\n" + render_comparison([scorecard])
-    sys.stdout.write(markdown)
-    if args.markdown:
-        args.markdown.parent.mkdir(parents=True, exist_ok=True)
-        args.markdown.write_text(markdown, encoding="utf-8")
-    if args.json:
-        args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(
-            json.dumps(scorecard, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
-    if args.record:
-        return _record(scorecard, args.record, _with_usage_cost(extra, scorecard), args.runs_dir)
-    return 0
+    markdown, status = _enrich_scorecard(
+        scorecard,
+        "",
+        args=args,
+        documents=documents,
+        results=results,
+        analyzer=analyzer,
+        attacker=attacker,
+    )
+    if status != 0:
+        return status
+    return _write_outputs(scorecard, markdown, args, extra)
 
 
 def _with_usage_cost(
