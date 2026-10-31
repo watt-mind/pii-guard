@@ -77,7 +77,8 @@ across deltas):
   and the next request's assistant history and `tool_result` went out masked again, with the
   same placeholders.
 
-**Fast mode (rules + NER).** Checked end to end (`test_claude_e2e.py`) with the published
-`v4.2` NER model (`python -m pii_guard.integrations.e2e --client claude-code`): Claude Code
-reads `client-letter.md`, `customers.csv` and `.env`, and writes `reply.md` with all 18 gold
-values restored and 0 leaked upstream.
+**Fast mode (rules + NER).** `test_claude_e2e.py` runs the same scripted session in CI, where
+no NER checkpoint is installed, so CI checks it rules-only. With the published `v4.2` NER
+model installed it was run locally (`python -m pii_guard.integrations.e2e --client
+claude-code`): Claude Code reads `client-letter.md`, `customers.csv` and `.env`, and writes
+`reply.md` with all 18 gold values restored and 0 leaked upstream.

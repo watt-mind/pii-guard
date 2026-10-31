@@ -50,6 +50,7 @@ from collections.abc import Iterable, Sequence
 from copy import copy
 from dataclasses import dataclass
 
+from pii_guard.detect.ner_numbers import NUMBER_TYPES
 from pii_guard.detect.normalize import NormalizedText, normalize_for_detection, spaced_view
 from pii_guard.detect.rules._base import VALIDATED_ID_DOCUMENT
 from pii_guard.detect.suffix_trim import trim_name_suffixes
@@ -274,9 +275,17 @@ def _outside(text: str, cand: _Cand, auth: list[_Cand]) -> list[_Cand]:
         if trimmed is None:
             continue
         ts, te = trimmed
-        # A short piece past a newline (e.g. a trailing line number joined by wrapped-number
-        # folding after a complete IBAN, cf. LAB-1604) is not part of the authoritative span.
-        if te - ts < 4 and "\n" in text[cand.start : ts]:
+        # A short piece on a later line than the validated span it follows (a trailing line
+        # number joined by wrapped-number folding after a complete IBAN, cf. LAB-1604) is not
+        # part of that value. Only for the number types, and only when the newline lies after
+        # the covering span: a newline before the value (``Hívjon:\n+36 1 234 5678 / 12``)
+        # says nothing about the tail, and a short tail of a card or phone (a CVV, a wrapped
+        # extension) is still personal data, so it stays masked.
+        if (
+            te - ts < 4
+            and cand.entity_type in NUMBER_TYPES
+            and any("\n" in text[a.end : ts] for a in covering if a.end <= ts)
+        ):
             continue
         if not any(ch.isdigit() for ch in text[ts:te]) and not any(
             _continues(text, a, ts, te) for a in covering

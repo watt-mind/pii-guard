@@ -706,8 +706,33 @@ class VaultSession:
                 if any(any(taken[start:end]) for start, end in spans):
                     return None
             self._take(text, found, language, replacements, taken)
+            # A new placeholder can lift the sweep veto of an older model-only entry next to
+            # it (``Claude`` before a newly masked ``Sonnet 4.5``), which only a scan of the
+            # older entries finds: mask from scratch when one still has an open occurrence.
+            if len(replacements) > len(masked.replacements) and self._older_guarded_open(
+                text, folded, language, changed, taken
+            ):
+                return None
         self._remember_masked(key, replacements, generation, masked.depends, masked.spans)
         return self._assemble(text, replacements, masked.spans, generation)
+
+    def _older_guarded_open(
+        self,
+        text: str,
+        folded: tuple[FoldedText, ...],
+        language: str,
+        changed: dict[_Entry, None],
+        taken: bytearray,
+    ) -> bool:
+        """Whether an unchanged ``model_only`` entry has an occurrence nothing took."""
+        older = [e for e in self._by_key.values() if e.model_only and e not in changed]
+        self.entries_scanned += len(older)
+        for entry in older:
+            _, occurrences, aliases = entry.find_occurrences(language, folded, text)
+            for start, end in itertools.chain(occurrences, *(o for _, o in aliases)):
+                if not any(taken[start:end]):
+                    return True
+        return False
 
     def _take_occurrence(
         self,

@@ -465,3 +465,36 @@ def test_outside_drops_short_remainder_past_newline() -> None:
     )
     resolved = resolve_spans(text, [rule_span, ner_span], detector_order=("rules", "ner"))
     assert [s.text for s in resolved] == ["DE89 3704 0044 0532 0130 00"]
+
+
+@pytest.mark.parametrize(
+    ("text", "ner_start", "value", "tail", "entity_type"),
+    [
+        # A newline before the value (the NER span starts on the label line) says nothing
+        # about the same-line extension after it.
+        ("Hívjon:\n+36 1 234 5678 / 12", 0, "+36 1 234 5678", "12", E.PHONE),
+        # A CVV on the next line is still card data.
+        (
+            "Kártya: 4111 1111 1111 1111\n123 lejár",
+            8,
+            "4111 1111 1111 1111",
+            "123",
+            E.PAYMENT_CARD,
+        ),
+        # A wrapped phone tail is not dropped: phones are not a LAB-1604 number type.
+        ("Tel. +49 30 1234567\n89", 5, "+49 30 1234567", "89", E.PHONE),
+    ],
+    ids=["hu-phone-extension", "hu-card-cvv", "de-phone-wrapped-tail"],
+)
+def test_outside_keeps_short_remainder_unless_number_type_past_newline(
+    text: str, ner_start: int, value: str, tail: str, entity_type: E
+) -> None:
+    """LAB-1735: the short-remainder drop is scoped to the number types and to a newline after
+    the covering rule span; every other short tail the NER span holds stays masked."""
+    start = text.index(value)
+    end = start + len(value)
+    tail_end = text.index(tail, end) + len(tail)
+    rule_span = Span(start, end, entity_type, value, 0.99, "rules")
+    ner_span = Span(ner_start, tail_end, entity_type, text[ner_start:tail_end], 0.9, "ner")
+    resolved = resolve_spans(text, [rule_span, ner_span], detector_order=("rules", "ner"))
+    assert [s.text for s in resolved] == [value, tail]
