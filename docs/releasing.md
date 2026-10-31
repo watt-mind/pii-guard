@@ -31,7 +31,7 @@ Automated releases require the following one-time configurations:
 | **PyPI Trusted Publisher** | GitHub Actions (OIDC) | Configured under PyPI project/account settings: Owner `watt-mind`, Repo `pii-guard`, Workflow `release.yml`, Environment `pypi`. Minted dynamically via OpenID Connect; no static API tokens are stored. |
 | **GitHub Environment** | `pypi` | Created under repository Settings → Environments → `pypi`. |
 | **GitHub Repo Variable** | `PYPI_PUBLISH = "true"` | Controls whether `.github/workflows/release.yml` executes the `pypi` job. |
-| **Container Registry** | `ghcr.io/watt-mind/pii-guard` | Automated multi-arch container image builds via GitHub Actions `packages: write` permission. |
+| **Container Registry** | `ghcr.io/watt-mind/pii-guard` | Automated container image builds via GitHub Actions `packages: write` permission. |
 
 ---
 
@@ -54,6 +54,7 @@ Automated releases require the following one-time configurations:
 3. **Run Local Checks**:
    ```bash
    make check         # lint, mypy types, tests, and eval gate
+   make links         # validates internal markdown links and anchors
    make wheel         # builds bundled web console and validates size budget (< 5 MiB)
    make wheel-smoke   # validates throwaway install and isolated pii-guard up smoke test
    ```
@@ -111,7 +112,7 @@ flowchart LR
 ```
 
 1. **`gate`**: Executes `scripts/ci/release_gate.py` to confirm the tagged commit has a completed `success` run for `ci-ok` on `main` or `develop`.
-2. **`image`**: Builds the container image from scratch and pushes `ghcr.io/watt-mind/pii-guard:vX.Y.Z` and `:latest` with provenance attestations and SBOM.
+2. **`image`**: Builds the container image from scratch and pushes `ghcr.io/watt-mind/pii-guard:X.Y.Z`, `:X.Y`, and `:latest` with provenance attestations and SBOM.
 3. **`wheel`**:
    - Builds web console assets (`pnpm build`).
    - Copies dist into `src/pii_guard/_ui/` and packages wheel + sdist.
@@ -148,7 +149,7 @@ After the release workflow completes, run end-to-end verification:
    ```
 4. **Test Docker Image**:
    ```bash
-   docker run --rm ghcr.io/watt-mind/pii-guard:vX.Y.Z --version
+   docker run --rm ghcr.io/watt-mind/pii-guard:X.Y.Z pii-guard --version
    ```
 
 ---
