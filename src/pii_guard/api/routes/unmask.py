@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from pii_guard.api.deps import get_vault
 from pii_guard.api.errors import error_responses
-from pii_guard.api.routes._common import check_text_size, log_extra, v1_router
+from pii_guard.api.routes._common import check_text_size, log_extra, request_metrics, v1_router
 from pii_guard.api.routes.mask import SessionId
 from pii_guard.gateway.sessions import check_owner, client_identity
 from pii_guard.vault import Vault
@@ -80,5 +80,7 @@ def unmask(
     # owner's session alive (LAB-1584).
     session = vault.session(body.session_id, authorize=lambda s: check_owner(s, identity))
     result = session.unmask_with_report(body.text)
+    if result.unresolved and (metrics := request_metrics(request)) is not None:
+        metrics.observe_unresolved(len(result.unresolved))
     log_extra(request, unresolved=len(result.unresolved))
     return {"text": result.text, "unresolved": list(result.unresolved)}

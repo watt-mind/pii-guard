@@ -620,7 +620,6 @@ from the gateway's responses and are kept in memory next to the vault; a `REST A
 no recorded client or creation time.
 
 ## Timing
-## Timing
 
 The gateway times every request on the monotonic clock, from the moment the body has been
 received until the answer is built (non-streamed) or the stream has ended:
@@ -658,10 +657,36 @@ when the headers are sent, plus `upstream`, `overhead` and `total`, e.g.
 On a stream the header is sent before the answer, so it only covers the work up to the
 upstream's response headers.
 
-**Prometheus metrics** (`PII_GUARD_METRICS=true`, off by default) at `GET /metrics`:
-`pii_guard_gateway_requests_total{mode,outcome}` and histograms (ms) of
-`pii_guard_gateway_overhead_ms`, `_total_ms`, `_upstream_ms`, `_added_ttft_ms` per `mode`, and
-`pii_guard_gateway_stage_ms{mode,stage}`. Labels are modes, stages and outcome codes only.
+**Prometheus metrics** (`PII_GUARD_METRICS=true`, off by default; `pii-guard up` and `make demo`
+enable it by default; disabled in `PII_GUARD_HOSTED=true`) at `GET /metrics`
+(`text/plain; version=0.0.4`):
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `pii_guard_gateway_requests_total` | `counter` | `mode`, `outcome` | Gateway requests by mode (`fast`, `audit`) and outcome (`ok`, `blocked`, `refused`, `upstream_error`, `upstream_failed`, `stream_error`, `client_disconnected`, `error`) |
+| `pii_guard_gateway_overhead_ms` | `histogram` | `mode` | Gateway processing overhead in ms (`total_ms - upstream_ms - client_ms`) |
+| `pii_guard_gateway_total_ms` | `histogram` | `mode` | End-to-end gateway turn duration in ms |
+| `pii_guard_gateway_upstream_ms` | `histogram` | `mode` | Time spent waiting on the upstream LLM in ms |
+| `pii_guard_gateway_added_ttft_ms` | `histogram` | `mode` | Time-to-first-token added by PII Guard on streaming calls in ms |
+| `pii_guard_gateway_stage_ms` | `histogram` | `mode`, `stage` | Per-stage gateway timing in ms (`parse`, `detect`, `image`, `mask`, `forward`, `upstream_ttfb`, `upstream`, `unmask`, `response`, `client`) |
+| `pii_guard_detector_duration_ms` | `histogram` | `mode`, `detector` | Per-detector runtime in ms (`rules`, `ner`, `llm`, `visual`) |
+| `pii_guard_entities_detected_total` | `counter` | `entity_type` | PII entities detected across the gateway and `/v1/analyze` + `/v1/mask` |
+| `pii_guard_entities_masked_total` | `counter` | `entity_type` | PII entities replaced with vault placeholders across the gateway and `/v1/mask` |
+| `pii_guard_image_regions_total` | `counter` | `entity_type`, `action` | Visual PII regions processed (`action="masked"\|"kept"`) across the gateway and `/v1/mask/image` |
+| `pii_guard_blocked_entities_total` | `counter` | `stage`, `entity_type` | Entities that triggered a policy block (`stage="inbound"\|"outbound"`) |
+| `pii_guard_outbound_checks_total` | `counter` | `result` | Outbound leak-guard evaluations (`result="passed"\|"blocked"`) |
+| `pii_guard_detection_cache_total` | `counter` | `result` | Prefix detection cache lookups (`result="hit"\|"miss"\|"seeded"`) |
+| `pii_guard_upstream_tokens_total` | `counter` | `direction` | Upstream LLM tokens (`direction="input"\|"output"`) |
+| `pii_guard_unresolved_placeholders_total` | `counter` | — | Unknown or hallucinated `[[TYPE_id]]` placeholders left unresolved |
+| `pii_guard_http_requests_total` | `counter` | `method`, `path`, `status` | HTTP requests handled across all API routes (route templates only; `/metrics` excluded) |
+| `pii_guard_http_request_duration_ms` | `histogram` | `method`, `path` | HTTP request duration in ms by route template (to response headers on streams) |
+| `pii_guard_vault_active_sessions` | `gauge` | — | Live vault sessions in memory across root and project runtimes |
+| `pii_guard_ner_state` | `gauge` | `state` | One-hot NER warmup state (`1` for active state among `off`, `loading`, `ready`, `failed`) |
+
+All millisecond histograms use buckets `0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, +Inf` (`BUCKETS_MS` in `observability/metrics.py`).
+Labels are fixed enums and route templates only—never raw PII, session IDs or client identifiers.
+When `PII_GUARD_API_TOKEN` is set, configure Prometheus with `authorization: { credentials: <token> }`
+on the scrape job.
 
 ## Latency benchmark
 

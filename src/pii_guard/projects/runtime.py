@@ -209,6 +209,12 @@ class ProjectService:
             runtime.active -= 1
             runtime.touched = time.monotonic()
 
+    def live_session_count(self) -> int:
+        """Number of non-expired sessions across active project and endpoint runtimes."""
+        with self._lock:
+            runtimes = list(self._runtimes.values())
+        return sum(len(runtime.vault.live_sessions()) for runtime in runtimes)
+
     def gateway(self, request: Request) -> Gateway:
         existing = getattr(request.state, "project_gateway", None)
         if existing is not None:
@@ -277,12 +283,17 @@ class ProjectService:
             transport = SecureTransport()
         else:
             transport = getattr(request.app.state, "gateway_transport", None)
+        app_obs = getattr(request.app.state, "observability", None)
         observability = Observability(
             runtime.observability.settings,
             secrets=[credential.get_secret_value()] if credential else [],
         )
         observability.traffic = runtime.observability.traffic
-        observability.metrics = runtime.observability.metrics
+        observability.metrics = (
+            runtime.observability.metrics
+            if self.settings.hosted
+            else getattr(app_obs, "metrics", None)
+        )
         gateway = Gateway(
             settings=settings,
             vault=runtime.vault,
