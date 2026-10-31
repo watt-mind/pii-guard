@@ -269,8 +269,8 @@ the selected subscription first if not already registered.
    `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`. URI variables must refer to **versioned**
    secrets in the dedicated vault. No secret values enter the script. Run
    `deploy/azure/deploy.sh stage`; it validates and deploys internal ingress, Google Easy Auth,
-   zero to one replicas, with one worker per replica, and waits boundedly for the latest revision to be admitted as ready. Verify application
-   readiness through ingress too; scale-to-zero is expected after idle periods.
+   one replica in prod or zero to one in dev (LAB-1711), with one worker per replica, and waits boundedly for the latest revision to be admitted as ready. Verify application
+   readiness through ingress too; in dev scale-to-zero is expected after idle periods.
 5. Test synthetic requests through the actual ingress. Record the tests in an image-bound,
    externally reviewed evidence JSON (example below), then use `enable`. Do not announce the
    service until Google sign-in and the signed-in/guest mask → Meta → restore streaming flow
@@ -516,13 +516,14 @@ approving additional authority; unknown commits are charged conservatively. Neve
 restore the object to replenish credit. Legacy marker-only deployments retain their original
 restart-forfeiture rules and are not the Blob-backed release path.
 
-The app scales to zero when idle and runs at most one 2-vCPU/4-GiB replica. A cold start
+Prod keeps one 2-vCPU/4-GiB replica warm (LAB-1711) so signed-in visitors never wait on a
+cold start; dev scales to zero when idle. Both run at most one replica. A cold start
 serves the landing page, the UI, `/healthz` and `/v1/status` as soon as the process is up and
 loads the bundled NER model in the background (LAB-1548). Until it is loaded, detecting
 requests wait up to `PII_GUARD_NER_WARMUP_TIMEOUT` and then get `503 detector_loading` with
 `Retry-After`; a model that fails to load gets `503 detection_unavailable`. Nothing is ever
-detected without the model or forwarded unmasked. Scale-to-zero
-discards owner state. The Blob store resumes the same finite total/daily authority; it never
+detected without the model or forwarded unmasked. A replica restart, or
+scale-to-zero in dev, discards owner state. The Blob store resumes the same finite total/daily authority; it never
 reopens credit automatically.
 ACR Basic, Key Vault, Azure Files, networking and alerting cost extra. The USD 50 (prod) and USD 10 (dev) limits are
 application sponsored allocation ceilings, not Azure hard caps or verified price estimates.
@@ -548,7 +549,7 @@ probes are required and send `Host: localhost`. `PII_GUARD_ALLOWED_HOSTS` adds t
 public host and app default Azure host; loopback hosts remain allowed for probes. The image
 also checks `ner=ready` in its Docker healthcheck for local Docker verification. No image/OCR capability is advertised.
 The template creates content-free alerts for restarts, CPU saturation and memory
-pressure; scale-to-zero is expected and does not trigger a replica-loss alarm; attach a monitored action group before relying on delivery. In Azure Monitor inspect
+pressure; dev scale-to-zero is expected and does not trigger a replica-loss alarm; attach a monitored action group before relying on delivery. In Azure Monitor inspect
 `Requests` grouped by status category for 4xx/429 refusal and 5xx availability, not body or
 header logs. Alert delivery, 429 refusal thresholds, allocation exhaustion and provider spend
 reconciliation require operational validation; this template does not invent a provider billing

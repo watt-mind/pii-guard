@@ -457,7 +457,10 @@ class ReleaseTemplateTests(unittest.TestCase):
 
     def test_single_replica_offline_ner_health_and_hosts(self) -> None:
         template = self.resource("Microsoft.App/containerApps")["properties"]["template"]
-        self.assertEqual(template["scale"], {"minReplicas": 0, "maxReplicas": 1})
+        self.assertEqual(
+            template["scale"],
+            {"minReplicas": "[if(equals(parameters('environmentName'), 'prod'), 1, 0)]", "maxReplicas": 1},
+        )
         self.assertNotIn("volumes", template)
         container = template["containers"][0]
         self.assertEqual(container["image"], "[parameters('image')]")

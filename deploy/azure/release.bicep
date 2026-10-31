@@ -142,7 +142,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_METRICS', value: 'false' }
         ]
         // Readiness admits the replica while the bundled NER model still loads (LAB-1548):
-        // scale-to-zero cold starts serve the landing page at once, detecting requests wait or
+        // cold starts (dev scales to zero; prod keeps one warm, LAB-1711) serve the landing page at once, detecting requests wait or
         // get 503 detector_loading. Full /readyz (model loaded) stays the deploy smoke gate.
         // Startup and Readiness tick every 2 s (LAB-1594): 10 s ticks cost about 11 s of a 54 s
         // cold start. Startup keeps failureThreshold 60 (2 min for /healthz, up in about 1 s);
@@ -153,7 +153,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { type: 'Liveness', httpGet: { path: '/healthz', port: 8787, httpHeaders: [{ name: 'Host', value: 'localhost' }] }, periodSeconds: 30, failureThreshold: 3, timeoutSeconds: 5 }
         ]
       }]
-      scale: { minReplicas: 0, maxReplicas: 1 }
+      scale: { minReplicas: environmentName == 'prod' ? 1 : 0, maxReplicas: 1 }
     }
   }
 }
