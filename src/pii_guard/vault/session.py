@@ -83,6 +83,7 @@ __all__ = [
     "_authorized",
 ]
 
+# Re-exported in __all__ for callers importing from session directly.
 from pii_guard.vault.entry import UnmaskOutputTooLargeError
 
 logger = logging.getLogger(__name__)
@@ -994,7 +995,10 @@ class VaultSession:
         types = frozenset(entity_types)
         with self._lock:
             self._check_alive()
-            return [
-                *{e.original: None for e in self._by_key.values() if e.entity_type in types},
-                *{v.value: None for v in self._known.values() if v.entity_type in types},
-            ]
+            found = dict.fromkeys(
+                e.original for e in self._by_key.values() if e.entity_type in types
+            )
+            found.update(
+                dict.fromkeys(v.value for v in self._known.values() if v.entity_type in types)
+            )
+            return list(found)

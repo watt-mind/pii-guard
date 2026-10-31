@@ -69,6 +69,7 @@ def unmask_text_locked(
     by_placeholder: dict[str, _Entry],
     budget: RestoreBudget,
 ) -> UnmaskResult:
+    """Restore every known placeholder in ``text``, charging ``budget``; caller holds the lock."""
     unresolved: dict[str, None] = {}
     restored = 0
     parts: list[str] = []
@@ -106,7 +107,10 @@ def find_unmasked_locked(
     known: KnownValues,
     language: str,
 ) -> list[Unmasked]:
+    """Vault values left unmasked in ``texts``, longest first; caller holds the lock."""
     views = [folds.get(text) or fold_views(text) for text in texts]
+    # One string with every view: a value none of whose needles is in it can't occur
+    # in any text, so most entries are skipped after one substring search each.
     joined = (FoldedText("", "\x00".join(v.text for vs in views for v in vs)),)
     taken = _placeholder_mask(texts)
     found: list[Unmasked] = []
