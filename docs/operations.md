@@ -251,6 +251,8 @@ publishing (OIDC, no stored token). It is off until the repository variable `PYP
 `true`, and skips pre-releases (`v1.2.3-rc1`). Setup, once: on PyPI, a pending trusted
 publisher for project `wattmind-pii-guard` with owner `watt-mind`, repository `pii-guard`,
 workflow `release.yml` and environment `pypi`; on GitHub, an environment named `pypi`.
+Complete release SOP, tagging, and verification procedures are documented in
+[releasing.md](releasing.md), and version history in [CHANGELOG.md](../CHANGELOG.md).
 
 ## The demo stack
 
