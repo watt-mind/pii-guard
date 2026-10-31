@@ -93,7 +93,7 @@ class ProjectService:
             if self._store is None:
                 if self.settings.hosted_project_store == "azure_blob":
                     self._store = configured_blob_store(self.settings)
-                    self._key = self._store._key
+                    self._key = self._store.key
                     return self._store
                 path = Path(self.settings.project_state_path).expanduser()
                 key = self.settings.tenant_key_bytes()
@@ -297,12 +297,24 @@ class ProjectService:
 
             # The operator-key route only; own endpoints (BYOK/custom) get neither header.
             gateway.upstream_extra_headers = sponsored_upstream_headers(settings)
-        gateway._detect_workers = (
-            hosted._workers if hosted is not None else self.worker_pools(config.concurrency)
+        hosted_workers = (
+            getattr(hosted, "detect_workers", None)
+            or getattr(hosted, "workers", None)
+            or getattr(hosted, "_workers", None)
+            if hosted is not None
+            else None
         )
-        gateway._session_holds, gateway._holds_lock = runtime.session_holds, runtime.holds_lock
-        gateway.issued_ids = runtime.issued_ids
-        gateway._session_incarnations = runtime.session_incarnations
+        gateway.bind_shared_state(
+            detect_workers=(
+                hosted_workers
+                if hosted_workers is not None
+                else self.worker_pools(config.concurrency)
+            ),
+            session_holds=runtime.session_holds,
+            holds_lock=runtime.holds_lock,
+            issued_ids=runtime.issued_ids,
+            session_incarnations=runtime.session_incarnations,
+        )
         request.state.project_gateway = gateway
         return gateway
 

@@ -114,8 +114,7 @@ _NAMESPACE_KEYS = frozenset({"type", "name", "description", "tools"})
 _TEXT_KEYS = frozenset({"format", "verbosity"})
 
 
-def collect_response_texts(body: object) -> CollectedTexts:
-    """Every text of a Responses request, as :class:`TextSlot` objects (fail closed)."""
+def _validate_response_body(body: object) -> dict[str, Any]:
     if not isinstance(body, dict):
         raise InvalidChatRequestError("request body must be a JSON object")
     if not isinstance(body.get("model"), str) or not body["model"]:
@@ -130,8 +129,10 @@ def collect_response_texts(body: object) -> CollectedTexts:
         _TOP_SCALAR | _TOP_CHECKED | _TOP_WALKED | frozenset(_TOP_USER_TEXT) | frozenset(_TOP_STATE)
     )
     _reject_unknown(body, allowed, "", "request")
-    out = CollectedTexts([], [])
-    _collect_input(body, out)
+    return body
+
+
+def _collect_top_response_fields(body: dict[str, Any], out: CollectedTexts) -> None:
     instructions = body.get("instructions")
     if isinstance(instructions, str):
         # Muse Code's instructions can quote numbered file lines: same gutters as chat system.
@@ -150,16 +151,28 @@ def collect_response_texts(body: object) -> CollectedTexts:
             out.slots.append(TextSlot(value, _setter(body, key), "user"))
         elif value is not None:
             raise InvalidChatRequestError(f"{key} must be a string")
-    _collect_tools(body, out)
-    _collect_text_options(body, out)
+
+
+def _collect_response_metadata_fields(body: dict[str, Any], out: CollectedTexts) -> None:
     for key in ("metadata", "client_metadata"):
         metadata = body.get(key)
         if metadata is not None:
             if not isinstance(metadata, dict):
                 raise InvalidChatRequestError(f"{key} must be an object")
             _collect_metadata(metadata, out)
+
+
+def collect_response_texts(body: object) -> CollectedTexts:
+    """Every text of a Responses request, as :class:`TextSlot` objects (fail closed)."""
+    checked = _validate_response_body(body)
+    out = CollectedTexts([], [])
+    _collect_input(checked, out)
+    _collect_top_response_fields(checked, out)
+    _collect_tools(checked, out)
+    _collect_text_options(checked, out)
+    _collect_response_metadata_fields(checked, out)
     # ``model`` goes upstream verbatim and can't carry a placeholder: checked (LAB-1563).
-    _check_text(body["model"], "model", out)
+    _check_text(checked["model"], "model", out)
     return out
 
 

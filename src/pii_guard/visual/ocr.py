@@ -325,6 +325,68 @@ class _Reading:
         return self.confident_chars * (0.5 if self.sideways else 1.0)
 
 
+def _small_text_tiles(reading: _Reading, scale: float) -> tuple[list[Box], float]:
+    lines: dict[tuple[int, ...], list[Box]] = {}
+    for word in reading.words:
+        lines.setdefault(word.line, []).append(word.box)
+    # A line's text height is its words' median height: one misread word can stand
+    # three times taller than the rest.
+    small: list[tuple[Box, int]] = []
+    for boxes in lines.values():
+        height = round(statistics.median(b.height for b in boxes))
+        if height * scale < MIN_TEXT_HEIGHT:
+            union = boxes[0]
+            for b in boxes[1:]:
+                union = union.union(b)
+            small.append((union, max(height, 1)))
+    if not small:
+        return [], 1.0
+    fw, fh = reading.frame.size
+    tiles = _merge_boxes(
+        [
+            Box(
+                max(0, b.x1 - 2 * h),
+                max(0, b.y1 - h),
+                min(fw - 1, b.x2 + 2 * h),
+                min(fh - 1, b.y2 + h),
+            )
+            for b, h in small
+        ]
+    )
+    if len(tiles) > MAX_TILES:
+        everything = tiles[0]
+        for tile in tiles[1:]:
+            everything = everything.union(tile)
+        tiles = [everything]
+    height = min(h for _, h in small)
+    factor = min(MAX_UPSCALE, TARGET_TEXT_HEIGHT / max(height, 1))
+    area = sum(t.width * t.height for t in tiles)
+    factor = min(factor, math.sqrt(MAX_TILE_PIXELS / max(area, 1)))
+    if factor <= scale * 1.25:
+        return [], 1.0
+    return tiles, factor
+
+
+def _replace_tile_words(
+    words: list[OcrWord],
+    confidences: list[float],
+    inside: list[int],
+    found: list[OcrWord],
+    found_conf: list[float],
+) -> tuple[list[OcrWord], list[float]]:
+    at = inside[0] if inside else len(words)
+    keep = set(inside)
+    merged: list[tuple[OcrWord, float]] = []
+    for k, item in enumerate(zip(words, confidences, strict=True)):
+        if k == at:
+            merged.extend(zip(found, found_conf, strict=True))
+        if k not in keep:
+            merged.append(item)
+    if at == len(words):
+        merged.extend(zip(found, found_conf, strict=True))
+    return [w for w, _ in merged], [c for _, c in merged]
+
+
 class TesseractOcr:
     """Tesseract via ``pytesseract``. ``lang`` is Tesseract's language list (``"hun+eng"``).
 
@@ -588,43 +650,8 @@ class TesseractOcr:
     def _small_text(self, image: Image.Image, reading: _Reading, scale: float) -> list[OcrWord]:
         """``reading``'s words, with every line read under :data:`MIN_TEXT_HEIGHT` pixels
         (at OCR resolution) read again on an enlarged tile, where that reads better."""
-        lines: dict[tuple[int, ...], list[Box]] = {}
-        for word in reading.words:
-            lines.setdefault(word.line, []).append(word.box)
-        # A line's text height is its words' median height: one misread word can stand
-        # three times taller than the rest.
-        small: list[tuple[Box, int]] = []
-        for boxes in lines.values():
-            height = round(statistics.median(b.height for b in boxes))
-            if height * scale < MIN_TEXT_HEIGHT:
-                union = boxes[0]
-                for b in boxes[1:]:
-                    union = union.union(b)
-                small.append((union, max(height, 1)))
-        if not small:
-            return reading.words
-        fw, fh = reading.frame.size
-        tiles = _merge_boxes(
-            [
-                Box(
-                    max(0, b.x1 - 2 * h),
-                    max(0, b.y1 - h),
-                    min(fw - 1, b.x2 + 2 * h),
-                    min(fh - 1, b.y2 + h),
-                )
-                for b, h in small
-            ]
-        )
-        if len(tiles) > MAX_TILES:
-            everything = tiles[0]
-            for tile in tiles[1:]:
-                everything = everything.union(tile)
-            tiles = [everything]
-        height = min(h for _, h in small)
-        factor = min(MAX_UPSCALE, TARGET_TEXT_HEIGHT / max(height, 1))
-        area = sum(t.width * t.height for t in tiles)
-        factor = min(factor, math.sqrt(MAX_TILE_PIXELS / max(area, 1)))
-        if factor <= scale * 1.25:
+        tiles, factor = _small_text_tiles(reading, scale)
+        if not tiles:
             return reading.words
         framed = reading.frame.render(image)
         words = list(reading.words)
@@ -637,20 +664,10 @@ class TesseractOcr:
                 reading.frame, [words[i] for i in inside], [confidences[i] for i in inside]
             )
             new = _Reading(reading.frame, found, found_conf)
-            if not found or new.confident_chars <= old.confident_chars:
-                continue
-            at = inside[0] if inside else len(words)
-            keep = set(inside)
-            merged: list[tuple[OcrWord, float]] = []
-            for k, item in enumerate(zip(words, confidences, strict=True)):
-                if k == at:
-                    merged.extend(zip(found, found_conf, strict=True))
-                if k not in keep:
-                    merged.append(item)
-            if at == len(words):
-                merged.extend(zip(found, found_conf, strict=True))
-            words = [w for w, _ in merged]
-            confidences = [c for _, c in merged]
+            if found and new.confident_chars > old.confident_chars:
+                words, confidences = _replace_tile_words(
+                    words, confidences, inside, found, found_conf
+                )
         return words
 
 
@@ -853,17 +870,7 @@ def text_regions(
     return [finding.region for finding in found.findings]
 
 
-def ocr_text(
-    image: bytes | Image.Image,
-    detectors: Sequence[Detector],
-    *,
-    ocr: OcrEngine,
-    language: str = "hu",
-    captions: bool | CaptionLexicon = True,
-) -> OcrText:
-    """Like :func:`text_regions`, keeping the words and the text of every finding."""
-    if not detectors:
-        raise DetectionError("no text detector configured for OCR text")
+def _read_ocr_page(image: bytes | Image.Image, ocr: OcrEngine) -> OcrPage:
     if isinstance(image, Image.Image):
         decoded = image
     else:
@@ -880,26 +887,34 @@ def ocr_text(
         raise DetectionError(f"OCR failed ({type(exc).__name__})") from exc
     if not isinstance(page, OcrPage):
         raise DetectionError("OCR engine returned an unexpected page")
-    words = page.words
-    if not words:
-        return OcrText([], [], [], [])
-    text, offsets = join_words(words)
+    return page
 
-    # Layout-found MRZ zones: one box per zone, whatever the text detectors make of it.
-    zones = mrz_zones(words)
-    findings: list[TextFinding] = [
-        TextFinding(zone.region, "\n".join(zone.lines), "mrz") for zone in zones
-    ]
-    # Values next to known field captions, whatever the text detectors make of them.
+
+def _caption_findings(
+    words: Sequence[OcrWord], captions: bool | CaptionLexicon
+) -> tuple[list[TextFinding], list[CaptionValue]]:
+    if captions is False:
+        return [], []
+    lexicon = captions if isinstance(captions, CaptionLexicon) else None
+    findings: list[TextFinding] = []
     fields: list[CaptionValue] = []
-    if captions is not False:
-        lexicon = captions if isinstance(captions, CaptionLexicon) else None
-        for value in caption_values(words, lexicon, include_non_personal=True):
-            if value.entity_type is None:
-                fields.append(value)
-                continue
-            region = Region(value.entity_type, value.box, CAPTION_SCORE, CAPTION_SOURCE)
-            findings.append(TextFinding(region, value.text, "caption", value.caption))
+    for value in caption_values(words, lexicon, include_non_personal=True):
+        if value.entity_type is None:
+            fields.append(value)
+            continue
+        region = Region(value.entity_type, value.box, CAPTION_SCORE, CAPTION_SOURCE)
+        findings.append(TextFinding(region, value.text, "caption", value.caption))
+    return findings, fields
+
+
+def _detector_findings(
+    text: str,
+    words: Sequence[OcrWord],
+    offsets: Sequence[tuple[int, int]],
+    detectors: Sequence[Detector],
+    language: str,
+) -> list[TextFinding]:
+    findings: list[TextFinding] = []
     for detector in detectors:
         try:
             spans = detector.detect(text, language)
@@ -921,6 +936,35 @@ def ocr_text(
                 )
                 for box in by_line.values()
             )
+    return findings
+
+
+def ocr_text(
+    image: bytes | Image.Image,
+    detectors: Sequence[Detector],
+    *,
+    ocr: OcrEngine,
+    language: str = "hu",
+    captions: bool | CaptionLexicon = True,
+) -> OcrText:
+    """Like :func:`text_regions`, keeping the words and the text of every finding."""
+    if not detectors:
+        raise DetectionError("no text detector configured for OCR text")
+    page = _read_ocr_page(image, ocr)
+    words = page.words
+    if not words:
+        return OcrText([], [], [], [])
+    text, offsets = join_words(words)
+
+    # Layout-found MRZ zones: one box per zone, whatever the text detectors make of it.
+    zones = mrz_zones(words)
+    findings: list[TextFinding] = [
+        TextFinding(zone.region, "\n".join(zone.lines), "mrz") for zone in zones
+    ]
+    # Values next to known field captions, whatever the text detectors make of them.
+    caption_hits, fields = _caption_findings(words, captions)
+    findings.extend(caption_hits)
+    findings.extend(_detector_findings(text, words, offsets, detectors, language))
     logger.debug("ocr: %d word(s), %d text region(s)", len(words), len(findings))
     found = OcrText(words, findings, zones, fields)
     return found if page.frame.identity else _to_source(found, page.frame)

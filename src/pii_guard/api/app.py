@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager, suppress
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 
 import anyio.to_thread
 from fastapi import FastAPI
@@ -109,45 +109,9 @@ class NerWarmupMiddleware:
         await self.app(scope, receive, send)
 
 
-def create_app(
-    settings: Settings | None = None, observability: ObservabilitySettings | None = None
-) -> FastAPI:
-    """Build the app. ``settings`` defaults to :func:`pii_guard.config.get_settings`.
-
-    The settings object is available to routes as ``request.app.state.settings``; the
-    detector names (``PII_GUARD_DETECTORS``, else rules + ner when available) as
-    ``app.state.detector_names`` and the entity
-    policies (``PII_GUARD_POLICY_OVERRIDES``) as ``app.state.policies``. Unknown detector
-    names stop startup (:class:`~pii_guard.types.DetectionError`) rather than the first
-    request.
-
-    ``observability`` (default: from the environment) configures the traffic log, the
-    ``Server-Timing`` header and ``/metrics`` (``app.state.observability``). The traffic log at
-    level ``full`` on a non-loopback ``PII_GUARD_HOST`` or with non-loopback
-    ``PII_GUARD_ALLOWED_HOSTS`` stops startup
-    (:class:`~pii_guard.observability.TrafficLogConfigError`), and refuses every connection that
-    is not loopback on both ends (403 ``traffic_log_not_local``).
-
-    Requests with a ``Host`` header outside :func:`~pii_guard.api.security.allowed_hosts` get
-    400 (DNS-rebinding guard). ``PII_GUARD_API_TOKEN`` requires a bearer token on every route
-    but ``/healthz``; without it the API has no authentication.
-
-    With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
-    (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
-    race to load it; a model that can't be loaded stops startup. Hosted mode is the exception
-    (LAB-1548, scale to zero): it loads the configured model in the background like below, so
-    a cold start serves the landing page at once; a model that can't be loaded fails detecting
-    requests closed (503 ``detection_unavailable``) and keeps ``/readyz`` refusing. Without
-    it, when the stack
-    has ``ner`` (the resolved published model or fallback), the lifespan starts loading it in
-    the background (:class:`~pii_guard.detect.stack.NerWarmup`, ``app.state.ner_warmup``,
-    LAB-1303): the server answers at once, ``/healthz`` and ``/v1/status`` say ``loading``,
-    and detecting requests wait for the model (:class:`NerWarmupMiddleware`). The gateway
-    (``app.state.gateway``) keeps one upstream HTTP client; the lifespan closes it on shutdown
-    (LAB-1176).
-    """
-    settings = settings or get_settings()
-
+def _build_lifespan(
+    settings: Settings, warmup: NerWarmup
+) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if settings.hosted and warmup.start():
@@ -181,39 +145,10 @@ def create_app(
                 await app.state.hosted.close()
             app.state.projects.close()
 
-    app = FastAPI(
-        title="PII Guard",
-        version=__version__,
-        description="Privacy firewall for AI agents: reversible PII masking.",
-        lifespan=lifespan,
-    )
-    # Explicit PII_GUARD_DETECTORS, else the gateway fast-mode stack (LAB-1270). A configured
-    # but missing NER raises here, like an unknown name: at startup, not on the first request.
-    detector_names = rest_detector_names(settings)
-    for name in detector_names:
-        resolve_detector(name)
-    app.state.settings = settings
-    app.state.detector_names = list(detector_names)
-    app.state.max_text_chars = settings.max_text_chars
-    app.state.policies = PolicySet.from_settings(settings)
-    warmup = NerWarmup(settings)
-    app.state.ner_warmup = warmup
-    obs_settings = observability or ObservabilitySettings()
-    hosts = allowed_hosts(settings)
-    check_bind(obs_settings.traffic_log, settings.host)
-    check_allowed_hosts(obs_settings.traffic_log, hosts)
-    # The vault inspector (LAB-1328): `full` reveals originals, so it is loopback-only too.
-    inspect_mode = InspectMode(settings.vault_inspect)
-    check_inspect_bind(inspect_mode, settings.host, hosts)
-    app.state.vault_inspect = inspect_mode
-    app.state.vault_directory = SessionDirectory(settings.vault_max_sessions)
-    upstream_key = settings.upstream_api_key
-    app.state.observability = Observability(
-        obs_settings,
-        secrets=[upstream_key.get_secret_value()] if upstream_key is not None else [],
-    )
-    install_error_handlers(app)
+    return lifespan
 
+
+def _register_healthz(app: FastAPI, settings: Settings, warmup: NerWarmup) -> None:
     @app.get(
         "/healthz",
         tags=["health"],
@@ -252,46 +187,52 @@ def create_app(
             "image_require_ocr": settings.image_require_ocr,
         }
 
-    from pii_guard.projects.runtime import ProjectService
 
-    app.state.projects = ProjectService(settings)
-    include_routers(app)
-    if settings.hosted:
-        from pii_guard.hosted.routes import router as hosted_router
-        from pii_guard.hosted.runtime import HostedService
+def _configure_hosted(app: FastAPI, settings: Settings, warmup: NerWarmup) -> None:
+    from pii_guard.hosted.routes import router as hosted_router
+    from pii_guard.hosted.runtime import HostedService
 
-        app.state.hosted = HostedService(settings, projects=app.state.projects)
-        app.include_router(hosted_router)
-        # Hosted images (ADR 0014): the route's own byte limit and the one-job image pool.
-        app.state.max_image_bytes = settings.hosted_max_image_bytes
-        app.state.image_workers = app.state.hosted.image_workers
+    app.state.hosted = HostedService(settings, projects=app.state.projects)
+    app.include_router(hosted_router)
+    # Hosted images (ADR 0014): the route's own byte limit and the one-job image pool.
+    app.state.max_image_bytes = settings.hosted_max_image_bytes
+    app.state.image_workers = app.state.hosted.image_workers
 
-        def require_ready(*, serving: bool) -> dict[str, str]:
-            if warmup.state == "failed":
-                # Status only: the load error stays in the log (ADR 0006).
-                raise DetectionUnavailableError("ner model unavailable")
-            if warmup.state not in {"ready", "off"} and not (serving and warmup.state == "loading"):
-                raise DetectorLoadingError("Detectors are not ready")
-            if settings.hosted_images:
-                from pii_guard.hosted.images import require_image_pipeline
+    def require_ready(*, serving: bool) -> dict[str, str]:
+        if warmup.state == "failed":
+            # Status only: the load error stays in the log (ADR 0006).
+            raise DetectionUnavailableError("ner model unavailable")
+        if warmup.state not in {"ready", "off"} and not (serving and warmup.state == "loading"):
+            raise DetectorLoadingError("Detectors are not ready")
+        if settings.hosted_images:
+            from pii_guard.hosted.images import require_image_pipeline
 
-                # Fail closed (ADR 0006): a replica that offers images must be able to OCR
-                # them and to find faces on the CPU, or it is not ready at all.
-                require_image_pipeline(app.state)
-            return {"status": "ready"}
+            # Fail closed (ADR 0006): a replica that offers images must be able to OCR
+            # them and to find faces on the CPU, or it is not ready at all.
+            require_image_pipeline(app.state)
+        return {"status": "ready"}
 
-        @app.get("/readyz", include_in_schema=False)
-        def readyz() -> dict[str, str]:
-            """Full readiness (deploy smoke): the NER model is loaded."""
-            return require_ready(serving=False)
+    @app.get("/readyz", include_in_schema=False)
+    def readyz() -> dict[str, str]:
+        """Full readiness (deploy smoke): the NER model is loaded."""
+        return require_ready(serving=False)
 
-        @app.get("/readyz/serving", include_in_schema=False)
-        def readyz_serving() -> dict[str, str]:
-            """Serving readiness (the platform's Readiness probe, LAB-1548): also ready while
-            the NER model loads, since detecting requests wait for it; a failed load is never
-            ready. A plain path: Container Apps documents no query string in probe paths."""
-            return require_ready(serving=True)
+    @app.get("/readyz/serving", include_in_schema=False)
+    def readyz_serving() -> dict[str, str]:
+        """Serving readiness (the platform's Readiness probe, LAB-1548): also ready while
+        the NER model loads, since detecting requests wait for it; a failed load is never
+        ready. A plain path: Container Apps documents no query string in probe paths."""
+        return require_ready(serving=True)
 
+
+def _install_middlewares(
+    app: FastAPI,
+    settings: Settings,
+    obs_settings: ObservabilitySettings,
+    warmup: NerWarmup,
+    inspect_mode: InspectMode,
+    hosts: list[str],
+) -> None:
     # Innermost: detecting requests wait for a loading NER model (LAB-1303), on the rewritten
     # path. Then /s/<session>/v1/... reaches the /v1 routes with that vault session
     # (LAB-1286); the Host, loopback and token checks see the URL as sent.
@@ -332,4 +273,85 @@ def create_app(
     if obs_settings.traffic_log is TrafficLevel.FULL:
         app.add_middleware(LoopbackOnlyMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts, www_redirect=False)
+
+
+def create_app(
+    settings: Settings | None = None, observability: ObservabilitySettings | None = None
+) -> FastAPI:
+    """Build the app. ``settings`` defaults to :func:`pii_guard.config.get_settings`.
+
+    The settings object is available to routes as ``request.app.state.settings``; the
+    detector names (``PII_GUARD_DETECTORS``, else rules + ner when available) as
+    ``app.state.detector_names`` and the entity
+    policies (``PII_GUARD_POLICY_OVERRIDES``) as ``app.state.policies``. Unknown detector
+    names stop startup (:class:`~pii_guard.types.DetectionError`) rather than the first
+    request.
+
+    ``observability`` (default: from the environment) configures the traffic log, the
+    ``Server-Timing`` header and ``/metrics`` (``app.state.observability``). The traffic log at
+    level ``full`` on a non-loopback ``PII_GUARD_HOST`` or with non-loopback
+    ``PII_GUARD_ALLOWED_HOSTS`` stops startup
+    (:class:`~pii_guard.observability.TrafficLogConfigError`), and refuses every connection that
+    is not loopback on both ends (403 ``traffic_log_not_local``).
+
+    Requests with a ``Host`` header outside :func:`~pii_guard.api.security.allowed_hosts` get
+    400 (DNS-rebinding guard). ``PII_GUARD_API_TOKEN`` requires a bearer token on every route
+    but ``/healthz``; without it the API has no authentication.
+
+    With ``PII_GUARD_NER_MODEL`` set, the lifespan loads the NER model before the app serves
+    (:func:`~pii_guard.detect.stack.warm_up`, LAB-1274), so concurrent first requests don't
+    race to load it; a model that can't be loaded stops startup. Hosted mode is the exception
+    (LAB-1548, scale to zero): it loads the configured model in the background like below, so
+    a cold start serves the landing page at once; a model that can't be loaded fails detecting
+    requests closed (503 ``detection_unavailable``) and keeps ``/readyz`` refusing. Without
+    it, when the stack
+    has ``ner`` (the resolved published model or fallback), the lifespan starts loading it in
+    the background (:class:`~pii_guard.detect.stack.NerWarmup`, ``app.state.ner_warmup``,
+    LAB-1303): the server answers at once, ``/healthz`` and ``/v1/status`` say ``loading``,
+    and detecting requests wait for the model (:class:`NerWarmupMiddleware`). The gateway
+    (``app.state.gateway``) keeps one upstream HTTP client; the lifespan closes it on shutdown
+    (LAB-1176).
+    """
+    settings = settings or get_settings()
+    warmup = NerWarmup(settings)
+    app = FastAPI(
+        title="PII Guard",
+        version=__version__,
+        description="Privacy firewall for AI agents: reversible PII masking.",
+        lifespan=_build_lifespan(settings, warmup),
+    )
+    # Explicit PII_GUARD_DETECTORS, else the gateway fast-mode stack (LAB-1270). A configured
+    # but missing NER raises here, like an unknown name: at startup, not on the first request.
+    detector_names = rest_detector_names(settings)
+    for name in detector_names:
+        resolve_detector(name)
+    app.state.settings = settings
+    app.state.detector_names = list(detector_names)
+    app.state.max_text_chars = settings.max_text_chars
+    app.state.policies = PolicySet.from_settings(settings)
+    app.state.ner_warmup = warmup
+    obs_settings = observability or ObservabilitySettings()
+    hosts = allowed_hosts(settings)
+    check_bind(obs_settings.traffic_log, settings.host)
+    check_allowed_hosts(obs_settings.traffic_log, hosts)
+    # The vault inspector (LAB-1328): `full` reveals originals, so it is loopback-only too.
+    inspect_mode = InspectMode(settings.vault_inspect)
+    check_inspect_bind(inspect_mode, settings.host, hosts)
+    app.state.vault_inspect = inspect_mode
+    app.state.vault_directory = SessionDirectory(settings.vault_max_sessions)
+    upstream_key = settings.upstream_api_key
+    app.state.observability = Observability(
+        obs_settings,
+        secrets=[upstream_key.get_secret_value()] if upstream_key is not None else [],
+    )
+    install_error_handlers(app)
+    _register_healthz(app, settings, warmup)
+
+    from pii_guard.projects.runtime import ProjectService
+
+    app.state.projects = ProjectService(settings)
+    include_routers(app)
+    if settings.hosted:
+        _configure_hosted(app, settings, warmup)
+    _install_middlewares(app, settings, obs_settings, warmup, inspect_mode, hosts)
     return app

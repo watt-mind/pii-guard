@@ -194,6 +194,101 @@ def _last_token_letters(value: str) -> int:
     return sum(ch.isalpha() for ch in tokens[-1]) if tokens else 0
 
 
+def _hyphen_splits(surface: str) -> list[Split]:
+    hyphen = surface.rfind("-")
+    if hyphen <= 0 or not surface[hyphen - 1].isalnum():
+        return []
+    head, tail = surface[:hyphen], surface[hyphen:]
+    if tail[1:].casefold() in set(_HU_SUFFIXES) | set(_HU_HYPHENATED) and (
+        head[-1].isdigit() or head.split("-")[-1].isupper()
+    ):
+        return [Split(head, head, tail)]
+    return []
+
+
+def _lengthened_splits(surface: str, folded: str) -> list[Split]:
+    found: list[Split] = []
+    for suffix in sorted(set(_HU_LENGTHENING), key=len, reverse=True):
+        cut = len(surface) - len(suffix)
+        if cut < 1 or not folded.endswith(suffix):
+            continue
+        short = _HU_SHORT.get(surface[cut - 1])
+        if short is None:
+            continue
+        stem, lemma = surface[:cut], surface[: cut - 1] + short
+        if _last_token_letters(lemma) < _MIN_LEMMA_LETTERS + 1:
+            continue
+        strong = suffix in _HU_STRONG[short.casefold()]
+        found.append(Split(lemma, stem, surface[cut:], strong))
+    return found
+
+
+def _stacked_splits(surface: str, folded: str) -> list[Split]:
+    # Stacked: Kerekes Ottó|éknál, Teszt Hajná|éknak -> Teszt Hajna, Tihamér|éit (LAB-1337).
+    found: list[Split] = []
+    last_start = len(surface) - len(surface.split()[-1])
+    for cut in range(len(surface) - 2, last_start, -1):
+        if folded[cut] != "é" or not _HU_STACKED_RE.fullmatch(folded[cut:]):
+            continue
+        stem = surface[:cut]
+        if not stem[-1].isalpha():
+            continue
+        short = _HU_SHORT.get(stem[-1])
+        lemma = stem if short is None else stem[:-1] + short
+        if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
+            found.append(Split(lemma, stem, surface[cut:]))
+    return found
+
+
+def _doubled_splits(surface: str, folded: str) -> list[Split]:
+    found: list[Split] = []
+    for ending in _HU_DOUBLED_ENDINGS:
+        if not folded.endswith(ending):
+            continue
+        stem = surface[: len(surface) - len(ending)]
+        digraph = _hu_digraph(stem)
+        # Kováccs|al -> Kovács: the digraph's first letter is doubled.
+        if digraph is not None and stem[-3:-2].casefold() == digraph[0]:
+            lemma = stem[:-3] + stem[-2:]
+            if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
+                found.append(Split(lemma, stem, surface[len(stem) :]))
+            continue
+        # Tóth|tal -> Tóth, Kovácz|cal -> Kovácz: the sound of the old digraph is doubled.
+        lemma = stem[:-1]
+        old = _hu_old_digraph(lemma)
+        if old is not None and stem[-1].casefold() == old[0]:
+            if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
+                found.append(Split(lemma, lemma, surface[len(lemma) :]))
+            continue
+        if _hu_doubled(stem):
+            # Elek|kel -> Elek: a single final consonant doubled into the suffix.
+            if (
+                lemma[-2:-1].casefold() != lemma[-1].casefold()
+                and _hu_digraph(lemma) is None
+                and _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1
+            ):
+                found.append(Split(lemma, lemma, surface[len(lemma) :]))
+            # Bernadett|el -> Bernadett, Kiss|el -> Kiss: the value already ends doubled.
+            if _last_token_letters(stem) >= _MIN_LEMMA_LETTERS + 1:
+                found.append(Split(stem, stem, surface[len(stem) :]))
+    return found
+
+
+def _unchanged_splits(surface: str, folded: str) -> list[Split]:
+    found: list[Split] = []
+    for suffix in sorted(set(_HU_SUFFIXES) | set(_HU_HYPHENATED), key=len, reverse=True):
+        cut = len(surface) - len(suffix)
+        if cut < 1 or not folded.endswith(suffix) or not surface[cut - 1].isalpha():
+            continue
+        lemma = surface[:cut]
+        if suffix in _HU_HYPHENATED and lemma[-1].casefold() not in _HU_VOWELS:
+            continue
+        if _last_token_letters(lemma) < _MIN_LEMMA_LETTERS + 1:
+            continue
+        found.append(Split(lemma, lemma, surface[cut:]))
+    return found
+
+
 class HungarianSuffixMatcher:
     """Hungarian case suffixes, with the stem changes they cause.
 
@@ -263,81 +358,14 @@ class HungarianSuffixMatcher:
         surface = surface.strip()
         if not surface or not surface[-1].isalpha():
             return []
-        found: list[Split] = []
-        folded = surface.casefold()
-        hyphen = surface.rfind("-")
-        if hyphen > 0 and surface[hyphen - 1].isalnum():
-            head, tail = surface[:hyphen], surface[hyphen:]
-            if tail[1:].casefold() in set(_HU_SUFFIXES) | set(_HU_HYPHENATED) and (
-                head[-1].isdigit() or head.split("-")[-1].isupper()
-            ):
-                found.append(Split(head, head, tail))
+        found = _hyphen_splits(surface)
         if not _word_like(surface):
             return found
-        for suffix in sorted(set(_HU_LENGTHENING), key=len, reverse=True):
-            cut = len(surface) - len(suffix)
-            if cut < 1 or not folded.endswith(suffix):
-                continue
-            short = _HU_SHORT.get(surface[cut - 1])
-            if short is None:
-                continue
-            stem, lemma = surface[:cut], surface[: cut - 1] + short
-            if _last_token_letters(lemma) < _MIN_LEMMA_LETTERS + 1:
-                continue
-            strong = suffix in _HU_STRONG[short.casefold()]
-            found.append(Split(lemma, stem, surface[cut:], strong))
-        # Stacked: Kerekes Ottó|éknál, Teszt Hajná|éknak -> Teszt Hajna, Tihamér|éit (LAB-1337).
-        last_start = len(surface) - len(surface.split()[-1])
-        for cut in range(len(surface) - 2, last_start, -1):
-            if folded[cut] != "é" or not _HU_STACKED_RE.fullmatch(folded[cut:]):
-                continue
-            stem = surface[:cut]
-            if not stem[-1].isalpha():
-                continue
-            short = _HU_SHORT.get(stem[-1])
-            lemma = stem if short is None else stem[:-1] + short
-            if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
-                found.append(Split(lemma, stem, surface[cut:]))
-        for ending in _HU_DOUBLED_ENDINGS:
-            if not folded.endswith(ending):
-                continue
-            stem = surface[: len(surface) - len(ending)]
-            digraph = _hu_digraph(stem)
-            # Kováccs|al -> Kovács: the digraph's first letter is doubled.
-            if digraph is not None and stem[-3:-2].casefold() == digraph[0]:
-                lemma = stem[:-3] + stem[-2:]
-                if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
-                    found.append(Split(lemma, stem, surface[len(stem) :]))
-                continue
-            # Tóth|tal -> Tóth, Kovácz|cal -> Kovácz: the sound of the old digraph is doubled.
-            lemma = stem[:-1]
-            old = _hu_old_digraph(lemma)
-            if old is not None and stem[-1].casefold() == old[0]:
-                if _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1:
-                    found.append(Split(lemma, lemma, surface[len(lemma) :]))
-                continue
-            if _hu_doubled(stem):
-                # Elek|kel -> Elek: a single final consonant doubled into the suffix.
-                lemma = stem[:-1]
-                if (
-                    lemma[-2:-1].casefold() != lemma[-1].casefold()
-                    and _hu_digraph(lemma) is None
-                    and _last_token_letters(lemma) >= _MIN_LEMMA_LETTERS + 1
-                ):
-                    found.append(Split(lemma, lemma, surface[len(lemma) :]))
-                # Bernadett|el -> Bernadett, Kiss|el -> Kiss: the value already ends doubled.
-                if _last_token_letters(stem) >= _MIN_LEMMA_LETTERS + 1:
-                    found.append(Split(stem, stem, surface[len(stem) :]))
-        for suffix in sorted(set(_HU_SUFFIXES) | set(_HU_HYPHENATED), key=len, reverse=True):
-            cut = len(surface) - len(suffix)
-            if cut < 1 or not folded.endswith(suffix) or not surface[cut - 1].isalpha():
-                continue
-            lemma = surface[:cut]
-            if suffix in _HU_HYPHENATED and lemma[-1].casefold() not in _HU_VOWELS:
-                continue
-            if _last_token_letters(lemma) < _MIN_LEMMA_LETTERS + 1:
-                continue
-            found.append(Split(lemma, lemma, surface[cut:]))
+        folded = surface.casefold()
+        found.extend(_lengthened_splits(surface, folded))
+        found.extend(_stacked_splits(surface, folded))
+        found.extend(_doubled_splits(surface, folded))
+        found.extend(_unchanged_splits(surface, folded))
         # Strong readings first; otherwise keep the order above (most specific first).
         unique = list(dict.fromkeys(found))
         return sorted(unique, key=lambda split: not split.strong)

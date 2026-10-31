@@ -110,41 +110,44 @@ class _Sed:
             return ShellContext(True, sed_pattern=self.delimiter)
         return ShellContext(True)
 
+    def _feed_delimited(self, char: str) -> None:
+        if self.escape:
+            self.escape = False
+        elif char == "\\":
+            self.escape = True
+        elif char == self.delimiter:
+            self.state = {"pattern": "replacement", "replacement": "flags"}.get(self.state, "start")
+        elif char == "\n" or (char == "[" and self.state != "replacement"):
+            self.state = "unknown"
+
+    def _feed_start(self, char: str) -> None:
+        if char.isspace() or char in ";{}" or char.isdigit() or char in "$,!":
+            return
+        if char == "/":
+            self.delimiter, self.state = "/", "address"
+        elif char == "s":
+            self.state = "delimiter"
+        elif char not in _SED_BARE:
+            self.state = "unknown"
+
     def feed(self, char: str) -> None:
-        state = self.state
-        if state == "unknown":
+        if self.state == "unknown":
             return
-        if state in ("pattern", "replacement", "address"):
-            if self.escape:
-                self.escape = False
-            elif char == "\\":
-                self.escape = True
-            elif char == self.delimiter:
-                self.state = {"pattern": "replacement", "replacement": "flags"}.get(state, "start")
-            elif char == "\n" or (char == "[" and state != "replacement"):
-                self.state = "unknown"
+        if self.state in ("pattern", "replacement", "address"):
+            self._feed_delimited(char)
             return
-        if state == "delimiter":
+        if self.state == "delimiter":
             if char.isalnum() or char.isspace() or char in "\\[":
                 self.state = "unknown"
             else:
                 self.delimiter, self.state = char, "pattern"
             return
-        if state == "flags":
+        if self.state == "flags":
             if char in _SED_FLAGS:
                 return
-            state = self.state = "start"
-        if state == "start":
-            if char.isspace() or char in ";{}" or char.isdigit() or char in "$,!":
-                return
-            if char == "/":
-                self.delimiter, self.state = "/", "address"
-            elif char == "s":
-                self.state = "delimiter"
-            elif char in _SED_BARE:
-                return
-            else:
-                self.state = "unknown"
+            self.state = "start"
+        if self.state == "start":
+            self._feed_start(char)
 
 
 class _Shell:
@@ -207,6 +210,14 @@ class _Shell:
         elif char == "`" or (char == "(" and self.previous == "$"):
             self.mode = "unknown"
 
+    def _start_single(self) -> None:
+        if self.previous == "$":
+            self.mode = "unknown"
+            return
+        if self._sed_script_starts():
+            self.sed = _Sed()
+        self.mode, self.in_word, self.word_quoted = "single", True, True
+
     def _normal(self, char: str) -> None:
         if self.escape:
             self.escape, self.word_content = False, True
@@ -215,12 +226,7 @@ class _Shell:
         if char == "\\":
             self.escape, self.in_word = True, True
         elif char == "'":
-            if self.previous == "$":
-                self.mode = "unknown"
-                return
-            if self._sed_script_starts():
-                self.sed = _Sed()
-            self.mode, self.in_word, self.word_quoted = "single", True, True
+            self._start_single()
         elif char == '"':
             self.mode, self.in_word, self.word_quoted = "double", True, True
         elif char == "#" and not self.in_word:

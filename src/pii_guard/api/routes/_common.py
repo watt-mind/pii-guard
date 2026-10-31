@@ -25,6 +25,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Message
 
 from pii_guard.api.deps import PayloadTooLargeError, get_max_text_chars
 from pii_guard.gateway.sessions import check_owner, client_identity
@@ -117,7 +118,7 @@ class LoggedRoute(APIRoute):
             try:
                 limit = self.max_body_bytes(request)
                 _check_body_size(request, limit)
-                await _read_body_capped(request, limit)
+                request = await _read_body_capped(request, limit)
                 response = await handler(request)
                 status = response.status_code
                 return response
@@ -163,15 +164,15 @@ def _check_body_size(request: Request, limit: int) -> None:
         raise PayloadTooLargeError("request body is too large")
 
 
-async def _read_body_capped(request: Request, limit: int) -> None:
+async def _read_body_capped(request: Request, limit: int) -> Request:
     """Read the body with a running byte count; 413 once it passes ``limit``.
 
-    The body is cached on the request (Starlette's ``request.body()`` / ``stream()`` then
-    return it), so the handler reads what was counted here. A time deadline
+    The body is cached on the returned request (Starlette's ``request.body()`` / ``stream()``
+    then return it), so the handler reads what was counted here. A time deadline
     (:func:`body_read_timeout`, LAB-1566) bounds the whole read as well: past it, 408 and
     nothing is processed."""
     if request.method in ("GET", "HEAD", "OPTIONS"):
-        return
+        return request
     chunks: list[bytes] = []
     size = 0
     try:
@@ -183,7 +184,19 @@ async def _read_body_capped(request: Request, limit: int) -> None:
                 chunks.append(chunk)
     except TimeoutError:
         raise BodyReadTimeoutError("request body read timed out") from None
-    request._body = b"".join(chunks)
+    payload = b"".join(chunks)
+    consumed = False
+
+    async def replay_receive() -> Message:
+        nonlocal consumed
+        if not consumed:
+            consumed = True
+            return {"type": "http.request", "body": payload, "more_body": False}
+        return await request.receive()
+
+    buffered = Request(request.scope, replay_receive)
+    await buffered.body()
+    return buffered
 
 
 def check_text_size(request: Request, text: str) -> None:
