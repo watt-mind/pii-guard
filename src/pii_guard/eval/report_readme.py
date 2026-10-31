@@ -518,7 +518,7 @@ def _set_info(index: Mapping[str, Any], fixture_set: str, where: str) -> Mapping
     info = index["fixture_sets"].get(fixture_set)
     if info is None:
         raise RecordError(f"{where}: no fixture set {fixture_set!r}")
-    return info  # type: ignore[no-any-return]
+    return info
 
 
 def _language_names(codes: Sequence[str]) -> str:
