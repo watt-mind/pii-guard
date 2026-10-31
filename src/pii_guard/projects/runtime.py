@@ -298,6 +298,7 @@ class ProjectService:
             if self.settings.hosted
             else getattr(app_obs, "metrics", None)
         )
+        observability.remote = None if self.settings.hosted else getattr(app_obs, "remote", None)
         gateway = Gateway(
             settings=settings,
             vault=runtime.vault,

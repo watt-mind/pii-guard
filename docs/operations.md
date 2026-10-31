@@ -497,22 +497,27 @@ evicted first, some containing a recent value. A restart clears it; so does
 ## Traffic log
 
 Every call to `POST /v1/chat/completions`, `POST /v1/responses` or `POST /v1/messages` produces
-one event, kept **in memory only**, when the traffic log is on or a remote dashboard exporter
-is configured:
+one event when the traffic log is on or a remote dashboard exporter is configured. The local log
+keeps events **in memory only** (none while it is off); the exporter only ships them:
 
 | Setting | Values | Default |
 |---|---|---|
 | `PII_GUARD_TRAFFIC_LOG` | `off`, `masked`, `full` | `off` (`masked` in the demo) |
 | `PII_GUARD_TRAFFIC_LOG_SIZE` | events kept (ring buffer) | `200` |
-| `PII_GUARD_REMOTE_URL` | dashboard origin (`https://guard.watt-mind.com`), `/v1` or `/e/<endpoint>/v1` | unset |
-| `PII_GUARD_REMOTE_KEY` | bearer credential (`pg_live_...`, `pg_ep_...`, or self-hosted `PII_GUARD_API_TOKEN`) | unset |
-| `PII_GUARD_REMOTE_LEVEL` | `masked` (scrubbed placeholder payloads + stats), `stats` (counts, entity types, model, usage and timings only) | `masked` |
+| `PII_GUARD_REMOTE_URL` | dashboard origin (`https://guard.watt-mind.com`), `/v1` or `/e/<endpoint>/v1`; `https://` only (`http://` for a loopback host), no credentials in the URL. Nothing is exported while it is unset. | unset |
+| `PII_GUARD_REMOTE_KEY` | bearer credential (a hosted `pg_...` API key, an endpoint `pg_ep_...` key, or a self-hosted `PII_GUARD_API_TOKEN`) | unset |
+| `PII_GUARD_REMOTE_LEVEL` | `masked`: the forwarded (masked) request and response bodies plus stats. That includes any value the policy keeps unmasked. `stats`: counts, entity types, model, usage and timings only. | `masked` |
 
 | Endpoint | What it returns |
 |---|---|
 | `GET /v1/traffic?limit=50&after=<seq>` | `{"level", "size", "boot", "events": [...]}`, oldest first |
-| `POST /v1/traffic` (and `POST /e/<endpoint>/v1/traffic`) | `{"accepted", "boot"}`; ingests 1–50 scrubbed `masked` or `stats` events from a local gateway (`422 invalid_request` if `level="full"`, `request.original` or `response.unmasked` is present) |
+| `POST /v1/traffic` (and `POST /e/<endpoint>/v1/traffic`) | `{"accepted", "boot"}`; ingests 1–50 scrubbed `masked` or `stats` events from a local gateway, `application/json` only (`415 unsupported_media_type` otherwise; `422 invalid_request` if `level="full"`, `request.original` or `response.unmasked` is present). Ingested events carry `"source": "remote"`. |
 | `GET /v1/traffic/stream?replay=10` | Server-sent events: one `traffic` event per call (`id:` = `seq`), a keep-alive comment every 15 s |
+
+The exporter is a background thread with a bounded queue: a slow or unreachable dashboard never
+blocks or fails a local call. Batches are cut at 24 KiB, under the hosted ingest's 32 KiB body
+limit. An event too large for a batch on its own is sent at `stats` level. The first failed
+send is logged at warning level; `sent`, `failed` and `dropped` count the rest.
 
 All three answer `404 traffic_log_disabled` while the log is off.
 

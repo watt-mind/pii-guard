@@ -28,6 +28,7 @@ from pii_guard.observability import (
     RemoteTrafficExporter,
     RemoteTrafficLevel,
     TrafficLevel,
+    build_remote_exporter,
     resolve_ingest_url,
     sanitize_for_remote,
 )
@@ -151,7 +152,19 @@ def test_resolve_ingest_url_normalizes_origins_and_endpoint_paths(
     assert resolve_ingest_url(raw_url) == expected
 
 
-@pytest.mark.parametrize("bad_url", ["", "   ", "ftp://guard.example", "not-a-url"])
+@pytest.mark.parametrize(
+    "bad_url",
+    [
+        "",
+        "   ",
+        "ftp://guard.example",
+        "not-a-url",
+        # Plaintext off the machine, or credentials in a URL that repr() prints (LAB-1704).
+        "http://guard.example/v1",
+        "http://10.0.0.5:8787",
+        "https://user:secret@guard.example",
+    ],
+)
 def test_resolve_ingest_url_rejects_invalid_urls(bad_url: str) -> None:
     with pytest.raises(ValueError, match="remote_url"):
         resolve_ingest_url(bad_url)
@@ -204,14 +217,13 @@ def test_exporter_handles_http_errors_transport_failures_and_observability_setti
             return httpx.Response(503, json={"error": {"code": "unavailable", "message": "busy"}})
         raise httpx.ConnectError("connection refused")
 
-    obs = Observability(
-        ObservabilitySettings(
-            traffic_log=TrafficLevel.OFF,
-            remote_url="https://guard.example/v1",
-            remote_key=SecretStr(SYNTHETIC_KEY),
-            remote_level=RemoteTrafficLevel.STATS,
-        )
+    obs_settings = ObservabilitySettings(
+        traffic_log=TrafficLevel.OFF,
+        remote_url="https://guard.example/v1",
+        remote_key=SecretStr(SYNTHETIC_KEY),
+        remote_level=RemoteTrafficLevel.STATS,
     )
+    obs = Observability(obs_settings, remote=build_remote_exporter(obs_settings))
     assert obs.remote is not None
     assert "RemoteTrafficExporter" in repr(obs.remote)
     assert obs.recording is True
@@ -232,6 +244,101 @@ def test_exporter_handles_http_errors_transport_failures_and_observability_setti
     exporter.close(timeout=2.0)
     assert exporter.failed == 2
     assert exporter.enqueue(_sample_event()) is False
+
+
+def test_only_the_app_level_observability_starts_an_exporter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Runtimes and per-request instances read the same env but never start a thread."""
+    import threading
+
+    monkeypatch.setenv("PII_GUARD_REMOTE_URL", "https://guard.example")
+    monkeypatch.setenv("PII_GUARD_REMOTE_KEY", SYNTHETIC_KEY)
+    settings = ObservabilitySettings(traffic_log=TrafficLevel.MASKED)
+    assert settings.remote_url == "https://guard.example"
+    before = threading.active_count()
+    instances = [Observability(settings) for _ in range(20)]
+    assert all(o.remote is None for o in instances)
+    assert threading.active_count() == before
+
+
+def test_local_app_builds_its_exporter_from_the_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PII_GUARD_REMOTE_URL", "https://guard.example")
+    local = create_app(
+        Settings(_env_file=None, detectors=("rules",), ner_fallback="off"),
+        observability=ObservabilitySettings(traffic_log=TrafficLevel.MASKED),
+    )
+    assert local.state.observability.remote is not None
+    local.state.observability.close(timeout=1.0)
+
+
+def test_exporter_cuts_batches_by_bytes_and_downgrades_oversized_events() -> None:
+    bodies: list[bytes] = []
+
+    def remote(request: httpx.Request) -> httpx.Response:
+        bodies.append(request.content)
+        return httpx.Response(200, json={"accepted": 1, "boot": "b_0"})
+
+    exporter = RemoteTrafficExporter(
+        "https://guard.example",
+        level=RemoteTrafficLevel.MASKED,
+        batch_bytes=4096,
+        client=httpx.Client(transport=httpx.MockTransport(remote)),
+    )
+    big = _sample_event()
+    big["request"] = {"masked": {"messages": [{"role": "user", "content": "x" * 20_000}]}}
+    for _ in range(3):
+        assert exporter.enqueue(_sample_event()) is True
+    assert exporter.enqueue(big) is True
+    exporter.close(timeout=2.0)
+    assert bodies and all(len(b) <= 4096 + 64 for b in bodies)
+    events = [e for b in bodies for e in json.loads(b)["events"]]
+    assert len(events) == 4
+    assert events[-1]["request"] is None  # sent at stats level, not dropped
+    assert exporter.sent == 4
+    assert exporter.dropped == 0
+
+
+def test_exporter_warns_once_on_failure(caplog: pytest.LogCaptureFixture) -> None:
+    exporter = RemoteTrafficExporter(
+        "https://guard.example",
+        batch_size=1,
+        client=httpx.Client(transport=httpx.MockTransport(lambda _r: httpx.Response(413))),
+    )
+    with caplog.at_level("DEBUG", logger="pii_guard.observability.remote"):
+        exporter.enqueue(_sample_event())
+        exporter.enqueue(_sample_event())
+        exporter.close(timeout=2.0)
+    levels = [r.levelname for r in caplog.records]
+    assert levels.count("WARNING") == 1
+    assert exporter.failed == 2
+    assert SYNTHETIC_KEY not in caplog.text
+
+
+def test_ingest_traffic_refuses_non_json_bodies_and_stamps_remote_source() -> None:
+    app = create_app(
+        Settings(_env_file=None, detectors=("rules",), ner_fallback="off"),
+        observability=ObservabilitySettings(traffic_log=TrafficLevel.MASKED),
+    )
+    with TestClient(app) as client:
+        # A cross-site page can send text/plain without a preflight: refused (LAB-1704).
+        res = client.post(
+            "/v1/traffic",
+            content=json.dumps(_sample_event(level="masked", request=None, response=None)),
+            headers={"Content-Type": "text/plain", "Origin": "https://evil.example"},
+        )
+        assert res.status_code == 415
+        assert res.json()["error"]["code"] == "unsupported_media_type"
+        event = _sample_event(level="masked", outcome="exploded", source="local")
+        event["request"] = {"masked": {"messages": []}}
+        event["response"] = None
+        res = client.post("/v1/traffic", json=event)
+        assert res.status_code == 200, res.text
+        [stored] = client.get("/v1/traffic").json()["events"]
+        assert stored["source"] == "remote"
+        assert stored["outcome"] == "error"
 
 
 def test_ingest_traffic_accepts_masked_and_stats_and_rejects_unmasked() -> None:
@@ -299,7 +406,7 @@ def test_ingest_traffic_accepts_masked_and_stats_and_rejects_unmasked() -> None:
         assert third["seq"] == 3
         assert third["id"].startswith("req_")
         assert third["route"] == "/v1/chat/completions"
-        assert third["outcome"] == "ok"
+        assert third["outcome"] == "error"  # missing: unknown, never shown as success
 
 
 def test_ingest_traffic_returns_404_when_traffic_log_is_off() -> None:

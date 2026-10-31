@@ -35,6 +35,7 @@ from pii_guard.observability import (
     Observability,
     ObservabilitySettings,
     TrafficLevel,
+    build_remote_exporter,
     check_bind,
     is_loopback,
 )
@@ -346,6 +347,8 @@ def create_app(
     app.state.observability = Observability(
         obs_settings,
         secrets=[upstream_key.get_secret_value()] if upstream_key is not None else [],
+        # Hosted only ingests remote telemetry; it never ships its tenants' traffic anywhere.
+        remote=None if settings.hosted else build_remote_exporter(obs_settings),
     )
     install_error_handlers(app)
     _register_healthz(app, settings, warmup)

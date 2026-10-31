@@ -62,6 +62,11 @@ class TrafficIngestError(PiiGuardError):
     status_code = 422
 
 
+class TrafficIngestMediaTypeError(PiiGuardError):
+    code = "unsupported_media_type"
+    status_code = 415
+
+
 class MetricsDisabledError(PiiGuardError):
     code = "metrics_disabled"
     status_code = 404
@@ -92,7 +97,7 @@ def _traffic(request: Request) -> TrafficLog | TrafficFeedView:
 
 _TRAFFIC_ERRORS = error_responses("traffic_log_disabled", "invalid_request")
 _TRAFFIC_INGEST_ERRORS = error_responses(
-    "traffic_log_disabled", "invalid_request", "payload_too_large"
+    "traffic_log_disabled", "invalid_request", "payload_too_large", "unsupported_media_type"
 )
 
 
@@ -135,7 +140,9 @@ def _validate_ingested_event(raw: object) -> dict[str, Any]:
         clean["route"] = "/v1/chat/completions"
     outcome = clean.get("outcome")
     if outcome not in _VALID_OUTCOMES:
-        clean["outcome"] = "ok"
+        clean["outcome"] = "error"  # never show an unknown remote outcome as a success
+    # Set here, never taken from the sender: ingested calls are told apart from local ones.
+    clean["source"] = "remote"
     clean["stream"] = bool(clean.get("stream", False))
     clean["session_new"] = bool(clean.get("session_new", False))
     detectors = clean.get("detectors")
@@ -225,6 +232,11 @@ async def ingest_traffic(request: Request) -> dict[str, Any]:
         raise TrafficLogDisabledError(
             "the traffic log is off; set PII_GUARD_TRAFFIC_LOG=masked (or full, on localhost)"
         )
+    # Only application/json: a cross-site page can send text/plain without a CORS preflight,
+    # so accepting it would let any website write into a local dashboard (LAB-1704).
+    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if media_type != "application/json":
+        raise TrafficIngestMediaTypeError("traffic events must be sent as application/json")
     try:
         payload = await request.json()
     except (ValueError, UnicodeDecodeError):

@@ -17,6 +17,7 @@ queue is full, events are dropped and counted in :attr:`RemoteTrafficExporter.dr
 
 from __future__ import annotations
 
+import json
 import logging
 import queue
 import threading
@@ -28,11 +29,12 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
-from pii_guard.observability.config import RemoteTrafficLevel
+from pii_guard.observability.config import RemoteTrafficLevel, is_loopback
 from pii_guard.observability.traffic import scrub
 
 __all__ = [
     "DEFAULT_QUEUE_SIZE",
+    "MAX_BATCH_BYTES",
     "MAX_BATCH_SIZE",
     "RemoteTrafficExporter",
     "RemoteTrafficLevel",
@@ -44,6 +46,9 @@ logger = logging.getLogger("pii_guard.observability.remote")
 
 DEFAULT_QUEUE_SIZE = 256
 MAX_BATCH_SIZE = 25
+# Under the hosted ingest's 32 KiB body limit (``PII_GUARD_HOSTED_MAX_BODY_BYTES``), with room
+# for the envelope: a batch is cut at this many serialized bytes, whatever its event count.
+MAX_BATCH_BYTES = 24 * 1024
 _TIMEOUT = httpx.Timeout(10.0, connect=3.0)
 
 
@@ -53,8 +58,13 @@ def resolve_ingest_url(remote_url: str) -> str:
     if not cleaned:
         raise ValueError("remote_url must not be empty")
     parts = urlsplit(cleaned)
-    if parts.scheme not in {"http", "https"} or not parts.netloc:
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
         raise ValueError("remote_url must be an http:// or https:// URL")
+    if parts.username is not None or parts.password is not None:
+        raise ValueError("remote_url must not carry credentials; use PII_GUARD_REMOTE_KEY")
+    # The bearer key and masked payloads never cross the network in plaintext.
+    if parts.scheme == "http" and not is_loopback(parts.hostname):
+        raise ValueError("remote_url must use https:// (http:// only for a loopback host)")
     path = parts.path.rstrip("/")
     if path.endswith("/v1/traffic"):
         target_path = path
@@ -108,6 +118,10 @@ def sanitize_for_remote(
     return scrubbed
 
 
+def _size(event: Mapping[str, Any]) -> int:
+    return len(json.dumps(event, separators=(",", ":"), default=str))
+
+
 class RemoteTrafficExporter:
     """Bounded background shipper that POSTs sanitized traffic events to a remote dashboard."""
 
@@ -119,11 +133,13 @@ class RemoteTrafficExporter:
         level: RemoteTrafficLevel = RemoteTrafficLevel.MASKED,
         queue_size: int = DEFAULT_QUEUE_SIZE,
         batch_size: int = MAX_BATCH_SIZE,
+        batch_bytes: int = MAX_BATCH_BYTES,
         client: httpx.Client | None = None,
     ) -> None:
         self.url = resolve_ingest_url(remote_url)
         self.level = RemoteTrafficLevel(level)
         self.batch_size = max(1, min(batch_size, 50))
+        self.batch_bytes = max(1024, batch_bytes)
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
         self._own_client = client is None
         self._client = client or httpx.Client(timeout=_TIMEOUT)
@@ -133,6 +149,8 @@ class RemoteTrafficExporter:
         self.dropped = 0
         self.sent = 0
         self.failed = 0
+        self._warned = False
+        self._carry: dict[str, Any] | None = None
         self._thread = threading.Thread(
             target=self._run,
             name="pii-guard-remote-traffic",
@@ -151,13 +169,27 @@ class RemoteTrafficExporter:
         with self._lock:
             if self._closed:
                 return False
-        sanitized = sanitize_for_remote(event, level=self.level)
+        sanitized = self._fit(sanitize_for_remote(event, level=self.level))
+        if sanitized is None:
+            self._count("dropped", 1)
+            return False
         try:
             self._queue.put_nowait(sanitized)
             return True
         except queue.Full:
-            self.dropped += 1
+            self._count("dropped", 1)
             return False
+
+    def _fit(self, event: dict[str, Any]) -> dict[str, Any] | None:
+        """``event``, or its stats-level form when it alone is over the batch byte cap."""
+        if _size(event) <= self.batch_bytes:
+            return event
+        stats = {**event, "request": None, "response": None}
+        return stats if _size(stats) <= self.batch_bytes else None
+
+    def _count(self, field: str, n: int) -> None:
+        with self._lock:
+            setattr(self, field, getattr(self, field) + n)
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -175,24 +207,23 @@ class RemoteTrafficExporter:
                 headers=self._headers(),
             )
             if 200 <= response.status_code < 300:
-                self.sent += len(batch)
+                self._count("sent", len(batch))
             else:
-                self.failed += len(batch)
-                logger.debug(
-                    "remote traffic ingest answered HTTP %d (%d event(s) dropped)",
-                    response.status_code,
-                    len(batch),
-                )
+                self._failed(len(batch), f"HTTP {response.status_code}")
         except Exception as exc:
-            self.failed += len(batch)
-            logger.debug(
-                "remote traffic ingest failed (%s, %d event(s) dropped)",
-                type(exc).__name__,
-                len(batch),
-            )
+            self._failed(len(batch), type(exc).__name__)
+
+    def _failed(self, n: int, why: str) -> None:
+        self._count("failed", n)
+        # The first failure is a warning, so a misconfigured dashboard is noticed; the rest
+        # stay at debug so an unreachable one can't flood the log.
+        level = logging.DEBUG if self._warned else logging.WARNING
+        self._warned = True
+        logger.log(level, "remote traffic ingest failed (%s, %d event(s) dropped)", why, n)
 
     def _drain_batch(self, first: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:
         batch = [first]
+        size = _size(first)
         stop = False
         while len(batch) < self.batch_size:
             try:
@@ -202,12 +233,19 @@ class RemoteTrafficExporter:
             if item is None:
                 stop = True
                 break
+            item_size = _size(item)
+            if size + item_size > self.batch_bytes:
+                # Over the byte cap: this event starts the next batch.
+                self._carry = item
+                break
             batch.append(item)
+            size += item_size
         return batch, stop
 
     def _run(self) -> None:
         while True:
-            item = self._queue.get()
+            item = self._carry if self._carry is not None else self._queue.get()
+            self._carry = None
             if item is None:
                 self._queue.task_done()
                 break

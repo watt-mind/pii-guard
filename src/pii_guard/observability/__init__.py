@@ -40,12 +40,21 @@ __all__ = [
     "TrafficLevel",
     "TrafficLog",
     "TrafficLogConfigError",
+    "build_remote_exporter",
     "check_bind",
     "is_loopback",
     "resolve_ingest_url",
     "sanitize_for_remote",
     "scrub",
 ]
+
+
+def build_remote_exporter(settings: ObservabilitySettings) -> RemoteTrafficExporter | None:
+    """The exporter ``PII_GUARD_REMOTE_URL`` asks for, or ``None``. One per app."""
+    if not settings.remote_url:
+        return None
+    key = settings.remote_key.get_secret_value() if settings.remote_key else None
+    return RemoteTrafficExporter(settings.remote_url, api_key=key, level=settings.remote_level)
 
 
 class Observability:
@@ -66,16 +75,9 @@ class Observability:
         remote_key = settings.remote_key.get_secret_value() if settings.remote_key else None
         all_secrets = [*(s for s in secrets if s), *([remote_key] if remote_key else [])]
         self._secrets = tuple(all_secrets)
-        if remote is not None:
-            self.remote: RemoteTrafficExporter | None = remote
-        elif settings.remote_url:
-            self.remote = RemoteTrafficExporter(
-                settings.remote_url,
-                api_key=remote_key,
-                level=settings.remote_level,
-            )
-        else:
-            self.remote = None
+        # Only the app-level instance gets an exporter (``build_remote_exporter``): runtimes and
+        # per-request instances are built often and must never start a thread (LAB-1704).
+        self.remote: RemoteTrafficExporter | None = remote
 
     def __repr__(self) -> str:
         return (
