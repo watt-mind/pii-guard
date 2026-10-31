@@ -1,102 +1,66 @@
-"""CLI browser-handoff provisioning for projects and telemetry endpoints (LAB-1708).
+"""CLI browser-handoff login with a one-time code and telemetry-only keys (LAB-1708).
 
-When a developer runs ``pii-guard login`` (or ``pii-guard run <agent>`` and chooses a remote
-dashboard), the browser opens ``/#cli-auth`` on the target dashboard. Once the owner selects a
-project (or creates a new one) and chooses a telemetry capture level (``masked`` session traces
-or ``stats``-only counts/timings), :func:`provision_cli_session` ensures an enabled endpoint in
-that project, issues a revocable ``pg_ep_...`` endpoint key, and returns a portable
-``pg_cli_...`` bundle for the local CLI callback or manual paste.
+``pii-guard login`` opens ``/#cli-auth?port=<port>&state=<state>`` on the dashboard. The
+signed-in owner picks a project and a telemetry level; the dashboard then creates a one-time
+code (:func:`create_cli_code`, ``POST /v1/projects/{id}/cli-codes``) and sends the browser to
+the CLI's loopback callback with ``state`` and ``code`` only. The CLI exchanges the code
+(:func:`exchange_cli_code`, ``POST /v1/cli/token``) for a ``telemetry``-scoped ``pg_ep_`` key
+on the project's "CLI telemetry" endpoint. The key can only ``POST /e/<endpoint>/v1/traffic``
+and revoke itself (``DELETE /v1/cli/token``); no long-lived secret ever travels in a URL.
+
+Codes are 256-bit, stored as SHA-256 digests, live five minutes and are deleted on first use.
 """
 
 from __future__ import annotations
 
-import base64
-import binascii
-import json
 from collections.abc import Mapping
 from typing import Any, Literal
 
-from pii_guard.projects.store import InvalidProjectConfigError, ProjectStore
+from pii_guard.projects.store import ProjectStore
+from pii_guard.types import PiiGuardError
 from pii_guard.upstreams import PRESETS
 
 __all__ = [
-    "CLI_BUNDLE_PREFIX",
     "CLI_ENDPOINT_NAME",
     "DEFAULT_CLI_MODEL",
+    "InvalidCliCodeError",
     "TelemetryChoice",
-    "decode_cli_bundle",
-    "encode_cli_bundle",
-    "provision_cli_session",
+    "cli_key_name",
+    "create_cli_code",
+    "exchange_cli_code",
 ]
 
 CLI_ENDPOINT_NAME = "CLI telemetry"
-CLI_BUNDLE_PREFIX = "pg_cli_"
 DEFAULT_CLI_MODEL = "muse-spark-1.3"
 TelemetryChoice = Literal["masked", "stats"]
+#: Live keys per endpoint the store allows; a new CLI login past it retires the oldest CLI key.
+_ACTIVE_KEY_LIMIT = 32
 
 
-def encode_cli_bundle(payload: Mapping[str, Any]) -> str:
-    """Encode a CLI session handoff dictionary into a compact ``pg_cli_...`` token."""
-    raw = json.dumps(dict(payload), separators=(",", ":"), sort_keys=True).encode("utf-8")
-    encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-    return f"{CLI_BUNDLE_PREFIX}{encoded}"
+class InvalidCliCodeError(PiiGuardError):
+    """The one-time CLI code is unknown, already used or expired."""
+
+    code = "invalid_code"
+    status_code = 400
+
+    def __init__(self) -> None:
+        super().__init__("The CLI login code is invalid or expired; run 'pii-guard login' again")
 
 
-def decode_cli_bundle(bundle: str) -> dict[str, Any]:
-    """Decode and validate a ``pg_cli_...`` token into its CLI configuration fields."""
-    cleaned = bundle.strip()
-    if not cleaned.startswith(CLI_BUNDLE_PREFIX):
-        raise ValueError("CLI bundle must start with 'pg_cli_'")
-    body = cleaned.removeprefix(CLI_BUNDLE_PREFIX)
-    if not body or len(body) > 8192:
-        raise ValueError("CLI bundle has invalid length")
-    padding = "=" * (-len(body) % 4)
-    try:
-        decoded = base64.urlsafe_b64decode((body + padding).encode("ascii"))
-        data = json.loads(decoded.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
-        raise ValueError("CLI bundle is not valid base64 JSON") from exc
-    if not isinstance(data, dict):
-        raise ValueError("CLI bundle must decode to an object")
-    required = ("dashboard_url", "project_id", "project_name", "endpoint_id", "endpoint_key")
-    for field in required:
-        val = data.get(field)
-        if not isinstance(val, str) or not val.strip():
-            raise ValueError(f"CLI bundle is missing required field {field!r}")
-    level = data.get("telemetry_level", "masked")
-    if level not in ("masked", "stats"):
-        raise ValueError("CLI bundle telemetry_level must be 'masked' or 'stats'")
-    return {
-        "dashboard_url": data["dashboard_url"].strip().rstrip("/"),
-        "project_id": data["project_id"].strip(),
-        "project_name": data["project_name"].strip(),
-        "endpoint_id": data["endpoint_id"].strip(),
-        "endpoint_key": data["endpoint_key"].strip(),
-        "telemetry_level": level,
-    }
-
-
-def _resolve_project(
-    store: ProjectStore, owner: str, project_id: str, project_name: str | None
-) -> dict[str, Any]:
-    if project_id == "new":
-        if not project_name or not project_name.strip():
-            raise InvalidProjectConfigError()
-        return store.create_project(owner, project_name.strip())
-    if project_id == "default":
-        return store.default_project(owner)
-    return store.get_project(owner, project_id)
+def cli_key_name(hostname: str | None) -> str:
+    """``CLI (<hostname>)``, or ``CLI`` when the CLI sent no host name."""
+    return f"CLI ({hostname})" if hostname else "CLI"
 
 
 def _ensure_cli_endpoint(
     store: ProjectStore, owner: str, project: Mapping[str, Any], *, default_model: str
 ) -> dict[str, Any]:
-    endpoints = store.list_endpoints(owner, str(project["id"]))
-    for endpoint in endpoints:
+    """The project's own enabled "CLI telemetry" endpoint, created when absent.
+
+    Never another endpoint: the owner's other endpoints may carry their own provider keys.
+    """
+    for endpoint in store.list_endpoints(owner, str(project["id"])):
         if endpoint.get("enabled") and endpoint.get("name") == CLI_ENDPOINT_NAME:
-            return endpoint
-    for endpoint in endpoints:
-        if endpoint.get("enabled"):
             return endpoint
     return store.save_endpoint(
         owner,
@@ -112,41 +76,64 @@ def _ensure_cli_endpoint(
     )
 
 
-def provision_cli_session(
-    store: ProjectStore,
+def create_cli_code(
+    store: Any,
     owner: str,
     *,
     project_id: str,
-    project_name: str | None = None,
-    telemetry_level: TelemetryChoice = "masked",
-    key_name: str = "CLI",
-    origin: str,
-    default_model: str = DEFAULT_CLI_MODEL,
+    telemetry_level: TelemetryChoice,
+    hostname: str | None,
 ) -> dict[str, Any]:
-    """Ensure a CLI telemetry endpoint in the target project and issue a ``pg_ep_...`` key."""
-    if telemetry_level not in ("masked", "stats"):
-        raise InvalidProjectConfigError()
-    clean_origin = origin.rstrip("/")
-    project = _resolve_project(store, owner, project_id, project_name)
-    endpoint = _ensure_cli_endpoint(store, owner, project, default_model=default_model)
-    issued = store.issue_key(owner, str(project["id"]), str(endpoint["id"]), key_name)
-    bundle = encode_cli_bundle(
-        {
-            "v": 1,
-            "dashboard_url": clean_origin,
-            "project_id": project["id"],
-            "project_name": project["name"],
-            "endpoint_id": endpoint["id"],
-            "endpoint_key": issued["key"],
-            "telemetry_level": telemetry_level,
+    """A one-time code for ``project_id`` (``default`` names the owner's default project)."""
+
+    def operation(engine: ProjectStore) -> dict[str, Any]:
+        project = (
+            engine.default_project(owner)
+            if project_id == "default"
+            else engine.get_project(owner, project_id)
+        )
+        return engine.create_cli_code(owner, str(project["id"]), telemetry_level, hostname)
+
+    result: dict[str, Any] = store.run_atomic(operation)
+    return result
+
+
+def exchange_cli_code(
+    store: Any, code: str, *, origin: str, default_model: str = DEFAULT_CLI_MODEL
+) -> dict[str, Any]:
+    """Consume ``code`` and mint a ``telemetry``-scoped key on the project's CLI endpoint."""
+
+    def operation(engine: ProjectStore) -> dict[str, Any] | None:
+        redeemed = engine.redeem_cli_code(code)
+        if redeemed is None:
+            # Returned, not raised: deleting an expired code must still be committed.
+            return None
+        owner = redeemed["owner_id"]
+        project = engine.get_project(owner, redeemed["project_id"])
+        endpoint = _ensure_cli_endpoint(engine, owner, project, default_model=default_model)
+        project_id, endpoint_id = str(project["id"]), str(endpoint["id"])
+        active = [
+            key
+            for key in engine.list_keys(owner, project_id, endpoint_id)
+            if key["revoked_at"] is None
+        ]
+        if len(active) >= _ACTIVE_KEY_LIMIT:
+            oldest = next((key for key in active if key["scope"] == "telemetry"), None)
+            if oldest is not None:
+                engine.revoke_key(owner, project_id, endpoint_id, oldest["id"])
+        issued = engine.issue_key(
+            owner, project_id, endpoint_id, cli_key_name(redeemed["hostname"]), scope="telemetry"
+        )
+        return {
+            "dashboard_url": origin.rstrip("/"),
+            "project_id": project_id,
+            "project_name": str(project["name"]),
+            "endpoint_id": endpoint_id,
+            "key": issued["key"],
+            "telemetry_level": redeemed["telemetry_level"],
         }
-    )
-    return {
-        "project": {"id": project["id"], "name": project["name"]},
-        "endpoint": {"id": endpoint["id"], "name": endpoint["name"]},
-        "key": issued,
-        "telemetry_level": telemetry_level,
-        "gateway_url": f"{clean_origin}/e/{endpoint['id']}/v1",
-        "dashboard_url": f"{clean_origin}/#logs",
-        "bundle": bundle,
-    }
+
+    result: dict[str, Any] | None = store.run_atomic(operation)
+    if result is None:
+        raise InvalidCliCodeError()
+    return result

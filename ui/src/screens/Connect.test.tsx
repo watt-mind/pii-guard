@@ -224,26 +224,23 @@ describe("Connect quickstart", () => {
     expect(container.textContent).not.toMatch(/sk-|Bearer [A-Za-z0-9]{8}/);
   });
 
-  it("renders the CLI authorization card for #cli-auth and issues a session bundle (LAB-1708)", async () => {
+  it("approves a #cli-auth request with a one-time code, never a key in the URL (LAB-1708)", async () => {
     const user = userEvent.setup();
+    const code = "synthetic-one-time-code-0000000000000000000";
     const callMock = vi.fn(async (path: string, body?: unknown, method?: string) => {
-      if (path === "/v1/projects") {
+      if (path === "/v1/projects" && body === undefined) {
         return {
           default_project_id: "prj_1",
           projects: [{ id: "prj_1", name: "Default project", default_policy_id: "pol_1" }],
         };
       }
-      if (path === "/v1/projects/new/endpoints" && method === "PUT") {
-        const req = body as { project_name: string; telemetry_level: "masked" | "stats" };
-        return {
-          project: { id: "prj_new", name: req.project_name },
-          endpoint: { id: "ep_cli", name: "CLI telemetry" },
-          key: { id: "key_1", name: "CLI", key: "pg_ep_aaa" },
-          telemetry_level: req.telemetry_level,
-          gateway_url: "https://guard.watt-mind.com/e/ep_cli/v1",
-          dashboard_url: "https://guard.watt-mind.com/#logs",
-          bundle: "pg_cli_synthetic_bundle",
-        };
+      if (path === "/v1/projects" && method === undefined) {
+        const req = body as { name: string };
+        return { id: "prj_new", name: req.name, default_policy_id: "pol_2" };
+      }
+      if (path === "/v1/projects/prj_new/cli-codes") {
+        expect(body).toEqual({ telemetry_level: "stats" });
+        return { code, expires_in: 300 };
       }
       throw new Error(`unexpected request ${method ?? "GET"} ${path}`);
     });
@@ -252,24 +249,81 @@ describe("Connect quickstart", () => {
         status={okStatus}
         traffic={live()}
         loadSnippets={loader()}
-        cliAuth={{ port: 51234, state: "st_abc", telemetry: "masked" }}
+        cliHandoff={{ port: 51234, state: "st_abc", telemetry: "masked" }}
         call={callMock as unknown as Requester}
       />,
     );
 
     const card = await screen.findByTestId("cli-auth-card");
     await within(card).findByRole("combobox", { name: /Project/ });
+    expect(within(card).getByTestId("cli-auth-request")).toHaveTextContent(
+      "A pii-guard CLI on this computer (port 51234) is asking for access to Default project.",
+    );
     await user.selectOptions(within(card).getByRole("combobox", { name: /Project/ }), "new");
     await user.type(within(card).getByRole("textbox", { name: /New project name/ }), "Agent CLI");
     await user.selectOptions(within(card).getByRole("combobox", { name: /Telemetry capture level/ }), "stats");
-    await user.click(within(card).getByRole("button", { name: "Authorize CLI" }));
+    await user.click(within(card).getByRole("button", { name: "Approve CLI access" }));
 
-    expect(await screen.findByTestId("cli-auth-bundle")).toHaveTextContent("pg_cli_synthetic_bundle");
-    const callbackLink = screen.getByRole("link", { name: "Complete login in terminal" });
-    expect(callbackLink).toHaveAttribute(
-      "href",
-      "http://127.0.0.1:51234/callback?state=st_abc&bundle=pg_cli_synthetic_bundle",
+    expect(await screen.findByTestId("cli-auth-code")).toHaveTextContent(code);
+    expect(screen.getByTestId("cli-auth-paste")).toHaveTextContent("pii-guard login --code -");
+    const callbackLink = screen.getByRole("link", { name: "Send to the CLI" });
+    expect(callbackLink).toHaveAttribute("href", `http://127.0.0.1:51234/callback?state=st_abc&code=${code}`);
+    expect(card.textContent).not.toMatch(/pg_ep_|pg_cli_/);
+  });
+
+  it("approves a paste-mode #cli-auth request (no port or state) with a one-time code (LAB-1708)", async () => {
+    const user = userEvent.setup();
+    const code = "synthetic-one-time-code-1111111111111111111";
+    const callMock = vi.fn(async (path: string, body?: unknown) => {
+      if (path === "/v1/projects" && body === undefined) {
+        return {
+          default_project_id: "prj_1",
+          projects: [
+            { id: "prj_1", name: "Default project", default_policy_id: "pol_1" },
+            { id: "prj_2", name: "Agents", default_policy_id: "pol_2" },
+          ],
+        };
+      }
+      if (path === "/v1/projects/prj_2/cli-codes") return { code, expires_in: 300 };
+      throw new Error(`unexpected request ${path}`);
+    });
+    render(
+      <Connect
+        status={okStatus}
+        traffic={live()}
+        loadSnippets={loader()}
+        cliHandoff={{ project: "prj_2" }}
+        call={callMock as unknown as Requester}
+      />,
     );
+    const card = await screen.findByTestId("cli-auth-card");
+    await within(card).findByRole("combobox", { name: /Project/ });
+    expect(within(card).getByTestId("cli-auth-request")).toHaveTextContent("Approve a pii-guard CLI for Agents");
+    await user.click(within(card).getByRole("button", { name: "Approve CLI access" }));
+    expect(await screen.findByTestId("cli-auth-code")).toHaveTextContent(code);
+    expect(screen.getByTestId("cli-auth-paste")).toHaveTextContent("pii-guard login --code -");
+    expect(screen.queryByRole("link", { name: "Send to the CLI" })).toBeNull();
+  });
+
+  it.each([
+    [{ state: "st_abc" }],
+    [{ port: 51234 }],
+    [{ port: 51234, state: "st_abc", malformed: true }],
+  ])("refuses a malformed #cli-auth request (LAB-1708): %j", async (handoff) => {
+    const callMock = vi.fn();
+    render(
+      <Connect
+        status={okStatus}
+        traffic={live()}
+        loadSnippets={loader()}
+        cliHandoff={handoff}
+        call={callMock as unknown as Requester}
+      />,
+    );
+    const card = await screen.findByTestId("cli-auth-card");
+    expect(card).toHaveTextContent("This link has an invalid CLI request");
+    expect(within(card).queryByRole("button")).toBeNull();
+    expect(callMock).not.toHaveBeenCalled();
   });
 });
 

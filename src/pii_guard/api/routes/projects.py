@@ -15,7 +15,7 @@ from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import v1_router
 from pii_guard.api.routes.models import provider_catalog
 from pii_guard.hosted.egress import validate_destination
-from pii_guard.projects.cli_auth import DEFAULT_CLI_MODEL, TelemetryChoice, provision_cli_session
+from pii_guard.projects.cli_auth import TelemetryChoice, create_cli_code
 from pii_guard.projects.runtime import ProjectAccessError
 from pii_guard.projects.store import InvalidProjectConfigError, ProjectStore
 from pii_guard.types import TEXT_ENTITY_TYPES, VISUAL_ENTITY_TYPES
@@ -254,36 +254,28 @@ class EndpointModelsRequest(_Body):
     )
 
 
-class CliSessionRequest(_Body):
-    """Browser-handoff CLI session provisioning request (LAB-1708)."""
+class CliCodeRequest(_Body):
+    """A one-time CLI login code for this project (LAB-1708)."""
 
-    project_name: str | None = Field(
+    telemetry_level: TelemetryChoice = Field(
+        description="What the CLI sends: `masked` session traces or `stats` counts only."
+    )
+    hostname: str | None = Field(
         default=None,
         min_length=1,
-        max_length=64,
+        max_length=57,
         repr=False,
-        description="New project display name when `project_id` is `new`.",
-    )
-    telemetry_level: TelemetryChoice = Field(
-        default="masked",
-        description="Telemetry capture level for local CLI sessions: `masked` or `stats`.",
-    )
-    key_name: str = Field(
-        default="CLI",
-        min_length=1,
-        max_length=64,
-        repr=False,
-        description="Display name for the issued endpoint key.",
+        description="The CLI machine's host name; the key is named `CLI (<hostname>)`.",
     )
 
-    @field_validator("project_name", "key_name")
+    @field_validator("hostname")
     @classmethod
-    def valid_optional_name(cls, value: str | None) -> str | None:
+    def valid_hostname(cls, value: str | None) -> str | None:
         if value is None:
             return None
         value = value.strip()
         if not value or any(ord(char) < 32 or ord(char) == 127 for char in value):
-            raise ValueError("invalid resource name")
+            raise ValueError("invalid host name")
         return value
 
 
@@ -358,33 +350,19 @@ def create_endpoint(
     return store.save_endpoint(owner, project_id, _endpoint_data(body, request))
 
 
-@router.put("/v1/projects/{project_id}/endpoints", status_code=201)
-def create_cli_session(
-    body: CliSessionRequest, request: Request, project_id: ResourceId
+@router.post("/v1/projects/{project_id}/cli-codes", status_code=201)
+def create_cli_login_code(
+    body: CliCodeRequest, request: Request, project_id: ResourceId
 ) -> dict[str, Any]:
-    """Provision a CLI telemetry endpoint and key for an existing, default or new project."""
+    """Create a one-time, five-minute CLI login code; the CLI exchanges it at
+    `POST /v1/cli/token` for a telemetry-only endpoint key. Only its digest is stored."""
     store, owner = _context(request)
-    settings = request.app.state.settings
-    hosted = getattr(request.app.state, "hosted", None)
-    origin = (
-        hosted.origin
-        if settings.hosted and hosted is not None and getattr(hosted, "origin", None)
-        else str(request.base_url).rstrip("/")
-    )
-    default_model = (
-        settings.hosted_models[0]
-        if settings.hosted and settings.hosted_models
-        else DEFAULT_CLI_MODEL
-    )
-    return provision_cli_session(
+    return create_cli_code(
         store,
         owner,
         project_id=project_id,
-        project_name=body.project_name,
         telemetry_level=body.telemetry_level,
-        key_name=body.key_name,
-        origin=origin,
-        default_model=default_model,
+        hostname=body.hostname,
     )
 
 

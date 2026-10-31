@@ -76,13 +76,18 @@ describe("console routes (LAB-1287)", () => {
     expect(parsed.route).toEqual({
       section: "connect",
       tab: "text",
-      cliAuth: { port: 51234, state: "st_123", telemetry: "stats" },
+      cliHandoff: { port: 51234, state: "st_123", telemetry: "stats" },
     });
     expect(hashOf(parsed.route)).toBe("#cli-auth?port=51234&state=st_123&telemetry=stats");
     expect(parseHash("#cli-auth")).toEqual({
-      route: { section: "connect", tab: "text", cliAuth: {} },
+      route: { section: "connect", tab: "text", cliHandoff: {} },
       redirect: false,
     });
+    // An out-of-range port, a malformed state or only one of them marks the request malformed.
+    expect(parseHash("#cli-auth?port=99999&state=bad%20state")!.route.cliHandoff).toEqual({ malformed: true });
+    expect(parseHash("#cli-auth?port=51234")!.route.cliHandoff).toEqual({ port: 51234, malformed: true });
+    // Paste mode: no port and no state, optionally a project to preselect.
+    expect(parseHash("#cli-auth?project=prj_1")!.route.cliHandoff).toEqual({ project: "prj_1" });
   });
 });
 

@@ -4,7 +4,7 @@ import type { SnippetsLoader } from "../api/connect";
 import { Notice, PageHeader } from "../components/ui";
 import type { Requester } from "../hosted/api";
 import type { ServerStatusState } from "../hooks/useServerStatus";
-import type { CliAuthParams } from "../lib/routes";
+import type { CliHandoffParams } from "../lib/routes";
 import { CliAuthCard } from "./CliAuthCard";
 import { ConnectQuickstart, CopyButton, type QuickstartTraffic } from "./ConnectQuickstart";
 
@@ -31,12 +31,12 @@ export interface ConnectProps {
   /** A `#connect/<client>` deep link names this client tab first (LAB-1314). */
   initialClient?: string | null;
   /** CLI browser-handoff parameters when opened via `#cli-auth` (LAB-1708). */
-  cliAuth?: CliAuthParams | null;
+  cliHandoff?: CliHandoffParams | null;
   /** Project API requester for CLI authorization (LAB-1708). */
   call?: Requester;
 }
 
-export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts, clientSetup, initialClient = null, cliAuth = null, call }: ConnectProps) {
+export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippets, serverSnippets = true, gatewayLine = true, accounts, clientSetup, initialClient = null, cliHandoff = null, call }: ConnectProps) {
   const server = status.state === "ok" ? status.status : null;
   const gateway = server?.gateway.url ?? DEFAULT_GATEWAY_URL;
 
@@ -48,7 +48,7 @@ export function Connect({ status, traffic, onOpenLog, onOpenSession, loadSnippet
         lead={clientSetup ? undefined : "Point a client at the gateway instead of the model provider. It sends real data, the model gets placeholders, and the answer, tool-call arguments included, comes back restored."}
       />
 
-      {cliAuth && <CliAuthCard cliAuth={cliAuth} call={call} />}
+      {cliHandoff && <CliAuthCard cliHandoff={cliHandoff} call={call} />}
 
       {clientSetup ? (
         <>

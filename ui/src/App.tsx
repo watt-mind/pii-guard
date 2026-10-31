@@ -565,18 +565,18 @@ interface ConnectViewProps {
 }
 
 function connectRouteProps(route: Route) {
-  if (route.section !== "connect") return { initialClient: null, cliAuth: null };
-  return { initialClient: route.client ?? null, cliAuth: route.cliAuth ?? null };
+  if (route.section !== "connect") return { initialClient: null, cliHandoff: null };
+  return { initialClient: route.client ?? null, cliHandoff: route.cliHandoff ?? null };
 }
 
 function ConnectView({ route, caps, status, server, hosted, hostedSnippets, trafficOpened, trafficHandle, onOpenLog, onOpenSession }: ConnectViewProps) {
-  const { initialClient, cliAuth } = connectRouteProps(route);
+  const { initialClient, cliHandoff } = connectRouteProps(route);
   const serverSnippets = !caps.accounts || (server !== null && hostedSnippets !== undefined);
   return (
     <Connect
       status={status}
       initialClient={initialClient}
-      cliAuth={cliAuth}
+      cliHandoff={cliHandoff}
       call={hosted?.call}
       serverSnippets={serverSnippets}
       loadSnippets={hostedSnippets}
