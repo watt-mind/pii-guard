@@ -5,16 +5,6 @@ resolution-markers = [
     "sys_platform == 'linux'",
     "sys_platform != 'linux'",
 ]
-conflicts = [[
-    { package = "wattmind-pii-guard", extra = "baselines" },
-    { package = "wattmind-pii-guard", extra = "ner" },
-], [
-    { package = "wattmind-pii-guard", extra = "gliner" },
-    { package = "wattmind-pii-guard", extra = "ner" },
-], [
-    { package = "wattmind-pii-guard", extra = "baselines" },
-    { package = "wattmind-pii-guard", extra = "gliner" },
-]]
 
 [[package]]
 name = "annotated-doc"
@@ -140,7 +130,7 @@ name = "blis"
 version = "1.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" } },
+    { name = "numpy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f9/b4/ebcfcce88ce01e4867a659f1db43593be00f150ad6d14bf1df42c85a9965/blis-1.3.4.tar.gz", hash = "sha256:c125acd77ccf0184f476b6a599f9819727e19ed311904ed3281118a3d06082d9", size = 2646618, upload-time = "2026-10-25T20:33:29.099Z" }
 wheels = [
@@ -177,7 +167,7 @@ name = "cffi"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz", hash = "sha256:dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be", size = 530807, upload-time = "2026-08-03T21:21:18.939Z" }
 wheels = [
@@ -301,7 +291,7 @@ name = "cryptography"
 version = "50.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "platform_python_implementation != 'PyPy' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "cffi", marker = "platform_python_implementation != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9d/af/182eb91b0df3fe75c4d9f26fe70684569566745f6ba7e5c9c73a862c5252/cryptography-50.0.2.tar.gz", hash = "sha256:7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5", size = 880623, upload-time = "2026-09-30T15:30:04.884Z" }
 wheels = [
@@ -423,26 +413,6 @@ wheels = [
 ]
 
 [[package]]
-name = "gliner"
-version = "0.2.29"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "huggingface-hub", version = "1.33.0", source = { registry = "https://pypi.org/simple" } },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" } },
-    { name = "packaging" },
-    { name = "safetensors" },
-    { name = "sentencepiece" },
-    { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'linux' and extra == 'extra-18-wattmind-pii-guard-gliner') or (sys_platform != 'linux' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'linux' and extra == 'extra-18-wattmind-pii-guard-gliner') or (sys_platform == 'linux' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "tqdm" },
-    { name = "transformers", version = "5.16.1", source = { registry = "https://pypi.org/simple" } },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/93/02/ab43b9ad919d3cc1bcbb35485b2cdf7508ede0cddcebf72e765711795c30/gliner-0.2.29.tar.gz", hash = "sha256:39fa8f33c027627e1d6724bff972ab197bf37cea27e401cd3d40f2f95909b0a4", size = 299687, upload-time = "2026-09-08T12:50:50.113Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/76/74ec5493e2167350c53a51c0f1db8e6a096c1b99f7110e2d9fc7daaf5cdc/gliner-0.2.29-py3-none-any.whl", hash = "sha256:0c8cfb9f5c2daf7aff329ebb5ab1609052d7ad0aca0ef26049b9476b018b3fde", size = 261988, upload-time = "2026-09-08T12:50:48.514Z" },
-]
-
-[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -513,11 +483,11 @@ name = "httpx2"
 version = "2.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "sys_platform != 'emscripten' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "httpcore2", marker = "sys_platform != 'emscripten' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "httpx2-jsfetch", marker = "sys_platform == 'emscripten' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "anyio", marker = "sys_platform != 'emscripten'" },
+    { name = "httpcore2", marker = "sys_platform != 'emscripten'" },
+    { name = "httpx2-jsfetch", marker = "sys_platform == 'emscripten'" },
     { name = "idna" },
-    { name = "truststore", marker = "sys_platform != 'emscripten' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "truststore", marker = "sys_platform != 'emscripten'" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/43/73/5ca2cedf5e4e50423d1c258877865a6b62793633b561c58499f8aeb33b7e/httpx2-2.16.0.tar.gz", hash = "sha256:0d54c98128e8f2ff7fbbde0fca8c359e5f032edeaaaac443cdb7f31f685bcd7f", size = 103116, upload-time = "2026-10-21T07:09:46.348Z" }
@@ -536,46 +506,18 @@ wheels = [
 
 [[package]]
 name = "huggingface-hub"
-version = "1.33.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'linux'",
-    "sys_platform != 'linux'",
-]
-dependencies = [
-    { name = "click", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "filelock", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "fsspec", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "hf-xet", marker = "(platform_machine == 'AMD64' and extra == 'extra-18-wattmind-pii-guard-gliner') or (platform_machine == 'aarch64' and extra == 'extra-18-wattmind-pii-guard-gliner') or (platform_machine == 'amd64' and extra == 'extra-18-wattmind-pii-guard-gliner') or (platform_machine == 'arm64' and extra == 'extra-18-wattmind-pii-guard-gliner') or (platform_machine == 'x86_64' and extra == 'extra-18-wattmind-pii-guard-gliner') or (platform_machine == 'AMD64' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'aarch64' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'amd64' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'arm64' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'x86_64' and extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "httpx", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "packaging", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "pyyaml", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "tqdm", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "typing-extensions", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/25/2a/484d112c0d8fc5f665d7b65137ac9cdb2953c982391598c3597968a12ee7/huggingface_hub-1.33.0.tar.gz", hash = "sha256:367be21a201db9523eddf8aeac7048f2602c1b308691c97640d5e72ed188007e", size = 1043548, upload-time = "2026-09-24T09:49:29.971Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fc/16/963096d224b80909432dc16561a615fd33d2d13beef3ce4c63fa25e40867/huggingface_hub-1.33.0-py3-none-any.whl", hash = "sha256:04e434b06e100eddbce9a6e817d72693a7884b10a79bd67ab48080d5c07eb899", size = 846435, upload-time = "2026-09-24T09:49:28.059Z" },
-]
-
-[[package]]
-name = "huggingface-hub"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'linux'",
-    "sys_platform != 'linux'",
-]
 dependencies = [
-    { name = "click", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "filelock", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "fsspec", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "hf-xet", marker = "(platform_machine == 'AMD64' and extra == 'extra-18-wattmind-pii-guard-baselines') or (platform_machine == 'AMD64' and extra == 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'ARM64' and extra == 'extra-18-wattmind-pii-guard-baselines') or (platform_machine == 'ARM64' and extra == 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'aarch64' and extra == 'extra-18-wattmind-pii-guard-baselines') or (platform_machine == 'aarch64' and extra == 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'amd64' and extra == 'extra-18-wattmind-pii-guard-baselines') or (platform_machine == 'amd64' and extra == 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'arm64' and extra == 'extra-18-wattmind-pii-guard-baselines') or (platform_machine == 'arm64' and extra == 'extra-18-wattmind-pii-guard-ner') or (platform_machine == 'x86_64' and extra == 'extra-18-wattmind-pii-guard-baselines') or (platform_machine == 'x86_64' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "httpx2", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "packaging", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "pyyaml", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "tqdm", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "typing-extensions", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
+    { name = "click" },
+    { name = "filelock" },
+    { name = "fsspec" },
+    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'ARM64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'" },
+    { name = "httpx2" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "tqdm" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/46/dd/585639d95f6a987c0bdfb9045f050f4ad67240775644ba7a4fdc5aca3a3b/huggingface_hub-2.3.0.tar.gz", hash = "sha256:0b783b37f200f1d25bef2344a997c7d410f4437fbe9d8fd965f958e75cec7aef", size = 1063410, upload-time = "2026-10-23T08:52:06.594Z" }
 wheels = [
@@ -839,7 +781,7 @@ version = "2.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ast-serialize" },
-    { name = "librt", marker = "platform_python_implementation != 'PyPy' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "librt", marker = "platform_python_implementation != 'PyPy'" },
     { name = "mypy-extensions" },
     { name = "pathspec" },
     { name = "typing-extensions" },
@@ -877,10 +819,6 @@ wheels = [
 name = "numpy"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'linux'",
-    "sys_platform != 'linux'",
-]
 sdist = { url = "https://files.pythonhosted.org/packages/d0/ad/fed0499ce6a338d2a03ebae59cd15093910c8875328855781952abf6c2fe/numpy-2.4.6.tar.gz", hash = "sha256:f3a3570c4a2a16746ac2c31a7c7c7b0c186b95ce902e33db6f28094ed7387dda", size = 20735807, upload-time = "2026-05-18T23:37:14.07Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/95/2a/3d7b5ac8aac24feaf9ad7ed58f45b0bbc06d37e4338ae84c9f2298b570f9/numpy-2.4.6-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:001fbb8e08d942dd57599e781f2472269ee7f2755fae407b4f67b2f0b17da3f1", size = 16689119, upload-time = "2026-05-18T23:33:54.065Z" },
@@ -894,29 +832,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f6/81/e1b27545deedce7f4a0b348618c6b62d74e36a4dc9ccd42f3eb2f85eee32/numpy-2.4.6-cp312-cp312-win32.whl", hash = "sha256:e3eeb0aabd6bd5ce64faae67e9935203a6991b4bc2a485a767fbafb2c5125f45", size = 5962825, upload-time = "2026-05-18T23:34:20.3Z" },
     { url = "https://files.pythonhosted.org/packages/ab/ca/feab00bd44aa5fe1ad2c18f08b4d3bb92e26484b0b1d1443897809ed528c/numpy-2.4.6-cp312-cp312-win_amd64.whl", hash = "sha256:d8e8286dd7cea7895157318d1b91cdacac64c479f3cbc8dce548331728484751", size = 12321687, upload-time = "2026-05-18T23:34:23.095Z" },
     { url = "https://files.pythonhosted.org/packages/63/cf/5a6d34850a39d1093558564f77ee8e8e0bee5061151b8f05a55711001ec7/numpy-2.4.6-cp312-cp312-win_arm64.whl", hash = "sha256:4081eb135ac24158bd51cdfbef16f1c64df7063b1143f24731387137c092bec8", size = 10221482, upload-time = "2026-05-18T23:34:25.876Z" },
-]
-
-[[package]]
-name = "numpy"
-version = "2.5.4"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'linux'",
-    "sys_platform != 'linux'",
-]
-sdist = { url = "https://files.pythonhosted.org/packages/95/b0/c7453d0b6e2073c3264468b106ee1563750cecc910965e67357e3698c83e/numpy-2.5.4.tar.gz", hash = "sha256:9a94cf751c9ad8ebaa835bcd3d40dacf8534ad086b88c38029b65123c7999d2a", size = 20866315, upload-time = "2026-10-10T20:05:31.422Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/97/ba2074e92b7befea137e77ea8471e768bbd87c339b7e8c9f5a931949f977/numpy-2.5.4-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:c6342f54c67093cae5c0227eb0eb772fdb79f2a2c37a6eb278b9909ee06aa356", size = 17001609, upload-time = "2026-10-10T20:02:40.843Z" },
-    { url = "https://files.pythonhosted.org/packages/ff/a9/bac826765e971d8e16e2064e9ac7525fd69b40ac17c905033a7f5442023f/numpy-2.5.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b11e8fda06a7d69f15ebf542660b74466c2e51094800c1fb794f47ad4faeef17", size = 12015718, upload-time = "2026-10-10T20:02:43.45Z" },
-    { url = "https://files.pythonhosted.org/packages/31/2f/5ea3570fcb8ccd0882bea99436a513b2c85dad8f774a2057849130a8fb99/numpy-2.5.4-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:9cb18a327b49c5c337f972b03682f6a49855525faaf3c0d3e9c96cd0fd8880a8", size = 5451717, upload-time = "2026-10-10T20:02:46.169Z" },
-    { url = "https://files.pythonhosted.org/packages/34/f2/b4fc1bafca03868220b5eaf729d2f21ebd7d7b151c0f9e144fe212bbca35/numpy-2.5.4-cp312-cp312-macosx_14_0_x86_64.whl", hash = "sha256:aec3fc4b32ff82421274f5d205c559c51c840c8df66a78efd7f3612dd005a26a", size = 6789926, upload-time = "2026-10-10T20:02:48.139Z" },
-    { url = "https://files.pythonhosted.org/packages/dc/96/8319e2457ae4333c62c815c7006b869a4f60985c1e01024c2f8c6c040fe5/numpy-2.5.4-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:fe4d21ab149f15e4e6043dfb0de87e6e5f34ac176cde83060e9802981fca2ac2", size = 15695312, upload-time = "2026-10-10T20:02:50.115Z" },
-    { url = "https://files.pythonhosted.org/packages/43/a3/c799c62e19c337e6d3770b08e475887fb30ce8477d3c09efca6b2f0228a6/numpy-2.5.4-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:fbde6962867ee75b48b0ee29b2b9372ec5d617799dbaf38e82dc0596f2f7738a", size = 16727283, upload-time = "2026-10-10T20:02:53.186Z" },
-    { url = "https://files.pythonhosted.org/packages/39/6b/3604e53fb00314d0dc1b94ec9125a1484f649c0a17480b1f0f0c7a9d6250/numpy-2.5.4-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:381a7a3d2e65e64c0ec302795ab9dc12bb1e73f150904699c153716177eebdaf", size = 17047890, upload-time = "2026-10-10T20:02:56.038Z" },
-    { url = "https://files.pythonhosted.org/packages/4a/7a/e8b58a5289a0d464c52885de47c35a935cdd70c03a4c3ab94a5126416dd0/numpy-2.5.4-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:b89d0aaae2fe498c648f4c4795c084db535af5bd98ef942b2a3681fb74ce8645", size = 18485839, upload-time = "2026-10-10T20:02:59.018Z" },
-    { url = "https://files.pythonhosted.org/packages/6f/c9/47094f597015009f310b8c900def59065ef1ff5a6fe7b51fc65ec58ec2c6/numpy-2.5.4-cp312-cp312-win32.whl", hash = "sha256:9968ab7e49b93ac6e1c3b2239732183152c9150f16308d30b66a372cffe3483c", size = 6138936, upload-time = "2026-10-10T20:03:01.626Z" },
-    { url = "https://files.pythonhosted.org/packages/12/33/fefe62073dc8acfd0f2b9ed7c003af2f50aa61555e113e6db02b8f79f145/numpy-2.5.4-cp312-cp312-win_amd64.whl", hash = "sha256:a7b1b6353e36a7e50de2973a38d705c88ee93adcf120673cee7f45a4a3fa223a", size = 12573091, upload-time = "2026-10-10T20:03:04.349Z" },
-    { url = "https://files.pythonhosted.org/packages/1a/07/161270b0c2eec56e4c905f6d6d22e1b836887b2cb189d3f5820aa588e9dd/numpy-2.5.4-cp312-cp312-win_arm64.whl", hash = "sha256:aa1cce2ff3f8d953de38b76bf44602caeb69f101430208f64a10067f7cb4b1d3", size = 10521630, upload-time = "2026-10-10T20:03:06.767Z" },
 ]
 
 [[package]]
@@ -941,8 +856,7 @@ name = "opencv-python-headless"
 version = "5.0.0.93"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or extra == 'extra-18-wattmind-pii-guard-ner' or extra != 'extra-18-wattmind-pii-guard-baselines'" },
+    { name = "numpy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1d/99/76b7c80252aa83c1af16393454aafd125a0287101afe8deb0a6821af0e30/opencv_python_headless-5.0.0.93.tar.gz", hash = "sha256:b82f9831daab90b725c7c1ee1b36cb5732c367096ac76d119e64e14eb70d5f3c", size = 81817738, upload-time = "2026-07-02T07:01:06.039Z" }
 wheels = [
@@ -1052,7 +966,7 @@ version = "2.2.365"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" } },
+    { name = "numpy" },
     { name = "phonenumbers" },
     { name = "preshed" },
     { name = "pydantic" },
@@ -1203,7 +1117,7 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
@@ -1500,7 +1414,7 @@ dependencies = [
     { name = "cymem" },
     { name = "jinja2" },
     { name = "murmurhash" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" } },
+    { name = "numpy" },
     { name = "packaging" },
     { name = "preshed" },
     { name = "pydantic" },
@@ -1599,7 +1513,7 @@ dependencies = [
     { name = "confection" },
     { name = "cymem" },
     { name = "murmurhash" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" } },
+    { name = "numpy" },
     { name = "packaging" },
     { name = "preshed" },
     { name = "pydantic" },
@@ -1639,8 +1553,7 @@ name = "tokenizers"
 version = "0.23.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "huggingface-hub", version = "1.33.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "huggingface-hub", version = "2.3.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
+    { name = "huggingface-hub" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e0/7c/2cabb2174e772636683008f2c5621949b645da7d303c596589e84516a184/tokenizers-0.23.3.tar.gz", hash = "sha256:cded33237c77caeef62944d32aa9a7ef42bdce2b3497e18d137e072a8c4be438", size = 385286, upload-time = "2026-10-09T10:16:55.759Z" }
 wheels = [
@@ -1670,18 +1583,16 @@ resolution-markers = [
     "sys_platform != 'linux'",
 ]
 dependencies = [
-    { name = "filelock", marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "fsspec", marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "jinja2", marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "networkx", marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "setuptools", marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "sympy", marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "typing-extensions", marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "filelock", marker = "sys_platform != 'linux'" },
+    { name = "fsspec", marker = "sys_platform != 'linux'" },
+    { name = "jinja2", marker = "sys_platform != 'linux'" },
+    { name = "networkx", marker = "sys_platform != 'linux'" },
+    { name = "setuptools", marker = "sys_platform != 'linux'" },
+    { name = "sympy", marker = "sys_platform != 'linux'" },
+    { name = "typing-extensions", marker = "sys_platform != 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/3c/379349820e9a6e713826de3d0b88f07728541bdcabe2a3afd128871cdc4b/torch-2.14.1-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:420dbf314c180ee4b86e9bc00aee5746a7d6e5bacdd7df925af671ed393f0b2e", size = 127307099, upload-time = "2026-09-30T17:44:10.421Z" },
-    { url = "https://files.pythonhosted.org/packages/a4/3e/474930ab971e306957ec763b7df695d659179e15ccab9e7073d47ae14ce8/torch-2.14.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:0b13acde294b401509830d85a8906cbf2fc97425a12a66cce1d9fa13c5106a2a", size = 453998918, upload-time = "2026-09-30T17:52:45.134Z" },
-    { url = "https://files.pythonhosted.org/packages/ba/fd/c470857d0dfc5d4c94430658b3eed60fd5292b0bf596a8aae7b9fd66d674/torch-2.14.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:23011fe29a99b591eabb3a31a25080c62e2c2f0690a3c798744e5489dae50451", size = 554618695, upload-time = "2026-09-30T17:53:06.8Z" },
     { url = "https://files.pythonhosted.org/packages/ad/1a/b9648b0d228e513f69f8453ec3f90a8d436d78ff6d85a2773e539f0c07cf/torch-2.14.1-cp312-cp312-win_amd64.whl", hash = "sha256:38bee9f2a2ccfc6898172a5075e4ba52522fbe143eeb099674fc67ab390e858d", size = 124113906, upload-time = "2026-09-30T17:52:21.377Z" },
 ]
 
@@ -1693,20 +1604,18 @@ resolution-markers = [
     "sys_platform == 'linux'",
 ]
 dependencies = [
-    { name = "filelock", marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "fsspec", marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "jinja2", marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "networkx", marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "setuptools", marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "sympy", marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "typing-extensions", marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "filelock", marker = "sys_platform == 'linux'" },
+    { name = "fsspec", marker = "sys_platform == 'linux'" },
+    { name = "jinja2", marker = "sys_platform == 'linux'" },
+    { name = "networkx", marker = "sys_platform == 'linux'" },
+    { name = "setuptools", marker = "sys_platform == 'linux'" },
+    { name = "sympy", marker = "sys_platform == 'linux'" },
+    { name = "typing-extensions", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-linux_s390x.whl", hash = "sha256:6b06a7f6275c5fdecaf1dbf5546f0820b024a97785575bb99e3d9930d83cd86b", upload-time = "2026-09-30T19:47:30Z" },
     { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:2af649994b36dffc627175c3f306d9e513a309b58d4619ac7107577613336454", upload-time = "2026-09-30T19:47:36Z" },
     { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:5a6363570c753812540a05eb82380e329469cbe668643e88111414c12627711f", upload-time = "2026-09-30T19:47:44Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-win_amd64.whl", hash = "sha256:c52adc3bd526ff7fc5bdcc58fc4a76e6214d09951b646ffe5256ebd7ba60cef1", upload-time = "2026-09-30T19:47:50Z" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-win_arm64.whl", hash = "sha256:2f8162c6b265eaf2b0bdd6bef20e96cece430f308e1477a32d0aef51e472124c", upload-time = "2026-09-30T19:47:55Z" },
 ]
 
 [[package]]
@@ -1714,7 +1623,7 @@ name = "tqdm"
 version = "4.70.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0d/ea/b2a5bd54b28a324dae8211928b2d730b6547500342c7e6c6dea08bd0a485/tqdm-4.70.1.tar.gz", hash = "sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4", size = 171846, upload-time = "2026-09-11T07:25:16.601Z" }
 wheels = [
@@ -1723,47 +1632,18 @@ wheels = [
 
 [[package]]
 name = "transformers"
-version = "5.16.1"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'linux'",
-    "sys_platform != 'linux'",
-]
-dependencies = [
-    { name = "huggingface-hub", version = "1.33.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "packaging", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "pyyaml", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "regex", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "safetensors", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "tokenizers", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "tqdm", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "typer", marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/2e/ba418680ab901dae269360bb8642485eae04f1af91ee2ebb8bd6f3607305/transformers-5.16.1.tar.gz", hash = "sha256:17b0eac726ddc55e84ac58946063e0c6d37fd000c456b581f050ea0f4e822869", size = 9650542, upload-time = "2026-08-26T14:48:58.789Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/4d/ee3728674c0bbc637bb4af88ccf0be697f92e4e90b55f5dc110c44d61b61/transformers-5.16.1-py3-none-any.whl", hash = "sha256:2f2d5b98a5ad3718713653734298fa620754ed683702a635ebb587df3ed29c7e", size = 12080592, upload-time = "2026-08-26T14:48:55.083Z" },
-]
-
-[[package]]
-name = "transformers"
 version = "5.21.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "sys_platform == 'linux'",
-    "sys_platform != 'linux'",
-]
 dependencies = [
-    { name = "huggingface-hub", version = "2.3.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra != 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "packaging", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "pyyaml", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "regex", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "safetensors", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "tokenizers", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "tqdm", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
-    { name = "typer", marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
+    { name = "huggingface-hub" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "regex" },
+    { name = "safetensors" },
+    { name = "tokenizers" },
+    { name = "tqdm" },
+    { name = "typer" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f6/9d/59e6232df8761e2c82d52e0bef5382e830d1cd65f02f648712ccd7675e7b/transformers-5.21.0.tar.gz", hash = "sha256:43c971a3eb9ab68dc9dfff430f8ab8a0fba09af2f68b608fd70c6245d2ddb8e7", size = 10321727, upload-time = "2026-10-26T18:17:26.892Z" }
 wheels = [
@@ -1785,7 +1665,7 @@ version = "0.27.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "rich" },
     { name = "shellingham" },
 ]
@@ -1862,10 +1742,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "sentencepiece" },
-    { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-gliner') or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "transformers", version = "5.16.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-gliner' or (extra == 'extra-18-wattmind-pii-guard-baselines' and extra == 'extra-18-wattmind-pii-guard-ner') or (extra != 'extra-18-wattmind-pii-guard-baselines' and extra != 'extra-18-wattmind-pii-guard-ner')" },
-    { name = "transformers", version = "5.21.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or extra == 'extra-18-wattmind-pii-guard-ner'" },
+    { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "transformers" },
     { name = "uvicorn" },
 ]
 
@@ -1873,14 +1752,10 @@ dependencies = [
 baselines = [
     { name = "de-core-news-lg" },
     { name = "en-core-web-lg" },
-    { name = "huggingface-hub", version = "2.3.0", source = { registry = "https://pypi.org/simple" } },
+    { name = "huggingface-hub" },
     { name = "presidio-analyzer" },
     { name = "presidio-anonymizer" },
     { name = "spacy" },
-]
-gliner = [
-    { name = "gliner" },
-    { name = "transformers", version = "5.16.1", source = { registry = "https://pypi.org/simple" } },
 ]
 hosted-azure = [
     { name = "azure-identity" },
@@ -1919,7 +1794,6 @@ requires-dist = [
     { name = "de-core-news-lg", marker = "extra == 'baselines'", url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" },
     { name = "en-core-web-lg", marker = "extra == 'baselines'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = ">=0.162.0" },
-    { name = "gliner", marker = "extra == 'gliner'", specifier = "==0.2.29" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "huggingface-hub", marker = "extra == 'baselines'", specifier = ">=0.30" },
     { name = "meta-sam-parser", marker = "extra == 'sam'", specifier = "==0.1.0" },
@@ -1935,11 +1809,10 @@ requires-dist = [
     { name = "spacy", marker = "extra == 'baselines'", specifier = ">=3.8.7,<3.9" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.14.1" },
     { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.14.1", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "transformers", specifier = ">=4.51.3" },
-    { name = "transformers", marker = "extra == 'gliner'", specifier = ">=4.51.3,<5.17" },
+    { name = "transformers", specifier = ">=5.21.0" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
-provides-extras = ["ocr", "baselines", "sam", "local-vision", "ner", "gliner", "hosted-azure"]
+provides-extras = ["ocr", "baselines", "sam", "local-vision", "ner", "hosted-azure"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1965,7 +1838,7 @@ dependencies = [
     { name = "httpx" },
     { name = "packaging" },
     { name = "pydantic" },
-    { name = "smart-open", extra = ["http"], marker = "extra == 'extra-18-wattmind-pii-guard-baselines' or (extra == 'extra-18-wattmind-pii-guard-gliner' and extra == 'extra-18-wattmind-pii-guard-ner')" },
+    { name = "smart-open", extra = ["http"] },
     { name = "srsly" },
     { name = "typer" },
     { name = "wasabi" },

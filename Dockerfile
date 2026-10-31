@@ -12,23 +12,28 @@ WORKDIR /app
 # Extras installed into the image. The `ocr` extra (pytesseract) reads the text in images;
 # without it image parts are refused (ADR 0006). The `local-vision` extra (OpenCV headless)
 # runs YuNet, the on-device face and ID-photo detector of the default hybrid segmenter
-# (PII_GUARD_SEGMENTER, LAB-1245). The demo image (compose.yaml, profile demo) adds `ner`
-# (torch + transformers) for fast mode with the NER; its model is fetched at run time into a
-# volume, never baked in (LAB-1192). The `sam` extra is Meta's official SAM 3.1 output parser
+# (PII_GUARD_SEGMENTER, LAB-1245). The `sam` extra is Meta's official SAM 3.1 output parser
 # (meta-sam-parser, SAM License, LAB-1665).
 ARG PII_GUARD_EXTRAS="ocr local-vision sam"
+# The NER (torch + transformers) is a core dependency (LAB-1733), but this base image stays
+# rules-only and inside its size budget (LAB-1192): these packages are skipped, so the default
+# stack falls back to rules. The demo image (compose.yaml, profile demo) sets this empty for fast
+# mode with the NER; its model is fetched at run time into a volume, never baked in.
+ARG PII_GUARD_SKIP_PACKAGES="torch transformers sentencepiece tokenizers safetensors sympy mpmath networkx"
 
 # Dependencies first, so code changes don't invalidate this layer.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-dev $(for e in $PII_GUARD_EXTRAS; do printf -- '--extra %s ' "$e"; done) \
+        $(for p in $PII_GUARD_SKIP_PACKAGES; do printf -- '--no-install-package %s ' "$p"; done) \
         --no-install-project
 
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev $(for e in $PII_GUARD_EXTRAS; do printf -- '--extra %s ' "$e"; done) \
+        $(for p in $PII_GUARD_SKIP_PACKAGES; do printf -- '--no-install-package %s ' "$p"; done) \
         --no-editable
 
 # The YuNet model (0.23 MB, MIT, OpenCV model zoo): fetched from its pinned URL and checked

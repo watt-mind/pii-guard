@@ -23,6 +23,7 @@ x-demo-image: &demo-image
     context: .
     args:
       PII_GUARD_EXTRAS: "ocr local-vision ner sam"
+      PII_GUARD_SKIP_PACKAGES: ""
 
 services:
   api:

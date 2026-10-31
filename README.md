@@ -126,3 +126,124 @@ for a request path at 9.4 s per document (p50). So it labeled the training text 
 | Audit mode, red team | **Muse Spark Open** (open weights): [audit runs](docs/benchmarks.md#smoke), [red team](eval/results/2026-10-27-redteam/README.md) |
 | Fictional ID specimens | **Muse Image**: painted the portraits, signatures and stamps ([generation record](eval/fixtures/visual/generation.json)) |
 | Signatures in images | **SAM 3.1** (Meta Model API, decoded with Meta's `meta_sam_parser`); faces stay on the device (YuNet): [specimen results](eval/results/visual/specimens.md) |
+
+## Inside the gateway
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/how-it-works-dark.svg">
+  <img src="docs/benchmarks/how-it-works.svg" alt="How it works: your app or agent sends a request to PII Guard, which runs on your side. On the way out PII Guard does 1. extract text, tool calls and image regions; 2. detect personal data with rules, then NER, then an optional audit LLM; 3. apply policies and pseudonymize with keyed placeholders; 4. mask image regions (faces, SAM 3.1, OCR). Only the masked request, with placeholders such as [[PERSON_968e29]] in place of personal data, crosses to the LLM provider. The response streams back to PII Guard, which does 5. restore placeholders chunk by chunk, and your app or agent gets the answer with the real values. The placeholder-to-value mapping never leaves PII Guard." width="100%">
+</picture>
+
+The gateway speaks the OpenAI Chat Completions and Responses APIs. It masks messages, **tool
+definitions, tool-call arguments, tool results** and images, restores placeholders in streams,
+keeps one placeholder per person per session, and fails closed on anything it can't mask; the
+mapping never leaves PII Guard. Every document in the hand-written set unmasks back to its
+original exactly.
+
+| Mode | Detection | Leaves your machine |
+|---|---|---|
+| `fast` (default): everyday traffic | Rules + on-device NER; no LLM call | Only the masked request, to your LLM provider |
+| `fast` with `PII_GUARD_DETECTORS=rules`: offline runs, CI, structured data | Rules only; free-text names only as [known values](docs/api.md#sessions-and-restore) your app registers | Only the masked request |
+| `audit` (opt-in, `X-PII-Guard-Mode: audit`): measuring the upper bound, training labels | Rules + NER + an LLM detector; fails closed if that call fails | The original text, to the audit endpoint you configure |
+
+**Grammar-aware.** In Hungarian a name changes with every case; the ending stays outside the
+placeholder:
+
+| | Hungarian (real output), with an English gloss |
+|---|---|
+| You send | Kérem, írjon Próba Zsuzsannának a zsuzsa.proba@example.com címre.<br><sub>Please write *to Zsuzsanna Próba* at …</sub> |
+| The model sees | Kérem, írjon [[PERSON_968e29]]nak a [[EMAIL_e7038b]] címre.<br><sub>… *to [[PERSON]]* …</sub> |
+| You get back | Megírtam a levelet Próba Zsuzsannának.<br><sub>I wrote *to Zsuzsanna Próba*.</sub> |
+
+**Language packs.** Hungarian, English, German and Polish each ship validated identifier rules,
+cue words and case handling; a new language is one package
+([how to add a language](docs/languages.md)).
+
+**What it detects:** people, addresses, emails, phone numbers, dates of birth, national and
+document IDs (including Hungarian tax and TAJ numbers), bank accounts and payment cards,
+vehicle plates, parcel numbers and secrets such as API keys, plus faces, ID photos and
+signatures in images ([full entity list](docs/entities.md)).
+
+**Real agents behind it.** On 2026-10-29 four unmodified coding agents (pi, OpenCode, Codex,
+Muse Code) worked a fictional customer file through the gateway: **115 requests, none of the
+file's 9 personal values reached the model**, and the answers and the files on disk came back
+with the real values. No turn was refused; in an earlier run on 2026-10-28, 7 of 15 were, before
+two gateway fixes (a system note saying the placeholders are intentional, and the NER no longer
+masking file names). Two Codex turns stopped on gateway bugs; ten turns is a sample, not a
+benchmark ([harness matrix](docs/integrations/harness-matrix-2026-10-29.md)).
+
+[Architecture](docs/architecture.md) · [sessions and modes](docs/architecture-gateway.md) ·
+[threat model](docs/privacy-model.md) · [GDPR context](docs/eu-regulation.md)
+
+[Thirteen differentiators, each with evidence](docs/why-pii-guard.md).
+
+## Use it from code
+
+### Round trip
+
+Mask, then unmask with the session PII Guard keeps. With `pii-guard up` running, this script
+takes the session id and the person placeholder from the first response (output from fast mode):
+
+```bash
+R=$(curl -sS http://127.0.0.1:8787/v1/mask \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Email Jane Placeholder, jane.placeholder@example.net, about the refund.", "language": "en"}')
+echo "$R"
+# {"masked_text":"Email [[PERSON_604260]], [[EMAIL_84bb25]], about the refund.",
+#  "session_id":"s_a925963eb8819a782a68c56f41265424","entities":[...],"kept":[]}
+SID=$(echo "$R" | python3 -c 'import json,sys; print(json.load(sys.stdin)["session_id"])')
+P=$(echo "$R" | grep -o '\[\[PERSON_[0-9a-f]*\]\]' | head -1)
+curl -sS http://127.0.0.1:8787/v1/unmask \
+  -H 'Content-Type: application/json' \
+  -d "{\"text\": \"Done: I emailed $P about the refund.\", \"session_id\": \"$SID\"}"
+# {"text":"Done: I emailed Jane Placeholder about the refund.","unresolved":[]}
+```
+
+The session id and the placeholders differ on every run: each new session gets its own.
+
+### Python client
+
+Put it in front of an existing client; only the base URL changes:
+
+```python
+# pip install openai
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="unused")  # mock upstream
+stream = client.chat.completions.create(
+    model="mock",
+    stream=True,
+    messages=[
+        {"role": "user", "content": "Refund Jane Placeholder, jane.placeholder@example.net."}
+    ],
+)
+for chunk in stream:  # the mock echoes the masked text it got; the gateway restores the values
+    print(chunk.choices[0].delta.content or "", end="")
+# Echo: Refund Jane Placeholder, jane.placeholder@example.net.
+```
+
+What the model actually received: `curl -sS 'http://127.0.0.1:8787/v1/traffic?limit=1'` shows
+the last gateway request as sent upstream, with placeholders (`pii-guard up` keeps a masked-only
+[traffic log](docs/operations.md#traffic-log)). [API guide](docs/api.md) ·
+[agents and harnesses](docs/integrations.md).
+
+## Console tour
+
+<p align="center">
+  <img src="docs/assets/demo/demo.webp" alt="Console tour in the dark theme, recorded in fast mode (rules + NER) with fictional English data: Overview, a support email masked in the Playground with names replaced by placeholders, the same session in Chat, Logs and Connect" width="100%">
+</p>
+
+<p align="center"><sub>Console tour, recorded in fast mode (rules + NER) with fictional data.
+<a href="ui/README.md#screens">More screens</a> · <a href="https://youtu.be/Lsr74ddhxRo">Video walkthrough</a>.</sub></p>
+
+Run the console locally: [`make demo` from a checkout](docs/operations.md#the-demo-stack).
+
+## Contributing, security, license
+
+The [contributing guide](CONTRIBUTING.md) has the rule that matters most: **never commit real
+personal data**, not even in a test.
+
+**Security:** found a way to make personal data leak past PII Guard? Report it privately:
+[SECURITY.md](SECURITY.md).
+
+Licensed [Apache-2.0](LICENSE).
