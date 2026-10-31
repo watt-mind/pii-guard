@@ -1,4 +1,4 @@
-"""Tests for ``pii-guard run <client>`` (LAB-1705).
+"""Tests for ``pii-guard run <client>`` (LAB-1705, LAB-1709).
 
 Synthetic data only (ADR 0005).
 """
@@ -7,14 +7,18 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import stat
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from pii_guard.cli import main as root_main
+from pii_guard.integrations import run as run_module
 from pii_guard.integrations.common import ConnectError
+from pii_guard.integrations.login import CliProfile, load_cli_profile, save_cli_profile
 from pii_guard.integrations.run import (
     DEFAULT_DASHBOARD_URL,
     ResolvedUpstream,
@@ -24,6 +28,7 @@ from pii_guard.integrations.run import (
     build_parser,
     child_base_env,
     main,
+    prompt_first_run_dashboard,
     resolve_dashboard,
     resolve_upstream,
     run_agent,
@@ -32,7 +37,9 @@ from pii_guard.integrations.run import (
 from pii_guard.upstreams import PRESETS
 
 
-def _clear_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def _clear_provider_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path | None = None) -> None:
+    if tmp_path is not None:
+        monkeypatch.setenv("PII_GUARD_CLI_CONFIG", str(tmp_path / "cli.json"))
     for var in (
         "META_API_KEY",
         "OPENAI_API_KEY",
@@ -67,7 +74,7 @@ def test_resolve_upstream_auto_detects_provider_keys(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    _clear_provider_env(monkeypatch)
+    _clear_provider_env(monkeypatch, tmp_path)
     parser = build_parser()
 
     with pytest.raises(ConnectError, match="no upstream provider configured"):
@@ -94,7 +101,7 @@ def test_resolve_upstream_claude_code_and_explicit_flags(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    _clear_provider_env(monkeypatch)
+    _clear_provider_env(monkeypatch, tmp_path)
     parser = build_parser()
 
     with pytest.raises(ConnectError, match="claude-code needs \\$ANTHROPIC_API_KEY"):
@@ -138,13 +145,19 @@ def test_resolve_dashboard_defaults_to_hosted_and_supports_self_hosted(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    _clear_provider_env(monkeypatch)
+    _clear_provider_env(monkeypatch, tmp_path)
     parser = build_parser()
 
     # No key or URL -> remote reporting off
     off_target = resolve_dashboard(parser.parse_args(["opencode"]))
     assert off_target.remote_url is None
     assert off_target.display_url is None
+    assert off_target.local_ui is False
+
+    # Scenario B: --dashboard local enables local web UI on the gateway port
+    local_ui = resolve_dashboard(parser.parse_args(["opencode", "--dashboard", "local"]))
+    assert local_ui.remote_url is None
+    assert local_ui.local_ui is True
 
     # Key only -> defaults to https://guard.watt-mind.com
     hosted = resolve_dashboard(
@@ -195,6 +208,64 @@ def test_resolve_dashboard_defaults_to_hosted_and_supports_self_hosted(
         resolve_dashboard(
             parser.parse_args(["opencode", "--dashboard-key-env", "MISSING_DASH_KEY"])
         )
+
+
+def test_resolve_dashboard_with_saved_profile_and_interactive_first_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_provider_env(monkeypatch, tmp_path)
+    parser = build_parser()
+
+    fake_remote = CliProfile(
+        mode="remote",
+        dashboard_url="https://guard.watt-mind.com",
+        project_id="prj_1",
+        project_name="Team Alpha",
+        endpoint_id="ep_999",
+        endpoint_key="pg_ep_aaa",
+        telemetry_level="stats",
+    )
+
+    # First-run interactive choice [1] Hosted dashboard
+    target_hosted = resolve_dashboard(
+        parser.parse_args(["opencode"]),
+        interactive=True,
+        input_fn=lambda _p: "1",
+        login_fn=lambda url, **_kw: fake_remote,
+        stderr=io.StringIO(),
+    )
+    assert target_hosted.remote_url == "https://guard.watt-mind.com/e/ep_999/v1"
+    assert target_hosted.remote_key == "pg_ep_aaa"
+    assert target_hosted.remote_level == "stats"
+    assert target_hosted.project_name == "Team Alpha"
+    assert load_cli_profile() == fake_remote
+
+    # Subsequent non-interactive run automatically uses the saved profile
+    target_saved = resolve_dashboard(parser.parse_args(["opencode"]))
+    assert target_saved.remote_url == "https://guard.watt-mind.com/e/ep_999/v1"
+
+    # First-run interactive choice [2] Local only
+    save_cli_profile(CliProfile(mode="local"))
+    target_local = resolve_dashboard(parser.parse_args(["opencode"]))
+    assert target_local.remote_url is None
+
+    # First-run interactive choice [3] Self-hosted URL
+    prompts = iter(["3", "https://guard.internal.example.com"])
+    self_profile = prompt_first_run_dashboard(
+        input_fn=lambda _p: next(prompts),
+        login_fn=lambda url, **_kw: CliProfile(
+            mode="remote",
+            dashboard_url=url,
+            project_id="prj_sh",
+            project_name="Self Hosted",
+            endpoint_id="ep_sh",
+            endpoint_key="pg_ep_bbb",
+            telemetry_level="masked",
+        ),
+        stderr=io.StringIO(),
+    )
+    assert self_profile.dashboard_url == "https://guard.internal.example.com"
 
 
 def test_build_agent_invocation_all_clients(tmp_path: Path) -> None:
@@ -355,7 +426,7 @@ def test_run_print_env_and_end_to_end_subprocess(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    _clear_provider_env(monkeypatch)
+    _clear_provider_env(monkeypatch, tmp_path)
 
     out = io.StringIO()
     err = io.StringIO()
@@ -383,12 +454,27 @@ def test_run_print_env_and_end_to_end_subprocess(
     assert payload["dashboard_url"] == f"{DEFAULT_DASHBOARD_URL}/#traffic"
     assert payload["command"] == ["dry-run", "run", "task"]
 
+    # Scenario B: --dashboard local in --print-env
+    out_local = io.StringIO()
+    assert (
+        main(
+            ["opencode", "--mock", "--dashboard", "local", "--print-env"],
+            stdout=out_local,
+            stderr=io.StringIO(),
+        )
+        == 0
+    )
+    local_payload = json.loads(out_local.getvalue())
+    assert local_payload["local_ui"] is True
+    assert local_payload["dashboard_url"].endswith("/#traffic")
+
     # Missing binary returns exit code 2
     err_missing = io.StringIO()
     code_missing = main(
         ["opencode", "--mock", "--agent-bin", str(tmp_path / "does-not-exist")],
         stdout=io.StringIO(),
         stderr=err_missing,
+        interactive=False,
     )
     assert code_missing == 2
     assert "was not found" in err_missing.getvalue()
@@ -445,7 +531,6 @@ def test_run_print_env_and_end_to_end_subprocess(
     recorded = json.loads(out_file.read_text(encoding="utf-8"))
     assert recorded["argv"] == ["run", "--auto"]
     content = recorded["reply"]["choices"][0]["message"]["content"]
-    # The mock upstream echoed the masked placeholder, and the local gateway restored the email
     assert "jane.placeholder@example.net" in content
     # What was forwarded upstream held a placeholder, never the email.
     [event] = recorded["traffic"]["events"]
@@ -460,6 +545,124 @@ def test_resolve_dashboard_refuses_plaintext_remote() -> None:
     args = build_parser().parse_args(["opencode", "--dashboard", "http://dash.example"])
     with pytest.raises(ConnectError, match="https"):
         resolve_dashboard(args)
+
+
+def test_saved_profile_is_validated_like_a_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_provider_env(monkeypatch, tmp_path)
+    args = build_parser().parse_args(["opencode"])
+    fake_key = "pg_ep_fake_profile_key"
+
+    plain = CliProfile(
+        dashboard_url="http://dash.example", endpoint_id="ep_1", endpoint_key=fake_key
+    )
+    with pytest.raises(ConnectError, match="https"):
+        resolve_dashboard(args, profile=plain)
+    creds = CliProfile(
+        dashboard_url="https://u:p@dash.example", endpoint_id="ep_1", endpoint_key=fake_key
+    )
+    with pytest.raises(ConnectError, match="credentials"):
+        resolve_dashboard(args, profile=creds)
+    # No endpoint: refused instead of posting to the dashboard root.
+    no_endpoint = CliProfile(dashboard_url="https://dash.example", endpoint_key=fake_key)
+    with pytest.raises(ConnectError, match="run `pii-guard login` again"):
+        resolve_dashboard(args, profile=no_endpoint)
+    save_cli_profile(no_endpoint)
+    with pytest.raises(ConnectError, match="run `pii-guard login` again"):
+        resolve_dashboard(args)
+    bad_endpoint = CliProfile(
+        dashboard_url="https://dash.example", endpoint_id="../admin", endpoint_key=fake_key
+    )
+    with pytest.raises(ConnectError, match="not a valid endpoint id"):
+        resolve_dashboard(args, profile=bad_endpoint)
+
+    loopback = CliProfile(
+        dashboard_url="http://127.0.0.1:9", endpoint_id="ep_1", endpoint_key=fake_key
+    )
+    assert resolve_dashboard(args, profile=loopback).remote_url == "http://127.0.0.1:9/e/ep_1/v1"
+
+    # A login whose result run would refuse is never saved.
+    (tmp_path / "cli.json").unlink()
+    with pytest.raises(ConnectError, match="https"):
+        resolve_dashboard(
+            args,
+            interactive=True,
+            input_fn=lambda _p: "1",
+            login_fn=lambda _url, **_kw: plain,
+            stderr=io.StringIO(),
+        )
+    assert load_cli_profile() is None
+
+    # An explicit --dashboard uses the saved profile only for the same origin.
+    good = CliProfile(
+        dashboard_url="https://dash.example", endpoint_id="ep_1", endpoint_key=fake_key
+    )
+    same = build_parser().parse_args(["opencode", "--dashboard", "https://DASH.example/"])
+    assert resolve_dashboard(same, profile=good).remote_key == fake_key
+    other = build_parser().parse_args(["opencode", "--dashboard", "https://other.example"])
+    target = resolve_dashboard(other, profile=good)
+    assert target.remote_key is None
+    assert target.remote_url == "https://other.example"
+
+
+def test_run_ctrl_c_at_first_run_prompt_exits_130(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_provider_env(monkeypatch, tmp_path)
+
+    def interrupt(_prompt: str) -> str:
+        raise KeyboardInterrupt
+
+    err = io.StringIO()
+    code = main(["opencode", "--mock"], stderr=err, interactive=True, input_fn=interrupt)
+    assert code == 130
+    assert "cancelled" in err.getvalue()
+
+
+def test_gateway_env_and_agent_never_hold_upstream_tenant_or_profile_keys(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_provider_env(monkeypatch, tmp_path)
+    monkeypatch.delenv("PII_GUARD_TENANT_KEY", raising=False)
+    fake_upstream = "sk-fake-upstream-0000"
+    fake_profile_key = "pg_ep_fake_profile_key"
+    monkeypatch.setenv("OPENAI_API_KEY", fake_upstream)
+    save_cli_profile(
+        CliProfile(
+            dashboard_url="https://dash.example", endpoint_id="ep_1", endpoint_key=fake_profile_key
+        )
+    )
+    seen: dict[str, Any] = {}
+
+    def fake_run_agent(cmd: list[str], env: dict[str, str]) -> int:
+        seen["environ"] = dict(os.environ)
+        seen["child"] = dict(env)
+        return 0
+
+    monkeypatch.setattr(run_module, "run_agent", fake_run_agent)
+    monkeypatch.setattr(run_module, "_resolve_binary", lambda _c, _o: "opencode")
+    code = main(
+        ["opencode", "--upstream", "openai", "--model", "m"],
+        stderr=io.StringIO(),
+        interactive=False,
+    )
+    assert code == 0
+    environ = seen["environ"]
+    assert "PII_GUARD_UPSTREAM_API_KEY" not in environ
+    assert "PII_GUARD_TENANT_KEY" not in environ
+    assert "PII_GUARD_UPSTREAM_BASE_URL" not in environ
+    # The telemetry key only feeds the in-process gateway's remote exporter.
+    assert environ["PII_GUARD_REMOTE_KEY"] == fake_profile_key
+    assert environ["PII_GUARD_REMOTE_URL"] == "https://dash.example/e/ep_1/v1"
+    child_values = " ".join(seen["child"].values())
+    assert fake_upstream not in child_values
+    assert fake_profile_key not in child_values
+    assert not any(k.startswith("PII_GUARD_REMOTE") for k in seen["child"])
+    assert "PII_GUARD_REMOTE_KEY" not in os.environ
 
 
 def test_child_base_env_drops_provider_and_dashboard_secrets() -> None:

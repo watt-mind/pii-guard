@@ -7,6 +7,7 @@ import { HostedSessionContext } from "./session";
 import { ClientSetup } from "./ClientSetup";
 import { resetFirstRun } from "./firstRun";
 import { publish } from "./setup";
+import { setSelectedProject } from "../projects/selection";
 import type { Account, Requester } from "./api";
 
 const account: Account = {
@@ -55,6 +56,26 @@ it("keeps retrying through a cold start before warning (LAB-1710)", async () => 
   render(<SetupChecklist call={call} account={account} active calls={0} retryDelays={[0, 0, 0]} />);
   expect(await screen.findByText("0 of 5 done")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Retry setup" })).not.toBeInTheDocument();
+});
+
+it("stops waiting on a hung setup read and warns after the retries (LAB-1729)", async () => {
+  const call = vi.fn().mockImplementation(() => new Promise(() => {})) as unknown as Requester;
+  render(<SetupChecklist call={call} account={account} active calls={0} retryDelays={[0]} timeoutMs={5} />);
+  expect(await screen.findByRole("button", { name: "Retry setup" })).toBeInTheDocument();
+  expect(call).toHaveBeenCalledTimes(2);
+});
+
+it("reads setup from the default project when the selected one is gone (LAB-1730)", async () => {
+  setSelectedProject("project-gone");
+  const call = vi.fn().mockImplementation(async (path: string) => {
+    if (path === "/v1/projects") return { projects: [{ id: "project-one", name: "Example" }], default_project_id: "project-one" };
+    if (path.includes("project-gone")) throw new Error("not found");
+    if (path.endsWith("/policies")) return { policies: [{ id: "p" }] };
+    return { endpoints: [] };
+  }) as unknown as Requester;
+  render(<SetupChecklist call={call} account={account} active calls={0} retryDelays={[]} />);
+  expect(await screen.findByText("1 of 5 done")).toBeInTheDocument();
+  setSelectedProject(null);
 });
 
 it("labels paused free inference without changing the selected connection", () => {

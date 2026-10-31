@@ -166,8 +166,10 @@ class BlobProjectStore:
     def endpoint_snapshot(self, owner: str, project: str, endpoint: str) -> EndpointSnapshot:
         return self._run(lambda store: store.endpoint_snapshot(owner, project, endpoint))
 
-    def issue_key(self, owner: str, project: str, endpoint: str, name: str) -> dict[str, Any]:
-        return self._run(lambda store: store.issue_key(owner, project, endpoint, name))
+    def issue_key(
+        self, owner: str, project: str, endpoint: str, name: str, *, scope: str = "full"
+    ) -> dict[str, Any]:
+        return self._run(lambda store: store.issue_key(owner, project, endpoint, name, scope=scope))
 
     def list_keys(self, owner: str, project: str, endpoint: str) -> list[dict[str, Any]]:
         return self._run(lambda store: store.list_keys(owner, project, endpoint))
@@ -180,6 +182,9 @@ class BlobProjectStore:
 
     def resolve_key(self, secret: str, endpoint: str) -> EndpointSnapshot | None:
         return self._run(lambda store: store.resolve_key(secret, endpoint))
+
+    def revoke_presented_key(self, secret: str) -> bool:
+        return self._run(lambda store: store.revoke_presented_key(secret))
 
     def close(self) -> None:
         with self._lock:

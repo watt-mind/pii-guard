@@ -248,7 +248,12 @@ export function Playground({ text, onText, sampleId, onSample, result, running, 
                     ? "Mask the document to see exactly what the model would get."
                     : "Mask the document to see exactly what would leave your network."
               }
-            />
+            >
+              {/* Same action as the Mask document button above the panes (LAB-1713). */}
+              <Button variant="primary" onClick={run} disabled={text.trim() === ""}>
+                Mask this document <span aria-hidden="true">→</span>
+              </Button>
+            </EmptyState>
           )}
         </Pane>
       </div>

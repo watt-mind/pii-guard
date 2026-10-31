@@ -145,6 +145,7 @@ from pii_guard.hosted.settlement import (
     _RoutePlan as _RoutePlan,
 )
 from pii_guard.projects.middleware import (
+    CLI_TOKEN_PATH,
     MUSE_CATALOG,
     endpoint_body,
     endpoint_path,
@@ -177,6 +178,10 @@ __all__ = [
 # The whole body (endpoint and hosted reads together) must arrive within this many seconds
 # of taking an ingress slot, however it is trickled.
 BODY_READ_SECONDS = 10
+# The CLI login exchange (LAB-1708): a one-code JSON body, rate limited as anonymous work,
+# held in the guest ingress pool under one shared principal, never charged inference quota.
+CLI_TOKEN_MAX_BODY = 1024
+_CLI_TOKEN_PRINCIPAL = Principal("cli-token-exchange", False, "guest")
 
 
 class HostedMiddleware:
@@ -212,6 +217,9 @@ class HostedMiddleware:
         headers = Headers(scope=ctx.scope)
         _check_unique_security_headers(headers)
         path = ctx.scope.get("path", "")
+        if path == CLI_TOKEN_PATH:
+            await self._execute_cli_token(ctx, headers)
+            return
         principal, path, routed, endpoint_snapshot = await self._authenticate(
             ctx, headers, path, key_predicate=key_predicate
         )
@@ -224,6 +232,7 @@ class HostedMiddleware:
             method=method,
             hosted_images=self.service.settings.hosted_images,
             expected_origin=self.service.origin,
+            key_scope=getattr(endpoint_snapshot, "key_scope", "full"),
         )
         if not plan.account:
             self.service.abuse.admit(
@@ -262,6 +271,38 @@ class HostedMiddleware:
         )
         await self._acquire_runtime(ctx, principal, plan, selected_endpoint)
         await self._forward(ctx, payload.raw)
+
+    async def _execute_cli_token(self, ctx: _RequestContext, headers: Headers) -> None:
+        """``POST``/``DELETE /v1/cli/token`` without a session (LAB-1708).
+
+        The route authenticates by the one-time code (``POST``) or by the telemetry key
+        itself (``DELETE``). Here: no browser cross-site request, JSON only, the anonymous
+        abuse bucket, a guest ingress slot, a small bounded body and no quota or runtime."""
+        method = ctx.scope.get("method")
+        if method not in {"POST", "DELETE"}:
+            raise HostedRequestError("The CLI token route accepts POST and DELETE only")
+        origin = headers.get("origin")
+        if (origin is not None and origin != self.service.origin) or headers.get(
+            "sec-fetch-site"
+        ) == "cross-site":
+            raise HostedRequestError("A same-origin request is required")
+        if method == "POST":
+            media = headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            if media != "application/json":
+                raise HostedRequestError("The CLI token exchange takes application/json only")
+        self.service.abuse.admit(
+            headers,
+            principal_id=_CLI_TOKEN_PRINCIPAL.id,
+            authenticated=False,
+            anonymous_sponsored=True,
+        )
+        self.service.enter_ingress(_CLI_TOKEN_PRINCIPAL)
+        ctx.ingress = _CLI_TOKEN_PRINCIPAL
+        deadline = asyncio.get_running_loop().time() + min(
+            BODY_READ_SECONDS, self.service.settings.hosted_request_timeout
+        )
+        raw = await self._read_bounded_body(ctx.receive, deadline, CLI_TOKEN_MAX_BODY)
+        await self._forward(ctx, raw, keep_authorization=method == "DELETE")
 
     async def _authenticate(
         self,
@@ -695,8 +736,15 @@ class HostedMiddleware:
             # (LAB-1492). Vault and session routes stay on one runtime.
             ctx.state["hosted_traffic"] = self.service.project_traffic(ctx.runtime, project_id)
 
-    async def _forward(self, ctx: _RequestContext, raw: bytearray) -> None:
+    async def _forward(
+        self, ctx: _RequestContext, raw: bytearray, *, keep_authorization: bool = False
+    ) -> None:
         filtered = _filter_forward_headers(ctx.scope.get("headers", []), len(raw))
+        if keep_authorization:
+            # Only the CLI logout: the route revokes the very key it is shown.
+            filtered.extend(
+                (k, v) for k, v in ctx.scope.get("headers", []) if k.lower() == b"authorization"
+            )
         consumed = False
 
         async def body_receive() -> Message:

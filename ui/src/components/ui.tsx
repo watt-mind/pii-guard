@@ -643,8 +643,14 @@ export function EmptyState({ title, body, children }: { title: string; body: str
  * refusal says the masked request did reach the upstream). Inbound: the answer could not be
  * restored, so nothing is shown. The hosted console never prints server text, which could echo
  * input; it shows the code and the mapped copy only.
+ *
+ * `onRetry` is required from every fetch-driven caller: an error with no recovery action
+ * strands the user (LAB-1714). Omit it only when the failure is terminal or when `action`
+ * carries a recovery that isn't a plain retry (e.g. RoundTrip's "Mask the document again"
+ * for an expired session): every recovery lives in the same action slot under the body,
+ * never beside the notice.
  */
-export function BlockedNotice({ error, phase = "outbound", onRetry }: { error: RunError; phase?: "outbound" | "inbound"; onRetry?: () => void }) {
+export function BlockedNotice({ error, phase = "outbound", onRetry, action }: { error: RunError; phase?: "outbound" | "inbound"; onRetry?: () => void; action?: ReactNode }) {
   // Outbound copy depends on the code: an upstream refusal is not pii-guard failing closed (LAB-1335).
   const copy = errorCopy(error.code, error.status ?? statusFromMessage(error.message));
   const title =
@@ -674,10 +680,15 @@ export function BlockedNotice({ error, phase = "outbound", onRetry }: { error: R
         {showMessage ? <> · {error.message}</> : null}
       </p>
       <p className="mt-2 text-muted">{body}</p>
-      {onRetry && (
-        <Button size="sm" className="mt-3" onClick={onRetry}>
-          Retry
-        </Button>
+      {(onRetry || action) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {onRetry && (
+            <Button size="sm" onClick={onRetry}>
+              Retry
+            </Button>
+          )}
+          {action}
+        </div>
       )}
     </div>
   );

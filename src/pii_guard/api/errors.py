@@ -79,6 +79,10 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
         "`POST /v1/messages`: the upstream has no Anthropic Messages API (404/405 on "
         "`.../messages`). Only the masked request reached it.",
     ),
+    "invalid_code": (
+        400,
+        "`POST /v1/cli/token`: the one-time CLI login code is unknown, used or expired.",
+    ),
     "unauthorized": (401, "`PII_GUARD_API_TOKEN` is set and the request has no valid token."),
     "traffic_log_not_local": (
         403,

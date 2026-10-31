@@ -1,6 +1,7 @@
 // The Vault screen (LAB-1328): session list, detail, reveal only in full mode, drop.
 // Fictional data only.
 
+import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -217,7 +218,7 @@ describe("Vault", () => {
     expect(await screen.findByRole("heading", { name: /Session s_3333cccc4444dddd/ })).toBeInTheDocument();
   });
 
-  it("follows the open session in the URL hash, and a stale ref says the session is gone (LAB-1333)", async () => {
+  it("follows the open session in the URL hash, and a stale ref says no session has it (LAB-1333)", async () => {
     const client = fakeClient("masked");
     const user = userEvent.setup();
     const onSelectRef = vi.fn();
@@ -227,7 +228,7 @@ describe("Vault", () => {
     expect(onSelectRef).toHaveBeenLastCalledWith("s_1111aaaa2222bbbb");
 
     render(<Vault status={statusOf("masked")} live active client={client} focus={{ ref: "s_deadbeef", nonce: 7 }} />);
-    expect(await screen.findByText("This session is gone: it expired or was dropped.")).toBeInTheDocument();
+    expect(await screen.findByText("No vault session has this ref: it expired, was dropped, or never existed.")).toBeInTheDocument();
   });
 
   it("clears the detail when a filter hides the open session (LAB-1333)", async () => {
@@ -242,6 +243,90 @@ describe("Vault", () => {
     await waitFor(() => expect(screen.queryByRole("heading", { name: /Session s_1111/ })).toBeNull());
     expect(screen.getByText("Pick a session to see its placeholders.")).toBeInTheDocument();
     expect(onSelectRef).toHaveBeenLastCalledWith(null);
+  });
+
+  it("clears the filters and restores the hidden session's detail (LAB-1712)", async () => {
+    const client = fakeClient("masked");
+    const user = userEvent.setup();
+    const onSelectRef = vi.fn();
+    const errors: unknown[][] = [];
+    const err = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => void errors.push(args));
+    try {
+      render(<Vault status={statusOf("masked")} live active client={client} onSelectRef={onSelectRef} />);
+      await user.click(await screen.findByRole("button", { name: /s_1111aaaa2222bbbb/ }));
+      expect(await screen.findByRole("heading", { name: /Session s_1111aaaa2222bbbb/ })).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText("Source"), "api");
+      await user.type(screen.getByLabelText("Search by session ref"), "zzz-no-such-session");
+      expect(await screen.findByText("No session matches.")).toBeInTheDocument();
+      expect(screen.getByText("Pick a session to see its placeholders.")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Clear filters" }));
+      expect(screen.getByLabelText("Source")).toHaveValue("all");
+      expect(screen.getByLabelText("Search by session ref")).toHaveValue("");
+      const list = screen.getByRole("list", { name: "Vault sessions" });
+      await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(2));
+      expect(await screen.findByRole("heading", { name: /Session s_1111aaaa2222bbbb/ })).toBeInTheDocument();
+      expect(onSelectRef).toHaveBeenLastCalledWith("s_1111aaaa2222bbbb");
+      // Clearing runs in an effect: no "Cannot update a component while rendering" warning.
+      expect(errors.flat().join("\n")).not.toContain("Cannot update a component");
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it("clears the hash without a render-phase parent update when a filter hides the session (LAB-1712)", async () => {
+    const client = fakeClient("masked");
+    const user = userEvent.setup();
+    const errors: unknown[][] = [];
+    const err = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => void errors.push(args));
+    try {
+      // Like the real console: the hash lives in the parent, updated through onSelectRef.
+      const HashParent = () => {
+        const [hash, setHash] = useState<string | null>(null);
+        return (
+          <>
+            <Vault status={statusOf("masked")} live active client={client} onSelectRef={setHash} />
+            <p data-testid="hash">{hash ?? "none"}</p>
+          </>
+        );
+      };
+      render(<HashParent />);
+      await user.click(await screen.findByRole("button", { name: /s_1111aaaa2222bbbb/ }));
+      await screen.findByRole("heading", { name: /Session s_1111aaaa2222bbbb/ });
+      expect(screen.getByTestId("hash")).toHaveTextContent("s_1111aaaa2222bbbb");
+
+      await user.type(screen.getByLabelText("Search by session ref"), "zzz-no-such-session");
+      await screen.findByText("No session matches.");
+      expect(screen.getByTestId("hash")).toHaveTextContent("none");
+      expect(errors.flat().join("\n")).not.toContain("Cannot update a component");
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it("retries the session list after a failure (LAB-1712)", async () => {
+    const client = fakeClient("masked");
+    client.list.mockRejectedValueOnce(new ApiError(503, "unreachable", "PII Guard API is not reachable"));
+    const user = userEvent.setup();
+    render(<Vault status={statusOf("masked")} live active client={client} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn't list the sessions/);
+    expect(screen.getByText("Couldn't load")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    const list = await screen.findByRole("list", { name: "Vault sessions" });
+    await waitFor(() => expect(within(list).getAllByRole("button")).toHaveLength(2));
+    expect(client.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries the session detail after a failure (LAB-1712)", async () => {
+    const client = fakeClient("masked");
+    client.detail.mockRejectedValueOnce(new ApiError(503, "unreachable", "PII Guard API is not reachable"));
+    const user = userEvent.setup();
+    render(<Vault status={statusOf("masked")} live active client={client} />);
+    // The auto-picked session's first load fails.
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn't open the session/);
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("heading", { name: /Session s_/ })).toBeInTheDocument();
   });
 
   it("says why it can't inspect: inspector off, demo mode", async () => {

@@ -1,5 +1,11 @@
 # Connect an application to pii-guard
 
+> [!NOTE]
+> **Related guides:** For the REST & OpenAI-compatible route reference, authentication tokens,
+> and error code catalog, see [api.md](api.md). For gateway operating modes (`fast` vs. `audit`),
+> session selection headers, and outbound re-check mechanics, see
+> [architecture-gateway.md](architecture-gateway.md).
+
 Point the application's OpenAI-compatible client at the **guard**. The guard detects and
 masks the request, calls the configured upstream, and restores known placeholders in the
 answer, including streamed text. Detection coverage depends on the installed detectors and

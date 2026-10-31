@@ -1,11 +1,11 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button, ButtonLink, Notice } from "../components/ui";
-import { COLD_START_RETRY_MS } from "../lib/coldStart";
+import { COLD_START_RETRY_MS, READ_TIMEOUT_MS, withTimeout } from "../lib/coldStart";
 import type { Account, Requester } from "./api";
 import { SETUP_STEPS, getLastRead, loadSetup, publish, subscribe, type SetupState } from "./setup";
 
 /** One ordered setup list with ticks and one primary action: the next step not yet done. */
-export function SetupChecklist({ call, account, active, calls, retryDelays = COLD_START_RETRY_MS }: { call: Requester; account: Account; active: boolean; calls: number; retryDelays?: readonly number[] }) {
+export function SetupChecklist({ call, account, active, calls, retryDelays = COLD_START_RETRY_MS, timeoutMs = READ_TIMEOUT_MS }: { call: Requester; account: Account; active: boolean; calls: number; retryDelays?: readonly number[]; timeoutMs?: number }) {
   const state = useSyncExternalStore(subscribe, getLastRead, () => null);
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,8 @@ export function SetupChecklist({ call, account, active, calls, retryDelays = COL
     const fail = () => { if (live) { publish(getLastRead()); setFailed(true); setLoading(false); } };
     // Quiet retries first: a cold start, a deploy's revision swap or a network blip shouldn't raise a warning (LAB-1710).
     const attempt = (n: number) => {
-      loadSetup(call, account).then(done, () => {
+      // A hung read fails after timeoutMs so the retries, then the warning, follow (LAB-1729).
+      withTimeout(loadSetup(call, account), timeoutMs).then(done, () => {
         if (!live) return;
         if (n < retryDelays.length) retry = setTimeout(() => attempt(n + 1), retryDelays[n]);
         else fail();
@@ -30,7 +31,7 @@ export function SetupChecklist({ call, account, active, calls, retryDelays = COL
       live = false;
       clearTimeout(retry);
     };
-  }, [call, account, active, revision, retryDelays]);
+  }, [call, account, active, revision, retryDelays, timeoutMs]);
   // Don't flash the spinner text for a quick refresh when earlier progress is already showing.
   // Keyed to the refresh it belongs to, so a finished refresh never makes the next one show at once.
   const [lateFor, setLateFor] = useState<number | null>(null);
