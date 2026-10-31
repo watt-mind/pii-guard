@@ -83,6 +83,48 @@ def _render_single_label_counter(
         out.append(f'{name}{{{label_key}="{_label(key)}"}} {n}')
 
 
+def _render_gauges(
+    out: list[str],
+    *,
+    active_sessions: int | None,
+    ner_state: str | None,
+    hosted_stats: Mapping[str, int] | None,
+) -> None:
+    if active_sessions is not None:
+        out.append("# HELP pii_guard_vault_active_sessions Live vault sessions in memory.")
+        out.append("# TYPE pii_guard_vault_active_sessions gauge")
+        out.append(f"pii_guard_vault_active_sessions {max(int(active_sessions), 0)}")
+    if ner_state is not None:
+        out.append(
+            "# HELP pii_guard_ner_state NER warmup state (1 for current state, 0 otherwise)."
+        )
+        out.append("# TYPE pii_guard_ner_state gauge")
+        for state in NER_STATES:
+            val = 1 if state == ner_state else 0
+            out.append(f'pii_guard_ner_state{{state="{_label(state)}"}} {val}')
+    if hosted_stats is not None:
+        owners = max(int(hosted_stats.get("owner_runtimes", 0)), 0)
+        guests = max(int(hosted_stats.get("guest_runtimes", 0)), 0)
+        streams = max(int(hosted_stats.get("active_streams", 0)), 0)
+        sponsored = 1 if hosted_stats.get("sponsored_available", 0) else 0
+        out.extend(
+            (
+                "# HELP pii_guard_hosted_active_runtimes "
+                "Active hosted tenant runtimes in memory by kind.",
+                "# TYPE pii_guard_hosted_active_runtimes gauge",
+                f'pii_guard_hosted_active_runtimes{{kind="owner"}} {owners}',
+                f'pii_guard_hosted_active_runtimes{{kind="guest"}} {guests}',
+                "# HELP pii_guard_hosted_active_streams Active hosted SSE traffic streams.",
+                "# TYPE pii_guard_hosted_active_streams gauge",
+                f"pii_guard_hosted_active_streams {streams}",
+                "# HELP pii_guard_hosted_sponsored_available "
+                "Whether hosted sponsored inference is available (1 or 0).",
+                "# TYPE pii_guard_hosted_sponsored_available gauge",
+                f"pii_guard_hosted_sponsored_available {sponsored}",
+            )
+        )
+
+
 class LatencyMetrics:
     """Counters, histograms and live gauges rendered in Prometheus text format. Thread-safe."""
 
@@ -172,12 +214,12 @@ class LatencyMetrics:
         if isinstance(cache, Mapping):
             for field, label in (("hits", "hit"), ("misses", "miss"), ("seeded", "seeded")):
                 count = cache.get(field)
-                if isinstance(count, int) and count > 0:
+                if isinstance(count, int) and not isinstance(count, bool) and count > 0:
                     self._cache[label] = self._cache.get(label, 0) + count
         upstream = event.get("upstream")
         if isinstance(upstream, Mapping):
             unresolved = upstream.get("unresolved_placeholders")
-            if isinstance(unresolved, int) and unresolved > 0:
+            if isinstance(unresolved, int) and not isinstance(unresolved, bool) and unresolved > 0:
                 self._unresolved_placeholders += unresolved
         usage = event.get("usage")
         if isinstance(usage, Mapping):
@@ -201,13 +243,13 @@ class LatencyMetrics:
     ) -> None:
         if isinstance(detected, Mapping):
             for entity_type, n in detected.items():
-                if isinstance(n, int) and n > 0:
+                if isinstance(n, int) and not isinstance(n, bool) and n > 0:
                     self._entities_detected[str(entity_type)] = (
                         self._entities_detected.get(str(entity_type), 0) + n
                     )
         if isinstance(masked, Mapping):
             for entity_type, n in masked.items():
-                if isinstance(n, int) and n > 0:
+                if isinstance(n, int) and not isinstance(n, bool) and n > 0:
                     self._entities_masked[str(entity_type)] = (
                         self._entities_masked.get(str(entity_type), 0) + n
                     )
@@ -220,14 +262,14 @@ class LatencyMetrics:
         for action, counts in (("masked", masked), ("kept", kept)):
             if isinstance(counts, Mapping):
                 for entity_type, n in counts.items():
-                    if isinstance(n, int) and n > 0:
+                    if isinstance(n, int) and not isinstance(n, bool) and n > 0:
                         key = (str(entity_type), action)
                         self._image_regions[key] = self._image_regions.get(key, 0) + n
 
     def _add_blocked_locked(self, stage: str, counts: Mapping[str, int] | None) -> None:
         if isinstance(counts, Mapping):
             for entity_type, n in counts.items():
-                if isinstance(n, int) and n > 0:
+                if isinstance(n, int) and not isinstance(n, bool) and n > 0:
                     key = (stage, str(entity_type))
                     self._blocked_entities[key] = self._blocked_entities.get(key, 0) + n
 
@@ -348,6 +390,7 @@ class LatencyMetrics:
         *,
         active_sessions: int | None = None,
         ner_state: str | None = None,
+        hosted_stats: Mapping[str, int] | None = None,
     ) -> str:
         """The Prometheus text exposition format (version 0.0.4)."""
         out = [
@@ -386,16 +429,10 @@ class LatencyMetrics:
                 for (method, path), hist in sorted(self._http_durations.items()):
                     labels = f'method="{_label(method)}",path="{_label(path)}"'
                     _render_histogram(out, name, labels, hist)
-        if active_sessions is not None:
-            out.append("# HELP pii_guard_vault_active_sessions Live vault sessions in memory.")
-            out.append("# TYPE pii_guard_vault_active_sessions gauge")
-            out.append(f"pii_guard_vault_active_sessions {max(int(active_sessions), 0)}")
-        if ner_state is not None:
-            out.append(
-                "# HELP pii_guard_ner_state NER warmup state (1 for current state, 0 otherwise)."
-            )
-            out.append("# TYPE pii_guard_ner_state gauge")
-            for state in NER_STATES:
-                val = 1 if state == ner_state else 0
-                out.append(f'pii_guard_ner_state{{state="{_label(state)}"}} {val}')
+        _render_gauges(
+            out,
+            active_sessions=active_sessions,
+            ner_state=ner_state,
+            hosted_stats=hosted_stats,
+        )
         return "\n".join(out) + "\n"

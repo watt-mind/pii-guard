@@ -378,6 +378,37 @@ def test_metrics_include_rest_routes_and_gauges() -> None:
     assert "pii_guard_vault_active_sessions 1" in metrics
 
 
+def test_metrics_token_isolates_scraper_from_self_hosted_api_token() -> None:
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY,
+        upstream_base_url=UPSTREAM_URL,
+        api_token="synthetic-api-token",  # noqa: S106
+    )
+    app = create_app(
+        settings,
+        ObservabilitySettings(metrics=True, metrics_token="synthetic-scrape-token"),  # noqa: S106
+    )
+    with TestClient(app) as client:
+        assert client.get("/metrics").status_code == 401
+        assert (
+            client.get(
+                "/metrics", headers={"Authorization": "Bearer synthetic-api-token"}
+            ).status_code
+            == 401
+        )
+        assert (
+            client.post(
+                "/v1/analyze",
+                json={"text": "hello"},
+                headers={"Authorization": "Bearer synthetic-scrape-token"},
+            ).status_code
+            == 401
+        )
+        scraped = client.get("/metrics", headers={"Authorization": "Bearer synthetic-scrape-token"})
+        assert scraped.status_code == 200
+        assert "pii_guard_vault_active_sessions" in scraped.text
+
+
 def test_overhead_and_added_ttft_streaming(monkeypatch: pytest.MonkeyPatch) -> None:
     clock = install_clock(monkeypatch)
     with TestClient(make(slow_upstream(clock, stream=True))) as client:

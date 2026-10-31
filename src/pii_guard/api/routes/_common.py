@@ -74,11 +74,11 @@ def body_read_timeout(request: Request) -> float:
 
 
 def request_metrics(request: Request) -> LatencyMetrics | None:
-    """The app's Prometheus metrics collector when enabled (never in hosted mode)."""
+    """The app's Prometheus metrics collector when enabled."""
     scope = getattr(request, "scope", None)
     app = scope.get("app") if isinstance(scope, dict) else getattr(request, "app", None)
     state = getattr(app, "state", None)
-    if state is None or getattr(getattr(state, "settings", None), "hosted", False):
+    if state is None:
         return None
     obs = getattr(state, "observability", None)
     return getattr(obs, "metrics", None)

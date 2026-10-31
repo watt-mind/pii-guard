@@ -454,6 +454,7 @@ reverse proxy. A container binds `0.0.0.0`; publish its port on `127.0.0.1` only
 | Setting | Effect | Default |
 |---|---|---|
 | `PII_GUARD_API_TOKEN` | Every route but `/healthz` needs `Authorization: Bearer <token>` (or `X-PII-Guard-Token: <token>`); otherwise `401 unauthorized` | unset: no auth |
+| `PII_GUARD_METRICS_TOKEN` | Dedicated bearer / `X-PII-Guard-Token` secret for `GET /metrics` only (`401 unauthorized` in self-hosted mode, `403 hosted_request_denied` in hosted mode when missing or invalid) | unset |
 | `PII_GUARD_ALLOWED_HOSTS` | Extra `Host` header names the API answers, comma-separated; `*` answers any | `localhost`, `127.0.0.1`, `[::1]` and `PII_GUARD_HOST` |
 
 - **DNS rebinding.** A web page on another site can point its own host name at `127.0.0.1` and
@@ -668,8 +669,8 @@ On a stream the header is sent before the answer, so it only covers the work up 
 upstream's response headers.
 
 **Prometheus metrics** (`PII_GUARD_METRICS=true`, off by default; `pii-guard up` and `make demo`
-enable it by default; disabled in `PII_GUARD_HOSTED=true`) at `GET /metrics`
-(`text/plain; version=0.0.4`):
+enable it by default; in `PII_GUARD_HOSTED=true` also requires `PII_GUARD_METRICS_TOKEN`) at
+`GET /metrics` (`text/plain; version=0.0.4`):
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
@@ -690,13 +691,16 @@ enable it by default; disabled in `PII_GUARD_HOSTED=true`) at `GET /metrics`
 | `pii_guard_unresolved_placeholders_total` | `counter` | — | Unknown or hallucinated `[[TYPE_id]]` placeholders left unresolved |
 | `pii_guard_http_requests_total` | `counter` | `method`, `path`, `status` | HTTP requests handled across all API routes (route templates only; `/metrics` excluded) |
 | `pii_guard_http_request_duration_ms` | `histogram` | `method`, `path` | HTTP request duration in ms by route template (to response headers on streams) |
-| `pii_guard_vault_active_sessions` | `gauge` | — | Live vault sessions in memory across root and project runtimes |
+| `pii_guard_vault_active_sessions` | `gauge` | — | Live vault sessions in memory across root, project and hosted tenant runtimes |
 | `pii_guard_ner_state` | `gauge` | `state` | One-hot NER warmup state (`1` for active state among `off`, `loading`, `ready`, `failed`) |
+| `pii_guard_hosted_active_runtimes` | `gauge` | `kind` | Hosted mode only: active tenant runtimes in memory (`kind="owner"\|"guest"`) |
+| `pii_guard_hosted_active_streams` | `gauge` | — | Hosted mode only: active SSE traffic streams |
+| `pii_guard_hosted_sponsored_available` | `gauge` | — | Hosted mode only: whether sponsored inference is available (`1` or `0`) |
 
 All millisecond histograms use buckets `0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, +Inf` (`BUCKETS_MS` in `observability/metrics.py`).
-Labels are fixed enums and route templates only—never raw PII, session IDs or client identifiers.
-When `PII_GUARD_API_TOKEN` is set, configure Prometheus with `authorization: { credentials: <token> }`
-on the scrape job.
+Labels are fixed enums and route templates only—never raw PII, session IDs, tenant IDs or client identifiers.
+In hosted multi-tenant mode (`PII_GUARD_HOSTED=true`), metrics aggregate traffic across all owner, project and endpoint runtimes (including remote CLI telemetry ingested via `POST /v1/traffic` and `POST /e/<endpoint>/v1/traffic`), and `GET /metrics` is refused with `403 hosted_request_denied` unless both `PII_GUARD_METRICS=true` and `PII_GUARD_METRICS_TOKEN` are set and the scraper sends `Authorization: Bearer <metrics_token>` (or `X-PII-Guard-Token: <metrics_token>`).
+In self-hosted mode, set `PII_GUARD_METRICS_TOKEN` (or `PII_GUARD_API_TOKEN`) and configure Prometheus with `authorization: { credentials: <token> }` on the scrape job.
 
 ## Latency benchmark
 

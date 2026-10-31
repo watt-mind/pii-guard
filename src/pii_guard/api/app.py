@@ -260,6 +260,11 @@ def _install_middlewares(
         app.add_middleware(HostedMiddleware, service=app.state.hosted)
 
     # Outermost last: Host check, then (full only) loopback sockets, then the token.
+    if (
+        obs_settings.metrics_token is not None
+        and not obs_settings.metrics_token.get_secret_value().strip()
+    ):
+        raise ValueError("PII_GUARD_METRICS_TOKEN is set but empty")
     token = settings.api_token
     if token is not None:
         if not token.get_secret_value().strip():

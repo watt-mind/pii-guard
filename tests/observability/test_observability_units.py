@@ -274,7 +274,16 @@ def test_metrics_observe_full_gateway_events_and_rest_helpers() -> None:
     metrics.observe_unresolved(2)
     metrics.observe_http("POST", "/v1/mask", 200, 3.2)
 
-    text = metrics.render(active_sessions=4, ner_state="ready")
+    text = metrics.render(
+        active_sessions=4,
+        ner_state="ready",
+        hosted_stats={
+            "owner_runtimes": 2,
+            "guest_runtimes": 1,
+            "active_streams": 3,
+            "sponsored_available": 1,
+        },
+    )
     assert 'pii_guard_detector_duration_ms_count{mode="fast",detector="ner"} 3' in text
     assert 'pii_guard_detector_duration_ms_count{mode="fast",detector="rules"} 3' in text
     assert 'detector="llm"' not in text
@@ -302,6 +311,10 @@ def test_metrics_observe_full_gateway_events_and_rest_helpers() -> None:
     assert "pii_guard_vault_active_sessions 4" in text
     assert 'pii_guard_ner_state{state="ready"} 1' in text
     assert 'pii_guard_ner_state{state="loading"} 0' in text
+    assert 'pii_guard_hosted_active_runtimes{kind="owner"} 2' in text
+    assert 'pii_guard_hosted_active_runtimes{kind="guest"} 1' in text
+    assert "pii_guard_hosted_active_streams 3" in text
+    assert "pii_guard_hosted_sponsored_available 1" in text
 
 
 # --- bind check ----------------------------------------------------------------------------
@@ -325,7 +338,11 @@ def test_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PII_GUARD_TRAFFIC_LOG", "masked")
     monkeypatch.setenv("PII_GUARD_TRAFFIC_LOG_SIZE", "5")
     monkeypatch.setenv("PII_GUARD_SERVER_TIMING", "true")
-    obs = Observability(ObservabilitySettings())
+    monkeypatch.setenv("PII_GUARD_METRICS_TOKEN", "synthetic-scrape-token")
+    settings = ObservabilitySettings()
+    obs = Observability(settings)
     assert obs.traffic.level is TrafficLevel.MASKED and obs.traffic.size == 5
     assert obs.server_timing and obs.metrics is None and obs.recording
+    assert settings.metrics_token is not None
+    assert settings.metrics_token.get_secret_value() == "synthetic-scrape-token"
     assert "masked" in repr(obs)
