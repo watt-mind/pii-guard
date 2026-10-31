@@ -405,7 +405,7 @@ class NameFinder:
 MANY_TEXTS = [
     "Teszt Elek e-mail címe teszt.elek@example.com.",
     "Nincs itt semmi.",
-    "Minta​ Mária hívja Teszt Eleket: +36 30 123 4567",  # normalised: zero-width space
+    "Minta\u200b Mária hívja Teszt Eleket: +36 30 123 4567",  # normalised: zero-width space
     "",
     "Teszt Elek",
 ]
@@ -420,7 +420,7 @@ def test_detect_many_equals_detect_per_text() -> None:
     assert many == [pipeline.detect(t, "hu") for t in MANY_TEXTS]
     assert ner.detect_calls == len(MANY_TEXTS)  # detect() itself does not batch
     # The zero-width space is inside the mapped-back name.
-    assert next(s.text for s in many[2] if s.entity_type is E.PERSON) == "Minta​ Mária"
+    assert next(s.text for s in many[2] if s.entity_type is E.PERSON) == "Minta\u200b Mária"
     assert pipeline.detect_many([], "hu") == []
 
 
@@ -443,3 +443,25 @@ def test_detect_many_rejects_a_wrong_result_count() -> None:
     finder.detect_batch = lambda texts, language="hu": [[]]  # type: ignore[method-assign]
     with pytest.raises(DetectionError, match="number of results"):
         DetectionPipeline([finder]).detect_many(["a", "b"])
+
+
+def test_outside_drops_short_remainder_past_newline() -> None:
+    """When wrapped-number folding joins a trailing line number (`\\n5`) onto a complete IBAN,
+    subtracting the authoritative rule IBAN span must drop the short `< 4` char line remainder."""
+    text = (
+        "4\t3,Max Mustermann,max.mustermann@example.de,+49 30 12345678,"
+        "DE89 3704 0044 0532 0130 00\n5\n"
+    )
+    iban_start = text.index("DE89")
+    iban_end = text.index("\n5")
+    rule_span = Span(iban_start, iban_end, E.BANK_ACCOUNT, text[iban_start:iban_end], 0.99, "rules")
+    ner_span = Span(
+        iban_start,
+        iban_end + 2,
+        E.BANK_ACCOUNT,
+        text[iban_start : iban_end + 2],
+        0.99,
+        "ner",
+    )
+    resolved = resolve_spans(text, [rule_span, ner_span], detector_order=("rules", "ner"))
+    assert [s.text for s in resolved] == ["DE89 3704 0044 0532 0130 00"]

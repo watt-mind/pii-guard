@@ -77,9 +77,7 @@ across deltas):
   and the next request's assistant history and `tool_result` went out masked again, with the
   same placeholders.
 
-**Known limit (fast mode).** That run used rules-only detection. With the NER on, Claude
-Code's own scaffolding still trips fail-closed checks: the NER reads words of its system
-prompt and tool schemas (`Claude`, `boolean`, `9007199254740991`, `thin`, ...) as personal
-data, and an identifier or a re-check hit refuses the request. The first three are fixed
-(model-id words, JSON-Schema type names and integer limits are exempt in identifiers); the
-rest are tracked as follow-ups to LAB-1605.
+**Fast mode (rules + NER).** Checked end to end (`test_claude_e2e.py`) with the published
+`v4.2` NER model (`python -m pii_guard.integrations.e2e --client claude-code`): Claude Code
+reads `client-letter.md`, `customers.csv` and `.env`, and writes `reply.md` with all 18 gold
+values restored and 0 leaked upstream.

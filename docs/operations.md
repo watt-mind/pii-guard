@@ -197,10 +197,10 @@ API, the OpenAI-compatible gateway (fast mode) and the built web UI at `/`. It n
 [uv](https://docs.astral.sh/uv/); uv fetches Python.
 
 ```bash
-# Today: the wheel attached to a GitHub release (the web UI is bundled in it)
+# From PyPI (the web UI and on-device NER dependencies are bundled in the wheel)
+uvx --python 3.12 --from wattmind-pii-guard pii-guard up
+# Or a specific wheel attached to a GitHub release
 uvx --from https://github.com/watt-mind/pii-guard/releases/download/vX.Y.Z/wattmind_pii_guard-X.Y.Z-py3-none-any.whl pii-guard up
-# Once published to PyPI
-uvx --from wattmind-pii-guard pii-guard up
 # From source: API + gateway only (a git build has no UI; / says how to get it)
 uvx --from git+https://github.com/watt-mind/pii-guard pii-guard up
 ```

@@ -40,17 +40,14 @@
 http://127.0.0.1:8787, with a mock model that echoes what it receives:
 
 ```bash
-uvx --python 3.12 \
-  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
-  pii-guard up
+uvx --python 3.12 --from wattmind-pii-guard pii-guard up
 ```
 
 **Launch a coding agent directly** ([OpenCode](docs/integrations/opencode.md), [Codex](docs/integrations/codex.md), [Claude Code](docs/integrations/claude-code.md), [pi](docs/integrations/pi.md), [Muse Code](docs/integrations/muse-code.md)) behind an in-process local gateway with Meta's `muse-spark-1.3`:
 
 ```bash
 export META_API_KEY=<your-key>
-uvx --python 3.12 \
-  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
+uvx --python 3.12 --from wattmind-pii-guard \
   pii-guard run opencode --upstream meta --model muse-spark-1.3
 ```
 

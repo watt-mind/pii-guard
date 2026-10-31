@@ -507,3 +507,32 @@ class TestFamilyFirmWords:
     def test_other_types_are_untouched(self) -> None:
         text = "A Balogh és Fia Kkt. ajánlata."
         assert kept(text, hit(text, "Fia", E.ORGANIZATION)) == ["Fia"]
+
+
+def test_sweep_veto_rechecked_when_neighbour_replacement_strips_software_version() -> None:
+    """When `Sonnet 4.5` is masked as ADDRESS right after `Claude` in `Claude Sonnet 4.5`,
+    `Claude` loses the version number that vetoed its sweep and must be masked too so outbound
+    re-check never sees an unmasked `Claude` before `[[ADDRESS_...]]`."""
+    from pii_guard.config import Settings
+    from pii_guard.vault import Vault
+
+    text = "You are Claude.\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+    spans = [
+        Span(text.index("Claude"), text.index("Claude") + 6, E.PERSON, "Claude", 0.99, "ner"),
+        Span(
+            text.index("Sonnet 4.5"),
+            text.index("Sonnet 4.5") + 10,
+            E.ADDRESS,
+            "Sonnet 4.5",
+            0.95,
+            "ner",
+        ),
+    ]
+    vault = Vault.from_settings(Settings(tenant_key="a" * 64))
+    session, _ = vault.session_or_create("s1")
+    masked = session.mask(text, spans, language="en")
+    assert "Claude" not in masked
+    assert session.unmask(masked) == text
+    # Also on a subsequent turn via mask_known (_take_older_guarded):
+    masked_later = session.mask(text, [spans[1]], language="en")
+    assert "Claude" not in masked_later

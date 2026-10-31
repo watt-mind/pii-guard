@@ -274,6 +274,10 @@ def _outside(text: str, cand: _Cand, auth: list[_Cand]) -> list[_Cand]:
         if trimmed is None:
             continue
         ts, te = trimmed
+        # A short piece past a newline (e.g. a trailing line number joined by wrapped-number
+        # folding after a complete IBAN, cf. LAB-1604) is not part of the authoritative span.
+        if te - ts < 4 and "\n" in text[cand.start : ts]:
+            continue
         if not any(ch.isdigit() for ch in text[ts:te]) and not any(
             _continues(text, a, ts, te) for a in covering
         ):
