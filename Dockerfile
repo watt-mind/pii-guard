@@ -17,9 +17,14 @@ WORKDIR /app
 ARG PII_GUARD_EXTRAS="ocr local-vision sam"
 # The NER (torch + transformers) is a core dependency (LAB-1733), but this base image stays
 # rules-only and inside its size budget (LAB-1192): these packages are skipped, so the default
-# stack falls back to rules. The demo image (compose.yaml, profile demo) sets this empty for fast
-# mode with the NER; its model is fetched at run time into a volume, never baked in.
-ARG PII_GUARD_SKIP_PACKAGES="torch transformers sentencepiece tokenizers safetensors sympy mpmath networkx"
+# stack falls back to rules. The list is the NER packages plus the dependencies only they pull
+# in (nothing else in the image imports them; `uv tree --no-dev` shows the graph). The demo
+# image (compose.yaml, profile demo) sets this empty for fast mode with the NER; its model is
+# fetched at run time into a volume, never baked in.
+ARG PII_GUARD_SKIP_PACKAGES="torch transformers sentencepiece protobuf tokenizers safetensors \
+sympy mpmath networkx setuptools jinja2 markupsafe filelock fsspec \
+huggingface-hub hf-xet httpx2 httpcore2 truststore pyyaml regex tqdm \
+typer rich markdown-it-py mdurl pygments shellingham"
 
 # Dependencies first, so code changes don't invalidate this layer.
 RUN --mount=type=cache,target=/root/.cache/uv \
