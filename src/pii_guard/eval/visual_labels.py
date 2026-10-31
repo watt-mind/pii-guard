@@ -515,7 +515,7 @@ def evaluate(
     ocr = ocr or CachedOcr.load(root / "ocr" / "tesseract.json")
     gold = load_gold(root)
     namesakes = load_namesakes(root / "near-namesakes.json")
-    masker = ImageMasker(sam=_NoSam(), policies=PolicySet(), ocr=ocr, text_detector=RuleDetector())  # type: ignore[arg-type]
+    masker = ImageMasker(sam=_NoSam(), policies=PolicySet(), ocr=ocr, text_detector=RuleDetector())
     vault = Vault(EVAL_KEY)
     total = _Tally()
     started_all = time.perf_counter()
@@ -600,7 +600,7 @@ def coverage(root: Path = FIXTURES, ocr: CachedOcr | None = None) -> dict[str, A
 
     ocr = ocr or CachedOcr.load(root / "ocr" / "tesseract.json")
     specimens = load_specimens(root / "manifest.json", root / "labels.json", root / "images")
-    masker = ImageMasker(sam=_NoSam(), policies=PolicySet(), ocr=ocr, text_detector=RuleDetector())  # type: ignore[arg-type]
+    masker = ImageMasker(sam=_NoSam(), policies=PolicySet(), ocr=ocr, text_detector=RuleDetector())
     vault = Vault(EVAL_KEY)
     out: dict[str, Any] = {}
     for mode in ("opaque", "labels"):
@@ -612,7 +612,7 @@ def coverage(root: Path = FIXTURES, ocr: CachedOcr | None = None) -> dict[str, A
             outcome = masker.mask(
                 data,
                 spec.language or "hu",
-                render=mode,  # type: ignore[arg-type]
+                render=mode,
                 matcher=VaultMatcher(session) if mode == "labels" else None,
             )
             expected = [r for r in spec.regions if r.type in ("text", "mrz")]

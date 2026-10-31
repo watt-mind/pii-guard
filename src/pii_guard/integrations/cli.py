@@ -59,6 +59,8 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from pathlib import Path
+from typing import TextIO
 
 import httpx
 
@@ -237,8 +239,8 @@ def _pi(args: argparse.Namespace, out: list[str]) -> int:
     return 0
 
 
-def _pi_check(path: os.PathLike[str], args: argparse.Namespace, out: list[str]) -> int:
-    existing, _ = pi.load(path)  # type: ignore[arg-type]
+def _pi_check(path: Path, args: argparse.Namespace, out: list[str]) -> int:
+    existing, _ = pi.load(path)
     entry = (existing.get("providers") or {}).get(pi.PROVIDER_ID)
     if not isinstance(entry, dict):
         raise ConnectError(f"{path} has no {pi.PROVIDER_ID!r} provider; run `pii-guard connect pi`")
@@ -392,7 +394,7 @@ def _block_check(args: argparse.Namespace, out: list[str]) -> int:
     return 0 if result.ok else 1
 
 
-def main(argv: Sequence[str] | None = None, *, stdout=None) -> int:  # type: ignore[no-untyped-def]
+def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None) -> int:
     stdout = stdout or sys.stdout
     args = build_parser().parse_args(list(argv) if argv is not None else None)
     out: list[str] = []

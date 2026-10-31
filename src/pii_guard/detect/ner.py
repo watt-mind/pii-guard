@@ -276,7 +276,7 @@ def decode_tokens(
             units.append((start, end, prefix, entity, float(score), new_word))
 
     entities: list[RawEntity] = []
-    current: list[Any] | None = None  # [label, start, end, [scores]]
+    current: tuple[str, int, int, list[float]] | None = None
 
     def close() -> None:
         nonlocal current
@@ -289,17 +289,16 @@ def decode_tokens(
         if prefix == "O":
             close()
             continue
-        continues = (
+        if (
             current is not None
             and current[0] == entity
             and (prefix == "I" or (aggregation == "token" and not word_start))
-        )
-        if continues:
-            current[2] = end  # type: ignore[index]
-            current[3].append(score)  # type: ignore[index]
+        ):
+            current[3].append(score)
+            current = (current[0], current[1], end, current[3])
         else:
             close()
-            current = [entity, start, end, [score]]
+            current = (entity, start, end, [score])
     close()
     return entities
 
@@ -717,9 +716,9 @@ class NerDetector:
         self._backend: NerBackend | None = None
         self._factory: Callable[[], NerBackend] | None = None
         if backend is not None and hasattr(backend, "predict"):
-            self._backend = backend  # type: ignore[assignment]
+            self._backend = backend
         elif backend is not None:
-            self._factory = backend  # type: ignore[assignment]
+            self._factory = backend
         if preload:
             self.load()
 

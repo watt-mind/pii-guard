@@ -693,16 +693,16 @@ def smoke_scores(
     with temporarily_registered(pack):
         results = run_documents(documents, DetectorAnalyzer(["rules"]))
     summary = summarize(results)
-    exact = summary["detection"]["exact"]["micro"]  # type: ignore[index]
-    overlap = summary["detection"]["overlap"]["micro"]  # type: ignore[index]
+    exact = summary["detection"]["exact"]["micro"]
+    overlap = summary["detection"]["overlap"]["micro"]
     scores: dict[str, float | int | None] = {
         "documents": len(documents),
         "gold": overlap["gold"],
         "precision_overlap": overlap["precision"],
         "recall_overlap": overlap["recall"],
         "recall_exact": exact["recall"],
-        "leak_rate": summary["leak"]["rate"],  # type: ignore[index]
-        "roundtrip": summary["roundtrip"]["rate"],  # type: ignore[index]
+        "leak_rate": summary["leak"]["rate"],
+        "roundtrip": summary["roundtrip"]["rate"],
     }
     findings: list[Finding] = []
     if scores["roundtrip"] is not None and scores["roundtrip"] < 1.0:
