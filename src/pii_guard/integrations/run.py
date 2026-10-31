@@ -691,10 +691,10 @@ def _discover_model(
         if snippets.safe_model(args.model) is None:
             raise ConnectError(f"--model {args.model!r} is not a valid model id")
         return str(args.model)
-    if upstream.mock:
-        return MOCK_DEFAULT_MODEL
     if args.client == "claude-code":
         return ANTHROPIC_DEFAULT_MODEL
+    if upstream.mock:
+        return MOCK_DEFAULT_MODEL
     try:
         models = fetch_models(gateway_base_url, token=token)
     except ConnectError:
@@ -900,6 +900,16 @@ def _print_banner(
         f"(mode={mode}, model={model}, upstream={upstream.label})",
         file=stderr,
     )
+    if mode == "fast":
+        from pii_guard.detect.stack import default_detector_names, ner_choice
+
+        settings = get_settings()
+        if "ner" in default_detector_names(settings) and not ner_choice(settings).ready:
+            print(
+                f"pii-guard run {client}: first run, the NER model downloads in the background; "
+                "the first requests wait for it",
+                file=stderr,
+            )
     if dashboard.local_ui:
         print(
             f"pii-guard run {client}: local dashboard {gateway_root}/#traffic "

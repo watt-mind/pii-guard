@@ -14,7 +14,7 @@ from hypothesis import strategies as st
 from test_vault_mask import _requests, _session, _session_turns
 from vault_helpers import span_of
 
-from pii_guard.types import Span
+from pii_guard.types import EntityType, Span
 from pii_guard.vault import VaultSession
 from pii_guard.vault import session as session_module
 
@@ -178,3 +178,34 @@ def test_a_fork_does_not_use_the_memo_and_commits_the_same() -> None:
     assert fork.mask(text, spans) == masked
     session.commit(fork)
     assert session.mask(text, spans) == masked
+
+
+def test_a_neighbour_learned_later_lifts_a_sweep_veto_as_from_scratch() -> None:
+    """LAB-1735: the memo path re-checks older model-only vetoes like a mask from scratch.
+
+    ``Claude`` (a model-only PERSON) is vetoed before ``Sonnet 4.5`` (software context). Once a
+    later text confirms ``Sonnet 4.5`` as an ADDRESS, re-sending the first text masks that
+    neighbour, which lifts the veto: the memo must not leave ``Claude`` before its placeholder.
+    """
+    first = "You are Claude.\nCo-Authored-By: Claude Sonnet 4.5 <noreply@example.com>"
+    second = "Szállítási cím: Sonnet 4.5"
+    start = first.index("Claude")
+    person = [Span(start, start + 6, EntityType.PERSON, "Claude", 0.9, "ner")]
+    start = second.index("Sonnet 4.5")
+    address = [Span(start, start + 10, EntityType.ADDRESS, "Sonnet 4.5", 0.9, "ner")]
+    turns: list[Turn] = [(first, person, "en"), (second, address, "en"), (first, person, "en")]
+
+    def masks(memo: bool) -> tuple[list[str], list[tuple[str, object, int]]]:
+        previous = session_module._MASK_MEMO
+        session_module._MASK_MEMO = memo
+        try:
+            session = _session(False)
+            out = [session.mask(text, spans, language=lang) for text, spans, lang in turns]
+            return out, session.entities()
+        finally:
+            session_module._MASK_MEMO = previous
+
+    on, off = masks(True), masks(False)
+    assert on == off
+    assert "Claude" not in on[0][2]
+    assert "Sonnet" not in on[0][2]

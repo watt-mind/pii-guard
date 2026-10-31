@@ -507,3 +507,69 @@ class TestFamilyFirmWords:
     def test_other_types_are_untouched(self) -> None:
         text = "A Balogh és Fia Kkt. ajánlata."
         assert kept(text, hit(text, "Fia", E.ORGANIZATION)) == ["Fia"]
+
+
+def test_sweep_veto_rechecked_when_neighbour_replacement_strips_software_version() -> None:
+    """When `Sonnet 4.5` is masked as ADDRESS right after `Claude` in `Claude Sonnet 4.5`,
+    `Claude` loses the version number that vetoed its sweep and must be masked too so outbound
+    re-check never sees an unmasked `Claude` before `[[ADDRESS_...]]`."""
+    from pii_guard.config import Settings
+    from pii_guard.vault import Vault
+
+    text = "You are Claude.\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+    spans = [
+        Span(text.index("Claude"), text.index("Claude") + 6, E.PERSON, "Claude", 0.99, "ner"),
+        Span(
+            text.index("Sonnet 4.5"),
+            text.index("Sonnet 4.5") + 10,
+            E.ADDRESS,
+            "Sonnet 4.5",
+            0.95,
+            "ner",
+        ),
+    ]
+    vault = Vault.from_settings(Settings(tenant_key="a" * 64))
+    session, _ = vault.session_or_create("s1")
+    masked = session.mask(text, spans, language="en")
+    assert "Claude" not in masked
+    assert session.unmask(masked) == text
+    # The same text masked again in full (the memo path, LAB-1315) stays masked too.
+    masked_later = session.mask(text, [spans[1]], language="en")
+    assert "Claude" not in masked_later
+
+
+def test_since_remask_rechecks_an_older_veto_once_a_neighbour_is_learned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A ``since`` remask scans only the entries changed since; ``_take_older_guarded`` then
+    re-checks the older model-only ``Claude`` whose veto the newly masked neighbour lifted."""
+    from pii_guard.config import Settings
+    from pii_guard.vault import Vault
+    from pii_guard.vault.session import VaultSession
+
+    text = "You are Claude.\nCo-Authored-By: Claude Sonnet 4.5 <noreply@example.com>"
+    start = text.index("Claude")
+    vault = Vault.from_settings(Settings(tenant_key="a" * 64))
+    session, _ = vault.session_or_create("s1")
+    first = session.mask_with_report(
+        text, [Span(start, start + 6, E.PERSON, "Claude", 0.99, "ner")], language="en"
+    )
+    assert "Claude Sonnet 4.5" in first.text  # vetoed: a model name in software context
+    other = "Szállítási cím: Sonnet 4.5"
+    start = other.index("Sonnet 4.5")
+    session.mask(
+        other, [Span(start, start + 10, E.ADDRESS, "Sonnet 4.5", 0.95, "ner")], language="en"
+    )
+    calls: list[int] = []
+    original = VaultSession._take_older_guarded
+
+    def spy(self: VaultSession, *args: object, **kwargs: object) -> None:
+        calls.append(1)
+        original(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(VaultSession, "_take_older_guarded", spy)
+    remasked = session.mask(first.text, [], language="en", remask=True, since=first.generation)
+    assert calls  # the since path ran, not a full rescan
+    assert "Claude" not in remasked
+    assert "Sonnet" not in remasked
+    assert session.unmask(remasked) == text

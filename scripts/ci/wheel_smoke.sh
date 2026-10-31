@@ -103,7 +103,15 @@ if grep -q 'anna.example@example.com' <<<"$traffic"; then
   echo "wheel-smoke: the masked traffic log contains the original email" >&2
   exit 1
 fi
-echo "chat: restored; traffic log: masked"
+resp_reply="$(curl -fsS "$base/v1/responses" -H 'content-type: application/json' \
+  -d '{"model":"pii-guard-mock","input":"Write to anna.example@example.com"}')"
+grep -q 'Echo: Write to anna.example@example.com' <<<"$resp_reply" ||
+  { echo "wheel-smoke: responses reply was not restored: $resp_reply" >&2; exit 1; }
+msg_reply="$(curl -fsS "$base/v1/messages" -H 'content-type: application/json' \
+  -d '{"model":"claude-sonnet-4-5","max_tokens":64,"messages":[{"role":"user","content":"Write to anna.example@example.com"}]}')"
+grep -q 'Echo: Write to anna.example@example.com' <<<"$msg_reply" ||
+  { echo "wheel-smoke: messages reply was not restored: $msg_reply" >&2; exit 1; }
+echo "chat + responses + messages: restored; traffic log: masked"
 
 kill -INT "$pid"
 for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.25; done
