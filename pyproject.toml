@@ -21,8 +21,12 @@ dependencies = [
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
     "pillow>=13.0.0",
+    "protobuf>=7.36.2",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
+    "sentencepiece>=0.2.2",
+    "torch>=2.14.1",
+    "transformers>=4.51.3",
     "uvicorn>=0.54.0",
 ]
 
@@ -65,19 +69,12 @@ sam = [
 local-vision = [
     "opencv-python-headless>=4.10",
 ]
-ner = [
-    "protobuf>=7.36.2",
-    "sentencepiece>=0.2.2",
-    "torch>=2.14.1",
-    "transformers>=5.21.0",
-]
+# Kept as an alias so existing `wattmind-pii-guard[ner]` and `--extra ner` invocations work.
+ner = []
 # GLiNER (LAB-1150 comparison, docs/models.md): gliner 0.2.29 needs transformers < 5.17, so
 # it conflicts with `ner`; use its own environment (UV_PROJECT_ENVIRONMENT=.venv-gliner).
 gliner = [
     "gliner==0.2.29",
-    "protobuf>=7.36.2",
-    "sentencepiece>=0.2.2",
-    "torch>=2.14.1",
     "transformers>=4.51.3,<5.17",
 ]
 hosted-azure = [
@@ -210,7 +207,7 @@ module = [
     "gliner.*",
     "huggingface_hub",
     "huggingface_hub.*",
-    "meta_sam_parser.*,",
+    "meta_sam_parser.*",
     "pyarrow",
     "pyarrow.*",
     "numpy.*",
