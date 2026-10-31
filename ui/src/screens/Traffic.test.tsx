@@ -264,11 +264,13 @@ describe("Live traffic", () => {
 
   it("falls back to the recorded traffic when the API is offline, with no original values", async () => {
     const f = fakeConnect();
-    const { container } = render(<Traffic connect={f.connect} pageHost="localhost" fixtureIntervalMs={60_000} />);
-    f.status({ state: "offline", message: "pii-guard API is not reachable" });
-    // The first offline contact is retried once before falling back (LAB-1703).
-    await waitFor(() => expect(f.connect).toHaveBeenCalledTimes(2), { timeout: 4000 });
-    expect(screen.queryByText("Recorded demo traffic.")).toBeNull();
+    const { container } = render(<Traffic connect={f.connect} pageHost="localhost" fixtureIntervalMs={60_000} offlineRetries={[0, 0]} />);
+    // An offline first contact is retried on a schedule before falling back (LAB-1710).
+    for (const calls of [2, 3]) {
+      f.status({ state: "offline", message: "pii-guard API is not reachable" });
+      await waitFor(() => expect(f.connect).toHaveBeenCalledTimes(calls));
+      expect(screen.queryByText("Recorded demo traffic.")).toBeNull();
+    }
     f.status({ state: "offline", message: "pii-guard API is not reachable" });
     expect(await screen.findByText("Recorded demo traffic.")).toBeInTheDocument();
     await waitFor(() => expect(within(screen.getByTestId("call-list")).getAllByRole("button").length).toBe(8));

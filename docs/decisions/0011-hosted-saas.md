@@ -68,7 +68,7 @@ privacy/acceptable-use review and provider-terms verification before editable te
    Merge #159, then #156, then #157; rebase deployment after the backend lands.
 2. Use environment-derived production names (`rg-pii-guard-prod`, `piiguard-prod-*`) and
    matching `project`/`environment` tags. Recreate the resource group and foundation in Sweden
-   Central with the owner-approved EUR 25/month notification budget and min replicas zero.
+   Central with the owner-approved EUR 25/month notification budget and min replicas zero (amended by LAB-1711: prod keeps one replica warm).
    The budget is not a hard cap. Cold starts reload NER and forfeit prior claimed credit.
    Build the hosted image and stage it with internal ingress. Configure Google OAuth callback
    for the eventual public HTTPS origin. Test model readiness and mount behavior.

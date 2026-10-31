@@ -1,10 +1,11 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button, ButtonLink, Notice } from "../components/ui";
+import { COLD_START_RETRY_MS } from "../lib/coldStart";
 import type { Account, Requester } from "./api";
 import { SETUP_STEPS, getLastRead, loadSetup, publish, subscribe, type SetupState } from "./setup";
 
 /** One ordered setup list with ticks and one primary action: the next step not yet done. */
-export function SetupChecklist({ call, account, active, calls, retryDelayMs = 2000 }: { call: Requester; account: Account; active: boolean; calls: number; retryDelayMs?: number }) {
+export function SetupChecklist({ call, account, active, calls, retryDelays = COLD_START_RETRY_MS }: { call: Requester; account: Account; active: boolean; calls: number; retryDelays?: readonly number[] }) {
   const state = useSyncExternalStore(subscribe, getLastRead, () => null);
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -16,15 +17,20 @@ export function SetupChecklist({ call, account, active, calls, retryDelayMs = 20
     const done = (s: SetupState) => { if (live) { publish(s); setFailed(false); setLoading(false); } };
     // Preserve the last good progress, but make failed refreshes recoverable.
     const fail = () => { if (live) { publish(getLastRead()); setFailed(true); setLoading(false); } };
-    // One quiet retry first: a deploy's revision swap or a network blip shouldn't raise a warning (LAB-1703).
-    loadSetup(call, account).then(done, () => {
-      if (live) retry = setTimeout(() => loadSetup(call, account).then(done, fail), retryDelayMs);
-    });
+    // Quiet retries first: a cold start, a deploy's revision swap or a network blip shouldn't raise a warning (LAB-1710).
+    const attempt = (n: number) => {
+      loadSetup(call, account).then(done, () => {
+        if (!live) return;
+        if (n < retryDelays.length) retry = setTimeout(() => attempt(n + 1), retryDelays[n]);
+        else fail();
+      });
+    };
+    attempt(0);
     return () => {
       live = false;
       clearTimeout(retry);
     };
-  }, [call, account, active, revision, retryDelayMs]);
+  }, [call, account, active, revision, retryDelays]);
   // Don't flash the spinner text for a quick refresh when earlier progress is already showing.
   // Keyed to the refresh it belongs to, so a finished refresh never makes the next one show at once.
   const [lateFor, setLateFor] = useState<number | null>(null);
