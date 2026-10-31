@@ -4,12 +4,20 @@
 export type Section = "overview" | "playground" | "logs" | "vault" | "connect" | "policy" | "projects" | "evaluation";
 export type PlaygroundTab = "text" | "chat" | "images";
 
+export interface CliAuthParams {
+  port?: number;
+  state?: string;
+  telemetry?: "masked" | "stats";
+}
+
 export interface Route {
   section: Section;
   /** The Playground's sub-tab; only meaningful when `section` is "playground". */
   tab: PlaygroundTab;
   /** The Connect screen's client tab; only meaningful when `section` is "connect". */
   client?: string;
+  /** CLI browser-handoff parameters when opened via `#cli-auth` (LAB-1708). */
+  cliAuth?: CliAuthParams;
   /** The open vault session's ref; only meaningful when `section` is "vault". */
   ref?: string;
   /** The Evaluation screen's filters; only meaningful when `section` is "evaluation". */
@@ -70,8 +78,36 @@ const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 const TAB_IDS = new Set<string>(PLAYGROUND_TABS.map((t) => t.id));
 const CLIENT_IDS = new Set<string>(CONNECT_CLIENTS);
 
+export function cliAuthQuery(params: CliAuthParams | undefined): string {
+  if (!params) return "";
+  const query = new URLSearchParams();
+  if (params.port !== undefined) query.set("port", String(params.port));
+  if (params.state) query.set("state", params.state);
+  if (params.telemetry) query.set("telemetry", params.telemetry);
+  return query.toString();
+}
+
+export function parseCliAuthQuery(query: string): CliAuthParams {
+  const params: CliAuthParams = {};
+  const search = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+  const rawPort = search.get("port");
+  if (rawPort && /^\d+$/.test(rawPort)) {
+    const port = Number(rawPort);
+    if (port >= 1 && port <= 65535) params.port = port;
+  }
+  const state = search.get("state");
+  if (state && /^[A-Za-z0-9_-]{1,128}$/.test(state)) params.state = state;
+  const telemetry = search.get("telemetry");
+  if (telemetry === "masked" || telemetry === "stats") params.telemetry = telemetry;
+  return params;
+}
+
 export function hashOf(route: Route): string {
   if (route.section === "playground") return `#playground/${route.tab}`;
+  if (route.section === "connect" && route.cliAuth !== undefined) {
+    const query = cliAuthQuery(route.cliAuth);
+    return query ? `#cli-auth?${query}` : "#cli-auth";
+  }
   if (route.section === "connect" && route.client && CLIENT_IDS.has(route.client)) return `#connect/${route.client}`;
   if (route.section === "evaluation") {
     const query = evaluationQuery(route.evaluation);
@@ -118,6 +154,13 @@ export function parseHash(hash: string): { route: Route; redirect: boolean } | n
   if (legacy) return { route: legacy, redirect: true };
   // No hash, and the skip link's #main, are not routes: the section stays as it is.
   if (hash === "" || hash === "#" || hash === "#main") return null;
+  const cliMatch = /^#cli-auth(\?[^#]*)?$/.exec(hash);
+  if (cliMatch) {
+    return {
+      route: { section: "connect", tab: "text", cliAuth: parseCliAuthQuery(cliMatch[1] ?? "") },
+      redirect: false,
+    };
+  }
   // Client ids contain hyphens (`muse-code`); section ids don't. A vault ref is `s_<hex>`.
   const m = /^#([a-z]+)(?:\/([^/?#]+))?(\?[^#]*)?$/.exec(hash);
   // Any other unknown hash lands on the Overview, with the URL cleaned up.
@@ -157,6 +200,9 @@ export function routeFromLocation(): Route {
 export const sameRoute = (a: Route, b: Route) =>
   a.section === b.section &&
   (a.section !== "playground" || a.tab === b.tab) &&
-  (a.section !== "connect" || a.client === b.client) &&
+  (a.section !== "connect" ||
+    (a.client === b.client &&
+      Boolean(a.cliAuth) === Boolean(b.cliAuth) &&
+      cliAuthQuery(a.cliAuth) === cliAuthQuery(b.cliAuth))) &&
   (a.section !== "evaluation" || evaluationQuery(a.evaluation) === evaluationQuery(b.evaluation)) &&
   (a.section !== "vault" || a.ref === b.ref);

@@ -69,6 +69,21 @@ describe("console routes (LAB-1287)", () => {
     expect(sameRoute({ section: "vault", tab: "text", ref: "s_aaa" }, { section: "vault", tab: "text", ref: "s_bbb" })).toBe(false);
     expect(sameRoute({ section: "vault", tab: "text" }, { section: "vault", tab: "text", ref: "s_aaa" })).toBe(false);
   });
+
+  it("parses and round-trips #cli-auth deep links (LAB-1708)", () => {
+    const parsed = parseHash("#cli-auth?port=51234&state=st_123&telemetry=stats")!;
+    expect(parsed.redirect).toBe(false);
+    expect(parsed.route).toEqual({
+      section: "connect",
+      tab: "text",
+      cliAuth: { port: 51234, state: "st_123", telemetry: "stats" },
+    });
+    expect(hashOf(parsed.route)).toBe("#cli-auth?port=51234&state=st_123&telemetry=stats");
+    expect(parseHash("#cli-auth")).toEqual({
+      route: { section: "connect", tab: "text", cliAuth: {} },
+      redirect: false,
+    });
+  });
 });
 
 describe("evaluation deep links (LAB-1133)", () => {

@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { firstRequest, newSessionId, parseSnippets, type Snippets, type SnippetsLoader } from "../api/connect";
 import { parseTrafficEvent, type TrafficEvent } from "../api/traffic";
+import type { Requester } from "../hosted/api";
 import type { ServerStatusState } from "../hooks/useServerStatus";
 import { Connect } from "./Connect";
 
@@ -222,6 +223,54 @@ describe("Connect quickstart", () => {
     expect(container.textContent).toContain("<your-key>");
     expect(container.textContent).not.toMatch(/sk-|Bearer [A-Za-z0-9]{8}/);
   });
+
+  it("renders the CLI authorization card for #cli-auth and issues a session bundle (LAB-1708)", async () => {
+    const user = userEvent.setup();
+    const callMock = vi.fn(async (path: string, body?: unknown, method?: string) => {
+      if (path === "/v1/projects") {
+        return {
+          default_project_id: "prj_1",
+          projects: [{ id: "prj_1", name: "Default project", default_policy_id: "pol_1" }],
+        };
+      }
+      if (path === "/v1/projects/new/endpoints" && method === "PUT") {
+        const req = body as { project_name: string; telemetry_level: "masked" | "stats" };
+        return {
+          project: { id: "prj_new", name: req.project_name },
+          endpoint: { id: "ep_cli", name: "CLI telemetry" },
+          key: { id: "key_1", name: "CLI", key: "pg_ep_aaa" },
+          telemetry_level: req.telemetry_level,
+          gateway_url: "https://guard.watt-mind.com/e/ep_cli/v1",
+          dashboard_url: "https://guard.watt-mind.com/#logs",
+          bundle: "pg_cli_synthetic_bundle",
+        };
+      }
+      throw new Error(`unexpected request ${method ?? "GET"} ${path}`);
+    });
+    render(
+      <Connect
+        status={okStatus}
+        traffic={live()}
+        loadSnippets={loader()}
+        cliAuth={{ port: 51234, state: "st_abc", telemetry: "masked" }}
+        call={callMock as unknown as Requester}
+      />,
+    );
+
+    const card = await screen.findByTestId("cli-auth-card");
+    await within(card).findByRole("combobox", { name: /Project/ });
+    await user.selectOptions(within(card).getByRole("combobox", { name: /Project/ }), "new");
+    await user.type(within(card).getByRole("textbox", { name: /New project name/ }), "Agent CLI");
+    await user.selectOptions(within(card).getByRole("combobox", { name: /Telemetry capture level/ }), "stats");
+    await user.click(within(card).getByRole("button", { name: "Authorize CLI" }));
+
+    expect(await screen.findByTestId("cli-auth-bundle")).toHaveTextContent("pg_cli_synthetic_bundle");
+    const callbackLink = screen.getByRole("link", { name: "Complete login in terminal" });
+    expect(callbackLink).toHaveAttribute(
+      "href",
+      "http://127.0.0.1:51234/callback?state=st_abc&bundle=pg_cli_synthetic_bundle",
+    );
+  });
 });
 
 describe("connect api helpers", () => {
@@ -255,4 +304,3 @@ describe("connect api helpers", () => {
     expect(await screen.findByText(/This endpoint lets your client choose the model/)).toHaveTextContent("for example gpt-4.1-mini");
   });
 });
-

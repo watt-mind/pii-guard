@@ -4,9 +4,10 @@ import { SITE_HASHES } from "./session";
 
 const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 
-/** The console section a hash opens (`#logs`, `#playground/chat`, the old `#traffic`), or null for the public page's anchors and anything else. */
+/** The console section a hash opens (`#logs`, `#playground/chat`, `#cli-auth`, the old `#traffic`), or null for the public page's anchors and anything else. */
 export function consoleSectionOf(hash: string): Section | null {
   if (SITE_HASHES.has(hash)) return null;
+  if (/^#cli-auth(?:\?[^#]*)?$/.test(hash)) return "connect";
   const legacy = LEGACY_HASHES[hash];
   if (legacy) return legacy.section;
   const m = /^#([a-z]+)(?:\/[a-z]+)?$/.exec(hash);
