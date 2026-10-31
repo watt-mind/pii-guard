@@ -110,6 +110,8 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
   const [notice, setNotice] = useState<string | null>(null);
   const [handledFocus, setHandledFocus] = useState<number | null>(null);
   const [autoPicked, setAutoPicked] = useState(false);
+  // The open session a filter hid (LAB-1712): "Clear filters" reopens it when visible again.
+  const [filteredOut, setFilteredOut] = useState<string | null>(null);
   // The detail to load: a new object (nonce) refetches, e.g. after a drop or a reveal.
   const [want, setWant] = useState<{ ref: string; reveal: boolean; nonce: number } | null>(null);
   // What the open detail was loaded at (generation, counts): when the list shows the session
@@ -176,6 +178,7 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
   const open = (ref: string) => {
     setScrollRequest((n) => n + 1);
     setSelected(ref);
+    setFilteredOut(null);
     setRevealed(false);
     setNotice(null);
     setDetail({ state: "loading" });
@@ -203,11 +206,22 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
   // stays, so an expired session still says it is gone instead of vanishing silently.
   if (selected !== null && (source !== "all" || query.trim() !== "") && !shown.some((s) => s.ref === selected)) {
     setSelected(null);
+    setFilteredOut(selected);
     setDetail({ state: "idle" });
     setWant(null);
     setRevealed(false);
-    onSelectRef?.(null);
   }
+  // The hash follows the cleared selection (LAB-1333), but telling the parent during
+  // render warns "Cannot update a component while rendering a different component":
+  // notify here instead, on the transition to a hidden selection (LAB-1712).
+  const lastHiddenNotified = useRef<string | null>(null);
+  useEffect(() => {
+    if (filteredOut === null) lastHiddenNotified.current = null;
+    else if (lastHiddenNotified.current !== filteredOut) {
+      lastHiddenNotified.current = filteredOut;
+      onSelectRef?.(null);
+    }
+  });
   const current = detail.state === "ok" && detail.detail.ref === selected ? detail.detail : null;
 
   // Like Logs, the screen opens on a session (LAB-1626): the most recently used one, once, without
@@ -228,6 +242,19 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
     if (loadedKey !== latestKey) setWant((w) => ({ ref: current.ref, reveal: revealed, nonce: (w?.nonce ?? 0) + 1 }));
   }
 
+  const clearFilters = () => {
+    setSource("all");
+    setQuery("");
+    if (selected === null && filteredOut !== null && sessions.some((s) => s.ref === filteredOut)) open(filteredOut);
+    else setFilteredOut(null);
+  };
+
+  const retryDetail = () => {
+    if (!selected) return;
+    setDetail({ state: "loading" });
+    setWant((w) => (w ? { ...w, nonce: w.nonce + 1 } : { ref: selected, reveal: revealed, nonce: 1 }));
+  };
+
   const toggleReveal = () => {
     if (!selected) return;
     const next = !revealed;
@@ -242,6 +269,7 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
       await vault.drop(selected);
       setNotice(`Dropped session ${selected}. Its placeholders can't be restored any more.`);
       setSelected(null);
+      setFilteredOut(null);
       onSelectRef?.(null);
       setDetail({ state: "idle" });
       setWant(null);
@@ -290,7 +318,15 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
             <Card
               title="Sessions"
               titleId="vault-sessions-title"
-              subtitle={list.state === "ok" ? (shown.length === sessions.length ? `${sessions.length} live` : `${shown.length} of ${sessions.length} shown`) : "Loading…"}
+              subtitle={
+                list.state === "ok"
+                  ? shown.length === sessions.length
+                    ? `${sessions.length} live`
+                    : `${shown.length} of ${sessions.length} shown`
+                  : list.state === "error"
+                    ? "Couldn't load"
+                    : "Loading…"
+              }
             >
               <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
                 <label className="sr-only" htmlFor="vault-source">
@@ -319,9 +355,20 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
               <div className="mt-3">
                 {list.state === "loading" && <p className="py-6 text-center text-sm text-muted">Loading sessions…</p>}
                 {list.state === "error" && (
-                  <p role="alert" className="py-4 text-sm text-danger">
-                    Couldn't list the sessions: {list.message}
-                  </p>
+                  <div className="space-y-3 py-4 text-center">
+                    <p role="alert" className="text-sm text-danger">
+                      Couldn't list the sessions: {list.message}
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setList({ state: "loading" });
+                        void refreshList();
+                      }}
+                    >
+                      Retry
+                    </Button>
+                  </div>
                 )}
                 {list.state === "ok" && sessions.length === 0 &&
                   (hosted ? (
@@ -331,7 +378,14 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
                       No live sessions. Send traffic through the gateway (Overview or Logs: "Send demo traffic") or mask a text in the Playground.
                     </p>
                   ))}
-                {list.state === "ok" && sessions.length > 0 && shown.length === 0 && <p className="py-6 text-center text-sm text-muted">No session matches.</p>}
+                {list.state === "ok" && sessions.length > 0 && shown.length === 0 && (
+                  <div className="space-y-3 py-6 text-center">
+                    <p className="text-sm text-muted">No session matches.</p>
+                    <Button size="sm" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  </div>
+                )}
                 {/* Capped like the Logs list, so the detail stays beside it (LAB-1626). */}
                 <ul className="max-h-[26rem] space-y-1 overflow-y-auto overscroll-contain lg:max-h-[calc(100dvh-16rem)]" aria-label="Vault sessions">
                   {shown.map((s) => (
@@ -354,9 +408,16 @@ export function Vault({ status, live, active, client, focus = null, onSelectRef,
                   <p className="py-6 text-center text-muted">Pick a session to see its placeholders.</p>
                 </div>
               ) : detail.state === "error" ? (
-                <p role="alert" className="py-6 text-sm text-danger">
-                  {detail.code === "not_found" ? "This session is gone: it expired or was dropped." : `Couldn't open the session: ${detail.message}`}
-                </p>
+                <div className="space-y-3 py-6 text-center">
+                  <p role="alert" className="text-sm text-danger">
+                    {detail.code === "not_found"
+                      ? "No vault session has this ref: it expired, was dropped, or never existed."
+                      : `Couldn't open the session: ${detail.message}`}
+                  </p>
+                  <Button size="sm" onClick={retryDetail}>
+                    Retry
+                  </Button>
+                </div>
               ) : current === null ? (
                 <p className="py-10 text-center text-sm text-muted">Opening the session…</p>
               ) : (

@@ -49,6 +49,17 @@ describe("error copy per code (LAB-1335)", () => {
     for (const code of ["ocr_unavailable", "detector_loading", "request_timeout"]) expect(errorCopy(code).kind).toBe("fail_closed");
   });
 
+  it("covers failed chunk downloads without claiming a guard failure (LAB-1714)", () => {
+    const page = errorCopy("page_load_failed");
+    expect(page.kind).toBe("load");
+    expect(page.title).toBe("This view could not be loaded.");
+    expect(page.body).toContain("unsaved work will be cleared");
+    const section = errorCopy("section_load_failed");
+    expect(section.kind).toBe("load");
+    expect(section.title).toBe("This section could not be loaded.");
+    expect(section.body).toMatch(/Retry/);
+  });
+
   it("keeps the policy text for policy blocks", () => {
     const c = errorCopy("blocked_entity");
     expect(c.kind).toBe("policy");

@@ -304,6 +304,20 @@ export function Chat({ client, live, draft, ner = null, mockUpstream = false, mo
                   Send the sample below, or write your own (fictional data only). You will see the message as the model received it, its
                   raw answer, and the answer with the real values put back.
                 </p>
+                <div className="mt-4">
+                  {/* Sends the default sample, whatever the composer holds (LAB-1713). */}
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setLanguage(DEFAULT_CHAT_SAMPLE.language);
+                      void send({ text: DEFAULT_CHAT_SAMPLE.text, language: DEFAULT_CHAT_SAMPLE.language });
+                    }}
+                    disabled={needsModel}
+                    title={needsModel ? "Choose a model first" : undefined}
+                  >
+                    Try a sample <span aria-hidden="true">→</span>
+                  </Button>
+                </div>
               </div>
             )}
             {turns.map((t, i) => (

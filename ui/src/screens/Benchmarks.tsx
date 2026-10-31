@@ -482,6 +482,7 @@ function SetChartsSections({
   info,
   runsReady,
   selected,
+  onRestoreFeatured,
 }: {
   set: string;
   snapshots: Snapshot[];
@@ -493,9 +494,17 @@ function SetChartsSections({
   info: FixtureSetInfo | undefined;
   runsReady: boolean;
   selected: string[];
+  onRestoreFeatured: () => void;
 }) {
   if (selected.length === 0) {
-    return <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-muted">Pick at least one system to compare.</p>;
+    return (
+      <div className="rounded-xl border border-dashed border-line px-4 py-10 text-center">
+        <p className="text-sm text-muted">Pick at least one system to compare.</p>
+        <Button size="sm" className="mt-3" onClick={onRestoreFeatured}>
+          Restore featured systems
+        </Button>
+      </div>
+    );
   }
   const history = index.history.filter((h) => h.fixture_set === set && selected.includes(h.system) && groupOf(index.systems[h.system]) === "ours");
   const scatterPoints = snapshots.flatMap((s) => {
@@ -683,6 +692,7 @@ function Explorer({ summary: base, runLog, source, retryRuns, initial, onParams 
               info={info}
               runsReady={runsReady}
               selected={selected}
+              onRestoreFeatured={() => setChosen(null)}
             />
           )}
           {index.visual.length > 0 && (

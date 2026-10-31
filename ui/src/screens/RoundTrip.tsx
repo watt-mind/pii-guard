@@ -297,7 +297,9 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
           </div>
           {view.kind === "error" ? (
             <div className="space-y-3">
-              <BlockedNotice error={view.error} phase="inbound" />
+              {/* An expired session recovers via "Mask the document again" below; any other
+                  inbound failure retries the restore in place (LAB-1714). */}
+              <BlockedNotice error={view.error} phase="inbound" onRetry={view.error.code === "not_found" ? undefined : () => void restoreNow()} />
               {view.error.code === "not_found" && (
                 <Button variant="secondary" onClick={onRun} busy={running}>
                   Mask the document again

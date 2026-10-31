@@ -5,7 +5,7 @@
 // there sends them looking for a detection problem that doesn't exist. Detection and masking
 // failures keep the fail-closed text, and policy blocks keep theirs.
 
-export type ErrorKind = "unreachable" | "policy" | "not_configured" | "upstream" | "stream" | "fail_closed";
+export type ErrorKind = "unreachable" | "policy" | "not_configured" | "upstream" | "stream" | "fail_closed" | "load";
 
 export interface ErrorCopy {
   kind: ErrorKind;
@@ -95,6 +95,20 @@ export function errorCopy(code: string | undefined, status: number | null = null
         kind: "fail_closed",
         title: "Checking took too long, so nothing was sent.",
         body: "PII Guard stops rather than forward something it couldn't finish checking. Retry, or try a smaller image or text.",
+      };
+    // A failed chunk download never discards the shell or other views' drafts (LAB-1714).
+    // Neither view nor section copy is a guard failure, so neither claims fail-closed.
+    case "page_load_failed":
+      return {
+        kind: "load",
+        title: "This view could not be loaded.",
+        body: "You can still use the other pages. Reload to try again; unsaved work will be cleared.",
+      };
+    case "section_load_failed":
+      return {
+        kind: "load",
+        title: "This section could not be loaded.",
+        body: "Its download failed; nothing else is affected. Retry, or reload the page if it keeps failing.",
       };
     default:
       // Any other upstream_* code (upstream_did_not_stream, …): the masked request reached the

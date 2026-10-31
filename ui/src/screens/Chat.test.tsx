@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockChat, type ChatClient, type ChatTurnRequest, type ChatTurnResult } from "../api/chat";
 import { ApiError } from "../api/http";
 import { createMockClient } from "../api/mock";
-import { CHAT_SAMPLES } from "../content/chatSamples";
+import { CHAT_SAMPLES, DEFAULT_CHAT_SAMPLE } from "../content/chatSamples";
 import { Chat, MODEL_PREF } from "./Chat";
 
 const META = ["muse-image-1.0", "sam-3.1", "muse-voice-transcribe-1.0", "muse-spark-1.2", "muse-wonder-1.0", "muse-spark-1.3"];
@@ -252,6 +252,30 @@ describe("Chat recovery and reset (LAB-1441)", () => {
     await user.click(screen.getByRole("button", { name: "Clear and start over" }));
     expect(screen.queryByRole("article", { name: "Chat turn" })).not.toBeInTheDocument();
     expect(screen.getByText("No messages yet")).toBeInTheDocument();
+  });
+});
+
+describe("Chat empty-state CTA (LAB-1713)", () => {
+  it("Try a sample sends the default sample even after the composer was edited", async () => {
+    const user = userEvent.setup();
+    const { client, calls } = liveChat();
+    render(<Chat client={client} live draft={null} />);
+    await screen.findByRole("combobox", { name: "Model" });
+    const input = screen.getByRole("textbox", { name: "Message" });
+    await user.clear(input);
+    await user.type(input, "Something I typed instead.");
+    await user.click(screen.getByRole("button", { name: /try a sample/i }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.messages.at(-1)!.content).toBe(DEFAULT_CHAT_SAMPLE.text);
+    expect(calls[0]!.language).toBe(DEFAULT_CHAT_SAMPLE.language);
+    expect(screen.queryByText("No messages yet")).not.toBeInTheDocument();
+  });
+
+  it("Try a sample is disabled until a model can be chosen", async () => {
+    const { client } = liveChat({ models: failWith(new ApiError(502, "upstream_unavailable", "x")) });
+    render(<Chat client={client} live draft={null} />);
+    expect(await screen.findByTestId("models-failed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try a sample/i })).toBeDisabled();
   });
 });
 

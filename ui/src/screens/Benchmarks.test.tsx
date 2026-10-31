@@ -144,6 +144,20 @@ describe("Benchmarks screen", () => {
     // locally and over 5 s on CI runners.
   }, 20_000);
 
+  it("restores the featured systems from the deselect-all state (LAB-1713)", async () => {
+    const { user, panel } = await openBenchmarks();
+    await within(panel).findByRole("region", { name: "Results" });
+    for (const box of within(panel).getAllByRole("checkbox")) {
+      if ((box as HTMLInputElement).checked) await user.click(box);
+    }
+    expect(within(panel).getByText("Pick at least one system to compare.")).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: "Restore featured systems" }));
+    const table = resultsTable(panel);
+    const set = INDEX.headline_set!;
+    const featured = INDEX.featured.filter((k) => INDEX.snapshots.some((s) => s.fixture_set === set && s.system === k));
+    expect(rowNames(table)).toHaveLength(featured.length);
+  }, 20_000);
+
   it("keeps its filters when switching sections", async () => {
     const { user, panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });
