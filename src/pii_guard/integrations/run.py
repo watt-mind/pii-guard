@@ -2,16 +2,18 @@
 
 ```
 pii-guard run opencode [--upstream meta|openai|fireworks|openrouter] [--model ID]
-                       [--dashboard URL] [--dashboard-key KEY] [--endpoint ID]
+                       [--dashboard URL|local|off] [--dashboard-key KEY] [--endpoint ID]
                        [--telemetry-level masked|stats] [-- <agent_args>...]
 pii-guard run codex|claude-code|pi|muse-code [options] [-- <agent_args>...]
 ```
 
 All PII detection and masking run locally in-process on ``127.0.0.1`` and the masked prompt goes
-straight from the local machine to the upstream LLM provider. When a remote dashboard key or URL
-is supplied (defaulting to ``https://guard.watt-mind.com`` when a key is present, or any
-self-hosted ``--dashboard`` URL), scrubbed ``masked`` or ``stats`` telemetry is shipped in the
-background via ``PII_GUARD_REMOTE_URL`` / ``PII_GUARD_REMOTE_KEY`` / ``PII_GUARD_REMOTE_LEVEL``.
+straight from the local machine to the upstream LLM provider. Telemetry can stay in memory
+(``--dashboard off``), be served by the bundled web UI on the local gateway port
+(``--dashboard local``), or be shipped as scrubbed ``masked`` or ``stats`` events to a hosted
+(``https://guard.watt-mind.com``) or self-hosted dashboard via ``PII_GUARD_REMOTE_URL`` /
+``PII_GUARD_REMOTE_KEY`` / ``PII_GUARD_REMOTE_LEVEL``, configured by ``pii-guard login`` (a saved
+telemetry-only key) or by flags.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,12 +40,20 @@ from urllib.parse import urlsplit
 
 from pydantic import SecretStr
 
-from pii_guard.app_bundle import MockServer
+from pii_guard.app_bundle import MockServer, Status, create_bundle_app
 from pii_guard.config import Settings, get_settings
 from pii_guard.gateway import GatewayConfig, Mode
 from pii_guard.gateway.config import cli_mode
 from pii_guard.integrations import muse_code, pi, snippets
 from pii_guard.integrations.common import ConnectError, fetch_models
+from pii_guard.integrations.login import (
+    CliProfile,
+    TelemetryLevel,
+    dashboard_origin,
+    load_cli_profile,
+    run_browser_login,
+    save_cli_profile,
+)
 from pii_guard.observability import resolve_ingest_url
 from pii_guard.upstreams import PRESETS, Upstream, by_url
 
@@ -57,6 +67,7 @@ __all__ = [
     "build_parser",
     "child_base_env",
     "main",
+    "prompt_first_run_dashboard",
     "resolve_dashboard",
     "resolve_upstream",
     "run_agent",
@@ -85,12 +96,14 @@ class ResolvedUpstream:
 
 @dataclass(frozen=True)
 class DashboardTarget:
-    """Resolved remote dashboard ingestion settings and display URL."""
+    """Resolved remote or local dashboard ingestion settings and display URL."""
 
     remote_url: str | None
     remote_key: str | None
     remote_level: str
     display_url: str | None
+    local_ui: bool = False
+    project_name: str | None = None
 
 
 def split_agent_argv(argv: Sequence[str]) -> tuple[list[str], list[str]]:
@@ -107,8 +120,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pii-guard run",
         description=(
             "Start a local on-device PII Guard gateway and launch a coding agent "
-            "(opencode, codex, claude-code, pi, muse-code) with optional remote dashboard "
-            "telemetry."
+            "(opencode, codex, claude-code, pi, muse-code) with optional remote or local "
+            "dashboard telemetry."
         ),
     )
     parser.add_argument("client", choices=RUNNABLE_CLIENTS, help="coding agent to launch")
@@ -170,9 +183,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="URL",
         help=(
-            "remote dashboard URL for telemetry (env: PII_GUARD_DASHBOARD_URL or "
-            f"PII_GUARD_REMOTE_URL; default: {DEFAULT_DASHBOARD_URL} when a key is set; "
-            "'off' disables remote reporting)"
+            "dashboard for telemetry: a remote https URL (env: PII_GUARD_DASHBOARD_URL or "
+            f"PII_GUARD_REMOTE_URL; default: {DEFAULT_DASHBOARD_URL} when a key is set, else "
+            "the `pii-guard login` profile), 'local' to serve the web UI on the local gateway "
+            "port, or 'off'"
         ),
     )
     parser.add_argument(
@@ -337,8 +351,132 @@ def _display_dashboard_url(remote_url: str) -> str:
     return f"{origin}/#traffic"
 
 
-def resolve_dashboard(args: argparse.Namespace) -> DashboardTarget:
-    """Resolve remote dashboard telemetry settings from CLI flags and environment."""
+def _off(level: str) -> DashboardTarget:
+    return DashboardTarget(remote_url=None, remote_key=None, remote_level=level, display_url=None)
+
+
+def _validated_remote_url(remote_url: str, what: str) -> str:
+    try:
+        resolve_ingest_url(remote_url)  # https only (http for loopback), no credentials
+    except ValueError as exc:
+        raise ConnectError(f"{what}: {exc}") from None
+    return remote_url
+
+
+def _target_from_profile(profile: CliProfile, level_override: str | None) -> DashboardTarget:
+    """Turn a saved login profile into a dashboard target, validating it like a flag."""
+    level = level_override or profile.telemetry_level
+    if profile.mode == "local":
+        return _off(level)
+    if not profile.dashboard_url or not profile.endpoint_id or not profile.endpoint_key:
+        raise ConnectError(
+            "the saved login profile has no dashboard, endpoint or key; "
+            "run `pii-guard login` again (or `pii-guard logout`)"
+        )
+    try:
+        origin = dashboard_origin(profile.dashboard_url)
+    except ConnectError as exc:
+        raise ConnectError(f"saved login profile: {exc}") from None
+    remote_url = _validated_remote_url(
+        f"{origin}/e/{_normalize_endpoint_id(profile.endpoint_id)}/v1", "saved login profile"
+    )
+    return DashboardTarget(
+        remote_url=remote_url,
+        remote_key=profile.endpoint_key,
+        remote_level=level,
+        display_url=_display_dashboard_url(remote_url),
+        project_name=profile.project_name or profile.project_id,
+    )
+
+
+def _login_and_save(
+    login_fn: Callable[..., CliProfile], url: str, level: str, stderr: Any
+) -> CliProfile:
+    profile = login_fn(url, telemetry_level="stats" if level == "stats" else None, stderr=stderr)
+    _target_from_profile(profile, None)  # refuse to save anything run would refuse to use
+    save_cli_profile(profile)
+    return profile
+
+
+def prompt_first_run_dashboard(
+    *,
+    telemetry_level: TelemetryLevel = "masked",
+    input_fn: Callable[[str], str] = input,
+    login_fn: Callable[..., CliProfile] = run_browser_login,
+    stderr: Any = None,
+) -> CliProfile:
+    """Interactive first-run prompt when no CLI profile or ``--dashboard`` flag is configured."""
+    err = stderr or sys.stderr
+    print(
+        "Where should PII Guard send scrubbed session telemetry?\n"
+        f"  [1] Hosted dashboard ({DEFAULT_DASHBOARD_URL}, sign in with the browser)\n"
+        "  [2] Local only (keep all metrics on this machine)\n"
+        "  [3] Self-hosted dashboard URL",
+        file=err,
+    )
+    choice = input_fn("Select [1/2/3] (default: 2): ").strip() or "2"
+    if choice == "1":
+        return _login_and_save(login_fn, DEFAULT_DASHBOARD_URL, telemetry_level, err)
+    if choice == "3":
+        custom_url = input_fn("Self-hosted dashboard URL: ").strip()
+        return _login_and_save(login_fn, custom_url, telemetry_level, err)
+    profile = CliProfile(mode="local", telemetry_level=telemetry_level)
+    save_cli_profile(profile)
+    return profile
+
+
+def _resolve_dashboard_key(args: argparse.Namespace) -> str | None:
+    if args.dashboard_key_env:
+        key = _env_or_dotenv(args.dashboard_key_env)
+        if not key:
+            raise ConnectError("the variable named by --dashboard-key-env is not set")
+        return key
+    return (
+        args.dashboard_key
+        or _env("PII_GUARD_DASHBOARD_KEY")
+        or _env("PII_GUARD_REMOTE_KEY")
+        or _env("PII_GUARD_ENDPOINT_KEY")
+    )
+
+
+def _resolve_implicit_dashboard(
+    args: argparse.Namespace,
+    level: str,
+    *,
+    profile: CliProfile | None,
+    interactive: bool,
+    input_fn: Callable[[str], str],
+    login_fn: Callable[..., CliProfile],
+    stderr: Any,
+) -> DashboardTarget:
+    saved = profile if profile is not None else load_cli_profile()
+    if saved is not None:
+        return _target_from_profile(saved, args.telemetry_level)
+    if interactive:
+        chosen = prompt_first_run_dashboard(
+            telemetry_level="stats" if level == "stats" else "masked",
+            input_fn=input_fn,
+            login_fn=login_fn,
+            stderr=stderr,
+        )
+        return _target_from_profile(chosen, args.telemetry_level)
+    return _off(level)
+
+
+def resolve_dashboard(
+    args: argparse.Namespace,
+    *,
+    profile: CliProfile | None = None,
+    interactive: bool = False,
+    input_fn: Callable[[str], str] = input,
+    login_fn: Callable[..., CliProfile] = run_browser_login,
+    stderr: Any = None,
+) -> DashboardTarget:
+    """Resolve dashboard telemetry from flags, the real environment, or the login profile.
+
+    Flags and environment win; with none set, the saved ``pii-guard login`` profile is used, and
+    an interactive first run asks where telemetry should go.
+    """
     level = (
         args.telemetry_level
         or _env("PII_GUARD_REMOTE_LEVEL")
@@ -347,38 +485,44 @@ def resolve_dashboard(args: argparse.Namespace) -> DashboardTarget:
     )
     raw_url = args.dashboard or _env("PII_GUARD_DASHBOARD_URL") or _env("PII_GUARD_REMOTE_URL")
     if raw_url and raw_url.strip().lower() in ("off", "none", "false", "0"):
+        return _off(level)
+    if raw_url and raw_url.strip().lower() == "local":
         return DashboardTarget(
-            remote_url=None, remote_key=None, remote_level=level, display_url=None
+            remote_url=None, remote_key=None, remote_level=level, display_url=None, local_ui=True
         )
-    if args.dashboard_key_env:
-        key = _env_or_dotenv(args.dashboard_key_env)
-        if not key:
-            raise ConnectError("the variable named by --dashboard-key-env is not set")
-    else:
-        key = (
-            args.dashboard_key
-            or _env("PII_GUARD_DASHBOARD_KEY")
-            or _env("PII_GUARD_REMOTE_KEY")
-            or _env("PII_GUARD_ENDPOINT_KEY")
-        )
+    key = _resolve_dashboard_key(args)
     endpoint = args.endpoint or _env("PII_GUARD_ENDPOINT_ID")
     if not raw_url and not key and not endpoint:
-        return DashboardTarget(
-            remote_url=None, remote_key=None, remote_level=level, display_url=None
+        return _resolve_implicit_dashboard(
+            args,
+            level,
+            profile=profile,
+            interactive=interactive,
+            input_fn=input_fn,
+            login_fn=login_fn,
+            stderr=stderr,
         )
     base = (raw_url or DEFAULT_DASHBOARD_URL).strip().rstrip("/")
     parts = urlsplit(base)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise ConnectError(f"--dashboard {base!r} must be an http:// or https:// URL")
+    if not key and not endpoint and "/e/" not in parts.path:
+        # A bare dashboard URL: use the login profile for it, or log in to it.
+        origin = dashboard_origin(base)
+        saved = profile if profile is not None else load_cli_profile()
+        if saved and saved.mode == "remote" and saved.dashboard_url:
+            with suppress(ConnectError):
+                if dashboard_origin(saved.dashboard_url) == origin:
+                    return _target_from_profile(saved, args.telemetry_level)
+        if interactive:
+            logged_in = _login_and_save(login_fn, origin, level, stderr)
+            return _target_from_profile(logged_in, args.telemetry_level)
     if endpoint and "/e/" not in parts.path:
         ep_id = _normalize_endpoint_id(endpoint)
         remote_url = f"{base}/e/{ep_id}/v1"
     else:
         remote_url = base
-    try:
-        resolve_ingest_url(remote_url)  # https only (http for loopback), no credentials
-    except ValueError as exc:
-        raise ConnectError(f"--dashboard: {exc}") from None
+    _validated_remote_url(remote_url, "--dashboard")
     return DashboardTarget(
         remote_url=remote_url,
         remote_key=key,
@@ -641,6 +785,20 @@ def _TemporaryEnv(overrides: dict[str, str | None]) -> Iterator[None]:
         get_settings.cache_clear()
 
 
+def _create_gateway_app(
+    settings: Settings, *, local_ui: bool, mode: str, upstream_label: str
+) -> Any:
+    from pii_guard.api.app import create_app
+
+    app = (
+        create_bundle_app(Status(upstream=upstream_label), settings)
+        if local_ui
+        else create_app(settings)
+    )
+    app.state.gateway_config = GatewayConfig(mode=Mode(mode))
+    return app
+
+
 @contextmanager
 def _local_gateway(
     args: argparse.Namespace,
@@ -648,8 +806,6 @@ def _local_gateway(
     dashboard: DashboardTarget,
 ) -> Iterator[tuple[str, Any]]:
     import uvicorn
-
-    from pii_guard.api.app import create_app
 
     mock_server: MockServer | None = None
     # No SO_REUSEADDR: on macOS it can let 127.0.0.1:<port> bind while another server holds
@@ -688,8 +844,12 @@ def _local_gateway(
             upstream_api_key=SecretStr(upstream.api_key) if upstream.api_key else None,
             default_language=args.language,
         )
-        app = create_app(settings)
-        app.state.gateway_config = GatewayConfig(mode=Mode(args.mode))
+        app = _create_gateway_app(
+            settings,
+            local_ui=dashboard.local_ui,
+            mode=args.mode,
+            upstream_label="mock" if upstream.mock else upstream.label,
+        )
         config = uvicorn.Config(
             app,
             host="127.0.0.1",
@@ -729,6 +889,7 @@ def _print_banner(
     gateway_root: str,
     model: str,
     mode: str,
+    traffic_log: str,
     upstream: ResolvedUpstream,
     dashboard: DashboardTarget,
     *,
@@ -739,15 +900,30 @@ def _print_banner(
         f"(mode={mode}, model={model}, upstream={upstream.label})",
         file=stderr,
     )
-    if dashboard.display_url:
+    if dashboard.local_ui:
+        print(
+            f"pii-guard run {client}: local dashboard {gateway_root}/#traffic "
+            f"(traffic log={traffic_log})",
+            file=stderr,
+        )
+    elif dashboard.display_url:
+        project = f"project={dashboard.project_name!r}, " if dashboard.project_name else ""
         print(
             f"pii-guard run {client}: remote dashboard {dashboard.display_url} "
-            f"(telemetry={dashboard.remote_level})",
+            f"({project}telemetry={dashboard.remote_level})",
             file=stderr,
         )
 
 
-def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any = None) -> int:
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    stdout: Any = None,
+    stderr: Any = None,
+    interactive: bool | None = None,
+    input_fn: Callable[[str], str] = input,
+    login_fn: Callable[..., CliProfile] = run_browser_login,
+) -> int:
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
     raw_argv = list(sys.argv[1:] if argv is None else argv)
@@ -761,9 +937,16 @@ def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any =
             )
         agent_args = [*trailing, *agent_args]
 
+    is_tty = (
+        not args.print_env and hasattr(sys.stdin, "isatty") and sys.stdin.isatty()
+        if interactive is None
+        else interactive
+    )
     try:
         upstream = resolve_upstream(args)
-        dashboard = resolve_dashboard(args)
+        dashboard = resolve_dashboard(
+            args, interactive=is_tty, input_fn=input_fn, login_fn=login_fn, stderr=stderr
+        )
         # Taken before the gateway's overrides go into os.environ, minus every secret.
         base_env = child_base_env(extra_secret_envs=(args.api_key_env, args.dashboard_key_env))
         binary = "dry-run" if args.print_env else _resolve_binary(args.client, args.agent_bin)
@@ -793,6 +976,7 @@ def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any =
                         gateway_root,
                         model,
                         args.mode,
+                        args.traffic_log,
                         upstream,
                         dashboard,
                         stderr=stderr,
@@ -807,7 +991,10 @@ def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any =
                 "mode": args.mode,
                 "remote_url": dashboard.remote_url,
                 "remote_level": dashboard.remote_level if dashboard.remote_url else None,
-                "dashboard_url": dashboard.display_url,
+                "dashboard_url": (
+                    f"{gateway_root}/#traffic" if dashboard.local_ui else dashboard.display_url
+                ),
+                "local_ui": dashboard.local_ui,
                 "command": cmd,
             }
             print(json.dumps(info, indent=2), file=stdout)
@@ -815,3 +1002,7 @@ def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any =
     except ConnectError as exc:
         print(f"pii-guard run: {exc}", file=stderr)
         return 2
+    except (KeyboardInterrupt, EOFError):
+        # Ctrl-C at the first-run prompt or while waiting for the browser login.
+        print("\npii-guard run: cancelled", file=stderr)
+        return 130

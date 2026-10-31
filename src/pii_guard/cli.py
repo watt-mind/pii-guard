@@ -104,6 +104,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
 
+    login = sub.add_parser(
+        "login",
+        help="authorize the CLI to send scrubbed telemetry to a hosted or self-hosted dashboard",
+        add_help=False,
+    )
+    login.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
+    logout = sub.add_parser(
+        "logout",
+        help="revoke the CLI telemetry key and remove ~/.config/pii-guard/cli.json",
+        add_help=False,
+    )
+    logout.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
     baselines = sub.add_parser(
         "baselines", help="set up the comparison baselines (docs/evaluation.md)"
     )
@@ -233,6 +247,18 @@ def _run(args: argparse.Namespace) -> int:
     return run_main(args.args)
 
 
+def _login(args: argparse.Namespace) -> int:
+    from pii_guard.integrations.login import login_main
+
+    return login_main(args.args)
+
+
+def _logout(args: argparse.Namespace) -> int:
+    from pii_guard.integrations.login import logout_main
+
+    return logout_main(args.args)
+
+
 def _models(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if args.models_command != "fetch":
         parser.parse_args(["models", "--help"])
@@ -267,19 +293,21 @@ def _baselines(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int
     return 0
 
 
+_PASSTHROUGH_COMMANDS = {
+    "bench": _bench,
+    "eval": _eval,
+    "connect": _connect,
+    "run": _run,
+    "login": _login,
+    "logout": _logout,
+    "lang": _lang,
+}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] == "bench":
-        return _bench(argparse.Namespace(args=argv[1:]))
-    if argv and argv[0] == "eval":
-        # Hand everything after "eval" to the eval CLI untouched (it owns its own flags).
-        return _eval(argparse.Namespace(args=argv[1:]))
-    if argv and argv[0] == "connect":
-        return _connect(argparse.Namespace(args=argv[1:]))
-    if argv and argv[0] == "run":
-        return _run(argparse.Namespace(args=argv[1:]))
-    if argv and argv[0] == "lang":
-        return _lang(argparse.Namespace(args=argv[1:]))
+    if argv and argv[0] in _PASSTHROUGH_COMMANDS:
+        return _PASSTHROUGH_COMMANDS[argv[0]](argparse.Namespace(args=argv[1:]))
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "serve":
