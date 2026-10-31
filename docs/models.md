@@ -32,9 +32,10 @@ encoder in-process and reports `PERSON`, `ADDRESS`, `ORGANIZATION` and, with the
 model, `DATE_OF_BIRTH`. NER v2 checkpoints also report `EMAIL`, `PHONE`, `ID_DOCUMENT`,
 `NATIONAL_ID_HU_TAX`, `NATIONAL_ID_HU_TAJ` and `BANK_ACCOUNT`; see
 [NER v2](#ner-v2-wider-labels-openpii-train-split-hard-negatives). Rules stay authoritative for structured identifiers in
-`DetectionPipeline`. Install with `uv sync --extra ner` (torch, transformers, sentencepiece,
-protobuf). Without the extra the registry reports `ner` as unavailable, so the gateway's fast
-mode stays rules-only; with it, fast mode picks `ner` up automatically. A model that can't be
+`DetectionPipeline`. Its dependencies (torch, transformers, sentencepiece, protobuf) are part
+of the default install (LAB-1733), so fast mode picks `ner` up automatically. Where they are
+missing, as in the rules-only base Docker image, the registry reports `ner` as unavailable and
+the gateway's fast mode stays rules-only. A model that can't be
 loaded and any inference error raise `DetectionError` (fail closed).
 
 | Setting | Env var | Default |
@@ -45,14 +46,14 @@ loaded and any inference error raise `DetectionError` (fail closed).
 | Fallback | `PII_GUARD_NER_FALLBACK` | `download`: fetch it on first use; `cached`: only if already downloaded; `off`: never |
 | Model cache | `PII_GUARD_MODELS_DIR` | `~/.cache/pii-guard/models` |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
-| Backend | `PII_GUARD_NER_BACKEND` | `transformers`; `gliner` runs a GLiNER model instead (needs the `gliner` extra) |
+| Backend | `PII_GUARD_NER_BACKEND` | `transformers`; `gliner` runs a GLiNER model instead (needs the `gliner` package, which is not in the lock since LAB-1733; reproduce from commit `13e2aaf`) |
 | GLiNER model | `PII_GUARD_GLINER_MODEL` | `urchade/gliner_multi-v2.1` (pinned revision) |
 
 Constructor keywords: `thresholds` (`{language: {type: min_score}}`, default 0.5), `entity_types`,
 `label_map`, `max_length`/`stride` (token windows for long inputs), `aggregation`, `preload`.
 Offsets come from the fast tokenizer's offset mapping (code points), so they are exact for any
 Unicode input. Fetch the model ahead of time with
-`uv run --extra ner python -m pii_guard.detect.ner_resolve fetch` (`status` prints which model
+`uv run python -m pii_guard.detect.ner_resolve fetch` (`status` prints which model
 would run, without downloading).
 
 ### Which NER model fast mode runs
@@ -112,8 +113,8 @@ Its other classes (health data, IP addresses, amounts…) are not PII Guard type
 ignored.
 
 **Why this model.** The ticket's three options were GLiNER multi v2.1 through the `gliner`
-extra, Davlan's XLM-R through the existing `ner` extra, or another Apache/MIT token
-classifier. All three run zero-shot here (rules + model, the LAB-1150 fixture list,
+extra (dropped from the lock in LAB-1733), Davlan's XLM-R through the then-optional `ner`
+extra, or another Apache/MIT token classifier. All three run zero-shot here (rules + model, the LAB-1150 fixture list,
 [eval/results/2026-10-27-fast-demo-ner/](../eval/results/2026-10-27-fast-demo-ner/README.md)):
 
 | | bardsai EU PII v1 (chosen) | GLiNER multi v2.1 | Davlan XLM-R base (old default) |
@@ -124,7 +125,7 @@ classifier. All three run zero-shot here (rules + model, the LAB-1150 fixture li
 | ai4privacy leak, pooled | **10.4 %**\* | 22.5 % | 28.7 % |
 | ai4privacy F1, mean | **84.6**\* | 75.9 | 77.0 |
 | NER per ~400-char message, M1 Max CPU p50 / p95 | 54 / 101 ms† | 107 / 126 ms | 48 / 56 ms† |
-| Installs with | `ner` extra | `gliner` extra (conflicts with `ner`) | `ner` extra |
+| Installs with | default install | not in the lock (dropped in LAB-1733; reproduce from commit `13e2aaf`) | default install |
 | License | Apache-2.0 | Apache-2.0 | AFL-3.0 |
 
 \* Not an out-of-distribution check: its card lists OpenPII among its training data, and the
@@ -133,8 +134,8 @@ comparison, and it leaks least there too.
 † Same session, machine loaded (load average 70–100 from other jobs); MPS p50 16.7 vs
 16.4 ms. GLiNER's figure is from LAB-1150 on an idle machine.
 
-Leak is the selection rule, so it wins on every set. It also installs with the existing `ner`
-extra, so `uvx`, `make demo` and the demo image need no second environment, unlike GLiNER
+Leak is the selection rule, so it wins on every set. It also runs on the default install's
+transformers, so `uvx`, `make demo` and the demo image need no second environment, unlike GLiNER
 (`gliner` 0.2.29 pins `transformers<5.17`). The cost is over-masking on the English smoke set
 (23.1 %): 9 of its 39 masked spans there are not in the gold (4 place names as `ADDRESS`,
 3 `PERSON`, 2 `ID_DOCUMENT`). Not chosen:
@@ -310,9 +311,11 @@ ablation, which never saw those rows, is the held-out figure.
   smoke over-masking to 9.5 %.
 - LAB-1150 named it the best public **fallback** of the two it compared: zero-shot it leaks
   22.5 % vs Davlan's 28.7 % on ai4privacy, and 2.8–5.4 % vs 7.5–10 % on smoke. LAB-1192 then
-  measured a third, the bards.ai EU PII model, which leaks less than both and installs with the
-  `ner` extra, so that is the fallback ([above](#which-ner-model-fast-mode-runs)).
-- The `gliner` extra pins `transformers<5.17`, so it can't be installed alongside `ner`.
+  measured a third, the bards.ai EU PII model, which leaks less than both and runs on the
+  default install's transformers, so that is the fallback ([above](#which-ner-model-fast-mode-runs)).
+- `gliner` 0.2.29 pins `transformers<5.17`, so it can't share an environment with the NER. Its
+  extra was dropped from the lock in LAB-1733; to reproduce these runs, check out commit
+  `13e2aaf` (or earlier) and use `UV_PROJECT_ENVIRONMENT=.venv-gliner uv sync --extra gliner`.
 
 **Spend:** about $4.85 of Modal: Glimmer for the corpus and labels, 8 XLM-R trainings, 1
 GLiNER fine-tune and a T4 latency bench.

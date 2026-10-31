@@ -106,7 +106,7 @@ the client's IBAN, email and phone and every customer's email.
 
 ```bash
 uv run pytest tests/integrations/test_pi_e2e.py        # CI: scripted mock model; needs node + npm
-uv run --extra ner python -m pii_guard.integrations.e2e \
+uv run python -m pii_guard.integrations.e2e \
     --upstream https://api.meta.ai/v1 --model muse-spark-1.3 --key-env META_API_KEY \
     --record examples/coding-agents/runs/<date>-coding-agent-pi-meta-<model>.json
 ```

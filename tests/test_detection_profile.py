@@ -69,7 +69,7 @@ def test_default_ner_requires_explicit_provisioned_directory(model, monkeypatch)
 
 def test_missing_local_dependency_does_not_downgrade_to_rules(tmp_path, monkeypatch):
     monkeypatch.setattr(stack, "_ner_available", lambda: False)
-    with pytest.raises(DetectionError, match="extra"):
+    with pytest.raises(DetectionError, match="not installed"):
         stack.default_detector_names(local(detectors=None, ner_model=str(tmp_path)))
 
 

@@ -68,7 +68,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]
         if key.startswith("PII_GUARD_") or key == "META_API_KEY":
             monkeypatch.delenv(key, raising=False)
     # No NER model download from a test: an empty model cache, the fallback used only if cached
-    # (so with the `ner` extra installed the default stack is still rules only; LAB-1192).
+    # (so with torch/transformers installed, the default, the stack is still rules only; LAB-1192).
     monkeypatch.setenv("PII_GUARD_MODELS_DIR", str(tmp_path / "models"))
     monkeypatch.setenv("PII_GUARD_PROJECT_STATE_PATH", str(tmp_path / "projects" / "state.sqlite3"))
     monkeypatch.setenv("PII_GUARD_NER_FALLBACK", "cached")
@@ -103,7 +103,7 @@ UNTRACED = "untraced"
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
-        f"{NER_AUTODETECT}: let build_mode_detectors add NER when the ner extra is installed "
+        f"{NER_AUTODETECT}: let build_mode_detectors add NER when torch/transformers import "
         "(by default the suite pins the gateway base detectors to rules only)",
     )
     config.addinivalue_line(
@@ -145,9 +145,10 @@ def rules_only_mode_detectors(
 ) -> None:
     """Make implicit ``build_mode_detectors`` calls independent of the installed extras.
 
-    Without ``base=``, ``build_mode_detectors`` adds ``ner`` whenever the ner extra is importable,
-    so a venv synced with ``uv sync --extra ner`` would see different spans, detector lists and
-    system keys than CI. Tests get rules only unless they pass ``base=`` themselves or are marked
+    Without ``base=``, ``build_mode_detectors`` adds ``ner`` whenever torch and transformers
+    import (the default install since LAB-1733) and a model is cached, so a developer's venv
+    would see different spans, detector lists and system keys than CI. Tests get rules only
+    unless they pass ``base=`` themselves or are marked
     ``@pytest.mark.ner_autodetect`` to keep the real, environment-dependent selection.
     """
     if request.node.get_closest_marker(NER_AUTODETECT) is None:

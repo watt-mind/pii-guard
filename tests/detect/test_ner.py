@@ -263,7 +263,7 @@ def test_out_of_range_offsets_fail_closed() -> None:
 
 def test_missing_extra_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ner, "dependencies_available", lambda: False)
-    with pytest.raises(DetectionError, match="'ner' extra"):
+    with pytest.raises(DetectionError, match="torch and transformers are not installed"):
         NerDetector()
     assert ner.main(["download"]) == 2
 
@@ -840,7 +840,7 @@ def _real_model_path() -> str:
     if not REAL_MODEL or not os.path.isdir(REAL_MODEL):
         pytest.skip(f"{ner.MODEL_ENV_VAR} does not point at a local checkpoint")
     if not dependencies_available():
-        pytest.skip("needs the 'ner' extra")
+        pytest.skip("needs torch and transformers")
     return REAL_MODEL
 
 

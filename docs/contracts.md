@@ -212,7 +212,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_MAX_TEXT_CHARS` | `max_text_chars` | `int` (>= 1, code points) | `200000` |
 | `PII_GUARD_POLICY_OVERRIDES` | `policy_overrides` | `dict[EntityType, Policy]` (`TYPE=mask\|keep\|block,...`) | none |
 | `PII_GUARD_GATEWAY_KEEP_TYPES` | `gateway_keep_types` | `frozenset[EntityType] \| None` (deprecated) | unset |
-| `PII_GUARD_NER_MODEL` | `ner_model` | `str \| None` (hub id or directory) | unset (detector default; a set model makes a missing `ner` extra stop startup) |
+| `PII_GUARD_NER_MODEL` | `ner_model` | `str \| None` (hub id or directory) | unset (detector default; a set model makes missing torch/transformers stop startup) |
 | `PII_GUARD_NER_REVISION` | `ner_revision` | `str \| None` | unset (pinned for the default model) |
 | `PII_GUARD_NER_DEVICE` | `ner_device` | `str \| None` (`auto\|cpu\|mps\|cuda`) | unset (`auto`) |
 | `PII_GUARD_NER_WARMUP_TIMEOUT` | `ner_warmup_timeout` | `float` (> 0, seconds): how long a detecting request waits for the background NER load | `120` |
@@ -241,12 +241,13 @@ unset. Secrets are `SecretStr`.
 
 One factory, `pii_guard.detect.stack`, picks the detectors for both the REST API and the
 gateway (LAB-1270). Without `PII_GUARD_DETECTORS` the REST API runs the gateway fast-mode stack:
-`rules`, plus `ner` when the `ner` extra is installed. An explicit `PII_GUARD_DETECTORS`
+`rules`, plus `ner` when torch and transformers import (the default install; the rules-only
+base Docker image skips them). An explicit `PII_GUARD_DETECTORS`
 (`rules,llm`, say) wins for the REST API only; the gateway keeps its per-mode set: `fast`, the
 default, or `audit`, which adds the LLM detector, chosen by `PII_GUARD_GATEWAY_MODE` or the
 `X-PII-Guard-Mode` header (old mode names: [operations.md](operations.md#modes)). NER fails
-closed (ADR 0006): with `PII_GUARD_NER_MODEL` set but the extra missing, startup raises
-`DetectionError` ("ner configured but the 'ner' extra is not installed") in both; with neither,
+closed (ADR 0006): with `PII_GUARD_NER_MODEL` set but torch/transformers missing, startup raises
+`DetectionError` ("ner configured but torch and transformers are not installed") in both; with neither,
 NER is skipped and one WARNING is logged. `NerDetector` gets its model, revision and device
 from `Settings`. Every detector's output goes through `CheckedDetector`: anything other than a
 list of spans whose offsets match the text is `503 detection_failed`, in the gateway as in the
@@ -262,7 +263,8 @@ gateway settings into `Settings` is LAB-1095.
 
 `PII_GUARD_DETECTION_PROFILE=local-only` constrains components that receive original input.
 `standard` preserves the behavior above. Local-only permits built-in `rules` and in-process
-Transformers `ner` only; default rules + NER requires the `ner` extra and an explicit existing
+Transformers `ner` only; default rules + NER requires torch and transformers (the default
+install, not the rules-only base Docker image) and an explicit existing
 `PII_GUARD_NER_MODEL` directory. Loading uses `local_files_only=True`, with no implicit model
 fetch or downgrade. Explicit `PII_GUARD_DETECTORS=rules` deliberately selects reduced coverage
 for both REST and gateway fast mode in this profile. Hub model IDs, GLiNER, plugin detectors

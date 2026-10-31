@@ -228,7 +228,8 @@ def _yolos(  # pragma: no cover - needs torch, transformers and the pinned files
         from transformers import AutoImageProcessor, AutoModelForObjectDetection
     except ImportError as exc:
         raise DetectionError(
-            "the signature detector needs torch and transformers (uv sync --extra ner)"
+            "the signature detector needs torch and transformers (part of the default install; "
+            "the rules-only base Docker image skips them)"
         ) from exc
     try:
         processor = AutoImageProcessor.from_pretrained(str(path), local_files_only=True)

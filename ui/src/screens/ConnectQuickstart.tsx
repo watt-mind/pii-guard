@@ -265,7 +265,7 @@ function FirstRequestStep({
   const noNames =
     ner === false ? (
       <p role="note" className="text-xs text-warn">
-        This server runs rules only: email addresses, phone numbers and IBANs are masked, free-text names are not (they reach the model as written). Install the ner extra to mask names.
+        This server runs rules only: email addresses, phone numbers and IBANs are masked, free-text names are not (they reach the model as written). Run an install with the on-device NER (the default; not the rules-only Docker image) to mask names.
       </p>
     ) : null;
   if (!snippets.session_ref || !traffic || traffic.source !== "api" || traffic.status.state === "disabled") {

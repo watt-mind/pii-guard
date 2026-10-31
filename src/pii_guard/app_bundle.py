@@ -453,9 +453,12 @@ def _banner(opts: UpOptions, status: Status, traffic_log: str, *, ui: bool) -> s
             lines.append(f"{pad}{status.ner}")
             lines.append(f"{pad}PII_GUARD_NER_FALLBACK=download downloads the NER model once")
         else:
+            # torch/transformers are core dependencies (LAB-1733) but missing here (the
+            # rules-only Docker image, or an install that skipped them): a fresh install has
+            # them. `[ner]` is a no-op alias kept so the line also works on older releases.
             lines.append(
-                f"{pad}free-text names need NER (pulls torch, then downloads the model "
-                "once, ~1 GB each):"
+                f"{pad}free-text names need NER: torch and transformers are missing here; "
+                "reinstall (the model downloads once, ~1 GB):"
             )
             lines.append(f"{pad}{launcher('ner')} up")
     lines.append(f"  traffic log    {traffic_log}   (live: {url}/v1/traffic/stream)")

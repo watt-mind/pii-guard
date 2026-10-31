@@ -200,7 +200,7 @@ no_implicit_optional = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-# Optional extras (ner, ocr, baselines, local segmentation) and comparison tools without stubs.
+# NER deps, optional extras (ocr, baselines, local segmentation) and comparison tools without stubs.
 module = [
     "cv2.*",
     "gliner.*",
@@ -220,7 +220,6 @@ module = [
     "transformers.*",
 ]
 ignore_missing_imports = true
-
 
 [tool.uv.sources]
 de-core-news-lg = { url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" }
