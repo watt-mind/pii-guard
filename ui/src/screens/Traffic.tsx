@@ -177,7 +177,7 @@ function CallListHeader({ paused, events }: { paused: boolean; events: TrafficEv
   return (
     <header className="flex items-start justify-between gap-2 border-b border-line p-4 sm:p-5">
       <div className="min-w-0">
-        <h2 id="calls-title" className="text-lg font-normal text-ink">
+        <h2 id="calls-title" tabIndex={-1} className="text-lg font-normal text-ink focus:outline-none">
           Calls
         </h2>
         <p className="mt-0.5 text-sm text-muted">Newest first</p>
@@ -228,9 +228,10 @@ interface CallListSectionProps {
   mockUpstream: boolean;
   endpointSelected: boolean;
   demoTraffic: boolean;
+  onClearFilters: () => void;
 }
 
-function CallListSection({ t, filtered, selectedId, onPick, mockUpstream, endpointSelected, demoTraffic }: CallListSectionProps) {
+function CallListSection({ t, filtered, selectedId, onPick, mockUpstream, endpointSelected, demoTraffic, onClearFilters }: CallListSectionProps) {
   // Backend restarts noticed while these calls arrived: the divider renders above the
   // first call of each new run (LAB-1366). A filtered-out first call hides its divider too.
   const breaksById = useMemo(() => new Map(t.runBreaks.map((b) => [b.beforeId, b])), [t.runBreaks]);
@@ -239,7 +240,15 @@ function CallListSection({ t, filtered, selectedId, onPick, mockUpstream, endpoi
       <CallListHeader paused={t.paused} events={t.events} />
       {filtered.length === 0 ? (
         <div className="p-4 sm:p-5">
-          <EmptyCalls hasAny={t.events.length > 0} source={t.source} status={t.status} replayDone={t.replayDone} demoTraffic={demoTraffic} endpointSelected={endpointSelected} />
+          <EmptyCalls
+            hasAny={t.events.length > 0}
+            source={t.source}
+            status={t.status}
+            replayDone={t.replayDone}
+            demoTraffic={demoTraffic}
+            endpointSelected={endpointSelected}
+            onClearFilters={onClearFilters}
+          />
         </div>
       ) : (
         <ul aria-label="Calls through the gateway" className="relative max-h-[26rem] divide-y divide-line overflow-y-auto lg:max-h-[calc(100dvh-10rem)]" data-testid="call-list">
@@ -325,7 +334,20 @@ export function Logs(rawProps: LogsProps) {
       <CallsSummaryMetrics filtered={filtered} totalCount={t.events.length} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)] xl:grid-cols-[minmax(19rem,25rem)_minmax(0,1fr)]">
-        <CallListSection t={t} filtered={filtered} selectedId={selected?.id} onPick={pick} mockUpstream={mockUpstream} endpointSelected={endpointSelected} demoTraffic={demoTraffic} />
+        <CallListSection
+          t={t}
+          filtered={filtered}
+          selectedId={selected?.id}
+          onPick={pick}
+          mockUpstream={mockUpstream}
+          endpointSelected={endpointSelected}
+          demoTraffic={demoTraffic}
+          onClearFilters={() => {
+            setFilters({ mode: "all", type: "all", problems: false });
+            // The button unmounts with the empty state: put focus on the list it reveals (LAB-1712).
+            document.getElementById("calls-title")?.focus();
+          }}
+        />
 
         <div ref={detailRef} className="@container min-w-0 scroll-mt-4 space-y-6">
           {selected ? (
@@ -554,10 +576,19 @@ interface EmptyCallsProps {
   replayDone: boolean;
   demoTraffic: boolean;
   endpointSelected?: boolean;
+  onClearFilters: () => void;
 }
 
-function EmptyCalls({ hasAny, source, status, replayDone, demoTraffic, endpointSelected = false }: EmptyCallsProps) {
-  if (hasAny) return <p className="py-6 text-center text-sm text-muted">No call matches these filters.</p>;
+function EmptyCalls({ hasAny, source, status, replayDone, demoTraffic, endpointSelected = false, onClearFilters }: EmptyCallsProps) {
+  if (hasAny)
+    return (
+      <div className="space-y-3 py-6 text-center">
+        <p className="text-sm text-muted">No call matches these filters.</p>
+        <Button size="sm" onClick={onClearFilters}>
+          Clear filters
+        </Button>
+      </div>
+    );
   if (source === "fixture" && replayDone) {
     return (
       <p className="py-6 text-center text-sm text-muted">

@@ -250,6 +250,23 @@ describe("Live traffic", () => {
     expect(rows[0]).toHaveTextContent("Refused");
   });
 
+  it("offers Clear filters when no call matches, returning the full list (LAB-1712)", async () => {
+    const user = userEvent.setup();
+    const f = fakeConnect();
+    render(<Traffic connect={f.connect} pageHost="localhost" />);
+    f.push([asMasked(huChat), asMasked(deTools)]);
+    await screen.findByTestId("call-list");
+    // Both calls are ok: "blocked or failed only" matches nothing.
+    await user.click(screen.getByRole("checkbox", { name: /blocked or failed only/i }));
+    expect(await screen.findByText("No call matches these filters.")).toBeInTheDocument();
+    expect(screen.queryByTestId("call-list")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(within(await screen.findByTestId("call-list")).getAllByRole("button")).toHaveLength(2);
+    expect(screen.getByRole("checkbox", { name: /blocked or failed only/i })).not.toBeChecked();
+    // The button unmounts: focus moves to the list it reveals, not to <body>.
+    expect(screen.getByRole("heading", { name: "Calls" })).toHaveFocus();
+  });
+
   it("explains a disabled log and offers the recorded traffic", async () => {
     const user = userEvent.setup();
     const f = fakeConnect();
