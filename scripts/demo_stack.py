@@ -158,7 +158,7 @@ def plan(
             fallback=setting("PII_GUARD_NER_FALLBACK", env_file) or None,
         )
         if not extra_installed():
-            p.ner_missing = "the 'ner' extra is not installed: `make demo` installs it"
+            p.ner_missing = "torch and transformers are not installed: `uv sync` installs them"
             env["PII_GUARD_NER_MODEL"] = ""
             env["PII_GUARD_NER_FALLBACK"] = "off"
         elif choice.model is None:

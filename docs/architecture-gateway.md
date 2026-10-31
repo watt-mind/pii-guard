@@ -32,7 +32,7 @@ Fast mode needs no model key. The NER checkpoint is optional: without one, fast 
 only ([models.md](models.md#ner-detector)).
 
 ```bash
-uv sync --extra ner
+uv sync
 export PII_GUARD_TENANT_KEY=$(openssl rand -hex 32)
 export PII_GUARD_NER_MODEL=/path/to/your/ner-checkpoint      # optional
 export PII_GUARD_UPSTREAM_BASE_URL=https://api.meta.ai/v1     # any OpenAI-compatible API

@@ -26,7 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="start here: API, gateway and web UI on one port (8787), offline mock model",
         description="Start everything in one process: the REST API, the OpenAI-compatible "
         "gateway and the bundled web UI at /. The gateway masks in fast mode (local rules, plus "
-        "NER when the ner extra is installed; no LLM call). Without --upstream or --upstream-url "
+        "the on-device NER, installed by default; no LLM call). Without --upstream or "
+        "--upstream-url "
         "(or PII_GUARD_UPSTREAM_BASE_URL) an offline mock model answers by echoing what it "
         "receives. --upstream meta: the Meta Model API with the key in $META_API_KEY.",
     )

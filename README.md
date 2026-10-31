@@ -41,14 +41,23 @@ http://127.0.0.1:8787, with a mock model that echoes what it receives:
 
 ```bash
 uvx --python 3.12 \
-  --from 'wattmind-pii-guard[ner] @ git+https://github.com/watt-mind/pii-guard' \
+  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
   pii-guard up
+```
+
+**Launch a coding agent directly** ([OpenCode](docs/integrations/opencode.md), [Codex](docs/integrations/codex.md), [Claude Code](docs/integrations/claude-code.md), [pi](docs/integrations/pi.md), [Muse Code](docs/integrations/muse-code.md)) behind an in-process local gateway with Meta's `muse-spark-1.3`:
+
+```bash
+export META_API_KEY=<your-key>
+uvx --python 3.12 \
+  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
+  pii-guard run opencode --upstream meta --model muse-spark-1.3
 ```
 
 - **First run:** downloads PyTorch and the NER once (the NER is 1.1 GB); `/healthz` reports
   `"ner": "ready"` when detection is live.
 - **A real model:** `--upstream meta` with `META_API_KEY`; `openai`, `fireworks`, `openrouter`
-  or any `--upstream-url` work the same way ([`pii-guard up` options](docs/operations.md#one-command-pii-guard-up)).
+  or any `--upstream-url` work the same way ([`pii-guard up` options](docs/operations.md#one-command-pii-guard-up), [coding agent integrations](docs/integrations/README.md)).
 - **No auth by default**, bound to 127.0.0.1: set `PII_GUARD_API_TOKEN` before exposing it
   ([how to expose it safely](docs/operations.md#exposure-and-authentication)).
 
@@ -134,7 +143,7 @@ original exactly.
 | Mode | Detection | Leaves your machine |
 |---|---|---|
 | `fast` (default): everyday traffic | Rules + on-device NER; no LLM call | Only the masked request, to your LLM provider |
-| `fast` without the `ner` extra: offline runs, CI, structured data | Rules only; free-text names only as [known values](docs/api.md#sessions-and-restore) your app registers | Only the masked request |
+| `fast` with `PII_GUARD_DETECTORS=rules`: offline runs, CI, structured data | Rules only; free-text names only as [known values](docs/api.md#sessions-and-restore) your app registers | Only the masked request |
 | `audit` (opt-in, `X-PII-Guard-Mode: audit`): measuring the upper bound, training labels | Rules + NER + an LLM detector; fails closed if that call fails | The original text, to the audit endpoint you configure |
 
 **Grammar-aware.** In Hungarian a name changes with every case; the ending stays outside the

@@ -139,8 +139,9 @@ class Settings(BaseSettings):
     # Applied by PolicySet.from_settings for the REST API and the gateway alike.
     gateway_keep_types: Annotated[frozenset[EntityType] | None, NoDecode] = None
 
-    # NER detector (the "ner" extra): hub id or local directory, hub revision, and device
-    # (auto|cpu|mps|cuda). A set model makes a missing "ner" extra stop startup (ADR 0006).
+    # NER detector (torch + transformers, in the default install): hub id or local directory,
+    # hub revision, and device (auto|cpu|mps|cuda). A set model makes missing torch/transformers
+    # stop startup (ADR 0006).
     # Unset, fast mode resolves (pii_guard.detect.ner_resolve, docs/models.md): the published
     # pii-guard checkpoint ("repo" or "repo@revision"; the default repo is pinned to v4.2), else
     # the public fallback (a stop-gap), fetched once into ~/.cache/pii-guard/models
@@ -243,7 +244,8 @@ class Settings(BaseSettings):
     sam_model: str | None = None
     # NER detector (fast mode). "transformers": a token-classification checkpoint
     # (PII_GUARD_NER_MODEL); "gliner": a GLiNER checkpoint, default the public zero-shot
-    # urchade/gliner_multi-v2.1 (needs the gliner extra). See docs/models.md.
+    # urchade/gliner_multi-v2.1 (needs the gliner package, not in the lock since LAB-1733;
+    # reproduce from commit 13e2aaf). See docs/models.md.
     ner_backend: Literal["transformers", "gliner"] = "transformers"
 
     # Corpus generation only (fictional data). Not prefixed: the provider's own name.

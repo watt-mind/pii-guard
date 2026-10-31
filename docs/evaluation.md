@@ -478,7 +478,7 @@ LLM Guard pins `transformers==4.51.3` and Presidio 2.2.358; PrivAiTe needs
 worker (`src/pii_guard/eval/baselines/workers/`) in an ephemeral `uv` environment built from
 pinned requirements (`src/pii_guard/eval/baselines/envs/*.txt`, compiled from `*.in` with
 `uv pip compile --universal --python-version 3.12 --no-header --no-annotate X.in -o X.txt`).
-PII Guard's own dependencies are unchanged. Presidio caps `numpy` below 2.5, so the `baselines` extra is declared as conflicting with the `ner` extra (`[tool.uv] conflicts`): uv resolves each on its own and the two can't be installed together. Documents reach a worker over a local pipe; the
+PII Guard's own dependencies are unchanged. Presidio caps `numpy` below 2.5, so the whole lock resolves to `numpy` 2.4.6 and the `baselines` extra installs alongside the default install (the `[tool.uv] conflicts` entry was removed in LAB-1733, when the NER became a core dependency). Documents reach a worker over a local pipe; the
 only network traffic is the first-run download of packages and models (Hugging Face Hub,
 spaCy wheels). Workers get no credentials from the environment, telemetry switches are set,
 and their stderr is discarded (the tools log detected values) unless
@@ -749,7 +749,7 @@ the model (in place of fast mode's NER). Pinned to revision
 fetched once into `$PII_GUARD_MODELS_DIR/ner/` (outside the repository) and checked:
 
 ```bash
-uv run --extra ner python -m pii_guard.eval.baselines.eu_pii_safeguard download
+uv run python -m pii_guard.eval.baselines.eu_pii_safeguard download
 PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score --record
 PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency
 ```
@@ -806,10 +806,10 @@ never product defaults**: nothing outside `pii_guard.eval` imports them.
 None is gated; nothing was accepted. The shared harness is
 `pii_guard.eval.baselines.encoders` (`EncoderSpec`, `LabelAdapter`, `ComparisonDetector`), which
 `eu_pii_safeguard` now uses too; the four specs are in `pii_guard.eval.baselines.new_encoders`.
-ModernBERT is supported by the `ner` extra's `transformers>=5.21`, so no pin changed.
+ModernBERT is supported by the default install's `transformers>=5.21`, so no pin changed.
 
 ```bash
-uv run --extra ner python -m pii_guard.eval.baselines.new_encoders download
+uv run python -m pii_guard.eval.baselines.new_encoders download
 PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py score \
   --configs fast-bardsai-v3 bardsai-v3 --record
 PII_GUARD_NER_DEVICE=cpu uv run --no-sync python scripts/bench_ner_encoders.py latency \

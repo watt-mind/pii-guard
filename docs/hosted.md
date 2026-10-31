@@ -152,8 +152,8 @@ roll back the snapshot to roll back app code. See [Azure setup and initializatio
 ## Build and configuration
 
 The self-hosted `Dockerfile`, Compose stack and wheel packaging remain separate. The hosted
-build reuses the bundled UI mechanism and the existing CPU `ner` extra/pinned checkpoint
-verifier. It builds the UI with `VITE_PII_GUARD_HOSTED=true` and `VITE_PII_GUARD_MODE=api`, bundles
+build reuses the bundled UI mechanism and the default install's CPU torch/transformers and pinned
+checkpoint verifier. It builds the UI with `VITE_PII_GUARD_HOSTED=true` and `VITE_PII_GUARD_MODE=api`, bundles
 the NER model under `/app/models/ner`, performs a warm-up forward pass, then runs offline. A
 missing/broken configured model stops startup. No OCR dependency is installed; images must be
 refused by the hosted backend, not forwarded for partial masking.
@@ -168,7 +168,7 @@ scripts/ci/lychee.sh --offline
 
 Use an immutable image digest for deployment. Azure Container Apps uses Linux amd64; building
 on an ARM workstation may use emulation and take longer. The NER image has its own size and
-startup characteristics and is not subject to the self-hosted image's 550 MB OCR/vision image budget.
+startup characteristics and is not subject to the self-hosted image's 650 MB OCR/vision image budget.
 
 | Setting | Hosted deployment |
 |---|---|
