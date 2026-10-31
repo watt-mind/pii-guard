@@ -11,7 +11,7 @@ import itertools
 import logging
 import secrets
 import threading
-from collections import Counter, OrderedDict
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
@@ -37,13 +37,9 @@ from pii_guard.vault.entry import (
     _initial,
     _layout,
     _Masked,
-    _placeholder_mask,
     _Plan,
     _recased,
     _relaid,
-    _restored,
-    _unmasked_for_entry,
-    _unmasked_known,
     _validated,
     _value_key,
     plan_spans,
@@ -58,6 +54,7 @@ from pii_guard.vault.placeholders import (
     derive_id,
     format_placeholder,
 )
+from pii_guard.vault.session_ops import assemble_masked, find_unmasked_locked, unmask_text_locked
 
 __all__ = [
     "DEFAULT_MAX_ENTRIES",
@@ -758,33 +755,7 @@ class VaultSession:
         generation: int,
     ) -> MaskResult:
         """Write the placeholders into ``text``, counting and remembering each occurrence."""
-        replacements.sort(key=lambda r: r[0])
-        parts: list[str] = []
-        cursor = 0
-        per_type: Counter[str] = Counter()
-        for start, end, entry in replacements:
-            parts.append(text[cursor:start])
-            parts.append(entry.placeholder)
-            entry.remember(following_suffix(text, end), text[start:end])
-            entry.count += 1
-            now = self._clock()
-            if entry.first_seen is None:
-                entry.first_seen = now
-            entry.last_seen = now
-            per_type[entry.entity_type.value] += 1
-            cursor = end
-        parts.append(text[cursor:])
-        logger.debug(
-            "masked %d occurrences (%d from spans): %s",
-            len(replacements),
-            spans,
-            dict(per_type),
-        )
-        return MaskResult(
-            "".join(parts),
-            tuple((start, end, entry.placeholder) for start, end, entry in replacements),
-            generation,
-        )
+        return assemble_masked(text, replacements, spans, generation, self._clock)
 
     def _fold_views(self, text: str) -> tuple[FoldedText, ...]:
         """:func:`fold_views` of ``text``, from the session's bounded memo when it has it."""
@@ -971,34 +942,7 @@ class VaultSession:
             budget = self.restore_budget()
         with self._lock:
             self._check_alive()
-            unresolved: dict[str, None] = {}
-            restored = 0
-            parts: list[str] = []
-            cursor = 0
-            for match in PLACEHOLDER_RE.finditer(text):
-                if match.start() < cursor:  # pragma: no cover - a suffix never holds "[["
-                    continue
-                parts.append(text[cursor : match.start()])
-                cursor = match.end()
-                entry = self._by_placeholder.get(match.group(0))
-                if entry is None:
-                    unresolved[match.group(0)] = None
-                    parts.append(match.group(0))
-                    continue
-                restored += 1
-                suffix = following_suffix(text, cursor)
-                value = _restored(entry, suffix)
-                budget.charge(max(0, len(value) - len(suffix)))
-                parts.append(value)
-                cursor += len(suffix)
-            parts.append(text[cursor:])
-            result = "".join(parts)
-            if unresolved:
-                logger.warning(
-                    "unmask left %d unresolved placeholders: %s", len(unresolved), list(unresolved)
-                )
-            logger.debug("unmasked %d placeholders", restored)
-            return UnmaskResult(result, tuple(unresolved))
+            return unmask_text_locked(text, self._by_placeholder, budget)
 
     @property
     def generation(self) -> int:
@@ -1040,23 +984,7 @@ class VaultSession:
         """
         with self._lock:
             self._check_alive()
-            views = [self._folds.get(text) or fold_views(text) for text in texts]
-            # One string with every view: a value none of whose needles is in it can't occur
-            # in any text, so most entries are skipped after one substring search each.
-            joined = (FoldedText("", "\x00".join(v.text for vs in views for v in vs)),)
-            taken = _placeholder_mask(texts)
-            found: list[Unmasked] = []
-            entries = sorted(self._by_key.values(), key=lambda e: (-len(e.normalized), e.order))
-            candidates = itertools.chain(
-                *(_unmasked_for_entry(e, texts, views, joined, language) for e in entries),
-                _unmasked_known(self._known, views, joined[0].text, language),
-            )
-            for item in candidates:
-                if item.end > item.start and not any(taken[item.index][item.start : item.end]):
-                    taken[item.index][item.start : item.end] = b"\x01" * (item.end - item.start)
-                    found.append(item)
-            found.sort(key=lambda u: (u.index, u.start))
-            return found
+            return find_unmasked_locked(texts, self._folds, self._by_key, self._known, language)
 
     def confirmed_values(self, entity_types: Iterable[EntityType]) -> list[str]:
         """The confirmed values of ``entity_types``, as first written, plus pre-loaded ones.
