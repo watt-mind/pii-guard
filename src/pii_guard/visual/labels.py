@@ -388,6 +388,66 @@ def _same_text(a: str, b: str) -> bool:
     return any(long[k : k + n] == short for k in range(len(long) - n + 1))
 
 
+def _near_region(covered: Sequence[tuple[Region, Policy]], i: int, j: int) -> bool:
+    a, b = covered[i][0], covered[j][0]
+    return a.entity_type is b.entity_type and same_value(a.box, b.box)
+
+
+def _same_reading(
+    covered: Sequence[tuple[Region, Policy]], reads: dict[int, tuple[str, str]], i: int, j: int
+) -> bool:
+    return _near_region(covered, i, j) and _same_text(reads[i][1], reads[j][1])
+
+
+def _unify_groups(
+    covered: Sequence[tuple[Region, Policy]],
+    labels: Sequence[RegionLabel],
+    reads: dict[int, tuple[str, str]],
+) -> list[list[int]]:
+    candidates = [
+        i
+        for i, (region, policy) in enumerate(covered)
+        if policy is Policy.MASK and not region.entity_type.is_visual
+    ]
+    neighbours = {
+        i: [j for j in candidates if j != i and _near_region(covered, i, j)] for i in candidates
+    }
+    ambiguous = {
+        i
+        for i, around in neighbours.items()
+        if any(not _near_region(covered, a, b) for a, b in combinations(around, 2))
+    }
+    joinable = [
+        i
+        for i in candidates
+        if i not in ambiguous
+        and i in reads
+        and labels[i].placeholder is not None
+        and labels[i].match != "uncertain"
+    ]
+    root = {i: i for i in joinable}
+
+    def find(i: int) -> int:
+        while root[i] != i:
+            root[i] = root[root[i]]
+            i = root[i]
+        return i
+
+    for i, j in combinations(joinable, 2):
+        if _same_reading(covered, reads, i, j):
+            root[find(i)] = find(j)
+    groups: dict[int, list[int]] = {}
+    for i in joinable:
+        groups.setdefault(find(i), []).append(i)
+    return [
+        group
+        for group in groups.values()
+        if len({labels[i].placeholder for i in group}) >= 2
+        and all(_same_reading(covered, reads, i, j) for i, j in combinations(group, 2))
+        and not any(j not in set(group) for i in group for j in neighbours[i])
+    ]
+
+
 def _unify(
     covered: Sequence[tuple[Region, Policy]],
     labels: list[RegionLabel],
@@ -419,48 +479,6 @@ def _unify(
     change: every region is still covered with its own box. Returns the labels and each
     losing placeholder's winner, so the summary and other labels can follow.
     """
-    candidates = [
-        i
-        for i, (region, policy) in enumerate(covered)
-        if policy is Policy.MASK and not region.entity_type.is_visual
-    ]
-
-    def near(i: int, j: int) -> bool:
-        a, b = covered[i][0], covered[j][0]
-        return a.entity_type is b.entity_type and same_value(a.box, b.box)
-
-    neighbours = {i: [j for j in candidates if j != i and near(i, j)] for i in candidates}
-    ambiguous = {
-        i
-        for i, around in neighbours.items()
-        if any(not near(a, b) for a, b in combinations(around, 2))
-    }
-    joinable = [
-        i
-        for i in candidates
-        if i not in ambiguous
-        and i in reads
-        and labels[i].placeholder is not None
-        and labels[i].match != "uncertain"
-    ]
-
-    def same(i: int, j: int) -> bool:
-        return near(i, j) and _same_text(reads[i][1], reads[j][1])
-
-    root = {i: i for i in joinable}
-
-    def find(i: int) -> int:
-        while root[i] != i:
-            root[i] = root[root[i]]
-            i = root[i]
-        return i
-
-    for i, j in combinations(joinable, 2):
-        if same(i, j):
-            root[find(i)] = find(j)
-    groups: dict[int, list[int]] = {}
-    for i in joinable:
-        groups.setdefault(find(i), []).append(i)
 
     def rank(i: int) -> tuple[bool, bool, bool, bool, int]:
         label, box = labels[i], covered[i][0].box
@@ -474,14 +492,7 @@ def _unify(
 
     out = list(labels)
     winners: dict[str, str] = {}
-    for group in groups.values():
-        members = set(group)
-        if len({labels[i].placeholder for i in group}) < 2:
-            continue
-        if not all(same(i, j) for i, j in combinations(group, 2)):
-            continue
-        if any(j not in members for i in group for j in neighbours[i]):
-            continue
+    for group in _unify_groups(covered, labels, reads):
         best = labels[max(group, key=rank)]
         for i in group:
             loser = labels[i].placeholder
@@ -629,6 +640,125 @@ def _leaks(text: str, values: Sequence[str]) -> bool:
     return False
 
 
+def _first_mrz(ocr: OcrText | None) -> MrzData | None:
+    if ocr is None:
+        return None
+    for zone in ocr.zones:
+        mrz_data = parse_mrz(zone.lines)
+        if mrz_data is not None:
+            return mrz_data
+    return None
+
+
+def _assign_holder(
+    findings: Sequence[TextFinding],
+    mrz_data: MrzData | None,
+    is_id: bool,
+    matcher: VaultMatcher,
+    matches: dict[str, int],
+    summary_fields: list[SummaryField],
+) -> tuple[_Holder | None, str | None, set[int]]:
+    person_fields = _person_fields(findings)
+    holder_value = _holder_text(person_fields, mrz_data) if is_id else None
+    holder_findings: set[int] = set()
+    if not holder_value:
+        return None, None, holder_findings
+    label = matcher.assign(holder_value, EntityType.PERSON)
+    holder = _Holder(label, frozenset(name_tokens(holder_value)))
+    matches[label.match or "new"] = matches.get(label.match or "new", 0) + 1
+    for field_key in ("surname", "given_names", "name"):
+        for finding in person_fields.get(field_key, ()):
+            if set(name_tokens(finding.text)) <= holder.tokens:
+                holder_findings.add(id(finding))
+                summary_fields.append(
+                    SummaryField(field_key, label.placeholder or "", label.match or "new")
+                )
+    return holder, holder_value, holder_findings
+
+
+def _resolve_mrz_document(mrz_data: MrzData | None, matcher: VaultMatcher) -> str | None:
+    if mrz_data is None or not mrz_data.document_number:
+        return None
+    # A valid zone's number is registered; a misread one is only matched, never stored.
+    if mrz_data.valid:
+        return matcher.assign(mrz_data.document_number, EntityType.ID_DOCUMENT).placeholder
+    # A misread zone's number is only matched, never stored. First as read, then
+    # the check-digit-gated OCR-confusion fixes (LAB-1197). A fix reconstructs the
+    # printed number with the digit's certainty, so it must match exactly: a fuzzy
+    # reuse could merge a near-namesake the digit ruled out.
+    found = matcher.match(mrz_data.document_number, EntityType.ID_DOCUMENT)
+    if (
+        found.accepted
+        and found.candidate is not None
+        and not found.candidate.placeholder.startswith("known:")
+    ):
+        return found.candidate.placeholder
+    for fix in mrz_number_fixes(mrz_data):
+        fixed = matcher.match(fix, EntityType.ID_DOCUMENT)
+        if (
+            fixed.status == "exact"
+            and fixed.candidate is not None
+            and not fixed.candidate.placeholder.startswith("known:")
+        ):
+            return fixed.candidate.placeholder
+    return None
+
+
+def _label_findings(
+    findings: Sequence[TextFinding],
+    holder: _Holder | None,
+    holder_findings: set[int],
+    mrz_document: str | None,
+    matcher: VaultMatcher,
+    matches: dict[str, int],
+    summary_fields: list[SummaryField],
+) -> list[tuple[TextFinding, RegionLabel]]:
+    labelled: list[tuple[TextFinding, RegionLabel]] = []
+    for finding in findings:
+        if id(finding) in holder_findings and holder is not None:
+            labelled.append((finding, holder.label))
+            continue
+        if finding.origin == "mrz":
+            target = mrz_document or (holder.label.placeholder if holder else None)
+            text_label = f"MRZ · {target}" if target else "MRZ"
+            labelled.append((finding, RegionLabel(text_label, target, None)))
+            continue
+        label = matcher.assign(finding.text, finding.region.entity_type)
+        matches[label.match or "new"] = matches.get(label.match or "new", 0) + 1
+        labelled.append((finding, label))
+        name = field_name(finding.caption, finding.region.entity_type) if finding.caption else None
+        if finding.origin == "caption" and name is not None and label.placeholder:
+            summary_fields.append(SummaryField(name, label.placeholder, label.match or "new"))
+    if mrz_document is not None and not any(f.name == "document_number" for f in summary_fields):
+        summary_fields.append(SummaryField("document_number", mrz_document, "new"))
+    return labelled
+
+
+def _initial_region_labels(
+    covered: Sequence[tuple[Region, Policy]],
+    labelled: Sequence[tuple[TextFinding, RegionLabel]],
+    holder: _Holder | None,
+) -> tuple[list[RegionLabel], dict[int, tuple[str, str]]]:
+    region_labels: list[RegionLabel] = []
+    reads: dict[int, tuple[str, str]] = {}
+    for position, (region, policy) in enumerate(covered):
+        if policy is not Policy.MASK:
+            region_labels.append(RegionLabel(None, None))
+            continue
+        if region.entity_type.is_visual:
+            label = _kind_label(region.entity_type, holder)
+        else:
+            index = _best_finding(region, labelled)
+            label = (
+                labelled[index][1] if index >= 0 else RegionLabel(region.entity_type.value, None)
+            )
+            if index >= 0:
+                finding = labelled[index][0]
+                reads[position] = (finding.origin, finding.text)
+        region_labels.append(label)
+    return region_labels, reads
+
+
 def label_image(
     ocr: OcrText | None,
     covered: Sequence[tuple[Region, Policy]],
@@ -649,96 +779,19 @@ def label_image(
         findings = [f for f in findings if f.region.entity_type in masked_types]
     words = ocr.words if ocr is not None else []
     text = " ".join(w.text for w in words)
-    mrz_data: MrzData | None = None
-    if ocr is not None:
-        for zone in ocr.zones:
-            mrz_data = parse_mrz(zone.lines)
-            if mrz_data is not None:
-                break
+    mrz_data = _first_mrz(ocr)
     is_id = document_type(text, mrz_data) in ID_DOCUMENTS or mrz_data is not None
 
-    labelled: list[tuple[TextFinding, RegionLabel]] = []
     summary_fields: list[SummaryField] = []
     matches: dict[str, int] = {}
-    holder: _Holder | None = None
-    person_fields = _person_fields(findings)
-    holder_value = _holder_text(person_fields, mrz_data) if is_id else None
-    holder_findings: set[int] = set()
-    if holder_value:
-        label = matcher.assign(holder_value, EntityType.PERSON)
-        holder = _Holder(label, frozenset(name_tokens(holder_value)))
-        matches[label.match or "new"] = matches.get(label.match or "new", 0) + 1
-        for field_key in ("surname", "given_names", "name"):
-            for finding in person_fields.get(field_key, ()):
-                if set(name_tokens(finding.text)) <= holder.tokens:
-                    holder_findings.add(id(finding))
-                    summary_fields.append(
-                        SummaryField(field_key, label.placeholder or "", label.match or "new")
-                    )
-    mrz_document: str | None = None
-    if mrz_data is not None and mrz_data.document_number:
-        # A valid zone's number is registered; a misread one is only matched, never stored.
-        if mrz_data.valid:
-            mrz_document = matcher.assign(
-                mrz_data.document_number, EntityType.ID_DOCUMENT
-            ).placeholder
-        else:
-            # A misread zone's number is only matched, never stored. First as read, then
-            # the check-digit-gated OCR-confusion fixes (LAB-1197). A fix reconstructs the
-            # printed number with the digit's certainty, so it must match exactly: a fuzzy
-            # reuse could merge a near-namesake the digit ruled out.
-            found = matcher.match(mrz_data.document_number, EntityType.ID_DOCUMENT)
-            if (
-                found.accepted
-                and found.candidate is not None
-                and not found.candidate.placeholder.startswith("known:")
-            ):
-                mrz_document = found.candidate.placeholder
-            else:
-                for fix in mrz_number_fixes(mrz_data):
-                    fixed = matcher.match(fix, EntityType.ID_DOCUMENT)
-                    if (
-                        fixed.status == "exact"
-                        and fixed.candidate is not None
-                        and not fixed.candidate.placeholder.startswith("known:")
-                    ):
-                        mrz_document = fixed.candidate.placeholder
-                        break
-    for finding in findings:
-        if id(finding) in holder_findings and holder is not None:
-            labelled.append((finding, holder.label))
-            continue
-        if finding.origin == "mrz":
-            target = mrz_document or (holder.label.placeholder if holder else None)
-            text_label = f"MRZ · {target}" if target else "MRZ"
-            labelled.append((finding, RegionLabel(text_label, target, None)))
-            continue
-        label = matcher.assign(finding.text, finding.region.entity_type)
-        matches[label.match or "new"] = matches.get(label.match or "new", 0) + 1
-        labelled.append((finding, label))
-        name = field_name(finding.caption, finding.region.entity_type) if finding.caption else None
-        if finding.origin == "caption" and name is not None and label.placeholder:
-            summary_fields.append(SummaryField(name, label.placeholder, label.match or "new"))
-    if mrz_document is not None and not any(f.name == "document_number" for f in summary_fields):
-        summary_fields.append(SummaryField("document_number", mrz_document, "new"))
-
-    region_labels: list[RegionLabel] = []
-    reads: dict[int, tuple[str, str]] = {}
-    for position, (region, policy) in enumerate(covered):
-        if policy is not Policy.MASK:
-            region_labels.append(RegionLabel(None, None))
-            continue
-        if region.entity_type.is_visual:
-            label = _kind_label(region.entity_type, holder)
-        else:
-            index = _best_finding(region, labelled)
-            label = (
-                labelled[index][1] if index >= 0 else RegionLabel(region.entity_type.value, None)
-            )
-            if index >= 0:
-                finding = labelled[index][0]
-                reads[position] = (finding.origin, finding.text)
-        region_labels.append(label)
+    holder, holder_value, holder_findings = _assign_holder(
+        findings, mrz_data, is_id, matcher, matches, summary_fields
+    )
+    mrz_document = _resolve_mrz_document(mrz_data, matcher)
+    labelled = _label_findings(
+        findings, holder, holder_findings, mrz_document, matcher, matches, summary_fields
+    )
+    region_labels, reads = _initial_region_labels(covered, labelled, holder)
     region_labels, winners = _unify(
         covered,
         region_labels,

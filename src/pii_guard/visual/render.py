@@ -36,7 +36,7 @@ placeholder is still in the transcript).
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -228,6 +228,48 @@ def _extend(
     return (x1, y1, max(x2, min(limit, x1 + needed - 1)), y2)
 
 
+def _padded_rects(
+    items: Sequence[LabelBox], width: int, height: int, padding: int
+) -> list[tuple[int, int, int, int] | None]:
+    rects: list[tuple[int, int, int, int] | None] = []
+    for item in items:
+        if not isinstance(item, LabelBox):
+            raise TypeError("boxes must be LabelBox instances")
+        box = item.box
+        x1, y1 = max(0, box.x1 - padding), max(0, box.y1 - padding)
+        x2, y2 = min(width - 1, box.x2 + padding), min(height - 1, box.y2 + padding)
+        rects.append((x1, y1, x2, y2) if x1 <= x2 and y1 <= y2 else None)
+    return rects
+
+
+def _draw_box_label(
+    draw: ImageDraw.ImageDraw,
+    rect: tuple[int, int, int, int],
+    label: str | None,
+    suppressed: bool,
+    ink: tuple[int, int, int],
+) -> None:
+    x1, y1, x2, y2 = rect
+    w, h = x2 - x1 + 1, y2 - y1 + 1
+    if not suppressed and w >= 4 and h >= 4:
+        draw.rectangle(rect, outline=ink, width=1)
+    if suppressed or not label:
+        return
+    fitted = fit_label(draw, label, w, h)
+    if fitted is None:
+        return
+    lines, size = fitted
+    font = _font(size)
+    margin = max(1, round(size * MARGIN))
+    sizes = [_measure(draw, line, size) for line in lines]
+    total = sum(lh for _, lh in sizes) + margin * (len(lines) - 1)
+    y = y1 + (h - total) // 2
+    for line, (lw, lh) in zip(lines, sizes, strict=True):
+        left, top, _, _ = draw.textbbox((0, 0), line, font=font)
+        draw.text((x1 + (w - lw) // 2 - left, y - top), line, fill=ink, font=font)
+        y += lh + margin
+
+
 def render_labels(
     image_bytes: bytes,
     boxes: Iterable[LabelBox],
@@ -257,14 +299,7 @@ def render_labels(
         draw = ImageDraw.Draw(image)
         width, height = image.size
         items = list(boxes)
-        rects: list[tuple[int, int, int, int] | None] = []
-        for item in items:
-            if not isinstance(item, LabelBox):
-                raise TypeError("boxes must be LabelBox instances")
-            box = item.box
-            x1, y1 = max(0, box.x1 - padding), max(0, box.y1 - padding)
-            x2, y2 = min(width - 1, box.x2 + padding), min(height - 1, box.y2 + padding)
-            rects.append((x1, y1, x2, y2) if x1 <= x2 and y1 <= y2 else None)
+        rects = _padded_rects(items, width, height, padding)
         blocked = [(b.x1, b.y1, b.x2, b.y2) for b in obstacles]
         suppressed = _duplicate_labels(items, rects)
         for index, (item, rect) in enumerate(zip(items, rects, strict=True)):
@@ -276,28 +311,8 @@ def render_labels(
             if rect is not None:
                 draw.rectangle(rect, fill=fill)
         for index, (item, rect) in enumerate(zip(items, rects, strict=True)):
-            if rect is None:
-                continue
-            x1, y1, x2, y2 = rect
-            label = None if index in suppressed else item.label
-            w, h = x2 - x1 + 1, y2 - y1 + 1
-            if index not in suppressed and w >= 4 and h >= 4:
-                draw.rectangle(rect, outline=ink, width=1)
-            if not label:
-                continue
-            fitted = fit_label(draw, label, w, h)
-            if fitted is None:
-                continue
-            lines, size = fitted
-            font = _font(size)
-            margin = max(1, round(size * MARGIN))
-            sizes = [_measure(draw, line, size) for line in lines]
-            total = sum(lh for _, lh in sizes) + margin * (len(lines) - 1)
-            y = y1 + (h - total) // 2
-            for line, (lw, lh) in zip(lines, sizes, strict=True):
-                left, top, _, _ = draw.textbbox((0, 0), line, font=font)
-                draw.text((x1 + (w - lw) // 2 - left, y - top), line, fill=ink, font=font)
-                y += lh + margin
+            if rect is not None:
+                _draw_box_label(draw, rect, item.label, index in suppressed, ink)
         covered = [Box(*rect) if rect is not None else None for rect in rects]
         return LabelledImage(encode_image(image, image_format), covered)
     except Exception as exc:

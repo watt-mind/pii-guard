@@ -206,7 +206,7 @@ class TrafficFeed:
                 event
                 for source, log in self._logs.items()
                 if include(source)
-                for event in log._events
+                for event in log.events_unlocked()
                 if after is None or event["seq"] > after
             ]
         events.sort(key=lambda event: event["seq"])
@@ -214,10 +214,14 @@ class TrafficFeed:
             events = events[-limit:] if limit > 0 else []
         return events
 
-    def _matching(self, source: str) -> list[tuple[asyncio.AbstractEventLoop, asyncio.Queue[Any]]]:
+    def matching_subscribers(
+        self, source: str
+    ) -> list[tuple[asyncio.AbstractEventLoop, asyncio.Queue[Any]]]:
         return [(loop, queue) for loop, queue, include in self._subscribers if include(source)]
 
-    def _discard(self, loop: asyncio.AbstractEventLoop, queue: asyncio.Queue[Any]) -> None:
+    def discard_subscriber(
+        self, loop: asyncio.AbstractEventLoop, queue: asyncio.Queue[Any]
+    ) -> None:
         with self.lock:
             self._subscribers = {s for s in self._subscribers if s[:2] != (loop, queue)}
 
@@ -305,6 +309,10 @@ class TrafficLog:
     def full(self) -> bool:
         return self.level is TrafficLevel.FULL
 
+    def events_unlocked(self) -> Iterable[dict[str, Any]]:
+        """Stored events without taking the lock (caller holds the shared feed lock)."""
+        return self._events
+
     def session_ref(self, session_id: str) -> str:
         """A stable, non-reversible handle for a session within this process."""
         digest = hmac.new(self._key, session_id.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -320,7 +328,7 @@ class TrafficLog:
             event["seq"] = next(self._seq)
             self._events.append(event)
             subscribers = list(self._subscribers)
-            shared = self.feed._matching(self.source) if self.feed is not None else []
+            shared = self.feed.matching_subscribers(self.source) if self.feed is not None else []
         for loop, queue in subscribers:
             try:
                 loop.call_soon_threadsafe(self._offer, queue, event)
@@ -332,7 +340,7 @@ class TrafficLog:
                 loop.call_soon_threadsafe(self._offer, queue, event)
             except RuntimeError:
                 if self.feed is not None:
-                    self.feed._discard(loop, queue)
+                    self.feed.discard_subscriber(loop, queue)
         return event
 
     def _offer(self, queue: asyncio.Queue[Any], event: dict[str, Any]) -> None:

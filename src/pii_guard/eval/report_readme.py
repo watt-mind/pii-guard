@@ -103,10 +103,7 @@ _MISSING = "—"
 _PARTIAL = "§"
 
 
-def parse_spec(raw: object, where: str) -> dict[str, Any]:
-    """Validate the config's ``readme`` section; :class:`RecordError` names what is wrong."""
-    if not isinstance(raw, dict):
-        raise RecordError(f"{where}: 'readme' must be an object")
+def _validate_columns_and_rows(raw: dict[str, Any], where: str) -> tuple[list[Any], list[Any]]:
     columns, rows = raw.get("columns"), raw.get("rows")
     if not isinstance(columns, list) or not columns or not isinstance(rows, list) or not rows:
         raise RecordError(f"{where}: 'readme' needs non-empty 'columns' and 'rows' lists")
@@ -125,6 +122,40 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
             isinstance(row.get(k), str) for k in ("system", "label")
         ):
             raise RecordError(f"{where}: each readme row needs 'system' and 'label': {row!r}")
+    return columns, rows
+
+
+def _validate_latency_specs(raw: dict[str, Any], spec: dict[str, Any], where: str) -> None:
+    if "latency" in raw:
+        lat = raw["latency"]
+        if (
+            not isinstance(lat, dict)
+            or not isinstance(lat.get("run"), str)
+            or not isinstance(lat.get("label"), str)
+            or not isinstance(lat.get("concurrency", 1), int)
+            or not isinstance(lat.get("stream", False), bool)
+        ):
+            raise RecordError(
+                f"{where}: readme 'latency' needs 'run' and 'label' strings, an integer "
+                f"'concurrency' and a boolean 'stream': {lat!r}"
+            )
+        spec["latency"] = lat
+    if "model_latency" in raw:
+        ml = raw["model_latency"]
+        if not isinstance(ml, dict) or not all(
+            isinstance(ml.get(k), str) for k in ("file", "model", "label")
+        ):
+            raise RecordError(
+                f"{where}: readme 'model_latency' needs 'file', 'model' and 'label' strings: {ml!r}"
+            )
+        spec["model_latency"] = dict(ml)
+
+
+def parse_spec(raw: object, where: str) -> dict[str, Any]:
+    """Validate the config's ``readme`` section; :class:`RecordError` names what is wrong."""
+    if not isinstance(raw, dict):
+        raise RecordError(f"{where}: 'readme' must be an object")
+    columns, rows = _validate_columns_and_rows(raw, where)
     spec: dict[str, Any] = {"columns": columns, "rows": rows}
     for key in ("layout", "aliases", "intro", "notes", "caveats", "details", "table_image"):
         if key in raw:
@@ -154,29 +185,7 @@ def parse_spec(raw: object, where: str) -> dict[str, Any]:
             if not isinstance(raw[flag], bool):
                 raise RecordError(f"{where}: readme '{flag}' must be true or false")
             spec[flag] = raw[flag]
-    if "latency" in raw:
-        lat = raw["latency"]
-        if (
-            not isinstance(lat, dict)
-            or not isinstance(lat.get("run"), str)
-            or not isinstance(lat.get("label"), str)
-            or not isinstance(lat.get("concurrency", 1), int)
-            or not isinstance(lat.get("stream", False), bool)
-        ):
-            raise RecordError(
-                f"{where}: readme 'latency' needs 'run' and 'label' strings, an integer "
-                f"'concurrency' and a boolean 'stream': {lat!r}"
-            )
-        spec["latency"] = lat
-    if "model_latency" in raw:
-        ml = raw["model_latency"]
-        if not isinstance(ml, dict) or not all(
-            isinstance(ml.get(k), str) for k in ("file", "model", "label")
-        ):
-            raise RecordError(
-                f"{where}: readme 'model_latency' needs 'file', 'model' and 'label' strings: {ml!r}"
-            )
-        spec["model_latency"] = dict(ml)
+    _validate_latency_specs(raw, spec, where)
     return spec
 
 
@@ -308,6 +317,42 @@ def _escape(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
+def _p50_entries(
+    index: Mapping[str, Any],
+    rows: Sequence[Mapping[str, Any]],
+    columns: Sequence[Mapping[str, Any]],
+) -> list[str]:
+    p50 = []
+    for row in rows:
+        if row.get("p50", True) is False:
+            continue
+        for col in columns:
+            if "fixture_set" not in col or col["fixture_set"] != index.get("headline_set"):
+                continue
+            snap = _snapshot(index, col["fixture_set"], row["system"])
+            if snap is not None and snap["all"]["detect_p50_ms"] is not None:
+                star = "*" if snap["all"]["latency_pooled"] else ""
+                short = row.get("short", row["label"])
+                p50.append(f"{short} {fmt_duration(snap['all']['detect_p50_ms'])}{star}")
+            break
+    return p50
+
+
+def _first_row_refs(columns: Sequence[Mapping[str, Any]], row_cells: Sequence[_Cell]) -> list[str]:
+    refs = []
+    for j, col in enumerate(columns):
+        links = row_cells[j].links
+        if len(links) == 1:
+            refs.append(f"[{col['title']}]({links[0]})")
+        elif links:
+            refs.append(
+                f"{col['title']} ("
+                + " · ".join(f"[{k}]({link})" for k, link in enumerate(links, 1))
+                + ")"
+            )
+    return refs
+
+
 def render_block(
     index: Mapping[str, Any], counts: Sequence[Mapping[str, Any]], spec: Mapping[str, Any]
 ) -> str:
@@ -322,7 +367,7 @@ def render_block(
         {
             (rows[i].get("short", rows[i]["label"]), str(col["title"]), ", ".join(c.missing))
             for i, r in enumerate(grid)
-            for j, (col, c) in enumerate(zip(columns, r, strict=True))
+            for col, c in zip(columns, r, strict=True)
             if c.missing and c.value is not None
         },
         key=lambda t: (t[1], t[0]),
@@ -336,19 +381,7 @@ def render_block(
         )
         out.append("")
 
-    p50 = []
-    for row in rows:
-        if row.get("p50", True) is False:
-            continue
-        for col in columns:
-            if "fixture_set" not in col or col["fixture_set"] != index.get("headline_set"):
-                continue
-            snap = _snapshot(index, col["fixture_set"], row["system"])
-            if snap is not None and snap["all"]["detect_p50_ms"] is not None:
-                star = "*" if snap["all"]["latency_pooled"] else ""
-                short = row.get("short", row["label"])
-                p50.append(f"{short} {fmt_duration(snap['all']['detect_p50_ms'])}{star}")
-            break
+    p50 = _p50_entries(index, rows, columns)
     if p50:
         out.append(
             f"Detection p50 on the `{index.get('headline_set')}` set: "
@@ -404,17 +437,7 @@ def render_block(
         )
         out.append("")
 
-    refs = []
-    for j, col in enumerate(columns):
-        links = grid[0][j].links
-        if len(links) == 1:
-            refs.append(f"[{col['title']}]({links[0]})")
-        elif links:
-            refs.append(
-                f"{col['title']} ("
-                + " · ".join(f"[{k}]({link})" for k, link in enumerate(links, 1))
-                + ")"
-            )
+    refs = _first_row_refs(columns, grid[0])
     if refs:
         out.append(
             f"Records behind the {first.get('short', first['label'])} row: "

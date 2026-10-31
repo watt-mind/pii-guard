@@ -140,24 +140,51 @@ def holds_credential(text: str) -> bool:
     return False
 
 
-def convert(row: Row, labels: LabelMap, *, prefix: str, kind: str, source: str) -> Converted:
-    """One :class:`Row` as a fixture :class:`Document` with id ``<prefix>-<uid>``."""
-    doc_id = f"{prefix}-{row.uid}"
+def _validate_row(row: Row, doc_id: str) -> None:
     text = row.text
     if not text or not text.strip() or not row.language:
         raise ConversionError(f"{doc_id}: missing text or language")
     if holds_credential(text):
         raise ConversionError(f"{doc_id}: holds a provider-format credential")
-    dropped: Counter[str] = Counter()
-    unknown: Counter[str] = Counter()
-    spans: list[tuple[int, int, EntityType, frozenset[str]]] = []
-    ignore: list[tuple[int, int, str]] = []
     if row.values is not None:
         if len(row.values) != len(row.spans):
             raise ConversionError(f"{doc_id}: span values don't match the spans")
         for (start, end, _), value in zip(row.spans, row.values, strict=True):
             if text[start:end] != value:
                 raise ConversionError(f"{doc_id}: span offsets don't match the text")
+
+
+def _append_or_merge_span(
+    spans: list[tuple[int, int, EntityType, frozenset[str]]],
+    start: int,
+    end: int,
+    entity_type: EntityType,
+    label: str,
+    text: str,
+    doc_id: str,
+) -> None:
+    if spans:
+        p_start, p_end, p_type, p_labels = spans[-1]
+        if start < p_end:
+            if p_type is not entity_type:
+                raise ConversionError(f"{doc_id}: overlapping spans of different types")
+            spans[-1] = (p_start, max(p_end, end), p_type, p_labels | {label})
+            return
+        if p_type is entity_type and _MERGE_GAP_RE.fullmatch(text[p_end:start]):
+            spans[-1] = (p_start, end, p_type, p_labels | {label})
+            return
+    spans.append((start, end, entity_type, frozenset({label})))
+
+
+def convert(row: Row, labels: LabelMap, *, prefix: str, kind: str, source: str) -> Converted:
+    """One :class:`Row` as a fixture :class:`Document` with id ``<prefix>-<uid>``."""
+    doc_id = f"{prefix}-{row.uid}"
+    text = row.text
+    _validate_row(row, doc_id)
+    dropped: Counter[str] = Counter()
+    unknown: Counter[str] = Counter()
+    spans: list[tuple[int, int, EntityType, frozenset[str]]] = []
+    ignore: list[tuple[int, int, str]] = []
     for start, end, label in sorted(row.spans, key=lambda s: (s[0], s[1])):
         if not 0 <= start < end <= len(text):
             raise ConversionError(f"{doc_id}: span offsets out of range")
@@ -173,19 +200,8 @@ def convert(row: Row, labels: LabelMap, *, prefix: str, kind: str, source: str) 
             if start < end:
                 ignore.append((start, end, label))
             continue
-        if start >= end:
-            continue
-        if spans:
-            p_start, p_end, p_type, p_labels = spans[-1]
-            if start < p_end:
-                if p_type is not entity_type:
-                    raise ConversionError(f"{doc_id}: overlapping spans of different types")
-                spans[-1] = (p_start, max(p_end, end), p_type, p_labels | {label})
-                continue
-            if p_type is entity_type and _MERGE_GAP_RE.fullmatch(text[p_end:start]):
-                spans[-1] = (p_start, end, p_type, p_labels | {label})
-                continue
-        spans.append((start, end, entity_type, frozenset({label})))
+        if start < end:
+            _append_or_merge_span(spans, start, end, entity_type, label, text, doc_id)
     kept: list[tuple[int, int, EntityType]] = []
     for s, e, t, merged in spans:
         if merged <= labels.part_only:  # a city or postcode on its own: not scored

@@ -759,6 +759,46 @@ def _type_ok(value: object, name: str) -> bool:
     return isinstance(value, _TYPES[name])
 
 
+def _validate_scalar(value: Any, schema: Mapping[str, Any], path: str, errors: list[str]) -> None:
+    if "const" in schema and value != schema["const"]:
+        errors.append(f"{path}: must be {schema['const']!r}")
+    if "enum" in schema and value not in schema["enum"]:
+        errors.append(f"{path}: {value!r} not one of {schema['enum']}")
+    if isinstance(value, str):
+        if "pattern" in schema and not re.search(schema["pattern"], value):
+            errors.append(f"{path}: {value!r} does not match {schema['pattern']}")
+        if len(value) < schema.get("minLength", 0):
+            errors.append(f"{path}: shorter than {schema['minLength']}")
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            errors.append(f"{path}: below {schema['minimum']}")
+        if "maximum" in schema and value > schema["maximum"]:
+            errors.append(f"{path}: above {schema['maximum']}")
+
+
+def _validate_object(
+    value: dict[str, Any],
+    schema: Mapping[str, Any],
+    root: Mapping[str, Any],
+    path: str,
+    errors: list[str],
+) -> None:
+    for key in schema.get("required", []):
+        if key not in value:
+            errors.append(f"{path}: missing {key!r}")
+    props = schema.get("properties", {})
+    additional = schema.get("additionalProperties", True)
+    for key, item in value.items():
+        if "propertyNames" in schema:
+            _validate(key, schema["propertyNames"], root, f"{path}.{key}<name>", errors)
+        if key in props:
+            _validate(item, props[key], root, f"{path}.{key}", errors)
+        elif additional is False:
+            errors.append(f"{path}: unexpected field {key!r}")
+        elif isinstance(additional, dict):
+            _validate(item, additional, root, f"{path}.{key}", errors)
+
+
 def _validate(
     value: Any, schema: Mapping[str, Any], root: Mapping[str, Any], path: str, errors: list[str]
 ) -> None:
@@ -782,35 +822,9 @@ def _validate(
         if not any(_type_ok(value, n) for n in names):
             errors.append(f"{path}: expected {'/'.join(names)}, got {type(value).__name__}")
             return
-    if "const" in schema and value != schema["const"]:
-        errors.append(f"{path}: must be {schema['const']!r}")
-    if "enum" in schema and value not in schema["enum"]:
-        errors.append(f"{path}: {value!r} not one of {schema['enum']}")
-    if isinstance(value, str):
-        if "pattern" in schema and not re.search(schema["pattern"], value):
-            errors.append(f"{path}: {value!r} does not match {schema['pattern']}")
-        if len(value) < schema.get("minLength", 0):
-            errors.append(f"{path}: shorter than {schema['minLength']}")
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        if "minimum" in schema and value < schema["minimum"]:
-            errors.append(f"{path}: below {schema['minimum']}")
-        if "maximum" in schema and value > schema["maximum"]:
-            errors.append(f"{path}: above {schema['maximum']}")
+    _validate_scalar(value, schema, path, errors)
     if isinstance(value, dict):
-        for key in schema.get("required", []):
-            if key not in value:
-                errors.append(f"{path}: missing {key!r}")
-        props = schema.get("properties", {})
-        additional = schema.get("additionalProperties", True)
-        for key, item in value.items():
-            if "propertyNames" in schema:
-                _validate(key, schema["propertyNames"], root, f"{path}.{key}<name>", errors)
-            if key in props:
-                _validate(item, props[key], root, f"{path}.{key}", errors)
-            elif additional is False:
-                errors.append(f"{path}: unexpected field {key!r}")
-            elif isinstance(additional, dict):
-                _validate(item, additional, root, f"{path}.{key}", errors)
+        _validate_object(value, schema, root, path, errors)
     if isinstance(value, list) and "items" in schema:
         for i, item in enumerate(value):
             _validate(item, schema["items"], root, f"{path}[{i}]", errors)

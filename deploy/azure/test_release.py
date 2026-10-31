@@ -1,6 +1,7 @@
 """Compile and check the release writer's scope without contacting Azure."""
 
 import json
+import os
 import re
 import runpy
 import shutil
@@ -14,43 +15,213 @@ from unittest import mock
 TEMPLATE = Path(__file__).with_name("release.bicep").resolve()
 SMOKE = Path(__file__).with_name("smoke.py").resolve()
 
+DEFAULT_SECURITY_HEADERS = [
+    ("content-security-policy", "default-src 'self'; object-src 'none'; frame-ancestors 'none'"),
+    ("x-content-type-options", "nosniff"),
+    ("x-frame-options", "DENY"),
+    ("referrer-policy", "same-origin"),
+    ("permissions-policy", "camera=(), microphone=()"),
+    ("cross-origin-opener-policy", "same-origin"),
+]
+
 
 class _FakeHttps:
     """A fictional public origin: ``/readyz`` answers 503 ``loads`` times, then 200."""
 
-    def __init__(self, loads: int) -> None:
+    def __init__(
+        self,
+        loads: int = 0,
+        *,
+        sponsored_enabled: bool = False,
+        security_headers: list[tuple[str, str]] | None = None,
+        robots_body: bytes | None = None,
+        account_authenticated: bool = False,
+        csrf_status: int = 403,
+        csrf_body: bytes = b'{"error": {"code": "hosted_request_denied"}}',
+        demo_status: int | None = None,
+        demo_payload: dict | None = None,
+        chat_payload: dict | None = None,
+        stream_body: bytes | None = None,
+    ) -> None:
         self.loads = loads
+        self.sponsored_enabled = sponsored_enabled
+        self.security_headers = (
+            list(DEFAULT_SECURITY_HEADERS) if security_headers is None else security_headers
+        )
+        self.robots_body = robots_body
+        self.account_authenticated = account_authenticated
+        self.csrf_status = csrf_status
+        self.csrf_body = csrf_body
+        self.demo_status = demo_status
+        self.demo_payload = demo_payload
+        self.chat_payload = chat_payload
+        self.stream_body = stream_body
+        self.hostname = "guard.example"
         self.paths: list[str] = []
+        self.requests: list[tuple[str, str, dict[str, str], bytes]] = []
 
-    def __call__(self, *args: object, **kwargs: object) -> "_FakeHttps":
+    def __call__(self, hostname: str, *args: object, **kwargs: object) -> "_FakeHttps":
+        self.hostname = hostname
         return self
 
-    def request(self, method: str, path: str, **kwargs: object) -> None:
+    def request(
+        self,
+        method: str,
+        path: str,
+        body: str | bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.paths.append(path)
+        raw_body = (
+            body.encode("utf-8")
+            if isinstance(body, str)
+            else (body if isinstance(body, bytes) else b"")
+        )
+        norm_headers = {k.lower(): v for k, v in (headers or {}).items()}
+        self.requests.append((method, path, norm_headers, raw_body))
 
     def getresponse(self) -> mock.Mock:
-        path = self.paths[-1]
+        _method, path, req_headers, raw_body = self.requests[-1]
         status, body = 200, b"{}"
-        if path == "/readyz" and self.paths.count("/readyz") <= self.loads:
+        resp_headers: list[tuple[str, str]] = list(self.security_headers)
+        if path == "/":
+            body = b"<html></html>"
+        elif path == "/readyz" and self.paths.count("/readyz") <= self.loads:
             status = 503
         elif path == "/healthz":
             body = b'{"status": "ok", "ner": "ready"}'
+        elif path == "/robots.txt":
+            if self.robots_body is not None:
+                body = self.robots_body
+            elif self.hostname == "guard.watt-mind.com":
+                body = b"User-agent: *\nAllow: /\nDisallow: /v1/\n"
+            else:
+                body = b"User-agent: *\nDisallow: /\n"
         elif path == "/v1/analyze":
             status = 401
-        return mock.Mock(status=status, read=mock.Mock(return_value=body))
+        elif path == "/v1/account":
+            resp_headers.append(
+                (
+                    "set-cookie",
+                    "__Host-pii-guard-guest=fictionalguestcookie; Path=/; Secure; HttpOnly",
+                )
+            )
+            body = json.dumps(
+                {
+                    "mode": "hosted",
+                    "authenticated": self.account_authenticated,
+                    "included_model": "muse-spark-1.3",
+                    "limits": {"sponsored_enabled": self.sponsored_enabled},
+                }
+            ).encode("utf-8")
+        elif path == "/v1/demo":
+            if req_headers.get("origin") == "https://evil.example":
+                status = self.csrf_status
+                body = self.csrf_body
+            elif self.demo_status is not None or self.demo_payload is not None:
+                status = self.demo_status or 200
+                body = json.dumps(self.demo_payload or {}).encode("utf-8")
+            elif self.sponsored_enabled:
+                status = 200
+                body = json.dumps(
+                    {
+                        "sample_id": "en-support",
+                        "language": "en",
+                        "original": (
+                            "Please write a short reply to this support request: I am "
+                            "Jane Placeholder, my email is jane.placeholder@example.com."
+                        ),
+                        "masked": (
+                            "Please write a short reply to this support request: I am "
+                            "[[PERSON_1a2b3c]], my email is [[EMAIL_4d5e6f]]."
+                        ),
+                        "answer": (
+                            "Hello [[PERSON_1a2b3c]], we received your request at [[EMAIL_4d5e6f]]."
+                        ),
+                        "restored": (
+                            "Hello Jane Placeholder, we received your request at "
+                            "jane.placeholder@example.com."
+                        ),
+                        "entities": [
+                            {"start": 57, "end": 73, "type": "PERSON"},
+                            {"start": 87, "end": 115, "type": "EMAIL"},
+                        ],
+                    }
+                ).encode("utf-8")
+            else:
+                status = 503
+                body = b'{"error": {"code": "sponsored_unavailable"}}'
+        elif path.endswith("/chat/completions"):
+            auth = req_headers.get("authorization", "")
+            if auth != "Bearer pg_valid_test_key":
+                status = 401
+                body = b'{"error": {"code": "unauthorized"}}'
+            else:
+                parsed_req = json.loads(raw_body or b"{}")
+                if parsed_req.get("stream"):
+                    body = (
+                        self.stream_body
+                        if self.stream_body is not None
+                        else (
+                            b'data: {"choices":[{"delta":{"content":"Confirmed for "}}]}\n\n'
+                            b'data: {"choices":[{"delta":{"content":'
+                            b'"jane.placeholder@example.com."}}]}\n\n'
+                            b"data: [DONE]\n\n"
+                        )
+                    )
+                else:
+                    payload = self.chat_payload or {
+                        "pii_guard": {
+                            "masked_messages": [
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        "Write one short sentence to [[PERSON_1a2b3c]] at "
+                                        "[[EMAIL_4d5e6f]] confirming her request."
+                                    ),
+                                }
+                            ]
+                        },
+                        "choices": [
+                            {
+                                "message": {
+                                    "role": "assistant",
+                                    "content": (
+                                        "Hello Jane Placeholder, we confirmed "
+                                        "jane.placeholder@example.com."
+                                    ),
+                                }
+                            }
+                        ],
+                    }
+                    body = json.dumps(payload).encode("utf-8")
+        return mock.Mock(
+            status=status,
+            read=mock.Mock(return_value=body),
+            getheaders=mock.Mock(return_value=resp_headers),
+        )
 
     def close(self) -> None:
         pass
 
 
 class SmokeTests(unittest.TestCase):
-    def run_smoke(self, loads: int, clock: list[float]) -> _FakeHttps:
-        fake = _FakeHttps(loads)
+    def run_smoke(
+        self,
+        loads: int = 0,
+        clock: list[float] | None = None,
+        *,
+        argv: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        **fake_kwargs: object,
+    ) -> _FakeHttps:
+        fake = _FakeHttps(loads, **fake_kwargs)
         with (
+            mock.patch.dict(os.environ, env or {}),
             mock.patch("http.client.HTTPSConnection", fake),
             mock.patch("time.sleep"),
-            mock.patch("time.monotonic", side_effect=clock),
-            mock.patch.object(sys, "argv", ["smoke.py", "https://guard.example"]),
+            mock.patch("time.monotonic", side_effect=clock or [0.0, 5.0, 10.0]),
+            mock.patch.object(sys, "argv", argv or ["smoke.py", "https://guard.example"]),
             mock.patch("builtins.print"),
         ):
             runpy.run_path(str(SMOKE), run_name="__main__")
@@ -64,6 +235,108 @@ class SmokeTests(unittest.TestCase):
     def test_smoke_fails_when_the_model_never_becomes_ready(self) -> None:
         with self.assertRaisesRegex(SystemExit, "public readiness failed"):
             self.run_smoke(loads=99, clock=[0.0, 100.0, 200.0])
+
+    def test_smoke_rejects_missing_or_duplicated_security_headers(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "security header x-frame-options"):
+            self.run_smoke(
+                security_headers=[h for h in DEFAULT_SECURITY_HEADERS if h[0] != "x-frame-options"]
+            )
+        with self.assertRaisesRegex(SystemExit, "security header x-frame-options"):
+            self.run_smoke(
+                security_headers=[*DEFAULT_SECURITY_HEADERS, ("x-frame-options", "DENY")]
+            )
+
+    def test_smoke_verifies_host_aware_robots_txt(self) -> None:
+        self.run_smoke(argv=["smoke.py", "https://guard.watt-mind.com"])
+        with self.assertRaisesRegex(SystemExit, "production robots.txt"):
+            self.run_smoke(
+                argv=["smoke.py", "https://guard.watt-mind.com"],
+                robots_body=b"User-agent: *\nDisallow: /\n",
+            )
+        with self.assertRaisesRegex(SystemExit, "non-production robots.txt"):
+            self.run_smoke(
+                argv=["smoke.py", "https://guard-dev.watt-mind.com"],
+                robots_body=b"User-agent: *\nAllow: /\n",
+            )
+
+    def test_smoke_rejects_spoofed_identity_or_accepted_cross_origin_post(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "spoofed X-MS-CLIENT-PRINCIPAL"):
+            self.run_smoke(account_authenticated=True)
+        with self.assertRaisesRegex(SystemExit, "cross-origin POST /v1/demo"):
+            self.run_smoke(csrf_status=200)
+
+    def test_smoke_skips_the_paid_demo_without_require_e2e(self) -> None:
+        # Only the free cross-origin refusal probe reaches /v1/demo.
+        fake = self.run_smoke(sponsored_enabled=True)
+        self.assertEqual(fake.paths.count("/v1/demo"), 1)
+        fake = self.run_smoke(
+            sponsored_enabled=True, env={"PII_GUARD_SMOKE_API_KEY": "pg_valid_test_key"}
+        )
+        self.assertNotIn("/v1/chat/completions", fake.paths)
+
+    def test_smoke_rejects_a_403_that_is_not_the_origin_guard(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "cross-origin POST /v1/demo"):
+            self.run_smoke(csrf_body=b'{"error": {"code": "waf_blocked"}}')
+
+    def test_smoke_exercises_public_demo_e2e_when_required(self) -> None:
+        e2e = ["smoke.py", "--require-e2e", "https://guard.example"]
+        fake = self.run_smoke(sponsored_enabled=True, argv=e2e)
+        self.assertEqual(fake.paths.count("/v1/demo"), 2)
+        with self.assertRaisesRegex(SystemExit, "leaked synthetic PII"):
+            self.run_smoke(
+                sponsored_enabled=True,
+                argv=e2e,
+                demo_payload={
+                    "masked": "Jane Placeholder [[EMAIL_4d5e6f]]",
+                    "answer": "ok",
+                    "restored": "ok",
+                    "entities": [{"type": "PERSON"}, {"type": "EMAIL"}],
+                },
+            )
+        with self.assertRaisesRegex(SystemExit, "un-restored placeholders"):
+            self.run_smoke(
+                sponsored_enabled=True,
+                argv=e2e,
+                demo_payload={
+                    "masked": "[[PERSON_1a2b3c]] [[EMAIL_4d5e6f]]",
+                    "answer": "Hello [[PERSON_1a2b3c]]",
+                    "restored": "Hello [[PERSON_1a2b3c]]",
+                    "entities": [{"type": "PERSON"}, {"type": "EMAIL"}],
+                },
+            )
+
+    def test_smoke_require_e2e_fails_when_sponsored_is_disabled(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "sponsored_enabled is not true"):
+            self.run_smoke(
+                sponsored_enabled=False,
+                argv=["smoke.py", "--require-e2e", "https://guard.example"],
+            )
+
+    def test_smoke_authenticated_non_streaming_and_streaming_e2e(self) -> None:
+        key = {"PII_GUARD_SMOKE_API_KEY": "pg_valid_test_key"}
+        fake = self.run_smoke(
+            sponsored_enabled=True,
+            env=key,
+            argv=[
+                "smoke.py",
+                "--require-e2e",
+                "--endpoint-url",
+                "/e/ep_123/v1",
+                "https://guard.example",
+            ],
+        )
+        chat_calls = [p for p in fake.paths if p == "/e/ep_123/v1/chat/completions"]
+        self.assertEqual(len(chat_calls), 3)
+        with self.assertRaisesRegex(SystemExit, "left un-restored placeholders"):
+            self.run_smoke(
+                sponsored_enabled=True,
+                env=key,
+                argv=["smoke.py", "--require-e2e", "https://guard.example"],
+                stream_body=(
+                    b'data: {"choices":[{"delta":{"content":"Leaked [[EMAIL_4d5e6f]]"}}]}\n\n'
+                    b"data: [DONE]\n\n"
+                ),
+            )
 
 
 class ReleaseSourceTests(unittest.TestCase):

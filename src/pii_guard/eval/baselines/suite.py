@@ -55,7 +55,9 @@ BASETEN_PRICE_USD_PER_1M = {"input": 1.25, "cached_input": 0.15, "output": 4.25}
 _WARMUP = ("Warm-up text without personal data.", "en")
 
 
-def cost_usd(usage: Mapping[str, int], price: Mapping[str, float] = BASETEN_PRICE_USD_PER_1M):
+def cost_usd(
+    usage: Mapping[str, int], price: Mapping[str, float] = BASETEN_PRICE_USD_PER_1M
+) -> float:
     """Cost of ``usage`` (the LLM detector's counters) at ``price`` per million tokens."""
     prompt = usage.get("prompt_tokens", 0)
     cached = usage.get("cached_tokens", 0)
