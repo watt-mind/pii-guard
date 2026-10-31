@@ -1,12 +1,13 @@
 """End-to-end run: a real coding agent (pinned) works on the fictional mini-repo through the
-gateway. Four clients: **pi** and **OpenCode** (Chat Completions), **Muse Code** and **Codex**
-(Responses API).
+gateway. Five clients: **pi** and **OpenCode** (Chat Completions), **Muse Code** and **Codex**
+(Responses API), and **Claude Code** (Anthropic Messages API).
 
 ```
 uv run python -m pii_guard.integrations.e2e                       # pi, scripted mock (CI)
 uv run python -m pii_guard.integrations.e2e --client muse-code    # Muse Code, scripted mock
 uv run python -m pii_guard.integrations.e2e --client codex        # Codex, scripted mock
 uv run python -m pii_guard.integrations.e2e --client opencode     # OpenCode, scripted mock
+uv run python -m pii_guard.integrations.e2e --client claude-code  # Claude Code, scripted mock
 uv run python -m pii_guard.integrations.e2e --client muse-code --session per-request  # before
 uv run python -m pii_guard.integrations.e2e --client muse-code --upstream https://api.meta.ai/v1 \\
     --model muse-spark-1.3 --key-env META_API_KEY --record examples/coding-agents/runs/<name>.json
@@ -20,16 +21,16 @@ What runs, all on loopback, in throwaway directories (``HOME`` and the client's 
    an installer that serves a different version stops the run with :class:`MuseVersionError`).
 2. A **recorder** stands in for the upstream: it keeps every request body it gets, then either
    answers like a scripted coding model (read the letter, read the CSV, read ``.env``, write
-   ``reply.md`` with the placeholders it saw, finish), as Chat Completions chunks or as
-   ``response.*`` events, or forwards to a real upstream (``--upstream``) with the key from
-   ``--key-env``. The gateway and the client never hold that key.
+   ``reply.md`` with the placeholders it saw, finish), as Chat Completions chunks, ``response.*``
+   events, or Anthropic ``message_*`` / ``content_block_*`` events, or forwards to a real upstream
+   (``--upstream``) with the key from ``--key-env``. The gateway and the client never hold that key.
 3. The gateway (``create_app``) forwards to the recorder; ``pii-guard connect`` configures the
    client (pi's ``models.json``; Muse's ``settings.json``, ``endpoint_transport``). Muse can't
    send ``X-PII-Guard-Mode``, so its gateway runs in fast mode (``PII_GUARD_GATEWAY_MODE``).
 4. The client runs headless (``pi --print``, ``muse exec``) on a copy of
-   ``examples/coding-agents/mini-repo``. Codex and OpenCode need no config file: they run the
-   Connect page's paste-and-run block (:mod:`pii_guard.integrations.snippets`) with
-   ``exec`` / ``run`` appended, so the e2e covers the text users paste.
+   ``examples/coding-agents/mini-repo``. Codex, OpenCode and Claude Code need no config file:
+   they run the Connect page's paste-and-run block (:mod:`pii_guard.integrations.snippets`) with
+   ``exec`` / ``run`` / ``-p`` appended, so the e2e covers the text users paste.
 
 The result (:class:`RunResult`) says whether any gold value (``examples/coding-agents/gold.json``)
 reached the upstream, whether the gateway refused a request, and what the agent wrote: the files
@@ -81,6 +82,9 @@ from pii_guard.integrations.e2e_recorder import (
     _codex_turn,
     _function_names,
     _last_input_text,
+    _messages_stream,
+    _messages_tool_texts,
+    _messages_turn,
     _pieces,
     _reply,
     _response_stream,
@@ -114,9 +118,17 @@ from pii_guard.integrations.e2e_recorder import (
     _written as _written,
 )
 from pii_guard.integrations.muse_code import MUSE_VERSION_CHECKED
-from pii_guard.integrations.snippets import CODEX_VERSION, OPENCODE_VERSION, PI_VERSION
+from pii_guard.integrations.snippets import (
+    CLAUDE_CODE_VERSION,
+    CODEX_VERSION,
+    OPENCODE_VERSION,
+    PI_VERSION,
+)
 
 __all__ = [
+    "CLAUDE_CODE_PACKAGE",
+    "CLAUDE_CODE_VERSION",
+    "CLAUDE_SCRIPTED_MODEL",
     "CODEX_VERSION",
     "EXAMPLE_DIR",
     "MUSE_INSTALLER",
@@ -136,12 +148,16 @@ __all__ = [
     "_codex_turn",
     "_function_names",
     "_last_input_text",
+    "_messages_stream",
+    "_messages_tool_texts",
+    "_messages_turn",
     "_pieces",
     "_reply",
     "_response_stream",
     "_scripted_turn",
     "_seen",
     "_tool_texts",
+    "install_claude_code",
     "install_codex",
     "install_muse",
     "install_opencode",
@@ -149,6 +165,7 @@ __all__ = [
     "load_gold",
     "main",
     "run",
+    "run_claude_code",
     "run_codex",
     "run_muse",
     "run_opencode",
@@ -157,6 +174,10 @@ __all__ = [
 PI_PACKAGE = "@earendil-works/pi-coding-agent"
 CODEX_PACKAGE = "@openai/codex"
 OPENCODE_PACKAGE = "opencode-ai"
+CLAUDE_CODE_PACKAGE = "@anthropic-ai/claude-code"
+#: Claude Code requires a ``claude-*`` model id so its client sends standard user/assistant
+#: messages and ``model_words`` recognises ``claude`` / ``sonnet`` in its system prompt.
+CLAUDE_SCRIPTED_MODEL = "claude-sonnet-4-5"
 MUSE_VERSION = MUSE_VERSION_CHECKED
 MUSE_INSTALLER = "https://dev.meta.ai/install.sh"
 EXAMPLE_DIR = Path(__file__).resolve().parents[3] / "examples" / "coding-agents"
@@ -248,6 +269,11 @@ def install_codex(prefix: Path, version: str = CODEX_VERSION) -> Path:
 def install_opencode(prefix: Path, version: str = OPENCODE_VERSION) -> Path:
     """OpenCode (``opencode-ai``, with its platform binary) from npm into ``prefix``."""
     return _install_npm(prefix, OPENCODE_PACKAGE, version, "opencode")
+
+
+def install_claude_code(prefix: Path, version: str = CLAUDE_CODE_VERSION) -> Path:
+    """Claude Code (``@anthropic-ai/claude-code``) from npm into ``prefix``."""
+    return _install_npm(prefix, CLAUDE_CODE_PACKAGE, version, "claude")
 
 
 class MuseVersionError(RuntimeError):
@@ -344,7 +370,7 @@ def serve(app: Any, port: int | None = None) -> Iterator[str]:
         thread.join(timeout=10)
 
 
-_COUNTED = ("/v1/chat/completions", "/v1/responses")
+_COUNTED = ("/v1/chat/completions", "/v1/responses", "/v1/messages")
 SESSIONS = ("path", "auto", "per-request")
 
 
@@ -579,6 +605,14 @@ def _snippet_command(tool: str, binary: Path, url: str, model: str, tail: str) -
     if tool == "codex":
         # The block is one command: `codex -m ... -c ...`; the run adds `exec ... "$PROMPT"`.
         code = code.replace("codex ", f"{shlex.quote(str(binary))} ", 1) + " " + tail
+    elif tool == "claude-code":
+        # The block ends with `claude --model ...`; the run appends `-p ... -- "$PROMPT"`.
+        code = "\n".join(
+            [
+                *lines[:-1],
+                lines[-1].replace("claude ", f"{shlex.quote(str(binary))} ", 1) + " " + tail,
+            ]
+        )
     else:
         # The block's last line starts the tool: `opencode`.
         code = "\n".join([*lines[:-1], f"{shlex.quote(str(binary))} {tail}"])
@@ -599,6 +633,7 @@ def _run_snippet_client(
     timeout: float,
     tail: str,
     extra_env: dict[str, str],
+    default_model: str = SCRIPTED_MODEL,
 ) -> RunResult:
     """A client configured by its quickstart block alone (no config file), gateway in fast
     mode, on the session URL the Connect page hands out."""
@@ -619,7 +654,7 @@ def _run_snippet_client(
             ) as gateway_url,
         ):
             url = f"{gateway_url}/s/e2e_{secrets.token_hex(8)}/v1"
-            cmd = _snippet_command(client, binary, url, model or SCRIPTED_MODEL, tail)
+            cmd = _snippet_command(client, binary, url, model or default_model, tail)
             env = {
                 "PATH": os.environ.get("PATH", ""),
                 "HOME": str(home),
@@ -728,6 +763,41 @@ def run_opencode(
     )
 
 
+def run_claude_code(
+    *,
+    claude_bin: Path,
+    upstream: str | None = None,
+    key: str | None = None,
+    model: str | None = None,
+    example_dir: Path = EXAMPLE_DIR,
+    prompt: str = PROMPT,
+    timeout: float = 900,
+    version: str = CLAUDE_CODE_VERSION,
+) -> RunResult:
+    """Claude Code through the gateway (Anthropic Messages API), started with the Connect
+    page's block plus ``-p --allowedTools "Read,Write" -- "$PII_GUARD_E2E_PROMPT"``."""
+    return _run_snippet_client(
+        client="claude-code",
+        version=version,
+        binary=claude_bin,
+        upstream=upstream,
+        key=key,
+        model=model,
+        example_dir=example_dir,
+        prompt=prompt,
+        timeout=timeout,
+        # --allowedTools is variadic in Claude Code, so `--` separates the prompt positional arg.
+        tail='-p --allowedTools "Read,Write" -- "$PII_GUARD_E2E_PROMPT" </dev/null',
+        extra_env={
+            "DISABLE_AUTOUPDATER": "1",
+            "DISABLE_TELEMETRY": "1",
+            "DISABLE_ERROR_REPORTING": "1",
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+        },
+        default_model=CLAUDE_SCRIPTED_MODEL,
+    )
+
+
 def record(result: RunResult, path: Path) -> None:
     """A run record for ``examples/coding-agents/runs/``: counts, never the values.
 
@@ -754,14 +824,56 @@ def record(result: RunResult, path: Path) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
+_SNIPPET_CLIENTS = ("codex", "opencode", "claude-code")
+
+
+def _run_snippet_for_cli(
+    client: str,
+    prefix: Path,
+    upstream: str | None,
+    key: str | None,
+    model: str | None,
+    timeout: float,
+) -> RunResult:
+    if client == "codex":
+        return run_codex(
+            codex_bin=install_codex(prefix),
+            upstream=upstream,
+            key=key,
+            model=model,
+            timeout=timeout,
+        )
+    if client == "opencode":
+        return run_opencode(
+            opencode_bin=install_opencode(prefix),
+            upstream=upstream,
+            key=key,
+            model=model,
+            timeout=timeout,
+        )
+    return run_claude_code(
+        claude_bin=install_claude_code(prefix),
+        upstream=upstream,
+        key=key,
+        model=model,
+        timeout=timeout,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m pii_guard.integrations.e2e")
-    parser.add_argument("--client", choices=("pi", "muse-code", "codex", "opencode"), default="pi")
+    parser.add_argument(
+        "--client",
+        choices=("pi", "muse-code", "codex", "opencode", "claude-code"),
+        default="pi",
+    )
     parser.add_argument("--upstream", default=None, help="a real OpenAI-compatible base URL")
     parser.add_argument("--model", default=None, help="model id (required with --upstream)")
     parser.add_argument("--key-env", default=None, help="env var (or .env key) with its API key")
     parser.add_argument(
-        "--pi-prefix", default=None, help="npm prefix for pi, Codex or OpenCode (default: temp)"
+        "--pi-prefix",
+        default=None,
+        help="npm prefix for pi, Codex, OpenCode or Claude Code (default: temp)",
     )
     parser.add_argument(
         "--muse-home", default=None, help="throwaway HOME for the Muse Code install (default: temp)"
@@ -789,28 +901,15 @@ def main(argv: list[str] | None = None) -> int:
         key = os.environ.get(args.key_env) or _dotenv(args.key_env)
         if not key:
             parser.error(f"{args.key_env} is not set")
-    if args.client in ("codex", "opencode"):
+    if args.client in _SNIPPET_CLIENTS:
         prefix = (
             Path(args.pi_prefix)
             if args.pi_prefix
             else Path(tempfile.gettempdir()) / f"pii-guard-{args.client}"
         )
-        if args.client == "codex":
-            result = run_codex(
-                codex_bin=install_codex(prefix),
-                upstream=args.upstream,
-                key=key,
-                model=args.model,
-                timeout=args.timeout,
-            )
-        else:
-            result = run_opencode(
-                opencode_bin=install_opencode(prefix),
-                upstream=args.upstream,
-                key=key,
-                model=args.model,
-                timeout=args.timeout,
-            )
+        result = _run_snippet_for_cli(
+            args.client, prefix, args.upstream, key, args.model, args.timeout
+        )
     elif args.client == "muse-code":
         home = (
             Path(args.muse_home)

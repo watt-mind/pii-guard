@@ -1,14 +1,15 @@
-"""A tiny OpenAI-compatible upstream for the demo, the smoke test and the latency benchmark.
+"""A tiny OpenAI- and Anthropic-compatible upstream for the demo, smoke tests and benchmarks.
 
 It answers ``POST /v1/chat/completions`` without any model: the reply echoes the last user
 message (``Echo: <text>``), so after the gateway restores it the client must get back exactly
 what it sent; with ``tools`` in the request it calls the first tool with
 ``{"text": <last user message>}`` instead. ``POST /v1/responses`` (the OpenAI Responses
-API, what Muse Code speaks) does the same: an ``output_text`` echo, or a ``function_call`` of
-the first function tool, whole or as ``response.*`` events. Streams are cut into small
-chunks, so placeholders are split across chunks. A fixed ``delay_ms`` before the answer
-(before the first chunk when streaming) stands in for model latency, so the benchmark
-isolates pii-guard's own overhead.
+API, what Muse Code and Codex speak) and ``POST /v1/messages`` (the Anthropic Messages API,
+what Claude Code speaks) do the same: an echo, or a tool call when a single tool or explicit
+``tool_choice`` is requested, whole or as SSE events. Streams are cut into small chunks, so
+placeholders are split across chunks. A fixed ``delay_ms`` before the answer (before the first
+chunk when streaming) stands in for model latency, so the benchmark isolates pii-guard's own
+overhead.
 
 It keeps the last requests it received in memory (``GET /_mock/received``, ``DELETE`` to
 reset): the smoke test asserts that no fictional gold value ever reached it. It never calls
@@ -88,6 +89,20 @@ def _first_function(tools: object) -> str | None:
             inner = _first_function(tool.get("tools"))
             if inner is not None:
                 return f"{tool.get('name')}.{inner}"
+    return None
+
+
+def _messages_tool_name(body: dict[str, Any]) -> str | None:
+    """The tool to call for a Messages request, or ``None`` for a text echo."""
+    choice = body.get("tool_choice")
+    if choice == "none" or (isinstance(choice, dict) and choice.get("type") == "none"):
+        return None
+    if isinstance(choice, dict) and isinstance(choice.get("name"), str):
+        return str(choice["name"])
+    tools = [t for t in (body.get("tools") or []) if isinstance(t, dict) and t.get("name")]
+    forced = isinstance(choice, dict) and choice.get("type") in ("any", "tool")
+    if tools and (len(tools) == 1 or forced):
+        return str(tools[0]["name"])
     return None
 
 
@@ -222,6 +237,78 @@ async def _handle_responses_request(mock: MockUpstream, body: dict[str, Any]) ->
     return whole
 
 
+async def _handle_messages_request(mock: MockUpstream, body: dict[str, Any]) -> Any:
+    text = last_user_text(body)
+    name = _messages_tool_name(body)
+    if name is not None:
+        block: dict[str, Any] = {
+            "type": "tool_use",
+            "id": "toolu_mock_1",
+            "name": name,
+            "input": {"text": text},
+        }
+        stop_reason = "tool_use"
+    else:
+        block = {"type": "text", "text": f"Echo: {text}"}
+        stop_reason = "end_turn"
+    input_tokens = _tokens(json.dumps(body.get("messages"), ensure_ascii=False))
+    output_tokens = _tokens(json.dumps(block, ensure_ascii=False))
+    whole = {
+        "id": "msg_mock",
+        "type": "message",
+        "role": "assistant",
+        "model": str(body.get("model") or MODEL),
+        "content": [block],
+        "stop_reason": stop_reason,
+        "stop_sequence": None,
+        "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
+    }
+    if body.get("stream"):
+        return StreamingResponse(_messages_events(mock, whole), media_type="text/event-stream")
+    if mock.delay_ms:
+        await asyncio.sleep(mock.delay_ms / 1000)
+    return whole
+
+
+async def _read_json_dict(
+    request: Request,
+    mock: MockUpstream,
+    *,
+    required_list_key: str | None = None,
+    required_key: str | None = None,
+    missing_code: str = "no_messages",
+) -> dict[str, Any] | JSONResponse:
+    raw = await request.body()
+    mock.record(raw)
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return JSONResponse({"error": {"type": "invalid_request", "code": "bad_json"}}, 400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": {"type": "invalid_request", "code": missing_code}}, 400)
+    if required_list_key is not None and not isinstance(body.get(required_list_key), list):
+        return JSONResponse({"error": {"type": "invalid_request", "code": missing_code}}, 400)
+    if required_key is not None and required_key not in body:
+        return JSONResponse({"error": {"type": "invalid_request", "code": missing_code}}, 400)
+    return body
+
+
+def _register_messages_routes(app: FastAPI, mock: MockUpstream) -> None:
+    @app.post("/v1/messages")
+    async def messages(request: Request) -> Any:
+        body = await _read_json_dict(request, mock, required_list_key="messages")
+        if isinstance(body, JSONResponse):
+            return body
+        return await _handle_messages_request(mock, body)
+
+    @app.post("/v1/messages/count_tokens")
+    async def count_tokens(request: Request) -> Any:
+        body = await _read_json_dict(request, mock, required_list_key="messages")
+        if isinstance(body, JSONResponse):
+            return body
+        return {"input_tokens": _tokens(json.dumps(body["messages"], ensure_ascii=False))}
+
+
 def create_mock_upstream(
     *, delay_ms: float = 0.0, chunk_chars: int = 7, state: MockUpstream | None = None
 ) -> FastAPI:
@@ -248,29 +335,64 @@ def create_mock_upstream(
 
     @app.post("/v1/chat/completions")
     async def chat(request: Request) -> Any:
-        raw = await request.body()
-        mock.record(raw)
-        try:
-            body = json.loads(raw)
-        except ValueError:
-            return JSONResponse({"error": {"type": "invalid_request", "code": "bad_json"}}, 400)
-        if not isinstance(body, dict) or not isinstance(body.get("messages"), list):
-            return JSONResponse({"error": {"type": "invalid_request", "code": "no_messages"}}, 400)
+        body = await _read_json_dict(request, mock, required_list_key="messages")
+        if isinstance(body, JSONResponse):
+            return body
         return await _handle_chat_completion(mock, body)
 
     @app.post("/v1/responses")
     async def responses(request: Request) -> Any:
-        raw = await request.body()
-        mock.record(raw)
-        try:
-            body = json.loads(raw)
-        except ValueError:
-            return JSONResponse({"error": {"type": "invalid_request", "code": "bad_json"}}, 400)
-        if not isinstance(body, dict) or "input" not in body:
-            return JSONResponse({"error": {"type": "invalid_request", "code": "no_input"}}, 400)
+        body = await _read_json_dict(request, mock, required_key="input", missing_code="no_input")
+        if isinstance(body, JSONResponse):
+            return body
         return await _handle_responses_request(mock, body)
 
+    _register_messages_routes(app, mock)
     return app
+
+
+async def _messages_events(mock: MockUpstream, whole: dict[str, Any]) -> AsyncIterator[bytes]:
+    """``whole`` as an Anthropic Messages SSE stream, cut into small deltas."""
+
+    def event(event_type: str, **fields: Any) -> bytes:
+        data = {"type": event_type, **fields}
+        return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
+
+    if mock.delay_ms:
+        await asyncio.sleep(mock.delay_ms / 1000)
+    n = mock.chunk_chars
+    head = {**whole, "content": [], "stop_reason": None}
+    yield event("message_start", message=head)
+    block = whole["content"][0]
+    if block["type"] == "text":
+        text = block["text"]
+        yield event("content_block_start", index=0, content_block={"type": "text", "text": ""})
+        for i in range(0, len(text), n):
+            yield event(
+                "content_block_delta",
+                index=0,
+                delta={"type": "text_delta", "text": text[i : i + n]},
+            )
+    else:
+        args = json.dumps(block["input"], ensure_ascii=False)
+        yield event(
+            "content_block_start",
+            index=0,
+            content_block={**block, "input": {}},
+        )
+        for i in range(0, len(args), n):
+            yield event(
+                "content_block_delta",
+                index=0,
+                delta={"type": "input_json_delta", "partial_json": args[i : i + n]},
+            )
+    yield event("content_block_stop", index=0)
+    yield event(
+        "message_delta",
+        delta={"stop_reason": whole["stop_reason"], "stop_sequence": None},
+        usage={"output_tokens": whole["usage"]["output_tokens"]},
+    )
+    yield event("message_stop")
 
 
 async def _response_events(mock: MockUpstream, whole: dict[str, Any]) -> AsyncIterator[bytes]:

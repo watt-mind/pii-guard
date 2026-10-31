@@ -642,9 +642,35 @@ class VaultSession:
         self.entries_scanned += len(entries)
         found = [entry.find_occurrences(language, folded, text) for entry in entries]
         self._take(text, found, language, replacements, taken)
+        if since is not None and replacements:
+            self._take_older_guarded(text, folded, language, since, replacements, taken)
         if depends is not None and key is not None:
             self._remember_masked(key, replacements, generation, depends, len(ordered))
         return self._assemble(text, replacements, len(ordered), generation)
+
+    def _take_older_guarded(
+        self,
+        text: str,
+        folded: tuple[FoldedText, ...],
+        language: str,
+        since: int,
+        replacements: list[tuple[int, int, _Entry]],
+        taken: bytearray,
+    ) -> None:
+        """Re-check older ``model_only`` entries when a ``since`` remask masked a neighbour."""
+        older = sorted(
+            (e for e in self._by_key.values() if e.changed <= since and e.model_only),
+            key=lambda e: len(e.normalized),
+            reverse=True,
+        )
+        if not older:
+            return
+        for match in PLACEHOLDER_RE.finditer(text):
+            if match.group(0) in self._by_placeholder:
+                taken[match.start() : match.end()] = b"\x01" * (match.end() - match.start())
+        self.entries_scanned += len(older)
+        older_found = [entry.find_occurrences(language, folded, text) for entry in older]
+        self._take(text, older_found, language, replacements, taken)
 
     def _mask_again(
         self, text: str, key: tuple[str, tuple[Span, ...], str], language: str
@@ -680,8 +706,97 @@ class VaultSession:
                 if any(any(taken[start:end]) for start, end in spans):
                     return None
             self._take(text, found, language, replacements, taken)
+            # A new placeholder can lift the sweep veto of an older model-only entry next to
+            # it (``Claude`` before a newly masked ``Sonnet 4.5``), which only a scan of the
+            # older entries finds: mask from scratch when one still has an open occurrence.
+            if len(replacements) > len(masked.replacements) and self._older_guarded_open(
+                text, folded, language, changed, taken
+            ):
+                return None
         self._remember_masked(key, replacements, generation, masked.depends, masked.spans)
         return self._assemble(text, replacements, masked.spans, generation)
+
+    def _older_guarded_open(
+        self,
+        text: str,
+        folded: tuple[FoldedText, ...],
+        language: str,
+        changed: dict[_Entry, None],
+        taken: bytearray,
+    ) -> bool:
+        """Whether an unchanged ``model_only`` entry has an occurrence nothing took."""
+        older = [e for e in self._by_key.values() if e.model_only and e not in changed]
+        self.entries_scanned += len(older)
+        for entry in older:
+            _, occurrences, aliases = entry.find_occurrences(language, folded, text)
+            for start, end in itertools.chain(occurrences, *(o for _, o in aliases)):
+                if not any(taken[start:end]):
+                    return True
+        return False
+
+    def _take_occurrence(
+        self,
+        text: str,
+        entry: _Entry,
+        alias: str | None,
+        start: int,
+        end: int,
+        language: str,
+        replacements: list[tuple[int, int, _Entry]],
+        taken: bytearray,
+    ) -> None:
+        written = text[start:end]
+        owner = entry
+        if alias is not None:
+            # Forms of an alias share the entry's placeholder; with a suffix, unmask restores
+            # them from ``seen``. A bare alias ("Minta Kende" after a "Minta Kendét" span) would
+            # come back as the span's surface: it gets the alias's own entry instead.
+            kind = entry.entity_type
+            if not following_suffix(text, end) and _value_key(kind, written) == _value_key(
+                kind, alias
+            ):
+                owner = self._entry_for(
+                    entry.entity_type,
+                    written,
+                    language,
+                    "ner" if entry.model_only else None,
+                )
+        replacements.append((start, end, self._cased(owner, written)))
+        taken[start:end] = b"\x01" * (end - start)
+
+    def _recheck_vetoed(
+        self,
+        text: str,
+        vetoed: list[tuple[_Entry, str | None, int, int]],
+        language: str,
+        replacements: list[tuple[int, int, _Entry]],
+        taken: bytearray,
+    ) -> None:
+        """Re-check occurrences skipped by ``sweep_vetoed`` once neighbours are replaced.
+
+        A neighbour replaced by a placeholder (``Sonnet 4.5`` in ``Claude Sonnet 4.5``) no
+        longer forms the software context that vetoed ``Claude`` in the unmasked text, so the
+        outbound re-check on the assembled text would see ``Claude`` unmasked and fail closed.
+        """
+        chars = list(text)
+        for r_start, r_end, _ in replacements:
+            chars[r_start:r_end] = ["["] * (r_end - r_start)
+        while vetoed:
+            view = "".join(chars)
+            remaining: list[tuple[_Entry, str | None, int, int]] = []
+            progressed = False
+            for entry, alias, start, end in vetoed:
+                if any(taken[start:end]):
+                    continue
+                if sweep_vetoed(view, start, end, entry.entity_type, language):
+                    remaining.append((entry, alias, start, end))
+                    continue
+                self._take_occurrence(text, entry, alias, start, end, language, replacements, taken)
+                chars[start:end] = ["["] * (end - start)
+                progressed = True
+            if not progressed:
+                break
+            vetoed = remaining
 
     def _take(
         self,
@@ -692,38 +807,28 @@ class VaultSession:
         taken: bytearray,
     ) -> None:
         """Add each occurrence in ``found`` (in its order) that overlaps nothing taken yet."""
+        vetoed: list[tuple[_Entry, str | None, int, int]] = []
         for entry, own, aliases in found:
             guarded = entry.model_only
             for start, end in own:
                 if any(taken[start:end]):
                     continue
                 if guarded and sweep_vetoed(text, start, end, entry.entity_type, language):
+                    vetoed.append((entry, None, start, end))
                     continue
-                replacements.append((start, end, self._cased(entry, text[start:end])))
-                taken[start:end] = b"\x01" * (end - start)
-            # Forms of an alias share the entry's placeholder; with a suffix, unmask restores
-            # them from ``seen``. A bare alias ("Minta Kende" after a "Minta Kendét" span) would
-            # come back as the span's surface: it gets the alias's own entry instead.
+                self._take_occurrence(text, entry, None, start, end, language, replacements, taken)
             for alias, occurrences in aliases:
                 for start, end in occurrences:
                     if any(taken[start:end]):
                         continue
                     if guarded and sweep_vetoed(text, start, end, entry.entity_type, language):
+                        vetoed.append((entry, alias, start, end))
                         continue
-                    written = text[start:end]
-                    owner = entry
-                    kind = entry.entity_type
-                    if not following_suffix(text, end) and _value_key(kind, written) == _value_key(
-                        kind, alias
-                    ):
-                        owner = self._entry_for(
-                            entry.entity_type,
-                            written,
-                            language,
-                            "ner" if entry.model_only else None,
-                        )
-                    replacements.append((start, end, self._cased(owner, written)))
-                    taken[start:end] = b"\x01" * (end - start)
+                    self._take_occurrence(
+                        text, entry, alias, start, end, language, replacements, taken
+                    )
+        if vetoed and replacements:
+            self._recheck_vetoed(text, vetoed, language, replacements, taken)
 
     def _remember_masked(
         self,

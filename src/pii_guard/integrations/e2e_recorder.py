@@ -28,6 +28,9 @@ __all__ = [
     "_codex_turn",
     "_function_names",
     "_last_input_text",
+    "_messages_stream",
+    "_messages_tool_texts",
+    "_messages_turn",
     "_pieces",
     "_reply",
     "_response_stream",
@@ -151,6 +154,132 @@ def _codex_turn(name: str, outputs: list[str]) -> tuple[str, Any]:
     return "text", "Done: wrote reply.md."
 
 
+def _messages_tool_texts(body: dict[str, Any]) -> list[str]:
+    """Tool outputs from Anthropic ``/v1/messages`` ``tool_result`` content blocks."""
+    out: list[str] = []
+    for message in body.get("messages") or []:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            inner = block.get("content")
+            if isinstance(inner, list):
+                inner = "\n".join(str(p.get("text", "")) for p in inner if isinstance(p, dict))
+            out.append(str(inner or ""))
+    return out
+
+
+def _messages_turn(body: dict[str, Any], workdir: Path | None) -> tuple[str, Any]:
+    """``("call", (name, arguments))`` or ``("text", text)`` for one ``/v1/messages`` request."""
+    tool_names = {
+        t.get("name")
+        for t in (body.get("tools") or [])
+        if isinstance(t, dict) and isinstance(t.get("name"), str)
+    }
+    if "Read" not in tool_names or "Write" not in tool_names:
+        return "text", "OK."
+    outputs = _messages_tool_texts(body)
+    step = len(outputs)
+    base = workdir or Path.cwd()
+    if step < len(_READS):
+        return "call", ("Read", {"file_path": str(base / _READS[step])})
+    if step == len(_READS):
+        return "call", (
+            "Write",
+            {"file_path": str(base / "reply.md"), "content": _reply(_seen(outputs))},
+        )
+    return "text", "Done: wrote reply.md."
+
+
+def _sse_event(event_type: str, payload: dict[str, Any]) -> str:
+    return f"event: {event_type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _messages_stream(number: int, model: str, turn: tuple[str, Any]) -> list[str]:
+    """One scripted Anthropic ``/v1/messages`` SSE stream (text or ``tool_use``)."""
+    msg: dict[str, Any] = {
+        "id": f"msg_mock_{number}",
+        "type": "message",
+        "role": "assistant",
+        "model": model,
+        "content": [],
+        "stop_reason": None,
+        "stop_sequence": None,
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+    lines = [_sse_event("message_start", {"type": "message_start", "message": msg})]
+    kind, payload = turn
+    if kind == "text":
+        lines.append(
+            _sse_event(
+                "content_block_start",
+                {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {"type": "text", "text": ""},
+                },
+            )
+        )
+        for piece in _pieces(str(payload)):
+            lines.append(
+                _sse_event(
+                    "content_block_delta",
+                    {
+                        "type": "content_block_delta",
+                        "index": 0,
+                        "delta": {"type": "text_delta", "text": piece},
+                    },
+                )
+            )
+        stop_reason = "end_turn"
+    else:
+        name, arguments = payload
+        lines.append(
+            _sse_event(
+                "content_block_start",
+                {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {
+                        "type": "tool_use",
+                        "id": f"toolu_mock_{number}",
+                        "name": name,
+                        "input": {},
+                    },
+                },
+            )
+        )
+        for piece in _pieces(json.dumps(arguments, ensure_ascii=False)):
+            lines.append(
+                _sse_event(
+                    "content_block_delta",
+                    {
+                        "type": "content_block_delta",
+                        "index": 0,
+                        "delta": {"type": "input_json_delta", "partial_json": piece},
+                    },
+                )
+            )
+        stop_reason = "tool_use"
+    lines.append(_sse_event("content_block_stop", {"type": "content_block_stop", "index": 0}))
+    lines.append(
+        _sse_event(
+            "message_delta",
+            {
+                "type": "message_delta",
+                "delta": {"stop_reason": stop_reason, "stop_sequence": None},
+                "usage": {"output_tokens": 1},
+            },
+        )
+    )
+    lines.append(_sse_event("message_stop", {"type": "message_stop"}))
+    return lines
+
+
 class _ResponseEvents:
     """One scripted ``response.*`` stream (the shape the Meta Model API sends)."""
 
@@ -253,6 +382,8 @@ class Recorder:
         self.app.add_api_route("/muse-code/models", self.muse_models, methods=["GET"])
         self.app.add_api_route("/v1/chat/completions", self.chat, methods=["POST"])
         self.app.add_api_route("/v1/responses", self.responses, methods=["POST"])
+        self.app.add_api_route("/v1/messages", self.messages, methods=["POST"])
+        self.app.add_api_route("/v1/messages/count_tokens", self.count_tokens, methods=["POST"])
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -316,6 +447,52 @@ class Recorder:
                 yield line
 
         return StreamingResponse(stream(), media_type="text/event-stream")
+
+    async def messages(self, request: Request) -> Response:
+        raw = await request.body()
+        number = self._record(raw)
+        body = json.loads(raw)
+        if self.upstream is not None:
+            return await self._forward("/messages", raw, bool(body.get("stream")))
+        model = str(body.get("model") or SCRIPTED_MODEL)
+        turn = _messages_turn(body, self.workdir)
+        if not body.get("stream"):
+            kind, payload = turn
+            if kind == "call":
+                name, arguments = payload
+                content: list[dict[str, Any]] = [
+                    {
+                        "type": "tool_use",
+                        "id": f"toolu_mock_{number}",
+                        "name": name,
+                        "input": arguments,
+                    }
+                ]
+                stop_reason = "tool_use"
+            else:
+                content = [{"type": "text", "text": str(payload)}]
+                stop_reason = "end_turn"
+            return JSONResponse(
+                {
+                    "id": f"msg_mock_{number}",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": model,
+                    "content": content,
+                    "stop_reason": stop_reason,
+                    "stop_sequence": None,
+                    "usage": {"input_tokens": 1, "output_tokens": 1},
+                }
+            )
+
+        async def stream() -> AsyncIterator[str]:
+            for line in _messages_stream(number, model, turn):
+                yield line
+
+        return StreamingResponse(stream(), media_type="text/event-stream")
+
+    async def count_tokens(self) -> Response:
+        return JSONResponse({"input_tokens": 1})
 
     def _scripted_completion(self, body: dict[str, Any]) -> dict[str, Any]:
         """A non-streamed answer (``connect --check``): repeats the placeholders it got."""

@@ -249,3 +249,36 @@ def test_cell_summary_counts_errors() -> None:
     cell = CellResult("fast", 1, False, 2, 2, 1.0, [])
     s = cell.summary()
     assert s["errors"] == 2 and s["overhead_ms"] is None
+
+
+def test_mock_messages_and_count_tokens() -> None:
+    app = create_mock_upstream(chunk_chars=4)
+    tools = [{"name": "Read", "input_schema": {"type": "object"}}]
+    with TestClient(app) as client:
+        body = {
+            "model": "claude-sonnet-4-5",
+            "max_tokens": 64,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "[[EMAIL_1a2b3c]] hi"}],
+                }
+            ],
+        }
+        r = client.post("/v1/messages", json=body)
+        assert r.status_code == 200
+        assert r.json()["content"] == [{"type": "text", "text": "Echo: [[EMAIL_1a2b3c]] hi"}]
+        assert r.json()["stop_reason"] == "end_turn"
+        # Single tool or forced tool_choice -> tool_use
+        r_tool = client.post("/v1/messages", json={**body, "tools": tools})
+        assert r_tool.json()["stop_reason"] == "tool_use"
+        assert r_tool.json()["content"][0]["name"] == "Read"
+        # Streamed text and tool_use
+        r_stream = client.post("/v1/messages", json={**body, "stream": True})
+        assert "event: message_start" in r_stream.text and "text_delta" in r_stream.text
+        r_tool_stream = client.post("/v1/messages", json={**body, "stream": True, "tools": tools})
+        assert "input_json_delta" in r_tool_stream.text
+        # count_tokens and invalid JSON
+        assert client.post("/v1/messages/count_tokens", json=body).json()["input_tokens"] > 0
+        assert client.post("/v1/messages", content=b"{").status_code == 400
+        assert client.post("/v1/messages/count_tokens", content=b"{").status_code == 400

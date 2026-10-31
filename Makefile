@@ -1,5 +1,5 @@
 .PHONY: help setup lint format test test-all types gate serve check docker docker-smoke audit licences \
-	pii-diff gitleaks links baselines openapi demo demo-traffic smoke smoke-fast bench wheel wheel-smoke
+	pii-diff gitleaks links baselines openapi demo demo-traffic smoke smoke-fast smoke-harnesses bench wheel wheel-smoke
 
 # Hygiene (LAB-1254): `uv sync` once via `make setup` (or `make baselines` for that extra),
 # then every `uv run` below is `uv run --no-sync`, so a source edit never rebuilds pii-guard
@@ -90,8 +90,9 @@ MODE ?= fast
 DEMO_EXTRAS := --extra local-vision
 
 demo: ## start API + gateway + UI on a mock upstream, fast mode (rules + NER); MODE=rules: offline
-	uv run --no-sync $(DEMO_EXTRAS) python -m pii_guard.visual.segment fetch
-	uv run --no-sync $(DEMO_EXTRAS) python scripts/demo.py --mode $(MODE)
+	uv sync $(DEMO_EXTRAS)
+	uv run --no-sync python -m pii_guard.visual.segment fetch
+	uv run --no-sync python scripts/demo.py --mode $(MODE)
 
 demo-traffic: ## send scripted fictional hu/en/de requests through the running demo gateway
 	uv run --no-sync python scripts/demo_traffic.py
@@ -101,6 +102,12 @@ smoke: ## rules only (CI): start the stack on the mock upstream, send the demo t
 
 smoke-fast: ## fast mode (local): as smoke with rules + NER, the NER-only scenario must be masked
 	uv run --no-sync python scripts/smoke.py --mode fast
+
+smoke-harnesses: ## run all 5 coding-agent harnesses (pi, muse-code, codex, opencode, claude-code) end to end
+	@for client in pi muse-code codex opencode claude-code; do \
+		echo "=== smoke-harnesses: $$client ==="; \
+		uv run --no-sync python -m pii_guard.integrations.e2e --client $$client || exit 1; \
+	done
 
 bench: ## gateway latency benchmark on the mock upstream (fast mode, concurrency 1 and 8)
 	uv run --no-sync pii-guard bench latency
