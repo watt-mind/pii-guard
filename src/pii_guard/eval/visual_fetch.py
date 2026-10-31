@@ -266,6 +266,29 @@ def _image_extension(response: httpx.Response, url: str) -> str:
     raise ValueError(f"not an image ({content_type or 'no content type'})")
 
 
+def _probe_catalog_sources(
+    raw_sources: Sequence[dict[str, Any]],
+    fetcher: PoliteFetcher,
+    log: Callable[[str], None],
+) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    for source in raw_sources:
+        record = {"name": source["name"], "url": source["url"]}
+        if source.get("kind") == "probe":
+            try:
+                fetcher.get(source["url"])
+                record["status"] = "reachable (not scraped: no fetch rules defined)"
+            except Blocked as exc:
+                record["status"] = f"blocked: {exc}"
+            except httpx.HTTPError as exc:
+                record["status"] = f"error: {type(exc).__name__}"
+            log(f"source {source['name']}: {record['status']}")
+        else:
+            record["status"] = "used"
+        sources.append(record)
+    return sources
+
+
 def fetch_catalog(
     catalog: dict[str, Any],
     out_dir: Path,
@@ -286,21 +309,7 @@ def fetch_catalog(
     out_dir.mkdir(parents=True, exist_ok=True)
     previous = {p["commons_title"]: p for p in catalog.get("previous", []) if "sha256" in p}
 
-    sources: list[dict[str, Any]] = []
-    for source in catalog.get("sources", []):
-        record = {"name": source["name"], "url": source["url"]}
-        if source.get("kind") == "probe":
-            try:
-                fetcher.get(source["url"])
-                record["status"] = "reachable (not scraped: no fetch rules defined)"
-            except Blocked as exc:
-                record["status"] = f"blocked: {exc}"
-            except httpx.HTTPError as exc:
-                record["status"] = f"error: {type(exc).__name__}"
-            log(f"source {source['name']}: {record['status']}")
-        else:
-            record["status"] = "used"
-        sources.append(record)
+    sources = _probe_catalog_sources(catalog.get("sources", []), fetcher, log)
 
     specimens: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []

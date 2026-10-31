@@ -440,6 +440,39 @@ def _leaks(text: str, value: str) -> bool:
     return leaks(text, [value])
 
 
+def _record_transcript_and_leaks(
+    session: Any,
+    outcome: Any,
+    values: dict[str, str],
+    tallies: Sequence[_Tally],
+) -> None:
+    for t in tallies:
+        t.transcripts += 1
+        restored = session.unmask_with_report(outcome.transcript or "")
+        t.transcripts_resolved += not restored.unresolved
+        text = (outcome.transcript or "") + json.dumps(outcome.summary or {})
+        t.leaked += sum(_leaks(text, v) for v in values.values())
+
+
+def _build_phase_seeds(
+    doc: str,
+    values: dict[str, str],
+    namesakes: dict[tuple[str, str], list[str]],
+    phase: str,
+) -> tuple[list[tuple[str, EntityType]], list[tuple[str, str]]]:
+    seeds: list[tuple[str, EntityType]] = []
+    owners: list[tuple[str, str]] = []
+    for key, value in sorted(values.items()):
+        entity_type = GOLD_TYPES[key]
+        if phase == "with-true":
+            seeds.append((value, entity_type))
+            owners.append((key, "true"))
+        for name in namesakes.get((doc, key), []):
+            seeds.append((name, entity_type))
+            owners.append((key, "namesake"))
+    return seeds, owners
+
+
 def _score_phase(
     *,
     doc: str,
@@ -455,16 +488,7 @@ def _score_phase(
     tally: _Tally,
 ) -> None:
     session = vault.session()
-    seeds: list[tuple[str, EntityType]] = []
-    owners: list[tuple[str, str]] = []
-    for key, value in sorted(values.items()):
-        entity_type = GOLD_TYPES[key]
-        if phase == "with-true":
-            seeds.append((value, entity_type))
-            owners.append((key, "true"))
-        for name in namesakes.get((doc, key), []):
-            seeds.append((name, entity_type))
-            owners.append((key, "namesake"))
+    seeds, owners = _build_phase_seeds(doc, values, namesakes, phase)
     placeholders = _seed(session, seeds)
     vault_matcher = (ExactMatcher if matcher == "exact" else VaultMatcher)(session, language)
     started = time.perf_counter()
@@ -495,12 +519,7 @@ def _score_phase(
         if owner == "true" and GOLD_TYPES[key] is EntityType.PERSON:
             total.people.setdefault((values[key], key), []).append(hit)
     if phase == "with-true":
-        for t in (total, tally):
-            t.transcripts += 1
-            restored = session.unmask_with_report(outcome.transcript or "")
-            t.transcripts_resolved += not restored.unresolved
-            text = (outcome.transcript or "") + json.dumps(outcome.summary or {})
-            t.leaked += sum(_leaks(text, v) for v in values.values())
+        _record_transcript_and_leaks(session, outcome, values, (total, tally))
     vault.drop(session.session_id)
 
 

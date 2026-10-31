@@ -140,31 +140,35 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_info_command(args: argparse.Namespace) -> int:
+    if args.command == "list":
+        for ds in REGISTRY.values():
+            langs = ",".join(ds.languages)
+            rows = "rows committed" if ds.commit_rows else "manifest only"
+            print(f"{ds.name:24} {ds.split:4} {ds.license[:28]:28} {langs:9} {rows}")
+        return 0
+    if args.command == "paths":
+        for path in get(args.name).fixture_paths():
+            print(path)
+        return 0
+    if args.command == "fetch":
+        for name in args.names:
+            for path in _fetch_one(get(name)):
+                print(f"datasets: wrote {path}", file=sys.stderr)
+        return 0
+    problems = [p for name in args.names for p in _check_one(get(name))]
+    for problem in problems:
+        print(f"datasets: {problem}", file=sys.stderr)
+    if not problems:
+        print("datasets: the committed files match a rebuild", file=sys.stderr)
+    return 1 if problems else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(list(argv) if argv is not None else None)
     try:
-        if args.command == "list":
-            for ds in REGISTRY.values():
-                langs = ",".join(ds.languages)
-                rows = "rows committed" if ds.commit_rows else "manifest only"
-                print(f"{ds.name:24} {ds.split:4} {ds.license[:28]:28} {langs:9} {rows}")
-            return 0
-        if args.command == "paths":
-            for path in get(args.name).fixture_paths():
-                print(path)
-            return 0
-        if args.command == "fetch":
-            for name in args.names:
-                for path in _fetch_one(get(name)):
-                    print(f"datasets: wrote {path}", file=sys.stderr)
-            return 0
-        if args.command == "check":
-            problems = [p for name in args.names for p in _check_one(get(name))]
-            for problem in problems:
-                print(f"datasets: {problem}", file=sys.stderr)
-            if not problems:
-                print("datasets: the committed files match a rebuild", file=sys.stderr)
-            return 1 if problems else 0
+        if args.command in ("list", "paths", "fetch", "check"):
+            return _run_info_command(args)
         from pii_guard.eval.datasets.run import print_summaries, run_dataset
 
         systems = [s.strip() for s in args.system.split(",") if s.strip()]

@@ -69,4 +69,4 @@ def test_datasets() -> list[Dataset]:
     return [ds for ds in REGISTRY.values() if ds.split == "test" and ds.derived_from is None]
 
 
-test_datasets.__test__ = False  # type: ignore[attr-defined]  # not a pytest test
+setattr(test_datasets, "__test__", False)  # noqa: B010  # not a pytest test

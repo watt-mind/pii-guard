@@ -331,8 +331,11 @@ class ProjectMiddleware:
                 scope, receive, send
             )
         finally:
-            gateway = state.get("project_gateway")
-            if gateway is not None:
-                await gateway.aclose()
-            if runtime is not None:
-                self.service.release(runtime)
+            await self._cleanup_project_state(state, runtime)
+
+    async def _cleanup_project_state(self, state: dict[str, Any], runtime: Any) -> None:
+        gateway = state.get("project_gateway")
+        if gateway is not None:
+            await gateway.aclose()
+        if runtime is not None:
+            self.service.release(runtime)

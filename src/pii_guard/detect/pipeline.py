@@ -327,6 +327,44 @@ def _trim(text: str, start: int, end: int) -> tuple[int, int] | None:
     return start, end
 
 
+def _select_non_overlapping(text: str, ordered: Sequence[_Cand]) -> list[_Cand]:
+    accepted: list[_Cand] = []
+    taken = _Taken()
+    # Where an overriding span ends inside a word: the suffix after it is not a remainder.
+    stems_end = {
+        c.end
+        for c in ordered
+        if c.overriding and 0 < c.end < len(text) and _word(text[c.end - 1]) and _word(text[c.end])
+    }
+    for c in ordered:
+        for ps, pe in taken.subtract(c.start, c.end):
+            if not c.overriding and ps in stems_end:
+                ps = min(pe, ps + len(following_suffix(text, ps)))
+                if ps >= pe:
+                    continue
+            if (ps, pe) != (c.start, c.end):
+                trimmed = _trim(text, ps, pe)
+                if trimmed is None:
+                    continue
+                ps, pe = trimmed
+            accepted.append(
+                _Cand(
+                    ps,
+                    pe,
+                    c.entity_type,
+                    c.score,
+                    c.detector,
+                    c.authoritative,
+                    c.rank,
+                    c.overriding,
+                    c.forced_by,
+                    c.subtype,
+                )
+            )
+            taken.add(ps, pe)
+    return accepted
+
+
 def resolve_spans(
     text: str,
     spans: Iterable[Span],
@@ -392,40 +430,7 @@ def resolve_spans(
             c.start,
         )
 
-    accepted: list[_Cand] = []
-    taken = _Taken()
-    # Where an overriding span ends inside a word: the suffix after it is not a remainder.
-    stems_end = {
-        c.end
-        for c in cands
-        if c.overriding and 0 < c.end < len(text) and _word(text[c.end - 1]) and _word(text[c.end])
-    }
-    for c in sorted(cands, key=priority):
-        for ps, pe in taken.subtract(c.start, c.end):
-            if not c.overriding and ps in stems_end:
-                ps = min(pe, ps + len(following_suffix(text, ps)))
-                if ps >= pe:
-                    continue
-            if (ps, pe) != (c.start, c.end):
-                trimmed = _trim(text, ps, pe)
-                if trimmed is None:
-                    continue
-                ps, pe = trimmed
-            accepted.append(
-                _Cand(
-                    ps,
-                    pe,
-                    c.entity_type,
-                    c.score,
-                    c.detector,
-                    c.authoritative,
-                    c.rank,
-                    c.overriding,
-                    c.forced_by,
-                    c.subtype,
-                )
-            )
-            taken.add(ps, pe)
+    accepted = _select_non_overlapping(text, sorted(cands, key=priority))
 
     accepted.sort(key=lambda c: (c.start, c.end))
     return [

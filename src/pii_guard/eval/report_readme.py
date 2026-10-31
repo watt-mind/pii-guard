@@ -581,6 +581,32 @@ def _bold_min(values: Sequence[float | None]) -> list[str]:
     return [f"**{t}**" if t != _MISSING and float(t[:-1]) == best else t for t in shown]
 
 
+def _record_refs_line(
+    index: Mapping[str, Any], columns: Sequence[Mapping[str, Any]], first: Mapping[str, Any]
+) -> str | None:
+    refs: list[str] = []
+    for col in columns:
+        snap = _snapshot(index, col["fixture_set"], first["system"])
+        if snap is None:
+            continue
+        links = [f"eval/results/runs/{run_id}.json" for run_id in snap["run_ids"]]
+        if len(links) == 1:
+            refs.append(f"[{col['title']}]({links[0]})")
+        else:
+            refs.append(
+                f"{col['title']} ("
+                + " · ".join(f"[{k}]({link})" for k, link in enumerate(links, 1))
+                + ")"
+            )
+    if not refs:
+        return None
+    return (
+        f"Records behind the {first['label']} column: "
+        + ", ".join(refs)
+        + "; every other cell is in the [run log](docs/benchmarks.md#run-log)."
+    )
+
+
 def render_compact(
     index: Mapping[str, Any], spec: Mapping[str, Any], where: str = "docs/benchmarks/config.json"
 ) -> str:
@@ -631,27 +657,9 @@ def render_compact(
     lines = [fill(x, index, spec, where) for x in details.get("lines") or []]
     if spec.get("model_latency"):
         lines.append(_model_latency_line(spec["model_latency"], where, p50=False))
-    first = rows[0]
-    refs = []
-    for col in columns:
-        snap = _snapshot(index, col["fixture_set"], first["system"])
-        if snap is None:
-            continue
-        links = [f"eval/results/runs/{run_id}.json" for run_id in snap["run_ids"]]
-        if len(links) == 1:
-            refs.append(f"[{col['title']}]({links[0]})")
-        else:
-            refs.append(
-                f"{col['title']} ("
-                + " · ".join(f"[{k}]({link})" for k, link in enumerate(links, 1))
-                + ")"
-            )
-    if refs:
-        lines.append(
-            f"Records behind the {first['label']} column: "
-            + ", ".join(refs)
-            + "; every other cell is in the [run log](docs/benchmarks.md#run-log)."
-        )
+    ref_line = _record_refs_line(index, columns, rows[0])
+    if ref_line:
+        lines.append(ref_line)
     if lines:
         out.append(f"<details><summary>{details.get('summary', 'How this is measured')}</summary>")
         out.append("")

@@ -322,7 +322,7 @@ def read_parquet(path: Path, columns: Sequence[str]) -> list[dict[str, Any]]:
     ``uv run --with pyarrow python -m pii_guard.eval.datasets fetch NAME``.
     """
     try:
-        import pyarrow.parquet as pq  # type: ignore[import-not-found,import-untyped,unused-ignore]
+        import pyarrow.parquet as pq
     except ImportError:
         raise RuntimeError(
             "reading Parquet needs pyarrow: "
