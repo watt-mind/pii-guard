@@ -72,8 +72,8 @@ class RecordError(ValueError):
 # --- Metrics ------------------------------------------------------------------------------
 
 
-def _r(value: object, digits: int = 6) -> float | None:
-    return None if value is None else round(float(value), digits)  # type: ignore[arg-type]
+def _r(value: Any, digits: int = 6) -> float | None:
+    return None if value is None else round(float(value), digits)
 
 
 def _counts(block: Mapping[str, Any], keys: Sequence[str]) -> dict[str, int]:

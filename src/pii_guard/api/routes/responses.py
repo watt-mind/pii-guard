@@ -205,17 +205,21 @@ async def muse_code_models(request: Request) -> JSONResponse:
                     content.extend(chunk)
         except httpx.HTTPError as exc:
             raise UpstreamError(f"upstream model catalog failed ({type(exc).__name__})") from None
+    return JSONResponse({"object": "list", "data": _parse_muse_catalog(content)})
+
+
+def _parse_muse_catalog(content: bytearray) -> list[dict[str, Any]]:
     try:
         data = json.loads(content).get("data")
     except (ValueError, AttributeError):
         raise UpstreamError("upstream model catalog is not a JSON object") from None
     if not isinstance(data, list):
         raise UpstreamError("upstream model catalog has no data array")
-    entries = []
+    entries: list[dict[str, Any]] = []
     for model in data[:_MAX_MODELS]:
         metadata = model.get("metadata") if isinstance(model, dict) else None
         muse = metadata.get("muse-code") if isinstance(metadata, dict) else None
         entry = _entry(model, muse)
         if entry is not None:
             entries.append(entry)
-    return JSONResponse({"object": "list", "data": entries})
+    return entries

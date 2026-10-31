@@ -148,6 +148,29 @@ def _map(label: str, language: str) -> EntityType | None:
     return override if override is not None else LABEL_MAP.get(label)
 
 
+def _append_or_merge_span(
+    spans: list[tuple[int, int, EntityType, frozenset[str]]],
+    text: str,
+    doc_id: str,
+    start: int,
+    end: int,
+    entity_type: EntityType,
+    label: str,
+) -> None:
+    if spans:
+        p_start, p_end, p_type, p_labels = spans[-1]
+        if start < p_end:
+            if p_type is not entity_type:
+                raise ConversionError(f"{doc_id}: overlapping spans of different types")
+            spans[-1] = (p_start, max(p_end, end), p_type, p_labels | {label})
+            return
+        gap = text[p_end:start]
+        if p_type is entity_type and _MERGE_GAP_RE.fullmatch(gap):
+            spans[-1] = (p_start, end, p_type, p_labels | {label})
+            return
+    spans.append((start, end, entity_type, frozenset({label})))
+
+
 def convert_row(row: Mapping[str, Any]) -> Converted:
     """One dataset row as a fixture :class:`Document` (``ai4privacy-<uid>``)."""
     uid = row.get("uid")
@@ -180,18 +203,7 @@ def convert_row(row: Mapping[str, Any]) -> Converted:
             continue
         if start >= end:
             continue
-        if spans:
-            p_start, p_end, p_type, p_labels = spans[-1]
-            if start < p_end:
-                if p_type is not entity_type:
-                    raise ConversionError(f"{doc_id}: overlapping spans of different types")
-                spans[-1] = (p_start, max(p_end, end), p_type, p_labels | {label})
-                continue
-            gap = text[p_end:start]
-            if p_type is entity_type and _MERGE_GAP_RE.fullmatch(gap):
-                spans[-1] = (p_start, end, p_type, p_labels | {label})
-                continue
-        spans.append((start, end, entity_type, frozenset({label})))
+        _append_or_merge_span(spans, text, doc_id, start, end, entity_type, label)
     kept: list[tuple[int, int, EntityType]] = []
     for s, e, t, labels in spans:
         if labels == {"CITY"}:  # a town on its own: pii-guard keeps it on purpose

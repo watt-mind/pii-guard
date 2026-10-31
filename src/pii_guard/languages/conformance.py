@@ -37,7 +37,7 @@ from pii_guard.languages import (
     register_pack,
     unregister_pack,
 )
-from pii_guard.types import TEXT_ENTITY_TYPES, EntityType
+from pii_guard.types import TEXT_ENTITY_TYPES, EntityType, Span
 
 if TYPE_CHECKING:
     from pii_guard.eval.fixtures import Document
@@ -274,9 +274,9 @@ def _check_rules(pack: LanguagePack) -> list[Finding]:
     return findings
 
 
-def _probe_rule(rule: object, text: str) -> str | None:
+def _probe_rule(rule: Any, text: str) -> str | None:
     try:
-        hits = list(rule(text))  # type: ignore[operator]
+        hits = list(rule(text))
     except Exception as exc:
         return f"raises {type(exc).__name__} on a probe text"
     for hit in hits:
@@ -496,6 +496,21 @@ def _check_corpus_party(
     return findings
 
 
+def _check_corpus_header(check: str, code: str, raw: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    declared = raw.get("language")
+    if declared != code:
+        findings.append(
+            _error(check, f"corpus_templates declare language {declared!r}, expected {code!r}")
+        )
+    missing_keys = [k for k in ("language_name", "inflection_rule", "field_labels") if k not in raw]
+    if missing_keys:
+        findings.append(_error(check, f"corpus_templates lack {', '.join(missing_keys)}"))
+    if not (raw.get("kinds") or []):
+        findings.append(_error(check, "corpus_templates define no [[kinds]]"))
+    return findings
+
+
 def _check_corpus(pack: LanguagePack) -> list[Finding]:
     """``identity_generator`` + ``corpus_templates``: both or neither, and they fit together."""
     check = "structure.corpus"
@@ -518,17 +533,8 @@ def _check_corpus(pack: LanguagePack) -> list[Finding]:
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         return [_error(check, f"corpus_templates cannot be read: {type(exc).__name__}")]
     findings: list[Finding] = []
-    declared = raw.get("language")
-    if declared != pack.code:
-        findings.append(
-            _error(check, f"corpus_templates declare language {declared!r}, expected {pack.code!r}")
-        )
-    missing_keys = [k for k in ("language_name", "inflection_rule", "field_labels") if k not in raw]
-    if missing_keys:
-        findings.append(_error(check, f"corpus_templates lack {', '.join(missing_keys)}"))
+    findings.extend(_check_corpus_header(check, pack.code, raw))
     kinds = raw.get("kinds") or []
-    if not kinds:
-        findings.append(_error(check, "corpus_templates define no [[kinds]]"))
     try:
         generator = generator_factory(random.Random(f"conformance/{pack.code}"))  # noqa: S311
     except Exception as exc:
@@ -640,7 +646,7 @@ def temporarily_registered(pack: LanguagePack) -> Iterator[LanguagePack]:
             register_pack(previous)
 
 
-def _gold_spans(document: Document) -> list[object]:
+def _gold_spans(document: Document) -> list[Span]:
     from pii_guard.eval.scorer import DEFAULT_POLICY
     from pii_guard.types import Span
 
@@ -662,7 +668,7 @@ def check_roundtrip(pack: LanguagePack, documents: Iterable[Document]) -> list[F
         for document in documents:
             session = vault.session()
             try:
-                masked = session.mask(document.text, _gold_spans(document), language=pack.code)  # type: ignore[arg-type]
+                masked = session.mask(document.text, _gold_spans(document), language=pack.code)
                 if session.unmask(masked) != document.text:
                     failed.append(document.id)
             except Exception:

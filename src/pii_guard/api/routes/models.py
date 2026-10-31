@@ -101,28 +101,41 @@ def _listing(models: list[dict[str, Any]]) -> dict[str, Any]:
     return {"object": "list", "data": models}
 
 
+def _upstream_headers(request: Request, settings: Any) -> dict[str, str]:
+    headers = {"Accept": "application/json"}
+    key = settings.upstream_api_key
+    if key is not None:
+        headers["Authorization"] = f"Bearer {key.get_secret_value()}"
+    elif request.headers.get("authorization"):
+        headers["Authorization"] = request.headers["authorization"]
+    return headers
+
+
+async def _routed_endpoint_models(request: Request, endpoint: Any) -> JSONResponse:
+    if endpoint.model is None:
+        # Pass-through (LAB-1451): the provider's own list, with the endpoint's credential.
+        return JSONResponse(_listing(await endpoint_catalog(request, endpoint)))
+    return JSONResponse(
+        _listing(
+            [
+                {
+                    "id": endpoint.model,
+                    "object": "model",
+                    "created": 0,
+                    "owned_by": endpoint.provider,
+                }
+            ]
+        )
+    )
+
+
 @router.get("/v1/models", tags=["gateway"])
 async def list_models(request: Request) -> JSONResponse:
     endpoint = getattr(request.state, "project_endpoint", None)
     if endpoint is not None and getattr(request.state, "project_routed_endpoint", False):
-        if endpoint.model is None:
-            # Pass-through (LAB-1451): the provider's own list, with the endpoint's credential.
-            return JSONResponse(_listing(await endpoint_catalog(request, endpoint)))
-        return JSONResponse(
-            _listing(
-                [
-                    {
-                        "id": endpoint.model,
-                        "object": "model",
-                        "created": 0,
-                        "owned_by": endpoint.provider,
-                    }
-                ]
-            )
-        )
+        return await _routed_endpoint_models(request, endpoint)
     state = request.app.state
-    hosted = getattr(state, "hosted", None)
-    if hosted is not None:
+    if getattr(state, "hosted", None) is not None:
         return await _hosted_models(request)
     config = getattr(state, "models_config", None) or ModelsConfig()
     if config.upstream_models:
@@ -134,12 +147,7 @@ async def list_models(request: Request) -> JSONResponse:
         raise UpstreamNotConfiguredError(
             "PII_GUARD_UPSTREAM_BASE_URL is not set; set it or PII_GUARD_UPSTREAM_MODELS"
         )
-    headers = {"Accept": "application/json"}
-    key = settings.upstream_api_key
-    if key is not None:
-        headers["Authorization"] = f"Bearer {key.get_secret_value()}"
-    elif request.headers.get("authorization"):
-        headers["Authorization"] = request.headers["authorization"]
+    headers = _upstream_headers(request, settings)
 
     transport = getattr(state, "gateway_transport", None)
     content = bytearray()

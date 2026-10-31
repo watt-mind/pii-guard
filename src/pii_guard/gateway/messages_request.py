@@ -327,6 +327,35 @@ def _collect_image_block(
 # --- tools -------------------------------------------------------------------------------
 
 
+def _collect_one_tool(tool: Any, where: str, out: CollectedTexts) -> None:
+    if not isinstance(tool, dict):
+        raise InvalidChatRequestError(f"{where} must be an object")
+    tool_type = tool.get("type", "custom")
+    if tool_type != "custom":
+        shown = tool_type if isinstance(tool_type, str) and len(tool_type) <= 40 else "unknown"
+        raise UnsupportedContentError(
+            f"{where}: tools of type {shown!r} are not supported; server tools act upstream "
+            "on data the gateway never sees (client tools with an input_schema are)"
+        )
+    _reject_unknown(tool, _TOOL_KEYS, where, "tool")
+    if not isinstance(tool.get("name"), str):
+        raise InvalidChatRequestError(f"{where}.name must be a string")
+    _check_text(tool["name"], f"{where}.name", out)
+    description = tool.get("description")
+    if isinstance(description, str):
+        out.slots.append(TextSlot(description, _setter(tool, "description"), "tools"))
+    elif description is not None:
+        raise InvalidChatRequestError(f"{where}.description must be a string")
+    if not isinstance(tool.get("input_schema"), dict):
+        raise InvalidChatRequestError(f"{where}.input_schema must be an object")
+    _collect_schema(tool, "input_schema", f"{where}.input_schema", out)
+    for key in ("defer_loading", "strict"):
+        if key in tool:
+            _require_scalars(tool[key], f"{where}.{key}")
+    if _CACHE in tool:
+        _check_json(tool, _CACHE, f"{where}.{_CACHE}", out)
+
+
 def _collect_tools(body: dict[str, Any], out: CollectedTexts) -> None:
     tools = body.get("tools")
     if tools is None:
@@ -334,30 +363,4 @@ def _collect_tools(body: dict[str, Any], out: CollectedTexts) -> None:
     if not isinstance(tools, list):
         raise InvalidChatRequestError("tools must be an array")
     for index, tool in enumerate(tools):
-        where = f"tools.{index}"
-        if not isinstance(tool, dict):
-            raise InvalidChatRequestError(f"{where} must be an object")
-        tool_type = tool.get("type", "custom")
-        if tool_type != "custom":
-            shown = tool_type if isinstance(tool_type, str) and len(tool_type) <= 40 else "unknown"
-            raise UnsupportedContentError(
-                f"{where}: tools of type {shown!r} are not supported; server tools act upstream "
-                "on data the gateway never sees (client tools with an input_schema are)"
-            )
-        _reject_unknown(tool, _TOOL_KEYS, where, "tool")
-        if not isinstance(tool.get("name"), str):
-            raise InvalidChatRequestError(f"{where}.name must be a string")
-        _check_text(tool["name"], f"{where}.name", out)
-        description = tool.get("description")
-        if isinstance(description, str):
-            out.slots.append(TextSlot(description, _setter(tool, "description"), "tools"))
-        elif description is not None:
-            raise InvalidChatRequestError(f"{where}.description must be a string")
-        if not isinstance(tool.get("input_schema"), dict):
-            raise InvalidChatRequestError(f"{where}.input_schema must be an object")
-        _collect_schema(tool, "input_schema", f"{where}.input_schema", out)
-        for key in ("defer_loading", "strict"):
-            if key in tool:
-                _require_scalars(tool[key], f"{where}.{key}")
-        if _CACHE in tool:
-            _check_json(tool, _CACHE, f"{where}.{_CACHE}", out)
+        _collect_one_tool(tool, f"tools.{index}", out)
