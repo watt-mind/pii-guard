@@ -342,6 +342,40 @@ def test_overhead_excludes_the_upstream_delay_non_streaming(
     header = r.headers["server-timing"]
     assert "overhead;dur=" in header and "upstream;dur=" in header
     assert 'pii_guard_gateway_requests_total{mode="audit",outcome="ok"} 1' in metrics
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL"} 1' in metrics
+    assert 'pii_guard_outbound_checks_total{result="passed"} 1' in metrics
+    assert 'pii_guard_upstream_tokens_total{direction="input"} 10' in metrics
+    assert 'pii_guard_upstream_tokens_total{direction="output"} 5' in metrics
+    chat_metric = (
+        'pii_guard_http_requests_total{method="POST",path="/v1/chat/completions",status="200"} 1'
+    )
+    assert chat_metric in metrics
+    assert "pii_guard_vault_active_sessions 1" in metrics
+    assert "pii_guard_ner_state{state=" in metrics
+
+
+def test_metrics_include_rest_routes_and_gauges() -> None:
+    app = make(MockUpstream(), metrics=True)
+    with TestClient(app) as client:
+        assert client.post("/v1/analyze", json={"text": f"Write to {EMAILS[0]}"}).status_code == 200
+        mask_res = client.post("/v1/mask", json={"text": f"Write to {EMAILS[0]}"})
+        assert mask_res.status_code == 200
+        sid = mask_res.json()["session_id"]
+        unmask_res = client.post(
+            "/v1/unmask",
+            json={"text": "Hello [[PERSON_deadbeef]]", "session_id": sid},
+        )
+        assert unmask_res.status_code == 200
+        metrics = client.get("/metrics").text
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL"} 2' in metrics
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL"} 1' in metrics
+    assert "pii_guard_unresolved_placeholders_total 1" in metrics
+    for path in ("/v1/analyze", "/v1/mask", "/v1/unmask"):
+        assert f'pii_guard_http_requests_total{{method="POST",path="{path}",status="200"}} 1' in (
+            metrics
+        )
+    assert 'path="/metrics"' not in metrics
+    assert "pii_guard_vault_active_sessions 1" in metrics
 
 
 def test_overhead_and_added_ttft_streaming(monkeypatch: pytest.MonkeyPatch) -> None:

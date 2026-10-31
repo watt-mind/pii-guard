@@ -29,6 +29,7 @@ from pii_guard.api.routes._common import (
     check_text_size,
     ephemeral_session,
     log_extra,
+    request_metrics,
     v1_router,
 )
 from pii_guard.api.routes.analyze import Language
@@ -151,6 +152,12 @@ def mask(
         KeptEntity(entity_type=entity_type.value, count=count)
         for entity_type, count in sorted(Counter(s.entity_type for s in kept).items())
     ]
+    if (metrics := request_metrics(request)) is not None:
+        detected_by_type = Counter(s.entity_type.value for s in spans)
+        masked_by_type: Counter[str] = Counter()
+        for entity in entities:
+            masked_by_type[entity.entity_type] += entity.count
+        metrics.observe_entities(detected=detected_by_type, masked=masked_by_type)
     log_extra(
         request,
         spans=len(spans),
