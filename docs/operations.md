@@ -434,6 +434,9 @@ LAB-1407 adds `cryptography` for authenticated encryption of stored provider cre
 the first amd64 CI image with that dependency measured 541 MB unpacked. The budget is now
 550 MB, retaining OCR and local vision and allowing 9 MB of headroom. This deliberate
 footprint increase supports encrypted configuration without implementing custom cryptography.
+Since LAB-1733 the NER (torch, transformers) is a core dependency that this image skips; it then
+measured 544 MB, so LAB-1734 raised the budget to 650 MB: room for ordinary growth, while the NER
+leaking into the base image (about +1 GB) still fails the check.
 `make demo` fetches YuNet too. Elsewhere: `uv sync --extra local-vision`, then
 `uv run python -m pii_guard.visual.segment fetch` (into `PII_GUARD_MODEL_DIR`, default
 `~/.cache/pii-guard/models`). Model files are never committed.
