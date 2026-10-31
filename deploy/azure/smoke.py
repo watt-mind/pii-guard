@@ -285,19 +285,20 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--require-e2e",
         action="store_true",
-        help="Require sponsored demo E2E round-trip to run and pass",
-    )
-    parser.add_argument(
-        "--api-key",
-        default=os.environ.get("PII_GUARD_SMOKE_API_KEY", ""),
-        help="Optional guard or endpoint API key (or PII_GUARD_SMOKE_API_KEY) for streaming E2E",
+        help=(
+            "Run the paid E2E tiers: the sponsored demo round-trip and, with "
+            "PII_GUARD_SMOKE_API_KEY set, authenticated chat. Never pass this from deploy.sh: "
+            "those calls spend sponsored budget and a failure there must not roll back ingress"
+        ),
     )
     parser.add_argument(
         "--endpoint-url",
         default=os.environ.get("PII_GUARD_SMOKE_ENDPOINT_URL", ""),
-        help="Optional endpoint base URL or path (/e/<id>/v1) for --api-key E2E",
+        help="Optional endpoint base URL or path (/e/<id>/v1) for the authenticated E2E",
     )
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    # The key comes only from the environment, never argv, so it stays out of ps and logs.
+    api_key = os.environ.get("PII_GUARD_SMOKE_API_KEY", "")
 
     origin, canonical_origin = _parse_origin(args.origin)
     assert origin.hostname is not None  # noqa: S101 - verified by _parse_origin
@@ -391,8 +392,9 @@ def main(argv: list[str] | None = None) -> None:
             headers=csrf_headers,
         )
         response = connection.getresponse()
-        response.read()
-        if response.status != 403:
+        csrf_payload = json.loads(response.read() or b"{}")
+        csrf_code = (csrf_payload.get("error") or {}).get("code")
+        if response.status != 403 or csrf_code != "hosted_request_denied":
             raise SystemExit("cross-origin POST /v1/demo was not refused with 403")
 
         # 8. Public walkthrough E2E (/v1/demo) or zero-sponsorship refusal check
@@ -407,35 +409,40 @@ def main(argv: list[str] | None = None) -> None:
         }
         if guest_cookie:
             demo_headers["Cookie"] = guest_cookie
-        connection.request(
-            "POST",
-            "/v1/demo",
-            body=json.dumps({"sample_id": "en-support"}),
-            headers=demo_headers,
-        )
-        response = connection.getresponse()
-        demo_payload = json.loads(response.read() or b"{}")
-        if sponsored_enabled is True or args.require_e2e:
-            if response.status != 200:
-                raise SystemExit(f"public demo E2E failed with status {response.status}")
-            _check_demo_roundtrip(demo_payload)
-            demo_summary = "public demo E2E round-trip passed"
+        if sponsored_enabled is True and not args.require_e2e:
+            # A live demo spends sponsored budget; the release gate stays free and read-only.
+            demo_summary = "sponsored demo E2E skipped (pass --require-e2e)"
         else:
-            error_code = (demo_payload.get("error") or {}).get("code")
-            if response.status != 503 or error_code != "sponsored_unavailable":
-                raise SystemExit(
-                    "zero-sponsorship /v1/demo did not fail closed with 503 sponsored_unavailable"
-                )
-            demo_summary = "zero-sponsorship refusal verified"
+            connection.request(
+                "POST",
+                "/v1/demo",
+                body=json.dumps({"sample_id": "en-support"}),
+                headers=demo_headers,
+            )
+            response = connection.getresponse()
+            demo_payload = json.loads(response.read() or b"{}")
+            if args.require_e2e:
+                if response.status != 200:
+                    raise SystemExit(f"public demo E2E failed with status {response.status}")
+                _check_demo_roundtrip(demo_payload)
+                demo_summary = "public demo E2E round-trip passed"
+            else:
+                error_code = (demo_payload.get("error") or {}).get("code")
+                if response.status != 503 or error_code != "sponsored_unavailable":
+                    raise SystemExit(
+                        "zero-sponsorship /v1/demo did not fail closed with 503 "
+                        "sponsored_unavailable"
+                    )
+                demo_summary = "zero-sponsorship refusal verified"
 
         # 9. Optional authenticated non-streaming + streaming E2E
-        auth_summary = "pass --api-key for authenticated streaming E2E"
-        if args.api_key:
+        auth_summary = "set PII_GUARD_SMOKE_API_KEY with --require-e2e for authenticated E2E"
+        if api_key and args.require_e2e:
             model = account_body.get("included_model") or "muse-spark-1.3"
             _run_authenticated_e2e(
                 connection,
                 base_path=endpoint_path,
-                api_key=args.api_key,
+                api_key=api_key,
                 model=model,
             )
             auth_summary = (

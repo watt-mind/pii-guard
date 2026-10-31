@@ -1,6 +1,7 @@
 """Compile and check the release writer's scope without contacting Azure."""
 
 import json
+import os
 import re
 import runpy
 import shutil
@@ -36,6 +37,7 @@ class _FakeHttps:
         robots_body: bytes | None = None,
         account_authenticated: bool = False,
         csrf_status: int = 403,
+        csrf_body: bytes = b'{"error": {"code": "hosted_request_denied"}}',
         demo_status: int | None = None,
         demo_payload: dict | None = None,
         chat_payload: dict | None = None,
@@ -49,6 +51,7 @@ class _FakeHttps:
         self.robots_body = robots_body
         self.account_authenticated = account_authenticated
         self.csrf_status = csrf_status
+        self.csrf_body = csrf_body
         self.demo_status = demo_status
         self.demo_payload = demo_payload
         self.chat_payload = chat_payload
@@ -114,7 +117,7 @@ class _FakeHttps:
         elif path == "/v1/demo":
             if req_headers.get("origin") == "https://evil.example":
                 status = self.csrf_status
-                body = b'{"error": {"code": "hosted_request_denied"}}'
+                body = self.csrf_body
             elif self.demo_status is not None or self.demo_payload is not None:
                 status = self.demo_status or 200
                 body = json.dumps(self.demo_payload or {}).encode("utf-8")
@@ -209,10 +212,12 @@ class SmokeTests(unittest.TestCase):
         clock: list[float] | None = None,
         *,
         argv: list[str] | None = None,
+        env: dict[str, str] | None = None,
         **fake_kwargs: object,
     ) -> _FakeHttps:
         fake = _FakeHttps(loads, **fake_kwargs)
         with (
+            mock.patch.dict(os.environ, env or {}),
             mock.patch("http.client.HTTPSConnection", fake),
             mock.patch("time.sleep"),
             mock.patch("time.monotonic", side_effect=clock or [0.0, 5.0, 10.0]),
@@ -260,12 +265,27 @@ class SmokeTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "cross-origin POST /v1/demo"):
             self.run_smoke(csrf_status=200)
 
-    def test_smoke_exercises_public_demo_e2e_when_sponsored_enabled(self) -> None:
+    def test_smoke_skips_the_paid_demo_without_require_e2e(self) -> None:
+        # Only the free cross-origin refusal probe reaches /v1/demo.
         fake = self.run_smoke(sponsored_enabled=True)
-        self.assertIn("/v1/demo", fake.paths)
+        self.assertEqual(fake.paths.count("/v1/demo"), 1)
+        fake = self.run_smoke(
+            sponsored_enabled=True, env={"PII_GUARD_SMOKE_API_KEY": "pg_valid_test_key"}
+        )
+        self.assertNotIn("/v1/chat/completions", fake.paths)
+
+    def test_smoke_rejects_a_403_that_is_not_the_origin_guard(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "cross-origin POST /v1/demo"):
+            self.run_smoke(csrf_body=b'{"error": {"code": "waf_blocked"}}')
+
+    def test_smoke_exercises_public_demo_e2e_when_required(self) -> None:
+        e2e = ["smoke.py", "--require-e2e", "https://guard.example"]
+        fake = self.run_smoke(sponsored_enabled=True, argv=e2e)
+        self.assertEqual(fake.paths.count("/v1/demo"), 2)
         with self.assertRaisesRegex(SystemExit, "leaked synthetic PII"):
             self.run_smoke(
                 sponsored_enabled=True,
+                argv=e2e,
                 demo_payload={
                     "masked": "Jane Placeholder [[EMAIL_4d5e6f]]",
                     "answer": "ok",
@@ -276,6 +296,7 @@ class SmokeTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "un-restored placeholders"):
             self.run_smoke(
                 sponsored_enabled=True,
+                argv=e2e,
                 demo_payload={
                     "masked": "[[PERSON_1a2b3c]] [[EMAIL_4d5e6f]]",
                     "answer": "Hello [[PERSON_1a2b3c]]",
@@ -292,21 +313,25 @@ class SmokeTests(unittest.TestCase):
             )
 
     def test_smoke_authenticated_non_streaming_and_streaming_e2e(self) -> None:
+        key = {"PII_GUARD_SMOKE_API_KEY": "pg_valid_test_key"}
         fake = self.run_smoke(
+            sponsored_enabled=True,
+            env=key,
             argv=[
                 "smoke.py",
-                "--api-key",
-                "pg_valid_test_key",
+                "--require-e2e",
                 "--endpoint-url",
                 "/e/ep_123/v1",
                 "https://guard.example",
-            ]
+            ],
         )
         chat_calls = [p for p in fake.paths if p == "/e/ep_123/v1/chat/completions"]
         self.assertEqual(len(chat_calls), 3)
         with self.assertRaisesRegex(SystemExit, "left un-restored placeholders"):
             self.run_smoke(
-                argv=["smoke.py", "--api-key", "pg_valid_test_key", "https://guard.example"],
+                sponsored_enabled=True,
+                env=key,
+                argv=["smoke.py", "--require-e2e", "https://guard.example"],
                 stream_body=(
                     b'data: {"choices":[{"delta":{"content":"Leaked [[EMAIL_4d5e6f]]"}}]}\n\n'
                     b"data: [DONE]\n\n"
