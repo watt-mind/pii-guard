@@ -293,11 +293,7 @@ class ProjectService:
             secrets=[credential.get_secret_value()] if credential else [],
         )
         observability.traffic = runtime.observability.traffic
-        observability.metrics = (
-            runtime.observability.metrics
-            if self.settings.hosted
-            else getattr(app_obs, "metrics", None)
-        )
+        observability.metrics = getattr(app_obs, "metrics", None)
         observability.remote = None if self.settings.hosted else getattr(app_obs, "remote", None)
         gateway = Gateway(
             settings=settings,

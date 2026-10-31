@@ -24,6 +24,7 @@ from pii_guard.hosted.identity import Principal
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
 from pii_guard.hosted.runtime import HostedCapacityError
 from pii_guard.hosted.spend import DurableSpend
+from pii_guard.observability import ObservabilitySettings
 
 ORIGIN = "https://guard.example"
 EMAIL = "synthetic.one@example.com"
@@ -977,3 +978,180 @@ def test_project_endpoints_tag_only_the_sponsored_route(
     assert untagged.status_code == 200, untagged.text
     assert recorded[-1].headers["authorization"] == "Bearer synthetic-own-meta-key"
     _attribution_free(recorded[-1])
+
+
+# --- Multi-tenant Prometheus scrape boundary and aggregation -------------------------------
+
+
+def test_hosted_metrics_is_get_only_and_throttles_bad_tokens_not_good_scrapes() -> None:
+    obs = ObservabilitySettings(metrics=True, metrics_token="synthetic-scrape-token")  # noqa: S106
+    app = create_app(settings(), obs)
+    good = {"Authorization": "Bearer synthetic-scrape-token"}
+    with TestClient(app, base_url=ORIGIN) as client:
+        service = client.app.state.hosted
+        service.abuse = AbuseAdmission("aca_xff_rightmost", clock=lambda: 100.0)
+        scraper = {**good, "x-forwarded-for": "198.51.100.7"}
+        for method in ("HEAD", "POST", "PUT", "DELETE"):
+            assert client.request(method, "/metrics", headers=scraper).status_code == 403
+        # A good token is never charged: more scrapes than the 30-request burst all succeed.
+        for _ in range(40):
+            assert client.get("/metrics", headers=scraper).status_code == 200
+        # Every bad guess is charged to the anonymous network bucket ...
+        attacker = {"x-forwarded-for": "203.0.113.9"}
+        for index in range(30):
+            wrong = {**attacker, "Authorization": f"Bearer synthetic-guess-{index}"}
+            assert client.get("/metrics", headers=wrong).status_code == 403
+        # ... and once it is spent, the token is not even compared: the right one is refused too.
+        denied = client.get("/metrics", headers={**attacker, **good})
+        assert denied.status_code == 429
+        assert denied.json()["error"]["code"] == "abuse_throttled"
+        assert client.get("/metrics", headers=scraper).status_code == 200
+
+
+def test_hosted_metrics_requires_dedicated_scrape_token_and_aggregates_all_runtimes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def echo(request: httpx.Request) -> httpx.Response:
+        text = json.loads(request.content)["messages"][-1]["content"]
+        return httpx.Response(
+            200,
+            json={
+                "id": "synthetic-completion",
+                "object": "chat.completion",
+                "model": "muse-spark-1.3",
+                "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18},
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": text}}],
+            },
+        )
+
+    monkeypatch.setattr(
+        "pii_guard.hosted.runtime.SecureTransport", lambda: httpx.MockTransport(echo)
+    )
+    monkeypatch.setattr(
+        "pii_guard.hosted.egress.SecureTransport", lambda: httpx.MockTransport(echo)
+    )
+    obs = ObservabilitySettings(metrics=True, metrics_token="synthetic-scrape-token")  # noqa: S106
+    app = create_app(settings(), obs)
+    app.state.hosted.quotas = QuotaLedger(
+        QuotaLimits(global_daily_microdollars=1_000_000_000),
+        sponsored_allocation_microdollars=1_000_000_000,
+        allocation_expires_at=time.time() + 3600,
+        claim_allocation=lambda: True,
+    )
+    with TestClient(app, base_url=ORIGIN) as client:
+        # Anonymous, Google session, and owner API key must all be denied on /metrics.
+        assert client.get("/metrics").status_code == 403
+        assert client.get("/metrics", headers=auth()).status_code == 403
+        assert (
+            client.get("/metrics", headers={"Authorization": "Bearer wrong-token"}).status_code
+            == 403
+        )
+        key_res = client.post(
+            "/v1/account/api-keys", json={"name": "Synthetic key"}, headers=auth()
+        )
+        assert key_res.status_code == 201
+        api_key = key_res.json()["key"]
+        assert (
+            client.get("/metrics", headers={"Authorization": f"Bearer {api_key}"}).status_code
+            == 403
+        )
+        # Conversely, the scrape token cannot be used as an API key on tenant routes.
+        assert (
+            client.post(
+                "/v1/mask",
+                json={"text": EMAIL},
+                headers={"Authorization": "Bearer synthetic-scrape-token"},
+            ).status_code
+            == 401
+        )
+
+        # Generate traffic across two owners, REST /v1/mask, a project endpoint, and remote ingest.
+        assert chat(client, auth("synthetic-one")).status_code == 200
+        assert (
+            client.post("/v1/mask", json={"text": EMAIL}, headers=auth("synthetic-two")).status_code
+            == 200
+        )
+        owner = client.get("/v1/account", headers=auth("synthetic-one")).json()["principal"]["id"]
+        store = client.app.state.projects.store
+        project = store.default_project(owner)["id"]
+        policy = store.list_policies(owner, project)[0]["policy_version_id"]
+        endpoint = store.save_endpoint(
+            owner,
+            project,
+            {
+                "name": "Synthetic sponsored endpoint",
+                "policy_version_id": policy,
+                "provider": "sponsored",
+                "base_url": "https://api.meta.ai/v1",
+                "model": "muse-spark-1.3",
+            },
+        )
+        body = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": EMAIL}]}
+        assert (
+            client.post(
+                f"/e/{endpoint['id']}/v1/chat/completions",
+                json=body,
+                headers=auth("synthetic-one"),
+            ).status_code
+            == 200
+        )
+        ingest_res = client.post(
+            f"/e/{endpoint['id']}/v1/traffic",
+            json={
+                "events": [
+                    {
+                        "id": "req_remote_1",
+                        "outcome": "ok",
+                        "mode": "fast",
+                        "detectors": ["rules"],
+                        "entities": {
+                            "detected": {"EMAIL": 2},
+                            "masked": {"EMAIL": 2},
+                            "blocked": {},
+                            "unmasked": 1,
+                        },
+                        "upstream": {"unresolved_placeholders": 1},
+                        "outbound_check": {"result": "passed", "hits": {}},
+                        "timing": {
+                            "overhead_ms": 4.2,
+                            "upstream_ms": 120.0,
+                            "stages_ms": {"detect": 2.0, "mask": 1.2, "unmask": 1.0},
+                            "detectors_ms": {"rules": 2.0},
+                        },
+                        "usage": {"prompt_tokens": 20, "completion_tokens": 10},
+                    }
+                ]
+            },
+            headers=auth("synthetic-one"),
+        )
+        assert ingest_res.status_code == 200, ingest_res.text
+
+        # Scrape with Authorization: Bearer <metrics_token> and X-PII-Guard-Token: <metrics_token>.
+        scraped = client.get("/metrics", headers={"Authorization": "Bearer synthetic-scrape-token"})
+        assert scraped.status_code == 200
+        alt = client.get("/metrics", headers={"X-PII-Guard-Token": "synthetic-scrape-token"})
+        assert alt.status_code == 200
+        text = scraped.text
+
+    # 2 gateway chat completions served here (local) + 1 remote ingested event (remote).
+    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok",source="local"} 2' in text
+    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok",source="remote"} 1' in text
+    # 1 EMAIL in owner chat + 1 in /v1/mask + 1 in endpoint chat (local); 2 in remote ingest.
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL",source="local"} 3' in text
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL",source="remote"} 2' in text
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL",source="local"} 3' in text
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL",source="remote"} 2' in text
+    assert "pii_guard_unresolved_placeholders_total 1" in text
+    assert 'pii_guard_upstream_tokens_total{direction="input",source="local"} 22' in text
+    assert 'pii_guard_upstream_tokens_total{direction="input",source="remote"} 20' in text
+    assert 'pii_guard_upstream_tokens_total{direction="output",source="local"} 14' in text
+    assert 'pii_guard_upstream_tokens_total{direction="output",source="remote"} 10' in text
+    assert "pii_guard_vault_active_sessions 3" in text
+    assert 'pii_guard_hosted_active_runtimes{kind="owner"} 3' in text
+    assert 'pii_guard_hosted_active_runtimes{kind="guest"} 0' in text
+    assert "pii_guard_hosted_active_streams 0" in text
+    assert "pii_guard_hosted_sponsored_available 1" in text
+    # Verify no tenant identifiers or PII appear in the metrics payload.
+    assert EMAIL not in text
+    assert "synthetic-one" not in text and "synthetic-two" not in text
+    assert owner not in text

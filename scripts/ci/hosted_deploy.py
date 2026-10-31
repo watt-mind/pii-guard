@@ -123,7 +123,12 @@ def assert_config(config: dict, target: str) -> None:
         or config.get("HOSTED_PUBLIC_ORIGIN") != "https://guard-dev.watt-mind.com"
     ):
         raise Refused("Dev requires the approved private network and exact split-DNS origin")
-    for field in ("META_KEY_SECRET_URI", "TENANT_KEY_SECRET_URI", "GOOGLE_SECRET_URI"):
+    for field in (
+        "META_KEY_SECRET_URI",
+        "TENANT_KEY_SECRET_URI",
+        "GOOGLE_SECRET_URI",
+        "METRICS_TOKEN_SECRET_URI",
+    ):
         if not re.fullmatch(
             r"https://[a-z0-9-]+\.vault\.azure\.net/secrets/[a-zA-Z0-9-]+/[a-f0-9]{32}",
             config.get(field, ""),

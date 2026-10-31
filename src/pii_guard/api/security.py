@@ -77,6 +77,16 @@ _PUBLIC_PATHS = frozenset({"/healthz"})
 _SELF_AUTHENTICATING_PATHS = frozenset({"/v1/cli/token"})
 
 
+def _bypasses_api_token(scope: Scope) -> bool:
+    path = scope.get("path", "")
+    if path in _PUBLIC_PATHS or path in _SELF_AUTHENTICATING_PATHS:
+        return True
+    if path == "/metrics":
+        obs = getattr(getattr(scope.get("app"), "state", None), "observability", None)
+        return getattr(getattr(obs, "settings", None), "metrics_token", None) is not None
+    return False
+
+
 def _host_pattern(host: str) -> str:
     host = host.strip().lower()
     if ":" in host and not host.startswith("["):
@@ -214,10 +224,10 @@ class BearerTokenMiddleware:
         return found, authenticates
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        path = scope.get("path", "")
-        if scope["type"] != "http" or path in _PUBLIC_PATHS or path in _SELF_AUTHENTICATING_PATHS:
+        if scope["type"] != "http" or _bypasses_api_token(scope):
             await self.app(scope, receive, send)
             return
+        path = scope.get("path", "")
         headers: list[tuple[bytes, bytes]] = list(scope.get("headers") or [])
 
         # Endpoint authentication is confined and checked by ProjectMiddleware,

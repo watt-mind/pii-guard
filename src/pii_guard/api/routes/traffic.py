@@ -20,25 +20,32 @@ of its endpoint runtimes (one owner-wide ``seq``, each endpoint event tagged ``e
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
+import math
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from fastapi import Query, Request
 from starlette.responses import PlainTextResponse, StreamingResponse
 
 from pii_guard.api.errors import error_responses
-from pii_guard.api.routes._common import v1_router
+from pii_guard.api.routes._common import request_metrics, v1_router
 from pii_guard.observability import (
     Observability,
     RemoteTrafficLevel,
     TrafficLog,
     sanitize_for_remote,
 )
+from pii_guard.observability.metrics import MAX_COUNT_PER_OBSERVATION, MAX_MS
+from pii_guard.observability.timing import STAGES
 from pii_guard.observability.traffic import TrafficFeedView
-from pii_guard.types import PiiGuardError
+from pii_guard.types import EntityType, PiiGuardError
+
+if TYPE_CHECKING:
+    from pii_guard.observability.metrics import LatencyMetrics
 
 __all__ = ["TrafficIngestError", "TrafficLogDisabledError", "router"]
 
@@ -50,6 +57,11 @@ _MAX_INGEST_EVENTS = 50
 _VALID_OUTCOMES = frozenset(
     {"ok", "upstream_error", "upstream_failed", "blocked", "refused", "error"}
 )
+_VALID_MODES = frozenset({"fast", "audit", "strict", "-"})
+_VALID_STAGES = frozenset(STAGES)
+_VALID_DETECTORS = frozenset({"rules", "ner", "llm", "known"})
+_VALID_ENTITY_TYPES = frozenset(t.value for t in EntityType)
+_VALID_OUTBOUND_RESULTS = frozenset({"passed", "blocked"})
 
 
 class TrafficLogDisabledError(PiiGuardError):
@@ -70,6 +82,12 @@ class TrafficIngestMediaTypeError(PiiGuardError):
 class MetricsDisabledError(PiiGuardError):
     code = "metrics_disabled"
     status_code = 404
+
+
+class MetricsUnauthorizedError(PiiGuardError):
+    code = "unauthorized"
+    status_code = 401
+    headers: ClassVar[dict[str, str]] = {"WWW-Authenticate": 'Bearer realm="pii-guard"'}
 
 
 def _observability(request: Request) -> Observability:
@@ -152,6 +170,111 @@ def _validate_ingested_event(raw: object) -> dict[str, Any]:
         else []
     )
     return clean
+
+
+def _finite_ms(value: object) -> float | None:
+    """A self-reported duration: a finite, non-negative number clamped to ``MAX_MS``."""
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        try:
+            fval = float(value)
+        except OverflowError:  # an int too large for a float
+            return MAX_MS if value > 0 else None
+        if math.isfinite(fval) and fval >= 0.0:
+            return min(fval, MAX_MS)
+    return None
+
+
+def _capped_count(value: object) -> int | None:
+    """A self-reported count: a positive int (bool is not an int here), capped per event."""
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return min(value, MAX_COUNT_PER_OBSERVATION)
+    return None
+
+
+def _filter_entity_counts(raw: object) -> dict[str, int]:
+    if not isinstance(raw, Mapping):
+        return {}
+    return {
+        str(k): n
+        for k, v in raw.items()
+        if k in _VALID_ENTITY_TYPES and (n := _capped_count(v)) is not None
+    }
+
+
+def _whitelisted_counts(raw: object, keys: tuple[str, ...]) -> dict[str, int] | None:
+    """Only ``keys``, each a capped positive int; anything else in ``raw`` is dropped."""
+    if not isinstance(raw, Mapping):
+        return None
+    return {k: n for k in keys if (n := _capped_count(raw.get(k))) is not None}
+
+
+def _sanitize_ingested_timing(raw: object) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+    out: dict[str, Any] = {}
+    for key in ("overhead_ms", "total_ms", "upstream_ms", "added_ttft_ms"):
+        if (val := _finite_ms(raw.get(key))) is not None:
+            out[key] = val
+    stages = raw.get("stages_ms")
+    if isinstance(stages, Mapping):
+        out["stages_ms"] = {
+            str(k): ms
+            for k, v in stages.items()
+            if k in _VALID_STAGES and (ms := _finite_ms(v)) is not None and ms > 0.0
+        }
+    detectors = raw.get("detectors_ms")
+    if isinstance(detectors, Mapping):
+        out["detectors_ms"] = {
+            str(k): ms
+            for k, v in detectors.items()
+            if k in _VALID_DETECTORS and (ms := _finite_ms(v)) is not None and ms > 0.0
+        }
+    return out
+
+
+def _observe_ingested_event(metrics: LatencyMetrics, event: Mapping[str, Any]) -> None:
+    """Record a validated remote telemetry event into Prometheus metrics with bounded labels."""
+    raw_mode = event.get("mode")
+    mode = raw_mode if isinstance(raw_mode, str) and raw_mode in _VALID_MODES else "-"
+    outcome = str(event.get("outcome") or "error")
+    timing = _sanitize_ingested_timing(event.get("timing"))
+    # Rebuilt from whitelisted keys only: a remote sender controls every value here.
+    sanitized_event: dict[str, Any] = {
+        "cache": _whitelisted_counts(event.get("cache"), ("hits", "misses", "seeded")),
+        "upstream": _whitelisted_counts(event.get("upstream"), ("unresolved_placeholders",)),
+        "usage": _whitelisted_counts(
+            event.get("usage"),
+            ("prompt_tokens", "input_tokens", "completion_tokens", "output_tokens"),
+        ),
+    }
+    entities = event.get("entities")
+    if isinstance(entities, Mapping):
+        images = entities.get("images")
+        sanitized_event["entities"] = {
+            "detected": _filter_entity_counts(entities.get("detected")),
+            "masked": _filter_entity_counts(entities.get("masked")),
+            "images": (
+                {
+                    "masked": _filter_entity_counts(images.get("masked")),
+                    "kept": _filter_entity_counts(images.get("kept")),
+                }
+                if isinstance(images, Mapping)
+                else None
+            ),
+        }
+    outbound = event.get("outbound_check")
+    if isinstance(outbound, Mapping):
+        result = outbound.get("result")
+        sanitized_event["outbound_check"] = {
+            "result": result if result in _VALID_OUTBOUND_RESULTS else None,
+            "hits": _filter_entity_counts(outbound.get("hits")),
+        }
+    error = event.get("error")
+    if isinstance(error, Mapping):
+        sanitized_event["error"] = {
+            "entity_types": _filter_entity_counts(error.get("entity_types"))
+        }
+    metrics.observe(mode, outcome, timing, sanitized_event, source="remote")
 
 
 @router.get(
@@ -256,8 +379,11 @@ async def ingest_traffic(request: Request) -> dict[str, Any]:
     else:
         raw_events = [payload]
     validated = [_validate_ingested_event(item) for item in raw_events]
+    app_metrics = request_metrics(request)
     for event in validated:
         obs.traffic.publish(event)
+        if app_metrics is not None:
+            _observe_ingested_event(app_metrics, event)
     return {
         "accepted": len(validated),
         "boot": obs.traffic.boot,
@@ -326,22 +452,49 @@ def _live_session_count(state: Any) -> int:
     projects = getattr(state, "projects", None)
     if projects is not None:
         total += projects.live_session_count()
+    hosted = getattr(state, "hosted", None)
+    if hosted is not None:
+        total += hosted.live_session_count()
     return total
+
+
+def _require_metrics_token(request: Request, obs: Observability) -> None:
+    token_secret = obs.settings.metrics_token
+    if token_secret is None or getattr(request.state, "metrics_authenticated", False):
+        return
+    expected = token_secret.get_secret_value().strip()
+    auth = request.headers.get("authorization")
+    header_token = request.headers.get("x-pii-guard-token")
+    if auth and header_token:
+        provided = ""
+    elif auth:
+        scheme, _, credential = auth.partition(" ")
+        provided = credential.strip() if scheme.lower() == "bearer" else ""
+    else:
+        provided = header_token.strip() if header_token else ""
+    if (
+        not expected
+        or not provided
+        or not hmac.compare_digest(provided.encode(), expected.encode())
+    ):
+        raise MetricsUnauthorizedError(
+            "this endpoint requires PII_GUARD_METRICS_TOKEN: send "
+            "'Authorization: Bearer <token>' or 'X-PII-Guard-Token: <token>'"
+        )
 
 
 @router.get("/metrics", include_in_schema=False)
 def metrics(request: Request) -> PlainTextResponse:
     state = request.app.state
-    obs = (
-        _observability(request)
-        if getattr(getattr(state, "settings", None), "hosted", False)
-        else getattr(state, "observability", None) or _observability(request)
-    )
+    obs = getattr(state, "observability", None) or _observability(request)
     if obs.metrics is None:
         raise MetricsDisabledError("metrics are off; set PII_GUARD_METRICS=true")
+    _require_metrics_token(request, obs)
     warmup = getattr(state, "ner_warmup", None)
+    hosted = getattr(state, "hosted", None)
     body = obs.metrics.render(
         active_sessions=_live_session_count(state),
         ner_state=getattr(warmup, "state", None),
+        hosted_stats=hosted.metrics_snapshot() if hosted is not None else None,
     )
     return PlainTextResponse(body, media_type="text/plain; version=0.0.4")

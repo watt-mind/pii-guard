@@ -204,8 +204,9 @@ def _assert_disconnected(app: FastAPI, stream: _Stream) -> None:
     # The disconnect closed the upstream *response*; the shared client stays open (LAB-1176).
     assert gateway._client is not None and not gateway._client.is_closed
     metrics = app.state.observability.metrics.render()
-    assert 'pii_guard_gateway_requests_total{mode="audit",outcome="client_disconnected"} 1' in (
-        metrics
+    assert (
+        'pii_guard_gateway_requests_total{mode="audit",outcome="client_disconnected",'
+        'source="local"} 1' in (metrics)
     )
     assert 'outcome="ok"' not in metrics
 
