@@ -68,7 +68,7 @@ class AzureProjectBlob:
                 read_timeout=5,
             )
 
-            def http_transport():
+            def http_transport() -> Any:
                 return transport.RequestsTransport(
                     use_env_settings=False,
                     connection_timeout=3,

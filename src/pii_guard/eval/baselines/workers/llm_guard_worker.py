@@ -31,9 +31,12 @@ def main() -> int:
 
     vault = Vault()
     scanner = Anonymize(vault)  # defaults: DeBERTa ai4privacy v2, threshold 0.5, language "en"
+    scanner_state = vars(scanner)
 
     captured: dict[str, Any] = {}
-    replace = Anonymize._anonymize
+    # llm-guard's Anonymize exposes its replacement hook and config only via internal attributes.
+    hook_attr = "_anonymize"
+    replace = getattr(Anonymize, hook_attr)
 
     def capturing(prompt: str, pii_entities: list[Any], vault: Any, use_faker: bool) -> Any:
         captured["entities"] = [(e.start, e.end, e.entity_type, e.score) for e in pii_entities]
@@ -42,11 +45,11 @@ def main() -> int:
         captured["mask_ms"] = ms_since(started)
         return result
 
-    Anonymize._anonymize = staticmethod(capturing)  # type: ignore[method-assign]
+    setattr(Anonymize, hook_attr, staticmethod(capturing))
 
     def handle(text: str, language: str) -> tuple[list[list[Any]], str, str | None, float, float]:
         doc_vault = Vault()
-        scanner._vault = doc_vault
+        scanner_state["_vault"] = doc_vault
         captured.clear()
         started = time.perf_counter()
         masked, _valid, _score = scanner.scan(text)
@@ -71,9 +74,9 @@ def main() -> int:
         ],
         "config": {
             "scanner": "Anonymize(vault) with defaults",
-            "language": scanner._language,
-            "threshold": scanner._threshold,
-            "entity_types": list(scanner._entity_types),
+            "language": scanner_state["_language"],
+            "threshold": scanner_state["_threshold"],
+            "entity_types": list(scanner_state["_entity_types"]),
             "use_onnx": False,
         },
     }

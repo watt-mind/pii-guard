@@ -283,6 +283,14 @@ describe("Benchmarks screen, deep links (LAB-1133)", () => {
     expect(cell(resultsTable(panel), "rules", "Leak")).toBe(pct(snap("smoke", "rules").languages.en!.leak));
   });
 
+  it("falls back to the default sort for an unknown or prototype key", async () => {
+    history.replaceState(null, "", "#evaluation?sort=constructor");
+    render(<App api={offlineApi()} mock={createMockClient()} loadBenchmarks={load} />);
+    const panel = screen.getByRole("region", { name: "Evaluation" });
+    await within(panel).findByRole("region", { name: "Results" });
+    expect(within(resultsTable(panel)).getByRole("columnheader", { name: "Leak" })).toHaveAttribute("aria-sort", "ascending");
+  });
+
   it("writes filter changes back to the hash, so the URL stays shareable", async () => {
     const { user, panel } = await openBenchmarks();
     await within(panel).findByRole("region", { name: "Results" });

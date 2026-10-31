@@ -13,6 +13,7 @@ import json
 import math
 import threading
 import time
+from collections import OrderedDict
 
 from fastapi import Request
 from starlette.responses import Response
@@ -72,7 +73,13 @@ def get_gateway(request: Request) -> Gateway:
                     observability=getattr(state, "observability", None),
                     image_workers=image_workers_for(state, state.settings.image_concurrency),
                 )
-                gateway._detect_workers = state.projects.worker_pools(gateway.config.concurrency)
+                gateway.bind_shared_state(
+                    detect_workers=state.projects.worker_pools(gateway.config.concurrency),
+                    session_holds={},
+                    holds_lock=threading.Lock(),
+                    issued_ids=gateway.issued_ids,
+                    session_incarnations=OrderedDict(),
+                )
                 state.gateway = gateway
     from pii_guard.detection_profile import DetectionProfileError, is_local_only
 

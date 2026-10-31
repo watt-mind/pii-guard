@@ -33,19 +33,7 @@ import { useServerStatus, type StatusLoader } from "./hooks/useServerStatus";
 import { useTheme } from "./hooks/useTheme";
 import { useTraffic, type TrafficHandle } from "./hooks/useTraffic";
 import { initialAnswer, knownSignatureOf, runGuard, toRunError, type KnownSession, type RunError, type RunResult } from "./lib/run";
-import {
-  DEFAULT_ROUTE,
-  PLAYGROUND_TABS,
-  SECTIONS,
-  hashOf,
-  parseHash,
-  routeFromLocation,
-  sameRoute,
-  type EvaluationParams,
-  type PlaygroundTab,
-  type Route,
-  type Section,
-} from "./lib/routes";
+import { DEFAULT_ROUTE, PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type EvaluationParams, type PlaygroundTab, type Route, type Section } from "./lib/routes";
 import type { VaultClient } from "./api/vault";
 import { newKnownRow, type KnownRow } from "./lib/knownRows";
 import { Overview } from "./screens/Overview";
@@ -146,11 +134,7 @@ function writeHash(route: Route, how: "push" | "replace") {
   }
 }
 
-function useHashSync(
-  hosted: boolean,
-  navigate: (next: Route, how?: "push" | "replace" | "none") => void,
-  setApiOpen: (open: boolean) => void,
-) {
+function useHashSync(hosted: boolean, navigate: (next: Route, how?: "push" | "replace" | "none") => void, setApiOpen: (open: boolean) => void) {
   useEffect(() => {
     const currentHash = globalThis.location?.hash ?? "";
     // An old tab link (#traffic, #benchmarks …) lands on its new place, with the URL rewritten.
@@ -212,10 +196,7 @@ function useConsoleNavigation(caps: Capabilities, hosted: HostedSession | null, 
   const openTab = useCallback((tab: PlaygroundTab) => navigate({ section: "playground", tab }), [navigate]);
   // The open Evaluation screen reports its filters so the URL stays shareable; off-section
   // nothing is reported, so a still-loading screen can't pull the user back (LAB-1133).
-  const reportEvaluation = useCallback(
-    (evaluation: EvaluationParams) => navigate({ section: "evaluation", tab: "text", evaluation }, "replace"),
-    [navigate],
-  );
+  const reportEvaluation = useCallback((evaluation: EvaluationParams) => navigate({ section: "evaluation", tab: "text", evaluation }, "replace"), [navigate]);
   useHashSync(hosted !== null, navigate, setApiOpen);
   // Rewrite the URL only once the server has said what it offers: until then a deep link to a
   // section the defaults leave out (hosted #playground/images) must survive (LAB-1448).
@@ -283,13 +264,7 @@ function usePlaygroundRunner(engine: EngineHandle) {
 }
 
 /** First paint waits (briefly) until the engine and the traffic log have settled (CLS, LAB-1448). */
-function useConsoleSettled(
-  engineState: EngineState,
-  trafficOpened: boolean,
-  trafficHandle: TrafficHandle,
-  accounts: boolean,
-  section: Section,
-): boolean {
+function useConsoleSettled(engineState: EngineState, trafficOpened: boolean, trafficHandle: TrafficHandle, accounts: boolean, section: Section): boolean {
   const [settleTimedOut, setSettleTimedOut] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setSettleTimedOut(true), SETTLE_CAP_MS);
@@ -347,11 +322,7 @@ function demoSectionNotice(section: Section, tab: PlaygroundTab): string {
 
 function DemoRecoveryHint({ state }: { state: EngineState }) {
   if (state.status.state !== "online") {
-    return (
-      <>
-        Start it with <code className="rounded-sm bg-surface px-1 font-mono text-xs">pii-guard up</code> for the real pipeline.
-      </>
-    );
+    return <>Start it with <code className="rounded-sm bg-surface px-1 font-mono text-xs">pii-guard up</code> for the real pipeline.</>;
   }
   return state.preference === "mock" ? (
     <>Switch the engine to Auto or Live API for the real pipeline.</>
@@ -393,12 +364,7 @@ function ConsoleFooter({ accounts, section, tab }: { accounts: boolean; section:
   );
 }
 
-function buildChatDraftFromPlayground(
-  text: string,
-  language: "hu" | "en",
-  result: RunResult | null,
-  chatClient: ChatClient,
-): ChatDraft {
+function buildChatDraftFromPlayground(text: string, language: "hu" | "en", result: RunResult | null, chatClient: ChatClient): ChatDraft {
   const sample = sampleBehind(text);
   // The same vault session, so Chat shows the same placeholders (LAB-1261);
   // only when Chat runs on the engine that made it.
@@ -412,21 +378,16 @@ function buildChatDraftFromPlayground(
   };
 }
 
-function PlaygroundTextPanel({
-  hidden,
-  opened,
-  playground,
-  engine,
-  chatClient,
-  onContinueToChat,
-}: {
+interface PlaygroundTextPanelProps {
   hidden: boolean;
   opened: boolean;
   playground: ReturnType<typeof usePlaygroundRunner>;
   engine: EngineHandle;
   chatClient: ChatClient;
   onContinueToChat: (draft: ChatDraft) => void;
-}) {
+}
+
+function PlaygroundTextPanel({ hidden, opened, playground, engine, chatClient, onContinueToChat }: PlaygroundTextPanelProps) {
   const [textView, setTextView] = useState<"mask" | "roundtrip">("mask");
   const { sampleId, text, language, setLanguage, known, setKnown, result, answer, setAnswer, running, error, run, pickSample, editText } = playground;
   const tryKnownSuffix = language === "hu" ? "\n\nA lakás kulcsait Gyakorló Tihamérnak kell átadni." : "\n\nPlease hand the keys to Gyakorló Tihamér's assistant.";
@@ -473,15 +434,7 @@ function PlaygroundTextPanel({
       {textView === "roundtrip" && (
         <PageLoadBoundary>
           <Suspense fallback={<p role="status">Loading round trip…</p>}>
-            <RoundTrip
-              key={result?.mask.session_id ?? "none"}
-              client={engine.client}
-              result={result}
-              answer={answer}
-              onAnswer={setAnswer}
-              running={running}
-              onRun={() => void run()}
-            />
+            <RoundTrip key={result?.mask.session_id ?? "none"} client={engine.client} result={result} answer={answer} onAnswer={setAnswer} running={running} onRun={() => void run()} />
           </Suspense>
         </PageLoadBoundary>
       )}
@@ -495,20 +448,7 @@ function playgroundLeadText(accounts: boolean): string {
     : "PII Guard finds personal data before a request leaves your network, swaps it for reversible placeholders, and puts the real values back into the answer.";
 }
 
-function PlaygroundSection({
-  tab,
-  openTab,
-  caps,
-  opened,
-  playground,
-  engine,
-  mockClient,
-  chatClient,
-  chatDraft,
-  setChatDraft,
-  loadImage,
-  server,
-}: {
+interface PlaygroundSectionProps {
   tab: PlaygroundTab;
   openTab: (t: PlaygroundTab) => void;
   caps: Capabilities;
@@ -521,7 +461,9 @@ function PlaygroundSection({
   setChatDraft: (draft: ChatDraft | null) => void;
   loadImage?: (src: string) => Promise<Blob>;
   server: ServerStatus | null;
-}) {
+}
+
+function PlaygroundSection({ tab, openTab, caps, opened, playground, engine, mockClient, chatClient, chatDraft, setChatDraft, loadImage, server }: PlaygroundSectionProps) {
   const showImages = caps.images && opened("playground/images");
   return (
     <>
@@ -543,14 +485,7 @@ function PlaygroundSection({
         <PageLoadBoundary>
           <Suspense fallback={<p role="status">Loading chat…</p>}>
             {opened("playground/chat") && (
-              <Chat
-                client={chatClient}
-                live={engine.state.status.state === "online"}
-                draft={chatDraft}
-                ner={server ? server.ner.available : null}
-                mockUpstream={Boolean(server?.upstream?.mock)}
-                modes={chatModesOf(server, caps)}
-              />
+              <Chat client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={Boolean(server?.upstream?.mock)} modes={chatModesOf(server, caps)} />
             )}
           </Suspense>
         </PageLoadBoundary>
@@ -558,15 +493,7 @@ function PlaygroundSection({
       <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
         <PageLoadBoundary>
           <Suspense fallback={<p role="status">Loading images…</p>}>
-            {showImages && (
-              <Images
-                client={engine.client}
-                engineState={engine.state}
-                loadImage={loadImage}
-                replayRecorded={mockClient.maskImage?.bind(mockClient)}
-                serverImages={server?.images ?? null}
-              />
-            )}
+            {showImages && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
           </Suspense>
         </PageLoadBoundary>
       </div>
@@ -583,23 +510,7 @@ function useTrafficFollow(section: Section, forceFixture: boolean, traffic?: Omi
   return { trafficOpened, trafficHandle };
 }
 
-function LazySection({
-  id,
-  label,
-  active,
-  opened,
-  loadingText,
-  className,
-  children,
-}: {
-  id: string;
-  label: string;
-  active: boolean;
-  opened: boolean;
-  loadingText: string;
-  className?: string;
-  children: ReactNode;
-}) {
+function LazySection({ id, label, active, opened, loadingText, className, children }: { id: string; label: string; active: boolean; opened: boolean; loadingText: string; className?: string; children: ReactNode }) {
   return (
     <section id={id} aria-label={label} hidden={!active} className={className}>
       {opened && (
@@ -611,17 +522,7 @@ function LazySection({
   );
 }
 
-function OverviewView({
-  active,
-  trafficOpened,
-  trafficHandle,
-  status,
-  forceFixture,
-  traffic,
-  caps,
-  server,
-  onOpenCall,
-}: {
+interface OverviewViewProps {
   active: boolean;
   trafficOpened: boolean;
   trafficHandle: TrafficHandle;
@@ -631,7 +532,9 @@ function OverviewView({
   caps: Capabilities;
   server: ServerStatus | null;
   onOpenCall: (id: string) => void;
-}) {
+}
+
+function OverviewView({ active, trafficOpened, trafficHandle, status, forceFixture, traffic, caps, server, onOpenCall }: OverviewViewProps) {
   if (!trafficOpened) return null;
   const liveCalls = trafficHandle.source === "api" ? trafficHandle.events.length : 0;
   return (
@@ -648,18 +551,7 @@ function OverviewView({
   );
 }
 
-function ConnectView({
-  route,
-  caps,
-  status,
-  server,
-  hosted,
-  hostedSnippets,
-  trafficOpened,
-  trafficHandle,
-  onOpenLog,
-  onOpenSession,
-}: {
+interface ConnectViewProps {
   route: Route;
   caps: Capabilities;
   status: ReturnType<typeof useServerStatus>["result"];
@@ -670,7 +562,9 @@ function ConnectView({
   trafficHandle: TrafficHandle;
   onOpenLog: (id: string) => void;
   onOpenSession: (ref: string) => void;
-}) {
+}
+
+function ConnectView({ route, caps, status, server, hosted, hostedSnippets, trafficOpened, trafficHandle, onOpenLog, onOpenSession }: ConnectViewProps) {
   const initialClient = route.section === "connect" ? (route.client ?? null) : null;
   const serverSnippets = !caps.accounts || (server !== null && hostedSnippets !== undefined);
   return (
@@ -694,16 +588,7 @@ function PolicyView({ caps, active, status, hosted }: { caps: Capabilities; acti
   return active ? <OwnerPolicy call={hosted?.call} projectId={getCurrentProject()} /> : null;
 }
 
-function LogsView({
-  trafficOpened,
-  trafficHandle,
-  forceFixture,
-  traffic,
-  caps,
-  server,
-  logFocus,
-  onOpenSession,
-}: {
+interface LogsViewProps {
   trafficOpened: boolean;
   trafficHandle: TrafficHandle;
   forceFixture: boolean;
@@ -712,7 +597,9 @@ function LogsView({
   server: ServerStatus | null;
   logFocus: { id: string; nonce: number } | null;
   onOpenSession: (ref: string) => void;
-}) {
+}
+
+function LogsView({ trafficOpened, trafficHandle, forceFixture, traffic, caps, server, logFocus, onOpenSession }: LogsViewProps) {
   if (!trafficOpened) return null;
   return (
     <Logs
@@ -728,26 +615,38 @@ function LogsView({
   );
 }
 
-function EvaluationView({
-  opened,
-  route,
-  loadBenchmarks,
-  reportEvaluation,
-}: {
-  opened: boolean;
-  route: Route;
-  loadBenchmarks?: BenchmarkLoader;
-  reportEvaluation: (evaluation: EvaluationParams) => void;
-}) {
+function EvaluationView({ opened, route, loadBenchmarks, reportEvaluation }: { opened: boolean; route: Route; loadBenchmarks?: BenchmarkLoader; reportEvaluation: (evaluation: EvaluationParams) => void }) {
   if (!opened) return null;
   const active = route.section === "evaluation";
-  return (
-    <Benchmarks
-      load={loadBenchmarks}
-      initial={active ? (route.evaluation ?? null) : undefined}
-      onParams={active ? reportEvaluation : undefined}
-    />
-  );
+  return <Benchmarks load={loadBenchmarks} initial={active ? (route.evaluation ?? null) : undefined} onParams={active ? reportEvaluation : undefined} />;
+}
+
+interface ConsoleSectionsProps {
+  route: Route;
+  caps: Capabilities;
+  opened: (key: string) => boolean;
+  sectionOpened: (key: string) => boolean;
+  navigate: (next: Route, how?: "push" | "replace" | "none") => void;
+  openSection: (s: Section) => void;
+  openTab: (t: PlaygroundTab) => void;
+  reportEvaluation: (evaluation: EvaluationParams) => void;
+  playground: ReturnType<typeof usePlaygroundRunner>;
+  engine: EngineHandle;
+  mockClient: GuardClient;
+  chatClient: ChatClient;
+  chatDraft: ChatDraft | null;
+  setChatDraft: (draft: ChatDraft | null) => void;
+  loadImage?: (src: string) => Promise<Blob>;
+  loadBenchmarks?: BenchmarkLoader;
+  status: ReturnType<typeof useServerStatus>["result"];
+  server: ServerStatus | null;
+  hosted: HostedSession | null;
+  hostedSnippets: ReturnType<typeof endpointSnippets> | undefined;
+  trafficOpened: boolean;
+  trafficHandle: TrafficHandle;
+  forceFixture: boolean;
+  traffic?: Omit<TrafficProps, "forceFixture">;
+  vault?: VaultClient;
 }
 
 function ConsoleSections({
@@ -776,33 +675,7 @@ function ConsoleSections({
   forceFixture,
   traffic,
   vault,
-}: {
-  route: Route;
-  caps: Capabilities;
-  opened: (key: string) => boolean;
-  sectionOpened: (key: string) => boolean;
-  navigate: (next: Route, how?: "push" | "replace" | "none") => void;
-  openSection: (s: Section) => void;
-  openTab: (t: PlaygroundTab) => void;
-  reportEvaluation: (evaluation: EvaluationParams) => void;
-  playground: ReturnType<typeof usePlaygroundRunner>;
-  engine: EngineHandle;
-  mockClient: GuardClient;
-  chatClient: ChatClient;
-  chatDraft: ChatDraft | null;
-  setChatDraft: (draft: ChatDraft | null) => void;
-  loadImage?: (src: string) => Promise<Blob>;
-  loadBenchmarks?: BenchmarkLoader;
-  status: ReturnType<typeof useServerStatus>["result"];
-  server: ServerStatus | null;
-  hosted: HostedSession | null;
-  hostedSnippets: ReturnType<typeof endpointSnippets> | undefined;
-  trafficOpened: boolean;
-  trafficHandle: TrafficHandle;
-  forceFixture: boolean;
-  traffic?: Omit<TrafficProps, "forceFixture">;
-  vault?: VaultClient;
-}) {
+}: ConsoleSectionsProps) {
   const [logFocus, setLogFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [vaultFocus, setVaultFocus] = useState<{ ref: string; nonce: number } | null>(null);
   const vaultFocusProp = resolveVaultFocus(route, vaultFocus);
@@ -815,34 +688,11 @@ function ConsoleSections({
   return (
     <>
       <LazySection id="section-overview" label="Overview" active={section === "overview"} opened={sectionOpened("overview")} loadingText="Loading overview…">
-        <OverviewView
-          active={section === "overview"}
-          trafficOpened={trafficOpened}
-          trafficHandle={trafficHandle}
-          status={status}
-          forceFixture={forceFixture}
-          traffic={traffic}
-          caps={caps}
-          server={server}
-          onOpenCall={openLogCall}
-        />
+        <OverviewView active={section === "overview"} trafficOpened={trafficOpened} trafficHandle={trafficHandle} status={status} forceFixture={forceFixture} traffic={traffic} caps={caps} server={server} onOpenCall={openLogCall} />
       </LazySection>
 
       <LazySection id="section-playground" label="Playground" active={section === "playground"} opened={sectionOpened("playground")} loadingText="Loading playground…" className="space-y-6">
-        <PlaygroundSection
-          tab={route.tab}
-          openTab={openTab}
-          caps={caps}
-          opened={opened}
-          playground={playground}
-          engine={engine}
-          mockClient={mockClient}
-          chatClient={chatClient}
-          chatDraft={chatDraft}
-          setChatDraft={setChatDraft}
-          loadImage={loadImage}
-          server={server}
-        />
+        <PlaygroundSection tab={route.tab} openTab={openTab} caps={caps} opened={opened} playground={playground} engine={engine} mockClient={mockClient} chatClient={chatClient} chatDraft={chatDraft} setChatDraft={setChatDraft} loadImage={loadImage} server={server} />
       </LazySection>
 
       <LazySection id="section-logs" label="Logs" active={section === "logs"} opened={sectionOpened("logs")} loadingText="Loading logs…">
@@ -862,14 +712,7 @@ function ConsoleSections({
       </LazySection>
 
       <LazySection id="section-vault" label="Vault" active={section === "vault"} opened={sectionOpened("vault")} loadingText="Loading vault…">
-        <Vault
-          status={status}
-          live={engine.engine === "api"}
-          active={section === "vault"}
-          client={vault}
-          focus={vaultFocusProp}
-          onSelectRef={(ref) => navigate({ section: "vault", tab: route.tab, ref: ref ?? undefined }, ref ? "push" : "replace")}
-        />
+        <Vault status={status} live={engine.engine === "api"} active={section === "vault"} client={vault} focus={vaultFocusProp} onSelectRef={(ref) => navigate({ section: "vault", tab: route.tab, ref: ref ?? undefined }, ref ? "push" : "replace")} />
       </LazySection>
 
       <LazySection id="section-connect" label="Connect" active={section === "connect"} opened={sectionOpened("connect")} loadingText="Loading connect…">
@@ -1025,9 +868,7 @@ function HeaderTitle({ route, apiOpen }: { route: Route; apiOpen: boolean }) {
       <span>{apiOpen ? "API reference" : section.label}</span>
       {tab && (
         <>
-          <span aria-hidden="true" className="text-faint">
-            /
-          </span>
+          <span aria-hidden="true" className="text-faint">/</span>
           <span className="text-muted">{tab.label}</span>
         </>
       )}

@@ -408,6 +408,100 @@ def _provenance(index: Mapping[str, Any], pairs: Sequence[tuple[str, str]]) -> s
 # --- (a) hero: leak vs over-masking -------------------------------------------------------
 
 
+def _hero_labels(
+    pts: Sequence[Mapping[str, Any]],
+    index: Mapping[str, Any],
+    spec: Mapping[str, Any],
+    theme: Theme,
+    colors: Mapping[str, str],
+    t: _Type,
+    bounds: tuple[float, float, float, float],
+    scales: tuple[Callable[[float], float], Callable[[float], float]],
+    tint_box: tuple[float, float, float],
+) -> list[str]:
+    px0, px1, py0, py1 = bounds
+    sx, sy = scales
+    tint_x1, tint_y0, tag_s = tint_box
+    r = t(13)
+    name_s, val_s = t(23), t(19)
+    marks = [(sx(p["over"]), sy(p["leak"])) for p in pts]
+    taken = [(mx - r * 1.4, my - r * 1.4, mx + r * 1.4, my + r * 1.4) for mx, my in marks]
+    tag_w = text_width("↙ better", tag_s, weight=700)
+    taken.append((tint_x1 - t(12) - tag_w, tint_y0, tint_x1, tint_y0 + tag_s * 1.6))
+    order = sorted(pts, key=lambda p: (p["key"] != spec["own"], p["leak"]))
+    placed: list[str] = []
+    for p in order:
+        x, y = sx(p["over"]), sy(p["leak"])
+        name = _name(spec, p["key"])
+        vals = f"leak {pct(p['leak'])} · over-masking {pct(p['over'])}"
+        bw = max(text_width(name, name_s, weight=700), text_width(vals, val_s))
+        bh = name_s + val_s * 1.4
+        g = r * 1.1
+        cands = [
+            (x + g, y - bh - g * 0.4),  # above right
+            (x + g, y + g * 0.4),  # below right
+            (x - g - bw, y - bh - g * 0.4),  # above left
+            (x - g - bw, y + g * 0.4),  # below left
+            (x + r * 2, y - bh / 2),  # right
+            (x - r * 2 - bw, y - bh / 2),  # left
+            (x - bw / 2, y - bh - r * 1.8),  # above
+            (x - bw / 2, y + r * 1.8),  # below
+        ]
+
+        def inside(c: tuple[float, float], bw: float = bw, bh: float = bh) -> bool:
+            return (
+                c[0] - 4 >= px0 + 2
+                and c[0] + bw + 4 <= px1
+                and c[1] - 2 >= py0 - t(30)
+                and c[1] + bh + 2 <= py1 - 2
+            )
+
+        choice = next((c for c in cands if inside(c)), cands[0])
+        for left, top_y in cands:
+            box = (left - 4, top_y - 2, left + bw + 4, top_y + bh + 2)
+            if not inside((left, top_y)):
+                continue
+            if any(
+                not (box[2] < o[0] or box[0] > o[2] or box[3] < o[1] or box[1] > o[3])
+                for o in taken
+            ):
+                continue
+            choice = (left, top_y)
+            break
+        left, top_y = choice
+        taken.append((left - 4, top_y - 2, left + bw + 4, top_y + bh + 2))
+        own = p["key"] == spec["own"]
+        placed.append(
+            _text(
+                left,
+                top_y + name_s * 0.85,
+                name,
+                size=name_s,
+                fill=theme.own_ink if own else theme.ink,
+                weight=700,
+            )
+        )
+        placed.append(_text(left, top_y + name_s + val_s * 1.1, vals, size=val_s, fill=theme.muted))
+    out: list[str] = []
+    for p in pts:
+        st = index["systems"].get(p["key"], {})
+        own = p["key"] == spec["own"]
+        shape = "circle" if own or p["key"] == spec.get("rules") else st.get("shape", "circle")
+        out.append(
+            _marker(
+                shape,
+                sx(p["over"]),
+                sy(p["leak"]),
+                r * (1.25 if own else 1),
+                colors[p["key"]],
+                theme.bg,
+                hollow=not own and p["key"] != spec.get("rules"),
+            )
+        )
+    out.extend(placed)
+    return out
+
+
 def hero(
     index: Mapping[str, Any], spec: Mapping[str, Any], size: tuple[int, int], theme: Theme
 ) -> str:
@@ -523,85 +617,19 @@ def hero(
             weight=600,
         )
     )
-
-    # Labels: two lines each, placed greedily (own system first) clear of points and labels.
-    r = t(13)
-    name_s, val_s = t(23), t(19)
-    marks = [(sx(p["over"]), sy(p["leak"])) for p in pts]
-    taken = [(mx - r * 1.4, my - r * 1.4, mx + r * 1.4, my + r * 1.4) for mx, my in marks]
-    tag_w = text_width("↙ better", tag_s, weight=700)
-    taken.append((tint_x1 - t(12) - tag_w, tint_y0, tint_x1, tint_y0 + tag_s * 1.6))
-    order = sorted(pts, key=lambda p: (p["key"] != spec["own"], p["leak"]))
-    placed: list[str] = []
-    for p in order:
-        x, y = sx(p["over"]), sy(p["leak"])
-        name = _name(spec, p["key"])
-        vals = f"leak {pct(p['leak'])} · over-masking {pct(p['over'])}"
-        bw = max(text_width(name, name_s, weight=700), text_width(vals, val_s))
-        bh = name_s + val_s * 1.4
-        g = r * 1.1
-        cands = [
-            (x + g, y - bh - g * 0.4),  # above right
-            (x + g, y + g * 0.4),  # below right
-            (x - g - bw, y - bh - g * 0.4),  # above left
-            (x - g - bw, y + g * 0.4),  # below left
-            (x + r * 2, y - bh / 2),  # right
-            (x - r * 2 - bw, y - bh / 2),  # left
-            (x - bw / 2, y - bh - r * 1.8),  # above
-            (x - bw / 2, y + r * 1.8),  # below
-        ]
-
-        def inside(c: tuple[float, float], bw: float = bw, bh: float = bh) -> bool:
-            return (
-                c[0] - 4 >= px0 + 2
-                and c[0] + bw + 4 <= px1
-                and c[1] - 2 >= py0 - t(30)
-                and c[1] + bh + 2 <= py1 - 2
-            )
-
-        # No free spot: the first one inside the plot, overlaps or not.
-        choice = next((c for c in cands if inside(c)), cands[0])
-        for left, top_y in cands:
-            box = (left - 4, top_y - 2, left + bw + 4, top_y + bh + 2)
-            if not inside((left, top_y)):
-                continue
-            if any(
-                not (box[2] < o[0] or box[0] > o[2] or box[3] < o[1] or box[1] > o[3])
-                for o in taken
-            ):
-                continue
-            choice = (left, top_y)
-            break
-        left, top_y = choice
-        taken.append((left - 4, top_y - 2, left + bw + 4, top_y + bh + 2))
-        own = p["key"] == spec["own"]
-        placed.append(
-            _text(
-                left,
-                top_y + name_s * 0.85,
-                name,
-                size=name_s,
-                fill=theme.own_ink if own else theme.ink,
-                weight=700,
-            )
+    body.extend(
+        _hero_labels(
+            pts,
+            index,
+            spec,
+            theme,
+            colors,
+            t,
+            (px0, px1, py0, py1),
+            (sx, sy),
+            (tint_x1, tint_y0, tag_s),
         )
-        placed.append(_text(left, top_y + name_s + val_s * 1.1, vals, size=val_s, fill=theme.muted))
-    for p in pts:
-        st = index["systems"].get(p["key"], {})
-        own = p["key"] == spec["own"]
-        shape = "circle" if own or p["key"] == spec.get("rules") else st.get("shape", "circle")
-        body.append(
-            _marker(
-                shape,
-                sx(p["over"]),
-                sy(p["leak"]),
-                r * (1.25 if own else 1),
-                colors[p["key"]],
-                theme.bg,
-                hollow=not own and p["key"] != spec.get("rules"),
-            )
-        )
-    body.extend(placed)
+    )
     desc = (
         f"Scatter of leak rate against over-masking rate on {n} fictional {hl['title']} "
         "documents; lower-left is better. "
@@ -615,6 +643,82 @@ def hero(
 
 
 # --- (b) stat card ------------------------------------------------------------------------
+
+
+def _card_bars(
+    systems: Sequence[str],
+    leak: Mapping[str, float],
+    over: Mapping[str, float],
+    colors: Mapping[str, str],
+    spec: Mapping[str, Any],
+    theme: Theme,
+    t: _Type,
+    w: int,
+    square: bool,
+    top: float,
+    bottom: float,
+) -> list[str]:
+    own = spec["own"]
+    rows = len(systems)
+    row_h = min(t(96 if square else 70), (bottom - top) / max(rows, 1))
+    label_s = min(t(26 if square else 24), row_h * 0.42)
+    short = {k: str(spec.get("short_names", {}).get(k, _name(spec, k))) for k in systems}
+    label_w = max(text_width(short[k], label_s, weight=700) for k in systems) + t(24)
+    label_w = min(label_w, w * 0.34)
+    note_w = text_width("16.6%  over-masking 35.2%", label_s * 0.95) + t(16)
+    bx0 = t.m + label_w
+    bx1 = w - t.m - note_w
+    vmax = max(leak.values()) or 1.0
+    head = "Leak: share of labeled personal values that reached the model"
+    out = [
+        _text(
+            t.m,
+            top - label_s * 0.4,
+            head,
+            size=_fit(head, label_s * 0.85, w - 2 * t.m),
+            fill=theme.muted,
+        )
+    ]
+    for i, k in enumerate(sorted(systems, key=lambda s: leak[s])):
+        cy = top + row_h * (i + 0.5) + label_s * 0.3
+        bh = row_h * 0.5
+        is_own = k == own
+        name = short[k]
+        out.append(
+            _text(
+                t.m,
+                cy + label_s * 0.35,
+                name,
+                size=label_s,
+                fill=theme.own_ink if is_own else theme.ink,
+                weight=700 if is_own else 600,
+            )
+        )
+        out.append(_rect(bx0, cy - bh / 2, bx1 - bx0, bh, theme.panel, rx=bh * 0.2))
+        bw = max(bh * 0.25, leak[k] / vmax * (bx1 - bx0))
+        out.append(_rect(bx0, cy - bh / 2, bw, bh, colors[k], rx=bh * 0.2))
+        vx = bx1 + t(16)
+        val = pct(leak[k])
+        out.append(
+            _text(
+                vx,
+                cy + label_s * 0.35,
+                val,
+                size=label_s,
+                fill=theme.own_ink if is_own else theme.ink,
+                weight=700,
+            )
+        )
+        out.append(
+            _text(
+                vx + text_width(val, label_s, weight=700) + t(10),
+                cy + label_s * 0.35,
+                f"over-masking {pct(over[k])}",
+                size=label_s * 0.8,
+                fill=theme.muted,
+            )
+        )
+    return out
 
 
 def card(
@@ -680,68 +784,9 @@ def card(
     body.append(_text(nx, ny - big * 0.42, line1, size=s1, fill=theme.ink, weight=600))
     body.append(_text(nx, ny - big * 0.42 + s2 * 1.6, line2, size=s2, fill=theme.muted))
 
-    # Bars: leak per system, over-masking as a note.
     top = ny + t(40 if not square else 70)
     bottom = claim_y - claim_s * 1.9
-    rows = len(systems)
-    row_h = min(t(96 if square else 70), (bottom - top) / max(rows, 1))
-    label_s = min(t(26 if square else 24), row_h * 0.42)
-    short = {k: str(spec.get("short_names", {}).get(k, _name(spec, k))) for k in systems}
-    label_w = max(text_width(short[k], label_s, weight=700) for k in systems) + t(24)
-    label_w = min(label_w, w * 0.34)
-    note_w = text_width("16.6%  over-masking 35.2%", label_s * 0.95) + t(16)
-    bx0 = t.m + label_w
-    bx1 = w - t.m - note_w
-    vmax = max(leak.values()) or 1.0
-    head = "Leak: share of labeled personal values that reached the model"
-    body.append(
-        _text(
-            t.m,
-            top - label_s * 0.4,
-            head,
-            size=_fit(head, label_s * 0.85, w - 2 * t.m),
-            fill=theme.muted,
-        )
-    )
-    for i, k in enumerate(sorted(systems, key=lambda s: leak[s])):
-        cy = top + row_h * (i + 0.5) + label_s * 0.3
-        bh = row_h * 0.5
-        is_own = k == own
-        name = short[k]
-        body.append(
-            _text(
-                t.m,
-                cy + label_s * 0.35,
-                name,
-                size=label_s,
-                fill=theme.own_ink if is_own else theme.ink,
-                weight=700 if is_own else 600,
-            )
-        )
-        body.append(_rect(bx0, cy - bh / 2, bx1 - bx0, bh, theme.panel, rx=bh * 0.2))
-        bw = max(bh * 0.25, leak[k] / vmax * (bx1 - bx0))
-        body.append(_rect(bx0, cy - bh / 2, bw, bh, colors[k], rx=bh * 0.2))
-        vx = bx1 + t(16)
-        val = pct(leak[k])
-        body.append(
-            _text(
-                vx,
-                cy + label_s * 0.35,
-                val,
-                size=label_s,
-                fill=theme.own_ink if is_own else theme.ink,
-                weight=700,
-            )
-        )
-        body.append(
-            _text(
-                vx + text_width(val, label_s, weight=700) + t(10),
-                cy + label_s * 0.35,
-                f"over-masking {pct(over[k])}",
-                size=label_s * 0.8,
-                fill=theme.muted,
-            )
-        )
+    body.extend(_card_bars(systems, leak, over, colors, spec, theme, t, w, square, top, bottom))
     title = f"PII Guard: {pct(leak[own])} of personal values reached the model"
     desc = (
         f"Stat card. On {n} fictional {hl['title']} documents, "

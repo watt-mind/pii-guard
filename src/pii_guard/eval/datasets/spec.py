@@ -125,7 +125,9 @@ def build(
     return sample(ds.read(paths), ds.sample, ds.seed, ds.to_document)
 
 
-def manifest(ds: Dataset, chosen: Mapping[str, Sequence[Converted]], seen: Mapping[str, int]):
+def manifest(
+    ds: Dataset, chosen: Mapping[str, Sequence[Converted]], seen: Mapping[str, int]
+) -> dict[str, Any]:
     languages: dict[str, Any] = {}
     for lang, items in chosen.items():
         gold: Counter[str] = Counter()

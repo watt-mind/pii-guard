@@ -360,9 +360,6 @@ class SseRestorer:
         if unmasker is None and len(self._unmaskers) >= MAX_UNMASKERS:
             raise StreamTooLargeError("upstream stream has too many open fields")
         if unmasker is None:
-            # StreamUnmasker calls unmask_with_report() (and hold_from()); the adapters have them.
-            # A JSON adapter tracks where it is in the arguments, so one per stream (LAB-1483).
-            # A tool adapter tracks the shell quoting it has read, so one per stream too.
             session: Any = {
                 "json": JsonEscapingSession(self._session, self._budget),
                 "tool": ToolInputSession(self._session, self._budget),
@@ -370,6 +367,18 @@ class SseRestorer:
             unmasker = StreamUnmasker(session, self._budget)
             self._unmaskers[key] = unmasker
         return unmasker
+
+    def _process_choices(self, chunk: dict[str, Any]) -> None:
+        choices = chunk.get("choices")
+        if not isinstance(choices, list):
+            return
+        for position, choice in enumerate(choices):
+            if isinstance(choice, dict):
+                self._process_choice(choice, position)
+        if self._template is None and choices:
+            self._template = {
+                k: chunk[k] for k in ("id", "object", "created", "model") if k in chunk
+            }
 
     def process(self, data: str) -> list[str]:
         """The payloads to emit for one upstream payload."""
@@ -393,44 +402,33 @@ class SseRestorer:
             ]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(chunk))
-        choices = chunk.get("choices")
-        if isinstance(choices, list):
-            for position, choice in enumerate(choices):
-                if isinstance(choice, dict):
-                    self._process_choice(choice, position)
-            if self._template is None and choices:
-                self._template = {
-                    k: chunk[k] for k in ("id", "object", "created", "model") if k in chunk
-                }
+        self._process_choices(chunk)
         self.chunks += 1
         return [json.dumps(chunk, ensure_ascii=False)]
 
-    def _process_choice(self, choice: dict[str, Any], position: int) -> None:
-        index = choice.get("index")
-        if type(index) is not int:
-            index = position
-        delta = choice.get("delta")
-        if not isinstance(delta, dict):
-            delta = {}
-            if choice.get("finish_reason"):
-                choice["delta"] = delta
+    def _process_content_parts(self, index: int, name: str, parts: list[Any]) -> None:
+        for part in parts:
+            if (
+                not isinstance(part, dict)
+                or part.get("type") != "text"
+                or not isinstance(part.get("text"), str)
+            ):
+                raise ValueError("unsupported upstream content part")
+            text = part["text"]
+            self._retain_masked(index, text)
+            part["text"] = self._unmasker((index, name)).feed(text)
+
+    def _process_delta_text_fields(self, index: int, delta: dict[str, Any]) -> None:
         for name in MESSAGE_TEXT_FIELDS:
             value = delta.get(name)
             if name == "content" and isinstance(value, list):
-                for part in value:
-                    if (
-                        not isinstance(part, dict)
-                        or part.get("type") != "text"
-                        or not isinstance(part.get("text"), str)
-                    ):
-                        raise ValueError("unsupported upstream content part")
-                    text = part["text"]
-                    self._retain_masked(index, text)
-                    part["text"] = self._unmasker((index, name)).feed(text)
+                self._process_content_parts(index, name, value)
             elif isinstance(value, str):
                 if name == "content":
                     self._retain_masked(index, value)
                 delta[name] = self._unmasker((index, name)).feed(value)
+
+    def _process_delta_tool_calls(self, index: int, delta: dict[str, Any]) -> None:
         for position_in_delta, call in enumerate(delta.get("tool_calls") or []):
             if not isinstance(call, dict):
                 continue
@@ -450,6 +448,18 @@ class SseRestorer:
                 custom["input"] = self._unmasker((index, "custom", tool_index), "tool").feed(
                     custom["input"]
                 )
+
+    def _process_choice(self, choice: dict[str, Any], position: int) -> None:
+        index = choice.get("index")
+        if type(index) is not int:
+            index = position
+        delta = choice.get("delta")
+        if not isinstance(delta, dict):
+            delta = {}
+            if choice.get("finish_reason"):
+                choice["delta"] = delta
+        self._process_delta_text_fields(index, delta)
+        self._process_delta_tool_calls(index, delta)
         # The legacy (pre-tools) single function call: ``delta.function_call.arguments``.
         function_call = delta.get("function_call")
         if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):

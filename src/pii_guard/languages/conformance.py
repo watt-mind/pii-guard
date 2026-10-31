@@ -26,7 +26,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from importlib.resources.abc import Traversable
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pii_guard.languages import (
     CODE_RE,
@@ -41,6 +41,7 @@ from pii_guard.types import TEXT_ENTITY_TYPES, EntityType
 
 if TYPE_CHECKING:
     from pii_guard.eval.fixtures import Document
+    from pii_guard.eval.identities import IdentityGenerator
 
 __all__ = [
     "DEFAULT_FIXTURES_DIR",
@@ -463,6 +464,38 @@ def _check_brands(pack: LanguagePack) -> list[Finding]:
     return []
 
 
+def _check_corpus_party(
+    check: str,
+    kind_id: object,
+    party: dict[str, Any],
+    labels: dict[str, Any],
+    unlabelled: set[str],
+    generator: IdentityGenerator,
+) -> list[Finding]:
+    where = f"kind {kind_id!r}, party {party.get('role', '?')!r}"
+    try:
+        record = generator.make(party.get("kind", ""))
+    except ValueError:
+        return [_error(check, f"{where}: unknown identity kind")]
+    except Exception as exc:
+        return [_error(check, f"{where}: the generator raises {exc!r}")]
+    findings: list[Finding] = []
+    for name in party.get("fields", ()):
+        try:
+            record.values([name])
+        except KeyError:
+            findings.append(
+                _error(
+                    check,
+                    f"{where}: the generator's {party.get('kind')} has no field {name!r}",
+                )
+            )
+        if name not in labels and name not in unlabelled:
+            unlabelled.add(name)
+            findings.append(_warning(check, f"field {name!r} has no entry in [field_labels]"))
+    return findings
+
+
 def _check_corpus(pack: LanguagePack) -> list[Finding]:
     """``identity_generator`` + ``corpus_templates``: both or neither, and they fit together."""
     check = "structure.corpus"
@@ -514,30 +547,9 @@ def _check_corpus(pack: LanguagePack) -> list[Finding]:
     for kind in kinds:
         kind_id = kind.get("id", "?")
         for party in kind.get("parties", ()):
-            where = f"kind {kind_id!r}, party {party.get('role', '?')!r}"
-            try:
-                record = generator.make(party.get("kind", ""))
-            except ValueError:
-                findings.append(_error(check, f"{where}: unknown identity kind"))
-                continue
-            except Exception as exc:
-                findings.append(_error(check, f"{where}: the generator raises {exc!r}"))
-                continue
-            for name in party.get("fields", ()):
-                try:
-                    record.values([name])
-                except KeyError:
-                    findings.append(
-                        _error(
-                            check,
-                            f"{where}: the generator's {party.get('kind')} has no field {name!r}",
-                        )
-                    )
-                if name not in labels and name not in unlabelled:
-                    unlabelled.add(name)
-                    findings.append(
-                        _warning(check, f"field {name!r} has no entry in [field_labels]")
-                    )
+            findings.extend(
+                _check_corpus_party(check, kind_id, party, labels, unlabelled, generator)
+            )
     return findings
 
 

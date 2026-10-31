@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from html import escape
 from typing import Any
 
@@ -608,6 +608,74 @@ def number_validity(index: Mapping[str, Any], *, fixture_set: str) -> str:
 # --- (c) progress over time -----------------------------------------------------------------
 
 
+def _progress_best_line(
+    cats: Sequence[tuple[str, str]],
+    comparable: Sequence[Mapping[str, Any]],
+    sx: Callable[[int], float],
+    sy: Callable[[float], float],
+) -> list[str]:
+    best: list[tuple[float, float]] = []
+    current = None
+    for i, cat in enumerate(cats):
+        vals = [
+            h["all"]["leak"]
+            for h in comparable
+            if (h["date"], h["commit"]) == cat and h["all"]["leak"] is not None
+        ]
+        if vals:
+            current = min(vals) if current is None else min(current, *vals)
+        if current is not None:
+            best.append((sx(i), sy(current)))
+    if not best:
+        return []
+    path = f"M{_n(best[0][0] - 40)},{_n(best[0][1])}"
+    for i, (x, y) in enumerate(best):
+        if i:
+            path += f"H{_n(x - 40)}V{_n(y)}"
+    path += f"H{_n(best[-1][0] + 40)}"
+    return [
+        f'<path d="{path}" fill="none" stroke="{INK}" stroke-width="3" stroke-dasharray="10 7"/>'
+    ]
+
+
+def _progress_legend(
+    ours: Sequence[str],
+    styles: Mapping[str, Any],
+    hist: Sequence[Mapping[str, Any]],
+    py0: float,
+) -> list[str]:
+    out: list[str] = []
+    ly = py0 + 10
+    for key in ours:
+        st = styles[key]
+        last = [h for h in hist if h["system"] == key]
+        if not last:
+            continue
+        out.append(_marker("circle", 1230, ly, 10, st["color"]))
+        name = st["short_label"] + (" (default)" if st.get("default") else "")
+        wrapped = _wrap(name, 20, 330)
+        for k, line in enumerate(wrapped):
+            out.append(_text(1250, ly + 7 + k * 26, line, size=20, weight="600"))
+        ly += 26 * max(len(wrapped) - 1, 0)
+        out.append(
+            _text(
+                1250,
+                ly + 33,
+                f"latest {fmt_pct(last[-1]['all']['leak'])}% leak"
+                + ("" if last[-1].get("comparable", True) else ", other documents"),
+                size=19,
+                fill=MUTED,
+            )
+        )
+        ly += 70
+    out.append(
+        f'<line x1="1218" y1="{_n(ly)}" x2="1242" y2="{_n(ly)}" stroke="{INK}" '
+        'stroke-width="3" stroke-dasharray="8 5"/>'
+    )
+    out.append(_text(1250, ly + 7, "best of any configuration so far", size=20, weight="600"))
+    return out
+
+
 def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[str]) -> str:
     styles = index["systems"]
     ours = [k for k in systems if styles.get(k, {}).get("family") == "pii-guard"]
@@ -615,12 +683,8 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
         k for k, v in styles.items() if v.get("default") and k not in ours and v["kind"] == "text"
     ]
     hist = [h for h in index["history"] if h["fixture_set"] == fixture_set and h["system"] in ours]
-    # Hollow points ran on other documents (an earlier fixture file, or fewer languages).
     comparable = [h for h in hist if h.get("comparable", True)]
-    cats: list[tuple[str, str]] = []
-    for h in hist:
-        if (h["date"], h["commit"]) not in cats:
-            cats.append((h["date"], h["commit"]))
+    cats = list(dict.fromkeys((h["date"], h["commit"]) for h in hist))
     px0, py0, px1, py1 = 150, 170, 1180, 670
     leak_max = max([h["all"]["leak"] or 0 for h in hist] + [0.1])
     ymax = min(1.0, math.ceil(leak_max * 10 + 0.5) / 10)
@@ -651,84 +715,30 @@ def progress(index: Mapping[str, Any], *, fixture_set: str, systems: Sequence[st
         body.append(
             _text(px0 - 16, sy(t) + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end")
         )
-    # Thin the x labels so dates never overlap at 1600 px (LAB-1224): keep at most
-    # ~6 labeled categories, always including the first and the last.
-    keep = {0, len(cats) - 1}
-    step = max(1, math.ceil(len(cats) / 6))
-    keep.update(range(0, len(cats), step))
+    keep = {0, len(cats) - 1, *range(0, len(cats), max(1, math.ceil(len(cats) / 6)))}
     for i, (day, commit) in enumerate(cats):
-        if i not in keep:
-            continue
-        body.append(_text(sx(i), py1 + 34, day, size=20, fill=MUTED, anchor="middle"))
-        body.append(_text(sx(i), py1 + 60, _short(commit), size=20, fill=MUTED, anchor="middle"))
+        if i in keep:
+            body.append(_text(sx(i), py1 + 34, day, size=20, fill=MUTED, anchor="middle"))
+            body.append(
+                _text(sx(i), py1 + 60, _short(commit), size=20, fill=MUTED, anchor="middle")
+            )
     body.append(
         f'<line x1="{px0}" y1="{py1}" x2="{px1}" y2="{py1}" stroke="{AXIS}" stroke-width="2"/>'
     )
-    # Best pii-guard result so far: a step line.
-    best: list[tuple[float, float]] = []
-    current = None
-    for i, cat in enumerate(cats):
-        vals = [
-            h["all"]["leak"]
-            for h in comparable
-            if (h["date"], h["commit"]) == cat and h["all"]["leak"] is not None
-        ]
-        if vals:
-            current = min(vals) if current is None else min(current, *vals)
-        if current is not None:
-            best.append((sx(i), sy(current)))
-    if best:
-        path = f"M{_n(best[0][0] - 40)},{_n(best[0][1])}"
-        for i, (x, y) in enumerate(best):
-            if i:
-                path += f"H{_n(x - 40)}V{_n(y)}"
-        path += f"H{_n(best[-1][0] + 40)}"
-        body.append(
-            f'<path d="{path}" fill="none" stroke="{INK}" stroke-width="3" '
-            'stroke-dasharray="10 7"/>'
-        )
+    body.extend(_progress_best_line(cats, comparable, sx, sy))
     for key in ours:
         st = styles[key]
         pts = [
             (cats.index((h["date"], h["commit"])), h["all"]["leak"], h.get("comparable", True))
             for h in hist
-            if h["system"] == key
+            if h["system"] == key and h["all"]["leak"] is not None
         ]
-        pts = [(i, v, c) for i, v, c in pts if v is not None]
         if len(pts) > 1:
             d = "M" + "L".join(f"{_n(sx(i))},{_n(sy(v))}" for i, v, _ in pts)
             body.append(f'<path d="{d}" fill="none" stroke="{st["color"]}" stroke-width="4"/>')
         for i, v, c in pts:
             body.append(_marker("circle", sx(i), sy(v), 11, st["color"], hollow=not c))
-    # Legend (right).
-    ly = py0 + 10
-    for key in ours:
-        st = styles[key]
-        last = [h for h in hist if h["system"] == key]
-        if not last:
-            continue
-        body.append(_marker("circle", 1230, ly, 10, st["color"]))
-        name = st["short_label"] + (" (default)" if st.get("default") else "")
-        # Wrap long legend names so they stay inside the 1600 px card (LAB-1224).
-        for k, line in enumerate(_wrap(name, 20, 330)):
-            body.append(_text(1250, ly + 7 + k * 26, line, size=20, weight="600"))
-        ly += 26 * max(len(_wrap(name, 20, 330)) - 1, 0)
-        body.append(
-            _text(
-                1250,
-                ly + 33,
-                f"latest {fmt_pct(last[-1]['all']['leak'])}% leak"
-                + ("" if last[-1].get("comparable", True) else ", other documents"),
-                size=19,
-                fill=MUTED,
-            )
-        )
-        ly += 70
-    body.append(
-        f'<line x1="1218" y1="{_n(ly)}" x2="1242" y2="{_n(ly)}" stroke="{INK}" '
-        'stroke-width="3" stroke-dasharray="8 5"/>'
-    )
-    body.append(_text(1250, ly + 7, "best of any configuration so far", size=20, weight="600"))
+    body.extend(_progress_legend(ours, styles, hist, py0))
     snaps = [{"dates": [h["date"]], "commits": [h["commit"]]} for h in hist]
     caption = [
         set_caption(index, fixture_set)
@@ -896,28 +906,80 @@ def is_segment_run(run: Mapping[str, Any]) -> bool:
     return str(run["system"]).startswith(SEGMENT_PREFIX)
 
 
-def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
-    # The latest run of each system on each set: bars grouped by set, colored by system.
-    # ``segmenters``: only the segmenter comparison runs (else: every other visual run).
-    latest: dict[tuple[str, str], Mapping[str, Any]] = {}
-    for r in index["visual"]:
-        if is_segment_run(r) != segmenters:
+def _visual_group_bars(
+    g: int,
+    name: str,
+    runs: Sequence[Mapping[str, Any]],
+    set_order: Sequence[str],
+    color: Mapping[str, str],
+    layout: tuple[float, float, float, float, float, Callable[[float], float]],
+) -> list[str]:
+    px0, py1, gw, bw, slots, sy = layout
+    gap = 0.4
+    gx = px0 + g * gw + (gw - bw * slots) / 2
+    cand: list[tuple[float, float]] = []
+    for k, r in enumerate(runs):
+        block = r["overall"] if name == "all" else r["by_region_type"].get(name)
+        if block:
+            v = block["recall_iou50"] or 0
+            set_index = set_order.index(str(r.get("fixture_set") or "specimens"))
+            cand.append((gx + (k + gap * set_index) * bw, v))
+    label_all = bw >= 30 or not cand
+    best_x = max(cand, key=lambda t: t[1])[0] if cand else 0.0
+    ns: list[int] = []
+    out: list[str] = []
+    for k, r in enumerate(runs):
+        block = r["overall"] if name == "all" else r["by_region_type"].get(name)
+        if not block:
             continue
-        latest[(str(r.get("fixture_set") or "specimens"), str(r["system"]))] = r
+        if block["regions"] not in ns:
+            ns.append(block["regions"])
+        v = block["recall_iou50"] or 0
+        set_index = set_order.index(str(r.get("fixture_set") or "specimens"))
+        x = gx + (k + gap * set_index) * bw
+        out.append(
+            f'<rect x="{_n(x + 3)}" y="{_n(sy(v))}" width="{_n(bw - 6)}" '
+            f'height="{_n(max(py1 - sy(v), 1))}" fill="{color[str(r["system"])]}"/>'
+        )
+        if label_all or x == best_x:
+            out.append(
+                _text(
+                    x + bw / 2,
+                    sy(v) - 10,
+                    fmt_pct(v, 0),
+                    size=19 if bw >= 34 else 18,
+                    anchor="middle",
+                )
+            )
+    out.append(_text(px0 + (g + 0.5) * gw, py1 + 34, name, size=21, anchor="middle", weight="600"))
+    out.append(
+        _text(
+            px0 + (g + 0.5) * gw,
+            py1 + 60,
+            "n=" + " / ".join(map(str, ns)),
+            size=19,
+            fill=MUTED,
+            anchor="middle",
+        )
+    )
+    return out
+
+
+def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
+    latest = {
+        (str(r.get("fixture_set") or "specimens"), str(r["system"])): r
+        for r in index["visual"]
+        if is_segment_run(r) == segmenters
+    }
     set_order = list(dict.fromkeys(key[0] for key in latest))
     systems = list(dict.fromkeys(key[1] for key in latest))
     runs = [latest[(fs, sk)] for fs in set_order for sk in systems if (fs, sk) in latest]
-    region_types = []
-    for r in runs:
-        for k in r["by_region_type"]:
-            if k not in region_types:
-                region_types.append(k)
+    region_types = list(dict.fromkeys(k for r in runs for k in r["by_region_type"]))
     groups = [*region_types, "all"]
     color = assign(dict(index.get("colours", {}).get("visual", {})), systems, PALETTE_VISUAL)
     px0, py0, px1, py1 = 150, 230, 1540, 680
     gw = (px1 - px0) / max(len(groups), 1)
-    gap = 0.4  # bar widths between the sets inside a group
-    slots = len(runs) + gap * (len(set_order) - 1)
+    slots = len(runs) + 0.4 * (len(set_order) - 1)
     bw = min(90, (gw - 24) / max(slots, 1))
 
     def sy(v: float) -> float:
@@ -955,65 +1017,15 @@ def visual_recall(index: Mapping[str, Any], *, segmenters: bool = False) -> str:
         body.append(
             _text(px0 - 16, sy(t) + 7, f"{t * 100:.0f}%", size=20, fill=MUTED, anchor="end")
         )
+    layout = (float(px0), float(py1), gw, bw, slots, sy)
     for g, name in enumerate(groups):
-        gx = px0 + g * gw + (gw - bw * slots) / 2
-        # Narrow bars (many systems) cannot carry a value label each: the labels
-        # overlap (LAB-1193). Label every bar only when they fit; otherwise label just
-        # the group's best bar, whose value the legend cannot show.
-        cand: list[tuple[float, float]] = []
-        for k, r in enumerate(runs):
-            block = r["overall"] if name == "all" else r["by_region_type"].get(name)
-            if not block:
-                continue
-            v = block["recall_iou50"] or 0
-            set_index = set_order.index(str(r.get("fixture_set") or "specimens"))
-            x = gx + (k + gap * set_index) * bw
-            cand.append((x, v))
-        label_all = bw >= 30 or not cand
-        best_x = max(cand, key=lambda t: t[1])[0] if cand else 0.0
-        ns: list[int] = []
-        for k, r in enumerate(runs):
-            block = r["overall"] if name == "all" else r["by_region_type"].get(name)
-            if not block:
-                continue
-            if block["regions"] not in ns:
-                ns.append(block["regions"])
-            v = block["recall_iou50"] or 0
-            set_index = set_order.index(str(r.get("fixture_set") or "specimens"))
-            x = gx + (k + gap * set_index) * bw
-            body.append(
-                f'<rect x="{_n(x + 3)}" y="{_n(sy(v))}" width="{_n(bw - 6)}" '
-                f'height="{_n(max(py1 - sy(v), 1))}" fill="{color[str(r["system"])]}"/>'
-            )
-            if label_all or x == best_x:
-                body.append(
-                    _text(
-                        x + bw / 2,
-                        sy(v) - 10,
-                        fmt_pct(v, 0),
-                        size=19 if bw >= 34 else 18,
-                        anchor="middle",
-                    )
-                )
-        body.append(
-            _text(px0 + (g + 0.5) * gw, py1 + 34, name, size=21, anchor="middle", weight="600")
-        )
-        body.append(
-            _text(
-                px0 + (g + 0.5) * gw,
-                py1 + 60,
-                "n=" + " / ".join(map(str, ns)),
-                size=19,
-                fill=MUTED,
-                anchor="middle",
-            )
-        )
+        body.extend(_visual_group_bars(g, name, runs, set_order, color, layout))
     body.append(
         f'<line x1="{px0}" y1="{py1}" x2="{px1}" y2="{py1}" stroke="{AXIS}" stroke-width="2"/>'
     )
-    sets: dict[str, tuple[int, int]] = {}
-    for r in runs:
-        sets[str(r.get("fixture_set") or "specimens")] = (r["specimens"], r["countries"])
+    sets = {
+        str(r.get("fixture_set") or "specimens"): (r["specimens"], r["countries"]) for r in runs
+    }
     caption = [
         f"Fixture set '{name}': {_VISUAL_SETS.get(name, 'image documents')}, {n} images, "
         f"{c} countries."
@@ -1092,6 +1104,49 @@ def stage_shares(cell: Mapping[str, Any]) -> list[tuple[str, float]]:
     return out
 
 
+def _latency_stage_panel(runs: Sequence[Mapping[str, Any]]) -> list[str]:
+    rx0, rx1 = 1080, 1544
+    out = [_text(rx0 - 20, 165, "Where it goes (p50, c=1, not streamed)", size=24, weight="700")]
+    ry = 210
+    step = min(110, 610 // max(len(runs), 1))  # keep the stage legend inside the canvas
+    for run in runs:
+        cell = next(
+            (c for c in run["cells"] if c["concurrency"] == 1 and not c["stream"]),
+            run["cells"][0] if run["cells"] else None,
+        )
+        if cell is None:
+            continue
+        shares = stage_shares(cell)
+        total = sum(v for _, v in shares) or 1.0
+        out.append(_text(rx0 - 20, ry, latency_label(run), size=20, weight="600"))
+        x = float(rx0 - 20)
+        width = rx1 - (rx0 - 20)
+        for name, v in shares:
+            w = v / total * width
+            if w <= 0:
+                continue
+            out.append(
+                f'<rect x="{_n(x)}" y="{ry + 12}" width="{_n(w)}" height="40" '
+                f'fill="{STAGE_COLORS[name]}"/>'
+            )
+            if w >= 70:
+                ink = BG if name in ("detect", "unmask") else INK
+                out.append(
+                    _text(x + w / 2, ry + 40, fmt_duration(v), size=18, fill=ink, anchor="middle")
+                )
+            x += w
+        ry += step
+    lx, ly = float(rx0 - 20), float(max(ry, 560))
+    for name, color in STAGE_COLORS.items():
+        tw = text_width(name, 19) + 46
+        if lx + tw > rx1 + 10:
+            lx, ly = float(rx0 - 20), ly + 34
+        out.append(f'<rect x="{_n(lx)}" y="{_n(ly - 18)}" width="20" height="20" fill="{color}"/>')
+        out.append(_text(lx + 28, ly, name, size=19))
+        lx += tw
+    return out
+
+
 def latency(index: Mapping[str, Any]) -> str:
     runs = latest_latency(index)
     rows: list[tuple[str, Mapping[str, Any], str]] = []
@@ -1116,7 +1171,6 @@ def latency(index: Mapping[str, Any]) -> str:
             fill=MUTED,
         )
     ]
-    # Left: overhead p50 (bar) and p95 (tick), log scale.
     lx0, lx1, ly0, ly1 = 420, 900, 190, 720
     values = [
         v
@@ -1125,8 +1179,7 @@ def latency(index: Mapping[str, Any]) -> str:
         if v
     ]
     lo = 10 ** math.floor(math.log10(max(min(values), 0.01))) if values else 0.1
-    hi = 10 ** math.ceil(math.log10(max(values))) if values else 10.0
-    hi = max(hi, lo * 10)
+    hi = max(10 ** math.ceil(math.log10(max(values))) if values else 10.0, lo * 10)
 
     def sx(ms: float) -> float:
         ms = min(max(ms, lo), hi)
@@ -1174,48 +1227,7 @@ def latency(index: Mapping[str, Any]) -> str:
     body.append(
         f'<line x1="{lx0}" y1="{ly1}" x2="{lx1}" y2="{ly1}" stroke="{AXIS}" stroke-width="2"/>'
     )
-    # Right: where the p50 overhead goes (c=1, not streamed), as shares of the bar.
-    rx0, rx1 = 1080, 1544
-    body.append(
-        _text(rx0 - 20, 165, "Where it goes (p50, c=1, not streamed)", size=24, weight="700")
-    )
-    ry = 210
-    step = min(110, 610 // max(len(runs), 1))  # keep the stage legend inside the canvas
-    for run in runs:
-        cell = next(
-            (c for c in run["cells"] if c["concurrency"] == 1 and not c["stream"]),
-            run["cells"][0] if run["cells"] else None,
-        )
-        if cell is None:
-            continue
-        shares = stage_shares(cell)
-        total = sum(v for _, v in shares) or 1.0
-        body.append(_text(rx0 - 20, ry, latency_label(run), size=20, weight="600"))
-        x = float(rx0 - 20)
-        width = rx1 - (rx0 - 20)
-        for name, v in shares:
-            w = v / total * width
-            if w <= 0:
-                continue
-            body.append(
-                f'<rect x="{_n(x)}" y="{ry + 12}" width="{_n(w)}" height="40" '
-                f'fill="{STAGE_COLORS[name]}"/>'
-            )
-            if w >= 70:
-                ink = BG if name in ("detect", "unmask") else INK
-                body.append(
-                    _text(x + w / 2, ry + 40, fmt_duration(v), size=18, fill=ink, anchor="middle")
-                )
-            x += w
-        ry += step
-    lx, ly = float(rx0 - 20), float(max(ry, 560))
-    for name, color in STAGE_COLORS.items():
-        tw = text_width(name, 19) + 46
-        if lx + tw > rx1 + 10:
-            lx, ly = float(rx0 - 20), ly + 34
-        body.append(f'<rect x="{_n(lx)}" y="{_n(ly - 18)}" width="20" height="20" fill="{color}"/>')
-        body.append(_text(lx + 28, ly, name, size=19))
-        lx += tw
+    body.extend(_latency_stage_panel(runs))
     delays = sorted({f"{r['upstream_delay_ms']:g} ms" for r in runs})
     hardware = sorted({str(r["hardware"]) for r in runs if r.get("hardware")})
     caption = [
