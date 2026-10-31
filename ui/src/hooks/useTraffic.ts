@@ -23,7 +23,11 @@ export interface TrafficOptions {
   forceFixture?: boolean;
   connect?: (o: TrafficConnectOptions) => { close(): void };
   fixtureIntervalMs?: number;
+  /** Wait before the one quiet retry of a first contact that came back offline (LAB-1703). */
+  offlineRetryMs?: number;
 }
+
+const OFFLINE_RETRY_MS = 2000;
 
 /** A backend restart between two shown calls: `beforeId` starts the new run. */
 export interface RunBreak {
@@ -77,7 +81,7 @@ const emptyStore = (key: string): FeedStore => ({
   pendingBreak: null,
 });
 
-export function useTraffic({ forceFixture = false, connect = connectTraffic, fixtureIntervalMs }: TrafficOptions = {}): TrafficHandle {
+export function useTraffic({ forceFixture = false, connect = connectTraffic, fixtureIntervalMs, offlineRetryMs = OFFLINE_RETRY_MS }: TrafficOptions = {}): TrafficHandle {
   const [chosenFixture, setChosenFixture] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const source: TrafficSource = forceFixture || chosenFixture ? "fixture" : "api";
@@ -144,13 +148,19 @@ export function useTraffic({ forceFixture = false, connect = connectTraffic, fix
     if (source !== "api") return;
     if (current.status.state === "live") sawLive.current = true;
     if (current.status.state === "offline" && !sawLive.current) {
+      // Retry the first contact once: a deploy's revision swap or a network blip must not
+      // leave a live server's console on the recorded demo (LAB-1703).
+      if (attempt === 0) {
+        const retry = setTimeout(() => setAttempt((a) => Math.max(a, 1)), offlineRetryMs);
+        return () => clearTimeout(retry);
+      }
       const t = setTimeout(() => {
         setLastApi(current.status);
         setChosenFixture(true);
       }, 0);
       return () => clearTimeout(t);
     }
-  }, [current.status, source]);
+  }, [current.status, source, attempt, offlineRetryMs]);
 
   const setPaused = useCallback((p: boolean) => {
     pausedRef.current = p;

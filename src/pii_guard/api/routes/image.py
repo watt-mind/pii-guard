@@ -59,6 +59,7 @@ from pii_guard.api.routes._common import (
     LoggedRoute,
     ephemeral_session,
     log_extra,
+    request_metrics,
     text_body_limit,
     v1_router,
 )
@@ -621,11 +622,18 @@ async def mask_image_endpoint(
             session=session,
             expiry=options.expiry,
         )
+    masked_counts = outcome.counts(Policy.MASK)
+    kept_counts = outcome.counts(Policy.KEEP)
+    if (metrics := request_metrics(request)) is not None:
+        metrics.observe_image_regions(
+            masked={t.value: n for t, n in masked_counts.items()},
+            kept={t.value: n for t, n in kept_counts.items()},
+        )
     log_extra(
         request,
         regions=len(outcome.regions),
-        masked=sum(outcome.counts(Policy.MASK).values()),
-        kept=sum(outcome.counts(Policy.KEEP).values()),
+        masked=sum(masked_counts.values()),
+        kept=sum(kept_counts.values()),
         ocr=outcome.ocr_engine or "off",
         render=outcome.render,
     )

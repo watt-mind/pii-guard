@@ -220,6 +220,90 @@ def test_metrics_render_prometheus_histograms() -> None:
     assert "added_ttft" not in text
 
 
+def test_metrics_observe_full_gateway_events_and_rest_helpers() -> None:
+    metrics = LatencyMetrics()
+    timing = {
+        "overhead_ms": 4.0,
+        "total_ms": 54.0,
+        "upstream_ms": 50.0,
+        "added_ttft_ms": 2.0,
+        "stages_ms": {"detect": 1.5},
+        "detectors_ms": {"rules": 0.4, "ner": 1.1, "llm": 0.0},
+    }
+    ok_event = {
+        "mode": "fast",
+        "outcome": "ok",
+        "timing": timing,
+        "entities": {
+            "detected": {"EMAIL": 2, "PERSON": 1},
+            "masked": {"EMAIL": 2},
+            "images": {"count": 1, "masked": {"FACE": 1}, "kept": {"STAMP": 2}, "ocr": True},
+        },
+        "outbound_check": {"result": "passed", "hits": {}},
+        "cache": {"hits": 3, "misses": 1, "seeded": 2},
+        "upstream": {"status": 200, "unresolved_placeholders": 1},
+        "usage": {"prompt_tokens": 120, "completion_tokens": 45},
+    }
+    metrics.observe("fast", "ok", timing, ok_event)
+
+    # Outbound block event (Responses-style input_tokens/output_tokens too)
+    outbound_block_event = {
+        "mode": "fast",
+        "outcome": "blocked",
+        "timing": timing,
+        "error": {"code": "outbound_check_failed", "entity_types": {"EMAIL": 1}},
+        "outbound_check": {"result": "blocked", "hits": {"EMAIL": 1}},
+        "usage": {"input_tokens": 30, "output_tokens": 10},
+    }
+    metrics.observe("fast", "blocked", timing, outbound_block_event)
+
+    # Inbound policy block event (no outbound check ran)
+    inbound_block_event = {
+        "mode": "fast",
+        "outcome": "blocked",
+        "timing": timing,
+        "error": {"code": "blocked_entity", "entity_types": {"SECRET": 2}},
+        "outbound_check": None,
+    }
+    metrics.observe("fast", "blocked", timing, inbound_block_event)
+
+    # Direct REST helpers and live gauges
+    metrics.observe_entities(detected={"PHONE": 1}, masked={"PHONE": 1})
+    metrics.observe_image_regions(masked={"SIGNATURE": 1}, kept={"STAMP": 1})
+    metrics.observe_blocked("inbound", {"IBAN": 1})
+    metrics.observe_unresolved(2)
+    metrics.observe_http("POST", "/v1/mask", 200, 3.2)
+
+    text = metrics.render(active_sessions=4, ner_state="ready")
+    assert 'pii_guard_detector_duration_ms_count{mode="fast",detector="ner"} 3' in text
+    assert 'pii_guard_detector_duration_ms_count{mode="fast",detector="rules"} 3' in text
+    assert 'detector="llm"' not in text
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL"} 2' in text
+    assert 'pii_guard_entities_detected_total{entity_type="PERSON"} 1' in text
+    assert 'pii_guard_entities_detected_total{entity_type="PHONE"} 1' in text
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL"} 2' in text
+    assert 'pii_guard_entities_masked_total{entity_type="PHONE"} 1' in text
+    assert 'pii_guard_image_regions_total{entity_type="FACE",action="masked"} 1' in text
+    assert 'pii_guard_image_regions_total{entity_type="SIGNATURE",action="masked"} 1' in text
+    assert 'pii_guard_image_regions_total{entity_type="STAMP",action="kept"} 3' in text
+    assert 'pii_guard_outbound_checks_total{result="passed"} 1' in text
+    assert 'pii_guard_outbound_checks_total{result="blocked"} 1' in text
+    assert 'pii_guard_blocked_entities_total{stage="outbound",entity_type="EMAIL"} 1' in text
+    assert 'pii_guard_blocked_entities_total{stage="inbound",entity_type="SECRET"} 2' in text
+    assert 'pii_guard_blocked_entities_total{stage="inbound",entity_type="IBAN"} 1' in text
+    assert 'pii_guard_detection_cache_total{result="hit"} 3' in text
+    assert 'pii_guard_detection_cache_total{result="miss"} 1' in text
+    assert 'pii_guard_detection_cache_total{result="seeded"} 2' in text
+    assert 'pii_guard_upstream_tokens_total{direction="input"} 150' in text
+    assert 'pii_guard_upstream_tokens_total{direction="output"} 55' in text
+    assert "pii_guard_unresolved_placeholders_total 3" in text
+    assert 'pii_guard_http_requests_total{method="POST",path="/v1/mask",status="200"} 1' in text
+    assert 'pii_guard_http_request_duration_ms_count{method="POST",path="/v1/mask"} 1' in text
+    assert "pii_guard_vault_active_sessions 4" in text
+    assert 'pii_guard_ner_state{state="ready"} 1' in text
+    assert 'pii_guard_ner_state{state="loading"} 0' in text
+
+
 # --- bind check ----------------------------------------------------------------------------
 
 

@@ -11,7 +11,13 @@ from pydantic import BaseModel, Field
 
 from pii_guard.api.deps import Analyzer, get_analyzer, get_language, get_policies, get_vault
 from pii_guard.api.errors import error_responses
-from pii_guard.api.routes._common import check_text_size, log_extra, owned_session, v1_router
+from pii_guard.api.routes._common import (
+    check_text_size,
+    log_extra,
+    owned_session,
+    request_metrics,
+    v1_router,
+)
 from pii_guard.detect.known import KNOWN_DETECTOR, merge_known
 from pii_guard.policy import Policy, PolicySet
 from pii_guard.types import Span
@@ -132,10 +138,13 @@ def analyze(
     if known_session is not None and (known := known_session.known_values):
         spans = merge_known(body.text, spans, known, language, keep_types=policies.keep_types)
     known_count = sum(s.detector == KNOWN_DETECTOR for s in spans)
+    detected_counts = Counter(e.entity_type.value for e in spans)
+    if (metrics := request_metrics(request)) is not None and detected_counts:
+        metrics.observe_entities(detected=detected_counts)
     log_extra(
         request,
         spans=len(spans),
-        types=_type_counts(e.entity_type.value for e in spans),
+        types=_type_counts(detected_counts),
         known=known_count,
         session=known_session is not None,
     )
@@ -158,6 +167,6 @@ def _policy(policies: PolicySet, span: Span) -> Policy:
     return policy
 
 
-def _type_counts(types: Iterable[str]) -> str:
-    counts = Counter(types)
+def _type_counts(types: Iterable[str] | Counter[str]) -> str:
+    counts = types if isinstance(types, Counter) else Counter(types)
     return ",".join(f"{name}:{count}" for name, count in sorted(counts.items())) or "-"

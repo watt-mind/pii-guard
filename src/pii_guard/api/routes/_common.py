@@ -19,7 +19,7 @@ import logging
 import time
 from collections.abc import Callable, Coroutine, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from fastapi import APIRouter, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -33,6 +33,9 @@ from pii_guard.policy import BlockedEntityError
 from pii_guard.types import PiiGuardError
 from pii_guard.vault import Vault, VaultSession
 
+if TYPE_CHECKING:
+    from pii_guard.observability.metrics import LatencyMetrics
+
 __all__ = [
     "BODY_READ_TIMEOUT_SECONDS",
     "BodyReadTimeoutError",
@@ -44,6 +47,7 @@ __all__ = [
     "ephemeral_session",
     "log_extra",
     "owned_session",
+    "request_metrics",
     "text_body_limit",
     "v1_router",
 ]
@@ -67,6 +71,17 @@ def body_read_timeout(request: Request) -> float:
     settings = getattr(getattr(app, "state", None), "settings", None)
     timeout = getattr(settings, "body_read_timeout", None)
     return float(timeout) if timeout is not None else BODY_READ_TIMEOUT_SECONDS
+
+
+def request_metrics(request: Request) -> LatencyMetrics | None:
+    """The app's Prometheus metrics collector when enabled (never in hosted mode)."""
+    scope = getattr(request, "scope", None)
+    app = scope.get("app") if isinstance(scope, dict) else getattr(request, "app", None)
+    state = getattr(app, "state", None)
+    if state is None or getattr(getattr(state, "settings", None), "hosted", False):
+        return None
+    obs = getattr(state, "observability", None)
+    return getattr(obs, "metrics", None)
 
 
 class BodyReadTimeoutError(PiiGuardError):
@@ -136,13 +151,16 @@ class LoggedRoute(APIRoute):
                 error_code = type(exc).__name__
                 raise
             finally:
+                duration_ms = (time.perf_counter() - started) * 1000
+                if self.path != "/metrics" and (metrics := request_metrics(request)) is not None:
+                    metrics.observe_http(request.method, self.path, status, duration_ms)
                 fields = getattr(request.state, "log_fields", None) or {}
                 access_logger.info(
                     "%s %s %d %.1fms%s%s",
                     request.method,
                     self.path,  # the template: never a session id from the URL
                     status,
-                    (time.perf_counter() - started) * 1000,
+                    duration_ms,
                     f" error={error_code}" if error_code else "",
                     "".join(f" {key}={value}" for key, value in sorted(fields.items())),
                 )
@@ -264,6 +282,8 @@ def _ephemeral_session(
     except BaseException as exc:
         if isinstance(exc, BlockedEntityError):
             log_extra(request, blocked=",".join(f"{t.value}:{n}" for t, n in exc.counts.items()))
+            if (metrics := request_metrics(request)) is not None:
+                metrics.observe_blocked("inbound", {t.value: n for t, n in exc.counts.items()})
         if session is not None and vault is not None and session_id is None:
             vault.drop(session.session_id)
         raise

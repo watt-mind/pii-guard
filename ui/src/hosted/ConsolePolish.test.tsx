@@ -19,9 +19,9 @@ beforeEach(() => { publish(null); localStorage.clear(); });
 
 it("makes a failed setup read recoverable and announces a pending retry", async () => {
   let finish!: (value: unknown) => void;
-  const call = vi.fn().mockRejectedValueOnce(new Error("private server detail"))
+  const call = vi.fn().mockRejectedValueOnce(new Error("private server detail")).mockRejectedValueOnce(new Error("private server detail"))
     .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; })) as unknown as Requester;
-  render(<SetupChecklist call={call} account={account} active calls={0} />);
+  render(<SetupChecklist call={call} account={account} active calls={0} retryDelayMs={0} />);
   const retry = await screen.findByRole("button", { name: "Retry setup" });
   expect(screen.queryByText(/private server detail/)).not.toBeInTheDocument();
   await userEvent.setup().click(retry);
@@ -35,10 +35,18 @@ it("makes a failed setup read recoverable and announces a pending retry", async 
 it("keeps the last progress visible when a refresh fails", async () => {
   publish({ provider: true, policy: true, endpoint: false, key: false, call: false });
   const call = vi.fn().mockRejectedValue(new Error("unavailable")) as unknown as Requester;
-  render(<SetupChecklist call={call} account={account} active calls={0} />);
+  render(<SetupChecklist call={call} account={account} active calls={0} retryDelayMs={0} />);
   await screen.findByRole("button", { name: "Retry setup" });
   expect(screen.getByText("2 of 5 done")).toBeInTheDocument();
   expect(screen.getByText(/Showing the last available progress/)).toBeInTheDocument();
+});
+
+it("retries a failed setup read once, quietly, before warning (LAB-1703)", async () => {
+  const call = vi.fn().mockRejectedValueOnce(new Error("revision swap")).mockResolvedValue({ projects: [] }) as unknown as Requester;
+  render(<SetupChecklist call={call} account={account} active calls={0} retryDelayMs={0} />);
+  expect(await screen.findByText("0 of 5 done")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Retry setup" })).not.toBeInTheDocument();
+  expect(call).toHaveBeenCalledTimes(2);
 });
 
 it("labels paused free inference without changing the selected connection", () => {
