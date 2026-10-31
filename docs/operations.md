@@ -676,12 +676,12 @@ enable it by default; disabled in `PII_GUARD_HOSTED=true`) at `GET /metrics`
 | `pii_guard_detection_cache_total` | `counter` | `result` | Prefix detection cache lookups (`result="hit"\|"miss"\|"seeded"`) |
 | `pii_guard_upstream_tokens_total` | `counter` | `direction` | Upstream LLM tokens (`direction="input"\|"output"`) |
 | `pii_guard_unresolved_placeholders_total` | `counter` | — | Unknown or hallucinated `[[TYPE_id]]` placeholders left unresolved |
-| `pii_guard_http_requests_total` | `counter` | `method`, `path`, `status` | HTTP requests handled across `/v1/*` routes (route templates only; `/metrics` excluded) |
-| `pii_guard_http_request_duration_ms` | `histogram` | `method`, `path` | HTTP request duration in ms by route template |
+| `pii_guard_http_requests_total` | `counter` | `method`, `path`, `status` | HTTP requests handled across all API routes (route templates only; `/metrics` excluded) |
+| `pii_guard_http_request_duration_ms` | `histogram` | `method`, `path` | HTTP request duration in ms by route template (to response headers on streams) |
 | `pii_guard_vault_active_sessions` | `gauge` | — | Live vault sessions in memory across root and project runtimes |
 | `pii_guard_ner_state` | `gauge` | `state` | One-hot NER warmup state (`1` for active state among `off`, `loading`, `ready`, `failed`) |
 
-All millisecond histograms use buckets `0.25, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, +Inf`.
+All millisecond histograms use buckets `0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, +Inf` (`BUCKETS_MS` in `observability/metrics.py`).
 Labels are fixed enums and route templates only—never raw PII, session IDs or client identifiers.
 When `PII_GUARD_API_TOKEN` is set, configure Prometheus with `authorization: { credentials: <token> }`
 on the scrape job.
