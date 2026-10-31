@@ -126,7 +126,10 @@ Storage account keys used by the platform SMB mount stay in ARM's secret handlin
 appear in source, CLI parameters or template outputs. Limit access to environment configuration
 and storage administration accordingly.
 
-The global traffic log, public metrics and uvicorn request access log are off. Each hosted
+The global traffic log and uvicorn request access log are off. Aggregate Prometheus metrics are
+on at `GET /metrics`, but only for the scrape token in Key Vault secret `metrics-token`
+(`Authorization: Bearer`); they carry no tenant, principal or endpoint labels. Rotate the token
+by adding a secret version, updating `METRICS_TOKEN_SECRET_URI` and releasing (LAB-1732). Each hosted
 owner nevertheless has an in-memory **masked** traffic log of its last 50 events, readable
 only through that owner's `/v1/traffic` routes. It contains the masked upstream request and
 upstream response, not an intentionally captured original/restored pair. Masked content can
@@ -202,7 +205,7 @@ startup characteristics and is not subject to the self-hosted image's 550 MB OCR
 | `PII_GUARD_HOSTED_IMAGE_INPUT_TOKENS` | Default 16,384 provider input tokens reserved per chat image, plus 32 KiB for its masked transcript; the image bytes are never charged as text tokens |
 | `PII_GUARD_HOSTED_SPEND_MANAGED_IDENTITY_CLIENT_ID` | Dedicated runtime UAMI client ID |
 | `PII_GUARD_HOSTED_ALLOCATION_EXPIRES_AT` | Unix UTC expiry for a positive allocation |
-| `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `false` |
+| `PII_GUARD_TRAFFIC_LOG`, `PII_GUARD_METRICS` | `off`, `true` (scrape token `PII_GUARD_METRICS_TOKEN` from Key Vault secret `metrics-token`, LAB-1732) |
 | `VITE_PII_GUARD_ROBOTS` (UI build arg) | Default `disallow`, and the hosted image keeps it. The app (`pii-guard up` and the hosted image) answers `/robots.txt` at runtime from the request host, so the build's file only matters when `ui/dist` is served by something else. That is the runtime switch: the one image promoted from dev to prod is indexable only on `guard.watt-mind.com` (`Allow: /`, with `/v1/`, `/docs`, `/openapi.json`, `/healthz` and `/readyz` disallowed). Every other host, including `guard-dev`, the `azurecontainerapps.io` hostnames and localhost, gets `Disallow: /` |
 | `VITE_PII_GUARD_DEMO_VIDEO_URL`, `VITE_PII_GUARD_DEMO_VIDEO_POSTER` (UI build args) | Unset by default: the landing's demo video slot stays hidden. Set the URL (and optionally a poster image) to show a poster with a play button above the demo |
 
@@ -266,7 +269,7 @@ the selected subscription first if not already registered.
    on this vault; the runtime retains Secrets User access. Revoke temporary provisioning
    access when operational policy requires it.
 4. Set `HOSTED_IMAGE`, `HOSTED_PUBLIC_ORIGIN`, `GOOGLE_CLIENT_ID`, `META_KEY_SECRET_URI`,
-   `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`. URI variables must refer to **versioned**
+   `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`, `METRICS_TOKEN_SECRET_URI`. URI variables must refer to **versioned**
    secrets in the dedicated vault. No secret values enter the script. Run
    `deploy/azure/deploy.sh stage`; it validates and deploys internal ingress, Google Easy Auth,
    one replica in prod or zero to one in dev (LAB-1711), with one worker per replica, and waits boundedly for the latest revision to be admitted as ready. Verify application

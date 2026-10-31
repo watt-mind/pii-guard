@@ -47,6 +47,9 @@ param metaKeySecretUri string
 param tenantKeySecretUri string
 @minLength(1)
 param googleSecretUri string
+@description('Versioned Key Vault reference to the Prometheus scrape token for GET /metrics (LAB-1732).')
+@minLength(1)
+param metricsTokenSecretUri string
 @description('Keep off until the actual production edge client-IP boundary has been verified. Dev always forces off.')
 @allowed(['off', 'aca_xff_rightmost'])
 param clientIpSource string = 'off'
@@ -99,6 +102,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
         { name: 'meta-key', keyVaultUrl: metaKeySecretUri, identity: identity.id }
         { name: 'tenant-key', keyVaultUrl: tenantKeySecretUri, identity: identity.id }
         { name: 'google-client-secret', keyVaultUrl: googleSecretUri, identity: identity.id }
+        { name: 'metrics-token', keyVaultUrl: metricsTokenSecretUri, identity: identity.id }
       ]
     }
     template: {
@@ -139,7 +143,9 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_UPSTREAM_API_KEY', secretRef: 'meta-key' }
           { name: 'PII_GUARD_TENANT_KEY', secretRef: 'tenant-key' }
           { name: 'PII_GUARD_TRAFFIC_LOG', value: 'off' }
-          { name: 'PII_GUARD_METRICS', value: 'false' }
+          // Aggregate, tenant-free Prometheus metrics; /metrics answers only the vault scrape token (LAB-1732).
+          { name: 'PII_GUARD_METRICS', value: 'true' }
+          { name: 'PII_GUARD_METRICS_TOKEN', secretRef: 'metrics-token' }
         ]
         // Readiness admits the replica while the bundled NER model still loads (LAB-1548):
         // cold starts (dev scales to zero; prod keeps one warm, LAB-1711) serve the landing page at once, detecting requests wait or

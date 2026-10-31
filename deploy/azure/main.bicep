@@ -144,7 +144,7 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
     }
   }
 }
-var devAppSecretNames = ['meta-api-key', 'tenant-key', 'google-oauth-client-secret']
+var devAppSecretNames = ['meta-api-key', 'tenant-key', 'google-oauth-client-secret', 'metrics-token']
 resource devAppSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = [for secretName in devAppSecretNames: {
   parent: vault
   name: secretName

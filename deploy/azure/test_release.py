@@ -480,9 +480,13 @@ class ReleaseTemplateTests(unittest.TestCase):
             "PII_GUARD_SEGMENTER": "local",
             "PII_GUARD_HOSTED_MODELS": "muse-spark-1.3",
             "PII_GUARD_TRAFFIC_LOG": "off",
-            "PII_GUARD_METRICS": "false",
+            "PII_GUARD_METRICS": "true",
         }.items():
             self.assertEqual(env[key]["value"], value)
+        self.assertEqual(
+            env["PII_GUARD_METRICS_TOKEN"],
+            {"name": "PII_GUARD_METRICS_TOKEN", "secretRef": "metrics-token"},
+        )
         # Signatures are masked on-device by the owner's policy: no server override (LAB-1444).
         self.assertNotIn("PII_GUARD_POLICY_OVERRIDES", env)
         hosts = env["PII_GUARD_ALLOWED_HOSTS"]["value"]
@@ -620,13 +624,14 @@ class ReleaseTemplateTests(unittest.TestCase):
             "metaKeySecretUri",
             "tenantKeySecretUri",
             "googleSecretUri",
+            "metricsTokenSecretUri",
         ):
             self.assertEqual(params[name]["minLength"], 1)
             self.assertNotIn("defaultValue", params[name])
         secrets = self.resource("Microsoft.App/containerApps")["properties"]["configuration"][
             "secrets"
         ]
-        self.assertEqual(len(secrets), 3)
+        self.assertEqual(len(secrets), 4)
         for secret in secrets:
             self.assertEqual(set(secret), {"name", "keyVaultUrl", "identity"})
             self.assertIn("parameters(", secret["keyVaultUrl"])
@@ -752,6 +757,7 @@ class ReleaseDriverIngressTests(unittest.TestCase):
             "META_KEY_SECRET_URI": secret.format("meta-key"),
             "TENANT_KEY_SECRET_URI": secret.format("tenant-key"),
             "GOOGLE_SECRET_URI": secret.format("google-client-secret"),
+            "METRICS_TOKEN_SECRET_URI": secret.format("metrics-token"),
             **extra,
         }
         result = subprocess.run(  # noqa: S603 - local driver against a fake az, no cloud
