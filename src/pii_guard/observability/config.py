@@ -6,6 +6,9 @@
 | ``PII_GUARD_TRAFFIC_LOG_SIZE`` | ``traffic_log_size`` (events kept in memory) | ``200`` |
 | ``PII_GUARD_SERVER_TIMING`` | ``server_timing`` (``Server-Timing`` response header) | ``false`` |
 | ``PII_GUARD_METRICS`` | ``metrics`` (Prometheus text at ``GET /metrics``) | ``false`` |
+| ``PII_GUARD_REMOTE_URL`` | ``remote_url`` (remote dashboard URL for telemetry) | ``None`` |
+| ``PII_GUARD_REMOTE_KEY`` | ``remote_key`` (bearer key for remote telemetry ingest) | ``None`` |
+| ``PII_GUARD_REMOTE_LEVEL`` | ``remote_level`` (``masked`` / ``stats``) | ``masked`` |
 
 ``full`` keeps the original (unmasked) request and the restored answer next to what was sent
 upstream. It is refused unless the server binds to a loopback address (:func:`check_bind`):
@@ -21,11 +24,12 @@ from __future__ import annotations
 import ipaddress
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = [
     "ObservabilitySettings",
+    "RemoteTrafficLevel",
     "TrafficLevel",
     "TrafficLogConfigError",
     "check_allowed_hosts",
@@ -40,6 +44,13 @@ class TrafficLevel(StrEnum):
     OFF = "off"
     MASKED = "masked"
     FULL = "full"
+
+
+class RemoteTrafficLevel(StrEnum):
+    """What leaves the local gateway when shipping telemetry to a remote dashboard."""
+
+    MASKED = "masked"
+    STATS = "stats"
 
 
 class TrafficLogConfigError(ValueError):
@@ -59,6 +70,9 @@ class ObservabilitySettings(BaseSettings):
     traffic_log_size: int = Field(default=200, ge=1, le=10_000)
     server_timing: bool = False
     metrics: bool = False
+    remote_url: str | None = None
+    remote_key: SecretStr | None = None
+    remote_level: RemoteTrafficLevel = RemoteTrafficLevel.MASKED
 
 
 def is_loopback(host: str) -> bool:

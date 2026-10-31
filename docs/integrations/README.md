@@ -10,12 +10,12 @@ For a plain OpenAI-compatible client (cURL, Python SDK), see [integrations.md](.
 
 | Tool | API it uses | Setup | Tested version | End-to-end test |
 |---|---|---|---|---|
-| [Muse Code](muse-code.md) (Meta's coding agent) | Responses (`/v1/responses`) | `pii-guard connect muse-code` (writes `settings.json`) | 1.4.14-R7309.1 | [`test_muse_e2e.py`](../../tests/integrations/test_muse_e2e.py) |
-| [pi](pi.md) (coding agent) | Chat Completions | `pii-guard connect pi` (writes `models.json`) | 1.4.0 | [`test_pi_e2e.py`](../../tests/integrations/test_pi_e2e.py) |
-| [Codex](codex.md) (OpenAI's coding agent) | Responses (`/v1/responses`) | a launch command with `-c` flags, no config file | 0.163.0 | [`test_codex_e2e.py`](../../tests/integrations/test_codex_e2e.py) |
-| [OpenCode](opencode.md) | Chat Completions | one variable, `OPENCODE_CONFIG_CONTENT`, no config file | 1.19.3 | [`test_opencode_e2e.py`](../../tests/integrations/test_opencode_e2e.py) |
+| [Muse Code](muse-code.md) (Meta's coding agent) | Responses (`/v1/responses`) | `pii-guard run muse-code` or `pii-guard connect muse-code` | 1.4.14-R7309.1 | [`test_muse_e2e.py`](../../tests/integrations/test_muse_e2e.py) |
+| [pi](pi.md) (coding agent) | Chat Completions | `pii-guard run pi` or `pii-guard connect pi` | 1.4.0 | [`test_pi_e2e.py`](../../tests/integrations/test_pi_e2e.py) |
+| [Codex](codex.md) (OpenAI's coding agent) | Responses (`/v1/responses`) | `pii-guard run codex` or a launch command with `-c` flags | 0.163.0 | [`test_codex_e2e.py`](../../tests/integrations/test_codex_e2e.py) |
+| [OpenCode](opencode.md) | Chat Completions | `pii-guard run opencode` or `OPENCODE_CONFIG_CONTENT` | 1.19.3 | [`test_opencode_e2e.py`](../../tests/integrations/test_opencode_e2e.py) |
 | cURL, Python (OpenAI SDK), LangChain, LiteLLM, Open WebUI, ... | Chat Completions or Responses | base URL `http://127.0.0.1:8787/v1`, see below | | |
-| [Claude Code](claude-code.md) | Anthropic Messages (`/v1/messages`) | `ANTHROPIC_BASE_URL` on the launch command, no config file; the upstream must serve the Messages API too | 2.1.312 | checked by hand ([claude-code.md](claude-code.md#what-was-checked)) |
+| [Claude Code](claude-code.md) | Anthropic Messages (`/v1/messages`) | `pii-guard run claude-code` or `ANTHROPIC_BASE_URL` on the launch command | 2.1.312 | checked by hand ([claude-code.md](claude-code.md#what-was-checked)) |
 
 The versions installed on a developer Mac (Codex 0.163.0, pi 1.3.0, OpenCode 1.18.26, Muse Code
 1.4.14, Claude Code 2.1.289) were also run by hand against the Meta Model API, with the
@@ -27,6 +27,25 @@ the fictional mini-repo through the gateway against a scripted upstream (CI), an
 no gold value reached the upstream and that the files the agent wrote hold the real values
 again. With `META_API_KEY` in the environment the Codex and OpenCode tests also run live
 against the Meta Model API.
+
+## One-command runner (`pii-guard run`)
+
+To start an in-process local gateway on `127.0.0.1` and launch a coding agent immediately in a
+single terminal:
+
+```bash
+export META_API_KEY=<your-key>              # or OPENAI_API_KEY, OPENROUTER_API_KEY, FIREWORKS_API_KEY
+pii-guard run opencode                      # also: codex, claude-code, pi, muse-code
+```
+
+With a remote dashboard key set, the local gateway filters and forwards LLM traffic on-device
+while shipping scrubbed `masked` or `stats` telemetry to `https://guard.watt-mind.com` (or any
+self-hosted `--dashboard` URL):
+
+```bash
+export PII_GUARD_DASHBOARD_KEY=<your-endpoint-or-dashboard-key>
+pii-guard run opencode --endpoint ep_abc123
+```
 
 ## Quickstart (the Connect page)
 

@@ -144,7 +144,7 @@ def json_string(pieces: Sequence[Piece] | Piece) -> Built:
     Values never contain characters JSON escapes, so a value's text is unchanged; the text
     around it is escaped with :func:`json.dumps` (non-ASCII kept).
     """
-    items: Sequence[Piece] = pieces if isinstance(pieces, list | tuple) else [pieces]  # type: ignore[list-item]
+    items: Sequence[Piece] = [pieces] if isinstance(pieces, str | Gold | Secret) else pieces
     out = Built('"')
     for p in items:
         if isinstance(p, Gold | Secret):

@@ -378,6 +378,37 @@ def _credential_shaped(value: str) -> bool:
     return len(value) >= 16 and _has_letter_and_digit(value) and _entropy(value) >= 3.0
 
 
+def _extract_assignment_value(
+    text: str, m: re.Match[str], key: str, last: str, *, quoted: bool
+) -> tuple[str, int, int] | None:
+    if quoted:
+        value, start = m.group("qvalue"), m.start("qvalue")
+        value_end = m.end("qvalue")
+        # Bearer inside a quoted header value: the token is the secret, not the scheme.
+        scheme = re.match(r"(?i)\s*(?:bearer|basic|token)\s+", value)
+        if scheme:
+            value, start = value[scheme.end() :], start + scheme.end()
+        return value, start, value_end
+    value, start = m.group("value"), m.start("value")
+    value_end = m.end("value")
+    sep = m.group("sep")
+    if m.group("q"):
+        return None  # JSON / dict: a quoted key takes a quoted literal.
+    spaced = sep.strip() == "=" and sep != sep.strip()
+    if spaced and _IDENTIFIER_RE.match(value):
+        return None  # ``token = token``: code, not configuration.
+    if sep.strip() == ":" and not _at_line_start(text, m.start()):
+        return None  # "requires API_TOKEN: send ..." is prose; YAML keys start a line.
+    folded = value.casefold()
+    if _IDENTIFIER_RE.match(value) and (
+        folded in {key.casefold(), last} or folded.endswith("_" + last)
+    ):
+        return None  # ``api_key=api_key``, ``token=access_token``: a keyword argument.
+    if folded in {"bearer", "basic", "token"}:
+        return None  # handled by the header rule
+    return value, start, value_end
+
+
 def _find_assignments(text: str) -> Iterator[_Hit]:
     for m in _ASSIGN_RE.finditer(text):
         key = m.group("key")
@@ -388,31 +419,10 @@ def _find_assignments(text: str) -> Iterator[_Hit]:
         last = words[-1]
         password_key = last.endswith(("password", "passwd", "pwd", "pass", "passphrase"))
         quoted = m.group("qvalue") is not None
-        if quoted:
-            value, start = m.group("qvalue"), m.start("qvalue")
-            value_end = m.end("qvalue")
-            # Bearer inside a quoted header value: the token is the secret, not the scheme.
-            scheme = re.match(r"(?i)\s*(?:bearer|basic|token)\s+", value)
-            if scheme:
-                value, start = value[scheme.end() :], start + scheme.end()
-        else:
-            value, start = m.group("value"), m.start("value")
-            value_end = m.end("value")
-            sep = m.group("sep")
-            if m.group("q"):
-                continue  # JSON / dict: a quoted key takes a quoted literal.
-            spaced = sep.strip() == "=" and sep != sep.strip()
-            if spaced and _IDENTIFIER_RE.match(value):
-                continue  # ``token = token``: code, not configuration.
-            if sep.strip() == ":" and not _at_line_start(text, m.start()):
-                continue  # "requires API_TOKEN: send ..." is prose; YAML keys start a line.
-            folded = value.casefold()
-            if _IDENTIFIER_RE.match(value) and (
-                folded in {key.casefold(), last} or folded.endswith("_" + last)
-            ):
-                continue  # ``api_key=api_key``, ``token=access_token``: a keyword argument.
-            if value.casefold() in {"bearer", "basic", "token"}:
-                continue  # handled by the header rule
+        extracted = _extract_assignment_value(text, m, key, last, quoted=quoted)
+        if extracted is None:
+            continue
+        value, start, value_end = extracted
         # Strip padding from both ends and move ``start`` past the leading part, so the span
         # is exactly the value: ``" Synth9!pass"`` must not mask the space and leak the tail.
         stripped = value.lstrip()

@@ -540,6 +540,31 @@ def restore_tool_input(
     return result.text
 
 
+def _restore_message_tool_calls(
+    session: VaultSession,
+    message: dict[str, Any],
+    report: RestoreReport,
+    budget: RestoreBudget,
+) -> None:
+    for call in message.get("tool_calls") or []:
+        if not isinstance(call, dict):
+            continue
+        function = call.get("function")
+        if isinstance(function, dict) and isinstance(function.get("arguments"), str):
+            function["arguments"] = restore_arguments(
+                session, function["arguments"], report, budget
+            )
+        custom = call.get("custom")
+        if isinstance(custom, dict) and isinstance(custom.get("input"), str):
+            # Custom tool input is freeform text, not JSON: restored without JSON escaping.
+            custom["input"] = restore_tool_input(session, custom["input"], report, budget)
+    function_call = message.get("function_call")
+    if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):
+        function_call["arguments"] = restore_arguments(
+            session, function_call["arguments"], report, budget
+        )
+
+
 def restore_completion(session: VaultSession, body: dict[str, Any]) -> RestoreReport:
     """Restore every choice's message in place. ``restored_spans`` maps choice index to the
     restored ``content`` string and its value spans (for the detection cache).
@@ -570,21 +595,5 @@ def restore_completion(session: VaultSession, body: dict[str, Any]) -> RestoreRe
                         restored, _, unresolved = restore_text(session, part["text"], budget)
                         part["text"] = restored
                         report.unresolved.update(dict.fromkeys(unresolved))
-        for call in message.get("tool_calls") or []:
-            if not isinstance(call, dict):
-                continue
-            function = call.get("function")
-            if isinstance(function, dict) and isinstance(function.get("arguments"), str):
-                function["arguments"] = restore_arguments(
-                    session, function["arguments"], report, budget
-                )
-            custom = call.get("custom")
-            if isinstance(custom, dict) and isinstance(custom.get("input"), str):
-                # Custom tool input is freeform text, not JSON: restored without JSON escaping.
-                custom["input"] = restore_tool_input(session, custom["input"], report, budget)
-        function_call = message.get("function_call")
-        if isinstance(function_call, dict) and isinstance(function_call.get("arguments"), str):
-            function_call["arguments"] = restore_arguments(
-                session, function_call["arguments"], report, budget
-            )
+        _restore_message_tool_calls(session, message, report, budget)
     return report

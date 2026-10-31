@@ -139,7 +139,7 @@ select = [
 ]
 
 [tool.ruff.lint.mccabe]
-max-complexity = 15
+max-complexity = 12
 
 [tool.ruff.lint.pylint]
 max-branches = 15
@@ -208,7 +208,11 @@ strict_equality = true
 module = [
     "cv2.*",
     "gliner.*",
-    "meta_sam_parser.*",
+    "huggingface_hub",
+    "huggingface_hub.*",
+    "meta_sam_parser.*,",
+    "pyarrow",
+    "pyarrow.*",
     "numpy.*",
     "onnxruntime.*",
     "presidio_analyzer.*",

@@ -379,12 +379,12 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 403 | `vault_reveal_disabled` | `GET /v1/vault/sessions/{ref}?reveal=true` while `PII_GUARD_VAULT_INSPECT` is not `full`. |
 | 404 | `not_found` | Unknown route, or an unknown or expired `session_id` on any route that takes one (`/v1/analyze`, `/v1/mask`, `/v1/mask/image`, `/v1/unmask`, the session and known-values routes, the gateway) |
 | 404 | `project_not_found` | The project-owned resource is unknown or does not belong to the selected project/owner. |
-| 404 | `traffic_log_disabled` | `GET /v1/traffic` and `/v1/traffic/stream` while `PII_GUARD_TRAFFIC_LOG=off` (the default). |
+| 404 | `traffic_log_disabled` | `GET` and `POST /v1/traffic` and `/v1/traffic/stream` while `PII_GUARD_TRAFFIC_LOG=off` (the default). |
 | 404 | `vault_inspect_disabled` | The `/v1/vault/*` routes while `PII_GUARD_VAULT_INSPECT=off`. |
 | 408 | `project_request_timeout` | An endpoint gateway request body did not finish within its bounded read deadline. |
 | 413 | `payload_too_large` | The body, text or image is larger than the configured limit (see docs/operations.md). |
 | 413 | `unmask_output_too_large` | Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values: one `/v1/unmask` text, or one gateway response (non-streaming: this error; streaming: the stream ends with an error event of this code). Nothing past the limit is returned. |
-| 415 | `unsupported_media_type` | `/v1/mask/image`: the image is not a PNG or JPEG (sniffed from its bytes). |
+| 415 | `unsupported_media_type` | `/v1/mask/image`: the image is not a PNG or JPEG (sniffed from its bytes). `POST /v1/traffic`: the body is not `application/json`. |
 | 422 | `invalid_request` | Body fails validation. The message lists field locations only, never values. |
 | 422 | `invalid_image` | `/v1/mask/image`: the image can't be decoded, or its base64 or JSON body is malformed. |
 | 422 | `invalid_known_value` | A pre-loaded known value is too short (< 3 non-space characters), too long, or has an unknown or visual type. The message names its index and type, never the value. |
@@ -907,6 +907,25 @@ An event's `outcome` is additive: new values can appear, so a consumer treats an
 as a failure. `upstream_failed` (LAB-1629) marks a call whose masked request was forwarded and
 then failed upstream (`502 upstream_unavailable`, `upstream_did_not_stream`); such calls were
 `refused` before, and their `error.code` is unchanged.
+
+### `POST /v1/traffic`
+
+Ingests telemetry from a local gateway's exporter (`PII_GUARD_REMOTE_URL`, LAB-1704) into this
+server's traffic log and live stream. Body: one event, or `{"events": [...]}` with 1 to 50 events;
+`application/json` only (`415 unsupported_media_type`, so a cross-site form or `text/plain` post
+can't write into a dashboard). Answers `{"accepted": int, "boot": str}`.
+
+- **Validation.** Every event is re-sanitized as the exporter does. `level` is forced to
+  `masked`; a `level` of `full`, any `original` or `unmasked` payload, or a request/response
+  payload with keys other than `masked`/`thumbnails` and `masked`/`chunks` is `422 invalid_request`.
+- **Normalization.** A missing or oversized `id`, `time` or `route` is replaced. An unknown
+  `outcome` becomes `error`. The server sets `"source": "remote"` on every ingested event.
+- **Access.** Local: as `GET /v1/traffic` (the bearer token when `PII_GUARD_API_TOKEN` is set).
+  Hosted: the same principals as hosted traffic reads (cookie POSTs must be same-origin), or an
+  endpoint `pg_ep_` key at `POST /e/{endpoint_id}/v1/traffic`, which writes only into that
+  endpoint's project log. Endpoint keys can write traffic but still can't read it. Ingest is bounded by the
+  hosted body limit and doesn't count against the request allowance.
+- `404 traffic_log_disabled` while the log is off.
 
 ### Vault inspector: `/v1/vault/sessions`
 

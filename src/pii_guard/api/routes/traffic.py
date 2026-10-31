@@ -1,6 +1,9 @@
 """The traffic log and latency metrics of the gateway (see ``docs/operations.md``).
 
 - ``GET /v1/traffic?limit=50&after=<seq>``: the most recent events, oldest first.
+- ``POST /v1/traffic``: ingest scrubbed ``masked`` or ``stats`` traffic events from a local
+  gateway (`PII_GUARD_REMOTE_URL`). Never accepts ``full`` events, ``request.original`` or
+  ``response.unmasked``.
 - ``GET /v1/traffic/stream``: server-sent events, one ``traffic`` event per gateway call
   (``?replay=N`` sends the last N stored events first), a comment line every 15 s to keep
   proxies from closing the connection.
@@ -18,7 +21,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Query, Request
@@ -26,21 +31,40 @@ from starlette.responses import PlainTextResponse, StreamingResponse
 
 from pii_guard.api.errors import error_responses
 from pii_guard.api.routes._common import v1_router
-from pii_guard.observability import Observability, TrafficLog
+from pii_guard.observability import (
+    Observability,
+    RemoteTrafficLevel,
+    TrafficLog,
+    sanitize_for_remote,
+)
 from pii_guard.observability.traffic import TrafficFeedView
 from pii_guard.types import PiiGuardError
 
-__all__ = ["router"]
+__all__ = ["TrafficIngestError", "TrafficLogDisabledError", "router"]
 
 router = v1_router()
 router.tags = ["observability"]
 
 _KEEPALIVE_SECONDS = 15.0
+_MAX_INGEST_EVENTS = 50
+_VALID_OUTCOMES = frozenset(
+    {"ok", "upstream_error", "upstream_failed", "blocked", "refused", "error"}
+)
 
 
 class TrafficLogDisabledError(PiiGuardError):
     code = "traffic_log_disabled"
     status_code = 404
+
+
+class TrafficIngestError(PiiGuardError):
+    code = "invalid_request"
+    status_code = 422
+
+
+class TrafficIngestMediaTypeError(PiiGuardError):
+    code = "unsupported_media_type"
+    status_code = 415
 
 
 class MetricsDisabledError(PiiGuardError):
@@ -72,6 +96,62 @@ def _traffic(request: Request) -> TrafficLog | TrafficFeedView:
 
 
 _TRAFFIC_ERRORS = error_responses("traffic_log_disabled", "invalid_request")
+_TRAFFIC_INGEST_ERRORS = error_responses(
+    "traffic_log_disabled", "invalid_request", "payload_too_large", "unsupported_media_type"
+)
+
+
+def _validate_ingested_event(raw: object) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise TrafficIngestError("each traffic event must be a JSON object")
+    level = raw.get("level")
+    if level not in (None, "masked", "stats"):
+        raise TrafficIngestError("remote traffic events must have level 'masked' or 'stats'")
+    if "original" in raw or "unmasked" in raw:
+        raise TrafficIngestError("unmasked payloads are not accepted by remote traffic ingest")
+    req_payload = raw.get("request")
+    if req_payload is not None and (
+        not isinstance(req_payload, dict)
+        or "original" in req_payload
+        or not set(req_payload).issubset({"masked", "thumbnails"})
+    ):
+        raise TrafficIngestError(
+            "traffic event request payload may only contain 'masked' and 'thumbnails'"
+        )
+    resp_payload = raw.get("response")
+    if resp_payload is not None and (
+        not isinstance(resp_payload, dict)
+        or "unmasked" in resp_payload
+        or not set(resp_payload).issubset({"masked", "chunks"})
+    ):
+        raise TrafficIngestError(
+            "traffic event response payload may only contain 'masked' and 'chunks'"
+        )
+    remote_level = RemoteTrafficLevel.STATS if level == "stats" else RemoteTrafficLevel.MASKED
+    clean = sanitize_for_remote(raw, level=remote_level)
+    event_id = clean.get("id")
+    if not isinstance(event_id, str) or not event_id.strip() or len(event_id) > 128:
+        clean["id"] = "req_" + secrets.token_hex(8)
+    event_time = clean.get("time")
+    if not isinstance(event_time, str) or not event_time.strip() or len(event_time) > 64:
+        clean["time"] = datetime.now(UTC).isoformat(timespec="milliseconds")
+    route = clean.get("route")
+    if not isinstance(route, str) or not route.strip() or len(route) > 128:
+        clean["route"] = "/v1/chat/completions"
+    outcome = clean.get("outcome")
+    if outcome not in _VALID_OUTCOMES:
+        clean["outcome"] = "error"  # never show an unknown remote outcome as a success
+    # Set here, never taken from the sender: ingested calls are told apart from local ones.
+    clean["source"] = "remote"
+    clean["stream"] = bool(clean.get("stream", False))
+    clean["session_new"] = bool(clean.get("session_new", False))
+    detectors = clean.get("detectors")
+    clean["detectors"] = (
+        [d for d in detectors if isinstance(d, str) and len(d) <= 64][:16]
+        if isinstance(detectors, list)
+        else []
+    )
+    return clean
 
 
 @router.get(
@@ -118,6 +198,69 @@ def recent_traffic(
         "size": traffic.size,
         "boot": traffic.boot,
         "events": events,
+    }
+
+
+@router.post(
+    "/v1/traffic",
+    summary="Ingest scrubbed traffic events from a local gateway",
+    responses={
+        200: {
+            "description": "Number of scrubbed traffic events accepted into the in-memory log "
+            "and the current `boot` identifier.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "accepted": 1,
+                        "boot": "b_3f9c2a7e5d1b8c04",
+                    }
+                }
+            },
+        },
+        **_TRAFFIC_INGEST_ERRORS,
+    },
+)
+async def ingest_traffic(request: Request) -> dict[str, Any]:
+    """Ingest one scrubbed traffic event or a batch (``{"events": [...]}``, up to 50 events)
+    from a local on-device gateway into the in-memory traffic log and live SSE stream.
+
+    404 ``traffic_log_disabled`` while ``PII_GUARD_TRAFFIC_LOG=off``. Rejects any event with
+    ``level="full"``, ``request.original`` or ``response.unmasked`` (422 ``invalid_request``).
+    Also reachable at ``POST /e/{endpoint_id}/v1/traffic`` with an endpoint ``pg_ep_`` key."""
+    obs = _observability(request)
+    if not obs.traffic.enabled:
+        raise TrafficLogDisabledError(
+            "the traffic log is off; set PII_GUARD_TRAFFIC_LOG=masked (or full, on localhost)"
+        )
+    # Only application/json: a cross-site page can send text/plain without a CORS preflight,
+    # so accepting it would let any website write into a local dashboard (LAB-1704).
+    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if media_type != "application/json":
+        raise TrafficIngestMediaTypeError("traffic events must be sent as application/json")
+    try:
+        payload = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        raise TrafficIngestError("invalid JSON request body") from None
+    if not isinstance(payload, dict):
+        raise TrafficIngestError("request body must be a JSON object")
+    if "events" in payload:
+        raw_events = payload.get("events")
+        if (
+            set(payload) != {"events"}
+            or not isinstance(raw_events, list)
+            or not (1 <= len(raw_events) <= _MAX_INGEST_EVENTS)
+        ):
+            raise TrafficIngestError(
+                f"events must be a list of 1 to {_MAX_INGEST_EVENTS} traffic events"
+            )
+    else:
+        raw_events = [payload]
+    validated = [_validate_ingested_event(item) for item in raw_events]
+    for event in validated:
+        obs.traffic.publish(event)
+    return {
+        "accepted": len(validated),
+        "boot": obs.traffic.boot,
     }
 
 

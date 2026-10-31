@@ -143,7 +143,9 @@ def _lexicon(entries: Iterable[str]) -> tuple[frozenset[str], tuple[str, ...]]:
 
 
 @lru_cache(maxsize=1)
-def _lexicons() -> tuple[tuple[frozenset[str], tuple[str, ...]], tuple[frozenset[str], ...]]:
+def _lexicons() -> tuple[
+    tuple[frozenset[str], tuple[str, ...]], tuple[frozenset[str], tuple[str, ...]]
+]:
     """(positive exact words, positive stems), (negative exact words, negative stems).
 
     The typed cues of every language pack join the positive words (phone cues too: a number
@@ -165,7 +167,7 @@ def _lexicons() -> tuple[tuple[frozenset[str], tuple[str, ...]], tuple[frozenset
     negatives = _pack_negatives()
     if negatives is None:
         negatives = list(_NEGATIVE)
-    return _lexicon(pos_words), _lexicon(negatives)  # type: ignore[return-value]
+    return _lexicon(pos_words), _lexicon(negatives)
 
 
 # A new pack's reference words rebuild the lexicons, like its cue words.

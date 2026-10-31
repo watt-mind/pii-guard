@@ -95,6 +95,15 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     connect.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
+    run = sub.add_parser(
+        "run",
+        help="start a local gateway and launch a coding agent (opencode, codex, claude-code, "
+        "pi, muse-code)",
+        add_help=False,
+    )
+    run.add_argument("args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
+
     baselines = sub.add_parser(
         "baselines", help="set up the comparison baselines (docs/evaluation.md)"
     )
@@ -218,6 +227,12 @@ def _connect(args: argparse.Namespace) -> int:
     return connect_main(args.args)
 
 
+def _run(args: argparse.Namespace) -> int:
+    from pii_guard.integrations.run import main as run_main
+
+    return run_main(args.args)
+
+
 def _models(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if args.models_command != "fetch":
         parser.parse_args(["models", "--help"])
@@ -261,6 +276,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _eval(argparse.Namespace(args=argv[1:]))
     if argv and argv[0] == "connect":
         return _connect(argparse.Namespace(args=argv[1:]))
+    if argv and argv[0] == "run":
+        return _run(argparse.Namespace(args=argv[1:]))
     if argv and argv[0] == "lang":
         return _lang(argparse.Namespace(args=argv[1:]))
     parser = build_parser()
