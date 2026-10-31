@@ -5,10 +5,8 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
-import re
 import secrets
 from collections.abc import Callable
-from dataclasses import dataclass
 from http.cookies import SimpleCookie
 from typing import Any
 
@@ -25,7 +23,6 @@ from pii_guard.hosted.abuse import AbuseAdmissionError
 from pii_guard.hosted.identity import GUEST_COOKIE_NAME, Principal, easy_auth_principal
 from pii_guard.hosted.images import (
     IMAGE_COMPUTE_TOKENS,
-    IMAGE_PATH,
     chat_body_limit,
     chat_image_charge,
     chat_images_enabled,
@@ -33,8 +30,11 @@ from pii_guard.hosted.images import (
     image_body_limit,
     require_image_capacity,
 )
-from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, Reservation, upstream_payload_bound
+from pii_guard.hosted.quotas import DEMO_MAX_OUTPUT_TOKENS, upstream_payload_bound
 from pii_guard.hosted.runtime import HostedService
+from pii_guard.hosted.settlement import (
+    _ALLOWED_ROUTES as _ALLOWED_ROUTES,
+)
 from pii_guard.hosted.settlement import (
     _ALLOWED_TOOLS_CHOICE,
     _CLIENT_TOOL_CHOICES,
@@ -50,6 +50,99 @@ from pii_guard.hosted.settlement import (
     _walk_tools,
     settled_tokens,
     settlement_logger,
+)
+from pii_guard.hosted.settlement import (
+    _BYPASS_PATHS as _BYPASS_PATHS,
+)
+from pii_guard.hosted.settlement import (
+    _CHAT_ROUTES as _CHAT_ROUTES,
+)
+from pii_guard.hosted.settlement import (
+    _CONSOLE_ROUTES as _CONSOLE_ROUTES,
+)
+from pii_guard.hosted.settlement import (
+    _CREDENTIAL_ITEM_RE as _CREDENTIAL_ITEM_RE,
+)
+from pii_guard.hosted.settlement import (
+    _CREDENTIAL_ROUTES as _CREDENTIAL_ROUTES,
+)
+from pii_guard.hosted.settlement import (
+    _DEMO_FORBIDDEN_HEADERS as _DEMO_FORBIDDEN_HEADERS,
+)
+from pii_guard.hosted.settlement import (
+    _HOSTED_PREFIXES as _HOSTED_PREFIXES,
+)
+from pii_guard.hosted.settlement import (
+    _PAID_ROUTES as _PAID_ROUTES,
+)
+from pii_guard.hosted.settlement import (
+    _PARAMETERIZED_ROUTE_RE as _PARAMETERIZED_ROUTE_RE,
+)
+from pii_guard.hosted.settlement import (
+    _PROJECT_POLICY_VERSION_RE as _PROJECT_POLICY_VERSION_RE,
+)
+from pii_guard.hosted.settlement import (
+    _PROJECT_SUBPATH_RE as _PROJECT_SUBPATH_RE,
+)
+from pii_guard.hosted.settlement import (
+    _PROTECTED_HEADERS as _PROTECTED_HEADERS,
+)
+from pii_guard.hosted.settlement import (
+    _READ_METHODS as _READ_METHODS,
+)
+from pii_guard.hosted.settlement import (
+    _SAFE_METHODS as _SAFE_METHODS,
+)
+from pii_guard.hosted.settlement import (
+    _SESSION_PREFIX_RE as _SESSION_PREFIX_RE,
+)
+from pii_guard.hosted.settlement import (
+    _STRIPPED_FORWARD_HEADERS as _STRIPPED_FORWARD_HEADERS,
+)
+from pii_guard.hosted.settlement import (
+    HostedRequestError as HostedRequestError,
+)
+from pii_guard.hosted.settlement import (
+    HostedUnauthorizedError as HostedUnauthorizedError,
+)
+from pii_guard.hosted.settlement import (
+    _check_access_and_origin as _check_access_and_origin,
+)
+from pii_guard.hosted.settlement import (
+    _check_owner_only_routes as _check_owner_only_routes,
+)
+from pii_guard.hosted.settlement import (
+    _check_unique_security_headers as _check_unique_security_headers,
+)
+from pii_guard.hosted.settlement import (
+    _classify_route as _classify_route,
+)
+from pii_guard.hosted.settlement import (
+    _extract_auth_token as _extract_auth_token,
+)
+from pii_guard.hosted.settlement import (
+    _filter_forward_headers as _filter_forward_headers,
+)
+from pii_guard.hosted.settlement import (
+    _is_credential_route as _is_credential_route,
+)
+from pii_guard.hosted.settlement import (
+    _is_hosted_scope as _is_hosted_scope,
+)
+from pii_guard.hosted.settlement import (
+    _is_project_management as _is_project_management,
+)
+from pii_guard.hosted.settlement import (
+    _PayloadSpec as _PayloadSpec,
+)
+from pii_guard.hosted.settlement import (
+    _RequestContext as _RequestContext,
+)
+from pii_guard.hosted.settlement import (
+    _ResponseTracker as _ResponseTracker,
+)
+from pii_guard.hosted.settlement import (
+    _RoutePlan as _RoutePlan,
 )
 from pii_guard.projects.middleware import (
     MUSE_CATALOG,
@@ -84,346 +177,6 @@ __all__ = [
 # The whole body (endpoint and hosted reads together) must arrive within this many seconds
 # of taking an ingress slot, however it is trickled.
 BODY_READ_SECONDS = 10
-
-_BYPASS_PATHS = frozenset({"/healthz", "/readyz", "/readyz/serving"})
-_HOSTED_PREFIXES = (
-    "/v1",
-    "/e/",
-    "/s/",
-    "/muse-code",
-    "/metrics",
-    "/docs",
-    "/redoc",
-    "/openapi",
-)
-_PROTECTED_HEADERS = frozenset(
-    {
-        "authorization",
-        "x-pii-guard-token",
-        "x-ms-client-principal",
-        "origin",
-        "x-pii-guard-connection",
-        "cookie",
-        "x-pii-guard-project",
-        "x-pii-guard-endpoint",
-    }
-)
-_ALLOWED_ROUTES = frozenset(
-    {
-        "/v1/account",
-        "/v1/demo",
-        "/v1/analyze",
-        "/v1/mask",
-        "/v1/unmask",
-        "/v1/chat/completions",
-        "/v1/responses",
-        "/v1/models",
-        "/muse-code/models",
-        "/v1/sessions",
-        "/v1/traffic",
-        "/v1/traffic/stream",
-        "/v1/vault/sessions",
-        "/v1/account/api-keys",
-        "/v1/account/connections",
-        "/v1/account/first-run",
-        "/v1/status",
-        "/v1/connect/snippets",
-    }
-)
-_CONSOLE_ROUTES = frozenset({"/v1/status", "/v1/connect/snippets"})
-_CREDENTIAL_ROUTES = frozenset(
-    {
-        "/v1/account/api-keys",
-        "/v1/account/connections",
-        "/v1/account/first-run",
-    }
-)
-_PAID_ROUTES = frozenset({"/v1/chat/completions", "/v1/responses", "/v1/demo"})
-_CHAT_ROUTES = frozenset({"/v1/chat/completions", "/v1/responses"})
-_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-_READ_METHODS = frozenset({"GET", "HEAD"})
-_DEMO_FORBIDDEN_HEADERS = (
-    "x-pii-guard-connection",
-    "x-pii-guard-session",
-    "x-pii-guard-mode",
-)
-_STRIPPED_FORWARD_HEADERS = frozenset(
-    {
-        b"authorization",
-        b"x-pii-guard-token",
-        b"cookie",
-        b"content-length",
-        b"x-forwarded-for",
-        b"forwarded",
-        b"x-real-ip",
-    }
-)
-_SESSION_PREFIX_RE = re.compile(r"^/s/[^/]+(?=/v1/|/muse-code/)")
-_PARAMETERIZED_ROUTE_RE = re.compile(
-    r"/v1/(?:sessions/[^/]+/known-values|vault/sessions/[^/]+|"
-    r"account/(?:api-keys|connections)/[^/]+)"
-)
-_PROJECT_SUBPATH_RE = re.compile(
-    r"/v1/projects/[A-Za-z0-9_-]+(?:/(?:policies|endpoints)"
-    r"(?:/[A-Za-z0-9_-]+(?:/keys(?:/[A-Za-z0-9_-]+)?)?)?)?"
-)
-_PROJECT_POLICY_VERSION_RE = re.compile(
-    r"/v1/projects/[A-Za-z0-9_-]+/policies/versions/[A-Za-z0-9_-]+"
-)
-_CREDENTIAL_ITEM_RE = re.compile(r"/v1/account/(?:api-keys|connections)/[^/]+")
-
-
-class HostedRequestError(PiiGuardError):
-    status_code = 403
-    code = "hosted_request_denied"
-
-
-class HostedUnauthorizedError(PiiGuardError):
-    status_code = 401
-    code = "unauthorized"
-
-
-@dataclass(slots=True)
-class _ResponseTracker:
-    """ASGI ``send`` wrapper that stamps hosted response headers and tracks response start."""
-
-    send: Send
-    state: dict[str, Any]
-    cookie_header: str | None = None
-    started: bool = False
-
-    async def __call__(self, message: Message) -> None:
-        if message["type"] == "http.response.start":
-            self.started = True
-            message = dict(message)
-            headers = list(message.get("headers", []))
-            headers.append((b"cache-control", b"no-store"))
-            if self.state.get("project_policy"):
-                headers.append(
-                    (
-                        b"x-pii-guard-policy-version",
-                        self.state["project_policy"]["policy_version_id"].encode(),
-                    )
-                )
-                headers.append((b"x-pii-guard-project", self.state["project_id"].encode()))
-            if self.cookie_header is not None:
-                headers.append((b"set-cookie", self.cookie_header.encode("ascii")))
-            message["headers"] = headers
-        await self.send(message)
-
-
-@dataclass(slots=True)
-class _RequestContext:
-    """Mutable per-request state and resource leases released on exit."""
-
-    scope: Scope
-    receive: Receive
-    state: dict[str, Any]
-    tracker: _ResponseTracker
-    runtime: Any = None
-    reservation: Reservation | None = None
-    #: The principal holding an ingress slot; set only once identity and admission pass.
-    ingress: Principal | None = None
-    streaming: str | None = None
-    payload_limit: int | None = None
-    settlement: _Settlement | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class _RoutePlan:
-    """Classified route permissions and resource requirements."""
-
-    path: str
-    canonical: str
-    routed: tuple[str, str] | None
-    image: bool
-    needs_runtime: bool
-    work: bool
-    paid: bool
-    read_or_first_run: bool
-    account: bool
-
-
-@dataclass(slots=True)
-class _PayloadSpec:
-    """Validated request body and token/image admission parameters."""
-
-    raw: bytearray
-    output_limit: int
-    inline_images: int = 0
-    image_bytes: int = 0
-    strip_usage: bool = False
-
-
-def _is_hosted_scope(scope: Scope) -> bool:
-    if scope["type"] != "http":
-        return False
-    path = scope.get("path", "")
-    return path not in _BYPASS_PATHS and path.startswith(_HOSTED_PREFIXES)
-
-
-def _check_unique_security_headers(headers: Headers) -> None:
-    for name in _PROTECTED_HEADERS:
-        if len(headers.getlist(name)) > 1:
-            raise HostedRequestError("Duplicate security header")
-
-
-def _extract_auth_token(headers: Headers) -> str | None:
-    auth = headers.get("authorization") or headers.get("x-pii-guard-token")
-    if not auth:
-        return None
-    if headers.get("authorization"):
-        scheme, _, auth = auth.partition(" ")
-        if scheme.lower() != "bearer":
-            raise HostedUnauthorizedError("Invalid guard API key")
-    return auth
-
-
-def _is_project_management(canonical: str) -> bool:
-    return (
-        canonical == "/v1/projects"
-        or _PROJECT_SUBPATH_RE.fullmatch(canonical) is not None
-        or _PROJECT_POLICY_VERSION_RE.fullmatch(canonical) is not None
-    )
-
-
-def _is_credential_route(canonical: str) -> bool:
-    return canonical in _CREDENTIAL_ROUTES or _CREDENTIAL_ITEM_RE.fullmatch(canonical) is not None
-
-
-def _check_owner_only_routes(
-    canonical: str,
-    principal: Principal,
-    *,
-    routed: tuple[str, str] | None,
-    method: str | None,
-    image: bool,
-    project_management: bool,
-    credentials: bool,
-) -> None:
-    if image:
-        if principal.auth_method != "google":
-            raise HostedUnauthorizedError("Image masking requires signed-in owner access")
-        if routed is not None or method != "POST":
-            raise HostedRequestError("Image masking accepts a direct POST only")
-    if project_management and principal.auth_method != "google":
-        raise HostedUnauthorizedError("Project management requires signed-in owner access")
-    if canonical in _CONSOLE_ROUTES and principal.auth_method != "google":
-        raise HostedUnauthorizedError("The console requires signed-in owner access")
-    if credentials and principal.auth_method != "google":
-        # A guard API key must never mint keys or connections that outlive it.
-        raise HostedUnauthorizedError("Key and connection management requires a signed-in session")
-
-
-def _check_access_and_origin(
-    path: str,
-    canonical: str,
-    headers: Headers,
-    principal: Principal,
-    *,
-    method: str | None,
-    expected_origin: str,
-) -> None:
-    if canonical not in {"/v1/account", "/v1/demo"} and not principal.authenticated:
-        raise HostedUnauthorizedError("Sign in with Google to use this endpoint")
-    if canonical == "/v1/demo" and (
-        path != canonical or any(headers.get(h) for h in _DEMO_FORBIDDEN_HEADERS)
-    ):
-        raise HostedRequestError("Demo accepts only a curated sample selection")
-    if method not in _SAFE_METHODS:
-        origin = headers.get("origin")
-        if (principal.auth_method != "api_key" or origin is not None) and origin != expected_origin:
-            raise HostedRequestError("A same-origin request is required")
-        if headers.get("sec-fetch-site") == "cross-site":
-            raise HostedRequestError("A same-origin request is required")
-
-
-def _classify_route(
-    path: str,
-    routed: tuple[str, str] | None,
-    headers: Headers,
-    principal: Principal,
-    *,
-    method: str | None,
-    hosted_images: bool,
-    expected_origin: str,
-) -> _RoutePlan:
-    canonical = routed[1] if routed else _SESSION_PREFIX_RE.sub("", path)
-    if routed is not None and canonical == "/v1/traffic" and method != "POST":
-        raise HostedRequestError("Endpoint traffic route accepts POST only")
-    # Hosted images (ADR 0014): signed-in Google owners only, never by key or as a
-    # guest, never through an endpoint path, and only while the operator offers them.
-    image = canonical == IMAGE_PATH and hosted_images
-    project_management = _is_project_management(canonical)
-    credentials = _is_credential_route(canonical)
-    _check_owner_only_routes(
-        canonical,
-        principal,
-        routed=routed,
-        method=method,
-        image=image,
-        project_management=project_management,
-        credentials=credentials,
-    )
-    parameterized = _PARAMETERIZED_ROUTE_RE.fullmatch(canonical)
-    if (
-        canonical not in _ALLOWED_ROUTES
-        and not image
-        and parameterized is None
-        and not project_management
-    ):
-        raise HostedRequestError("This endpoint is unavailable in hosted mode")
-    _check_access_and_origin(
-        path,
-        canonical,
-        headers,
-        principal,
-        method=method,
-        expected_origin=expected_origin,
-    )
-    read = method in _READ_METHODS
-    preflight = method == "OPTIONS"
-    # First run (LAB-1455) provisions the owner's default endpoint and its first key:
-    # a signed-in owner's, like key management, and free like the account itself.
-    first_run = canonical == "/v1/account/first-run"
-    # Scrubbed traffic telemetry from a local gateway spends no inference quota;
-    # the abuse read bucket and text body limit bound it (LAB-1704).
-    traffic_ingest = canonical == "/v1/traffic" and method == "POST"
-    # /v1/account is free under every method: it never admits, reserves budget or
-    # takes a runtime, so cookieless calls cannot exhaust capacity (LAB-1412).
-    account = canonical == "/v1/account"
-    if not principal.authenticated:
-        # A guest's only work is the curated demo itself.
-        needs_runtime = work = canonical == "/v1/demo" and method == "POST"
-    else:
-        # Key and connection management uses the account stores, never a runtime.
-        needs_runtime = not (account or preflight or credentials)
-        # Reads (the console polls them) spend no daily request or token budget and
-        # hold no inference concurrency; the abuse read bucket bounds them instead.
-        work = not (account or preflight or read or first_run or traffic_ingest)
-    return _RoutePlan(
-        path=path,
-        canonical=canonical,
-        routed=routed,
-        image=image,
-        needs_runtime=needs_runtime,
-        work=work,
-        paid=canonical in _PAID_ROUTES,
-        read_or_first_run=read or first_run or traffic_ingest,
-        account=account,
-    )
-
-
-def _filter_forward_headers(
-    raw_headers: list[tuple[bytes, bytes]], body_len: int
-) -> list[tuple[bytes, bytes]]:
-    filtered = [
-        (k, v)
-        for k, v in raw_headers
-        if k.lower() not in _STRIPPED_FORWARD_HEADERS and not k.lower().startswith(b"x-ms-")
-    ]
-    filtered.append((b"content-length", str(body_len).encode()))
-    return filtered
 
 
 class HostedMiddleware:
