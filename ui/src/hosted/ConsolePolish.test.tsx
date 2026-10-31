@@ -57,6 +57,13 @@ it("keeps retrying through a cold start before warning (LAB-1710)", async () => 
   expect(screen.queryByRole("button", { name: "Retry setup" })).not.toBeInTheDocument();
 });
 
+it("stops waiting on a hung setup read and warns after the retries (LAB-1729)", async () => {
+  const call = vi.fn().mockImplementation(() => new Promise(() => {})) as unknown as Requester;
+  render(<SetupChecklist call={call} account={account} active calls={0} retryDelays={[0]} timeoutMs={5} />);
+  expect(await screen.findByRole("button", { name: "Retry setup" })).toBeInTheDocument();
+  expect(call).toHaveBeenCalledTimes(2);
+});
+
 it("labels paused free inference without changing the selected connection", () => {
   const call = vi.fn() as unknown as Requester;
   render(<HostedSessionContext.Provider value={{ account, call, refresh: async () => {}, error: "" }}><ProviderConnections /></HostedSessionContext.Provider>);
