@@ -39,6 +39,7 @@ from pii_guard.observability import (
     TrafficLog,
     sanitize_for_remote,
 )
+from pii_guard.observability.metrics import MAX_COUNT_PER_OBSERVATION, MAX_MS
 from pii_guard.observability.timing import STAGES
 from pii_guard.observability.traffic import TrafficFeedView
 from pii_guard.types import EntityType, PiiGuardError
@@ -172,10 +173,21 @@ def _validate_ingested_event(raw: object) -> dict[str, Any]:
 
 
 def _finite_ms(value: object) -> float | None:
+    """A self-reported duration: a finite, non-negative number clamped to ``MAX_MS``."""
     if isinstance(value, int | float) and not isinstance(value, bool):
-        fval = float(value)
+        try:
+            fval = float(value)
+        except OverflowError:  # an int too large for a float
+            return MAX_MS if value > 0 else None
         if math.isfinite(fval) and fval >= 0.0:
-            return fval
+            return min(fval, MAX_MS)
+    return None
+
+
+def _capped_count(value: object) -> int | None:
+    """A self-reported count: a positive int (bool is not an int here), capped per event."""
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return min(value, MAX_COUNT_PER_OBSERVATION)
     return None
 
 
@@ -183,10 +195,17 @@ def _filter_entity_counts(raw: object) -> dict[str, int]:
     if not isinstance(raw, Mapping):
         return {}
     return {
-        str(k): int(v)
+        str(k): n
         for k, v in raw.items()
-        if k in _VALID_ENTITY_TYPES and isinstance(v, int) and not isinstance(v, bool) and v > 0
+        if k in _VALID_ENTITY_TYPES and (n := _capped_count(v)) is not None
     }
+
+
+def _whitelisted_counts(raw: object, keys: tuple[str, ...]) -> dict[str, int] | None:
+    """Only ``keys``, each a capped positive int; anything else in ``raw`` is dropped."""
+    if not isinstance(raw, Mapping):
+        return None
+    return {k: n for k in keys if (n := _capped_count(raw.get(k))) is not None}
 
 
 def _sanitize_ingested_timing(raw: object) -> dict[str, Any]:
@@ -219,10 +238,14 @@ def _observe_ingested_event(metrics: LatencyMetrics, event: Mapping[str, Any]) -
     mode = raw_mode if isinstance(raw_mode, str) and raw_mode in _VALID_MODES else "-"
     outcome = str(event.get("outcome") or "error")
     timing = _sanitize_ingested_timing(event.get("timing"))
+    # Rebuilt from whitelisted keys only: a remote sender controls every value here.
     sanitized_event: dict[str, Any] = {
-        "cache": event.get("cache"),
-        "upstream": event.get("upstream"),
-        "usage": event.get("usage"),
+        "cache": _whitelisted_counts(event.get("cache"), ("hits", "misses", "seeded")),
+        "upstream": _whitelisted_counts(event.get("upstream"), ("unresolved_placeholders",)),
+        "usage": _whitelisted_counts(
+            event.get("usage"),
+            ("prompt_tokens", "input_tokens", "completion_tokens", "output_tokens"),
+        ),
     }
     entities = event.get("entities")
     if isinstance(entities, Mapping):
@@ -251,7 +274,7 @@ def _observe_ingested_event(metrics: LatencyMetrics, event: Mapping[str, Any]) -
         sanitized_event["error"] = {
             "entity_types": _filter_entity_counts(error.get("entity_types"))
         }
-    metrics.observe(mode, outcome, timing, sanitized_event)
+    metrics.observe(mode, outcome, timing, sanitized_event, source="remote")
 
 
 @router.get(

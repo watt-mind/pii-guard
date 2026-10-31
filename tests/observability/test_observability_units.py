@@ -23,6 +23,7 @@ from pii_guard.observability import (
     is_loopback,
     scrub,
 )
+from pii_guard.observability.metrics import MAX_COUNT_PER_OBSERVATION as CAP
 from pii_guard.observability.timing import STAGES
 
 # --- timer ---------------------------------------------------------------------------------
@@ -212,7 +213,7 @@ def test_metrics_render_prometheus_histograms() -> None:
     metrics.observe("fast", "ok", timing)
     metrics.observe("fast", "ok", timing)
     text = metrics.render()
-    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok"} 2' in text
+    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok",source="local"} 2' in text
     assert 'pii_guard_gateway_overhead_ms_bucket{mode="fast",le="5"} 2' in text
     assert 'pii_guard_gateway_overhead_ms_bucket{mode="fast",le="2.5"} 0' in text
     assert 'pii_guard_gateway_stage_ms_count{mode="fast",stage="detect"} 2' in text
@@ -287,24 +288,40 @@ def test_metrics_observe_full_gateway_events_and_rest_helpers() -> None:
     assert 'pii_guard_detector_duration_ms_count{mode="fast",detector="ner"} 3' in text
     assert 'pii_guard_detector_duration_ms_count{mode="fast",detector="rules"} 3' in text
     assert 'detector="llm"' not in text
-    assert 'pii_guard_entities_detected_total{entity_type="EMAIL"} 2' in text
-    assert 'pii_guard_entities_detected_total{entity_type="PERSON"} 1' in text
-    assert 'pii_guard_entities_detected_total{entity_type="PHONE"} 1' in text
-    assert 'pii_guard_entities_masked_total{entity_type="EMAIL"} 2' in text
-    assert 'pii_guard_entities_masked_total{entity_type="PHONE"} 1' in text
-    assert 'pii_guard_image_regions_total{entity_type="FACE",action="masked"} 1' in text
-    assert 'pii_guard_image_regions_total{entity_type="SIGNATURE",action="masked"} 1' in text
-    assert 'pii_guard_image_regions_total{entity_type="STAMP",action="kept"} 3' in text
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL",source="local"} 2' in text
+    assert 'pii_guard_entities_detected_total{entity_type="PERSON",source="local"} 1' in text
+    assert 'pii_guard_entities_detected_total{entity_type="PHONE",source="local"} 1' in text
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL",source="local"} 2' in text
+    assert 'pii_guard_entities_masked_total{entity_type="PHONE",source="local"} 1' in text
+    assert (
+        'pii_guard_image_regions_total{entity_type="FACE",action="masked",source="local"} 1' in text
+    )
+    assert (
+        'pii_guard_image_regions_total{entity_type="SIGNATURE",action="masked",source="local"} 1'
+        in text
+    )
+    assert (
+        'pii_guard_image_regions_total{entity_type="STAMP",action="kept",source="local"} 3' in text
+    )
     assert 'pii_guard_outbound_checks_total{result="passed"} 1' in text
     assert 'pii_guard_outbound_checks_total{result="blocked"} 1' in text
-    assert 'pii_guard_blocked_entities_total{stage="outbound",entity_type="EMAIL"} 1' in text
-    assert 'pii_guard_blocked_entities_total{stage="inbound",entity_type="SECRET"} 2' in text
-    assert 'pii_guard_blocked_entities_total{stage="inbound",entity_type="IBAN"} 1' in text
+    assert (
+        'pii_guard_blocked_entities_total{stage="outbound",entity_type="EMAIL",source="local"} 1'
+        in text
+    )
+    assert (
+        'pii_guard_blocked_entities_total{stage="inbound",entity_type="SECRET",source="local"} 2'
+        in text
+    )
+    assert (
+        'pii_guard_blocked_entities_total{stage="inbound",entity_type="IBAN",source="local"} 1'
+        in text
+    )
     assert 'pii_guard_detection_cache_total{result="hit"} 3' in text
     assert 'pii_guard_detection_cache_total{result="miss"} 1' in text
     assert 'pii_guard_detection_cache_total{result="seeded"} 2' in text
-    assert 'pii_guard_upstream_tokens_total{direction="input"} 150' in text
-    assert 'pii_guard_upstream_tokens_total{direction="output"} 55' in text
+    assert 'pii_guard_upstream_tokens_total{direction="input",source="local"} 150' in text
+    assert 'pii_guard_upstream_tokens_total{direction="output",source="local"} 55' in text
     assert "pii_guard_unresolved_placeholders_total 3" in text
     assert 'pii_guard_http_requests_total{method="POST",path="/v1/mask",status="200"} 1' in text
     assert 'pii_guard_http_request_duration_ms_count{method="POST",path="/v1/mask"} 1' in text
@@ -346,3 +363,62 @@ def test_settings_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.metrics_token is not None
     assert settings.metrics_token.get_secret_value() == "synthetic-scrape-token"
     assert "masked" in repr(obs)
+
+
+def test_metrics_cap_every_count_and_duration_on_every_path() -> None:
+    """LAB-1731: per-observation caps hold even when a caller skips route-level validation."""
+    huge = int("9" * 4300)
+    metrics = LatencyMetrics()
+    event = {
+        "entities": {
+            "detected": {"EMAIL": huge},
+            "masked": {"EMAIL": huge},
+            "images": {"masked": {"FACE": huge}, "kept": {"STAMP": huge}},
+        },
+        "outbound_check": {"result": "blocked", "hits": {"EMAIL": huge}},
+        "cache": {"hits": huge, "misses": huge, "seeded": huge},
+        "upstream": {"unresolved_placeholders": huge},
+        "usage": {"input_tokens": huge, "output_tokens": huge},
+    }
+    timing = {
+        "overhead_ms": 1e308,
+        "total_ms": float("inf"),
+        "upstream_ms": float("nan"),
+        "added_ttft_ms": -5.0,
+        "stages_ms": {"detect": huge},
+        "detectors_ms": {"rules": 1e308},
+    }
+    for _ in range(2):
+        metrics.observe("fast", "blocked", timing, event, source="remote")
+        metrics.observe_entities(detected={"PHONE": huge}, masked={"PHONE": huge})
+        metrics.observe_image_regions(masked={"FACE": huge})
+        metrics.observe_blocked("inbound", {"IBAN": huge})
+        metrics.observe_unresolved(huge)
+        metrics.observe_http("POST", "/v1/mask", 200, 1e308)
+    metrics.observe("fast", "ok", {}, None, source="bogus")
+    text = metrics.render()
+    for line in text.splitlines():
+        if line.startswith("#"):
+            continue
+        value = float(line.rsplit(" ", 1)[1])
+        assert value <= 4 * CAP, line
+    assert f'pii_guard_upstream_tokens_total{{direction="input",source="remote"}} {2 * CAP}' in text
+    assert f'pii_guard_entities_detected_total{{entity_type="PHONE",source="local"}} {2 * CAP}' in (
+        text
+    )
+    assert (
+        f'pii_guard_image_regions_total{{entity_type="FACE",action="masked",source="local"}} '
+        f"{2 * CAP}" in text
+    )
+    assert f"pii_guard_unresolved_placeholders_total {4 * CAP}" in text
+    assert 'pii_guard_gateway_overhead_ms_sum{mode="fast"} 7200000.000' in text
+    assert 'pii_guard_gateway_total_ms_count{mode="fast"}' not in text  # inf dropped
+    assert 'pii_guard_gateway_upstream_ms_count{mode="fast"}' not in text  # nan dropped
+    assert 'pii_guard_gateway_added_ttft_ms_sum{mode="fast"} 0.000' in text  # clamped to 0
+    assert 'pii_guard_gateway_stage_ms_sum{mode="fast",stage="detect"} 7200000.000' in text
+    assert 'pii_guard_http_request_duration_ms_sum{method="POST",path="/v1/mask"} 7200000.000' in (
+        text
+    )
+    # An unknown source is recorded as local, never as a new label value.
+    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok",source="local"} 1' in text
+    assert "bogus" not in text

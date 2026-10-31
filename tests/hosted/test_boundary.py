@@ -983,6 +983,31 @@ def test_project_endpoints_tag_only_the_sponsored_route(
 # --- Multi-tenant Prometheus scrape boundary and aggregation -------------------------------
 
 
+def test_hosted_metrics_is_get_only_and_throttles_bad_tokens_not_good_scrapes() -> None:
+    obs = ObservabilitySettings(metrics=True, metrics_token="synthetic-scrape-token")  # noqa: S106
+    app = create_app(settings(), obs)
+    good = {"Authorization": "Bearer synthetic-scrape-token"}
+    with TestClient(app, base_url=ORIGIN) as client:
+        service = client.app.state.hosted
+        service.abuse = AbuseAdmission("aca_xff_rightmost", clock=lambda: 100.0)
+        scraper = {**good, "x-forwarded-for": "198.51.100.7"}
+        for method in ("HEAD", "POST", "PUT", "DELETE"):
+            assert client.request(method, "/metrics", headers=scraper).status_code == 403
+        # A good token is never charged: more scrapes than the 30-request burst all succeed.
+        for _ in range(40):
+            assert client.get("/metrics", headers=scraper).status_code == 200
+        # Every bad guess is charged to the anonymous network bucket ...
+        attacker = {"x-forwarded-for": "203.0.113.9"}
+        for index in range(30):
+            wrong = {**attacker, "Authorization": f"Bearer synthetic-guess-{index}"}
+            assert client.get("/metrics", headers=wrong).status_code == 403
+        # ... and once it is spent, the token is not even compared: the right one is refused too.
+        denied = client.get("/metrics", headers={**attacker, **good})
+        assert denied.status_code == 429
+        assert denied.json()["error"]["code"] == "abuse_throttled"
+        assert client.get("/metrics", headers=scraper).status_code == 200
+
+
 def test_hosted_metrics_requires_dedicated_scrape_token_and_aggregates_all_runtimes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1108,14 +1133,19 @@ def test_hosted_metrics_requires_dedicated_scrape_token_and_aggregates_all_runti
         assert alt.status_code == 200
         text = scraped.text
 
-    # 2 gateway chat completions + 1 remote ingested event = 3 gateway requests
-    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok"} 3' in text
-    # 1 EMAIL in owner chat + 1 in /v1/mask + 1 in endpoint chat + 2 in remote ingest = 5
-    assert 'pii_guard_entities_detected_total{entity_type="EMAIL"} 5' in text
-    assert 'pii_guard_entities_masked_total{entity_type="EMAIL"} 5' in text
+    # 2 gateway chat completions served here (local) + 1 remote ingested event (remote).
+    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok",source="local"} 2' in text
+    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok",source="remote"} 1' in text
+    # 1 EMAIL in owner chat + 1 in /v1/mask + 1 in endpoint chat (local); 2 in remote ingest.
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL",source="local"} 3' in text
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL",source="remote"} 2' in text
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL",source="local"} 3' in text
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL",source="remote"} 2' in text
     assert "pii_guard_unresolved_placeholders_total 1" in text
-    assert 'pii_guard_upstream_tokens_total{direction="input"} 42' in text
-    assert 'pii_guard_upstream_tokens_total{direction="output"} 24' in text
+    assert 'pii_guard_upstream_tokens_total{direction="input",source="local"} 22' in text
+    assert 'pii_guard_upstream_tokens_total{direction="input",source="remote"} 20' in text
+    assert 'pii_guard_upstream_tokens_total{direction="output",source="local"} 14' in text
+    assert 'pii_guard_upstream_tokens_total{direction="output",source="remote"} 10' in text
     assert "pii_guard_vault_active_sessions 3" in text
     assert 'pii_guard_hosted_active_runtimes{kind="owner"} 3' in text
     assert 'pii_guard_hosted_active_runtimes{kind="guest"} 0' in text

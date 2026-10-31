@@ -674,20 +674,20 @@ enable it by default; in `PII_GUARD_HOSTED=true` also requires `PII_GUARD_METRIC
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
-| `pii_guard_gateway_requests_total` | `counter` | `mode`, `outcome` | Gateway requests by mode (`fast`, `audit`) and outcome (`ok`, `blocked`, `refused`, `upstream_error`, `upstream_failed`, `stream_error`, `client_disconnected`, `error`) |
+| `pii_guard_gateway_requests_total` | `counter` | `mode`, `outcome`, `source` | Gateway requests by mode (`fast`, `audit`), outcome (`ok`, `blocked`, `refused`, `upstream_error`, `upstream_failed`, `stream_error`, `client_disconnected`, `error`) and source (`local`\|`remote`, see below) |
 | `pii_guard_gateway_overhead_ms` | `histogram` | `mode` | Gateway processing overhead in ms (`total_ms - upstream_ms - client_ms`) |
 | `pii_guard_gateway_total_ms` | `histogram` | `mode` | End-to-end gateway turn duration in ms |
 | `pii_guard_gateway_upstream_ms` | `histogram` | `mode` | Time spent waiting on the upstream LLM in ms |
 | `pii_guard_gateway_added_ttft_ms` | `histogram` | `mode` | Time-to-first-token added by PII Guard on streaming calls in ms |
 | `pii_guard_gateway_stage_ms` | `histogram` | `mode`, `stage` | Per-stage gateway timing in ms (`parse`, `detect`, `image`, `mask`, `forward`, `upstream_ttfb`, `upstream`, `unmask`, `response`, `client`) |
 | `pii_guard_detector_duration_ms` | `histogram` | `mode`, `detector` | Per-detector runtime in ms (`rules`, `ner`, `llm`, `visual`) |
-| `pii_guard_entities_detected_total` | `counter` | `entity_type` | PII entities detected across the gateway and `/v1/analyze` + `/v1/mask` |
-| `pii_guard_entities_masked_total` | `counter` | `entity_type` | PII entities replaced with vault placeholders across the gateway and `/v1/mask` |
-| `pii_guard_image_regions_total` | `counter` | `entity_type`, `action` | Visual PII regions processed (`action="masked"\|"kept"`) across the gateway and `/v1/mask/image` |
-| `pii_guard_blocked_entities_total` | `counter` | `stage`, `entity_type` | Entities that triggered a policy block (`stage="inbound"\|"outbound"`) |
+| `pii_guard_entities_detected_total` | `counter` | `entity_type`, `source` | PII entities detected across the gateway and `/v1/analyze` + `/v1/mask` |
+| `pii_guard_entities_masked_total` | `counter` | `entity_type`, `source` | PII entities replaced with vault placeholders across the gateway and `/v1/mask` |
+| `pii_guard_image_regions_total` | `counter` | `entity_type`, `action`, `source` | Visual PII regions processed (`action="masked"\|"kept"`) across the gateway and `/v1/mask/image` |
+| `pii_guard_blocked_entities_total` | `counter` | `stage`, `entity_type`, `source` | Entities that triggered a policy block (`stage="inbound"\|"outbound"`) |
 | `pii_guard_outbound_checks_total` | `counter` | `result` | Outbound leak-guard evaluations (`result="passed"\|"blocked"`) |
 | `pii_guard_detection_cache_total` | `counter` | `result` | Prefix detection cache lookups (`result="hit"\|"miss"\|"seeded"`) |
-| `pii_guard_upstream_tokens_total` | `counter` | `direction` | Upstream LLM tokens (`direction="input"\|"output"`) |
+| `pii_guard_upstream_tokens_total` | `counter` | `direction`, `source` | Upstream LLM tokens (`direction="input"\|"output"`) |
 | `pii_guard_unresolved_placeholders_total` | `counter` | — | Unknown or hallucinated `[[TYPE_id]]` placeholders left unresolved |
 | `pii_guard_http_requests_total` | `counter` | `method`, `path`, `status` | HTTP requests handled across all API routes (route templates only; `/metrics` excluded) |
 | `pii_guard_http_request_duration_ms` | `histogram` | `method`, `path` | HTTP request duration in ms by route template (to response headers on streams) |
@@ -699,8 +699,23 @@ enable it by default; in `PII_GUARD_HOSTED=true` also requires `PII_GUARD_METRIC
 
 All millisecond histograms use buckets `0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, +Inf` (`BUCKETS_MS` in `observability/metrics.py`).
 Labels are fixed enums and route templates only—never raw PII, session IDs, tenant IDs or client identifiers.
+`source` is a fixed enum: `remote` for events a CLI gateway self-reported through `POST /v1/traffic`
+(or `POST /e/<endpoint>/v1/traffic`), `local` for traffic this server handled itself. Remote
+telemetry is unverified, so dashboards that count what this server did should filter
+`source="local"`. The latency histograms carry no `source` label and include remote timings.
+Every value a single event adds is bounded: each count at most 10,000,000 and each duration a
+finite number clamped to `[0, 3600000]` ms; ingest rebuilds `usage`, `cache`, `upstream` and the
+entity counts from whitelisted keys and drops everything else, so one hostile event cannot
+overflow a series or make `/metrics` unrenderable.
 In hosted multi-tenant mode (`PII_GUARD_HOSTED=true`), metrics aggregate traffic across all owner, project and endpoint runtimes (including remote CLI telemetry ingested via `POST /v1/traffic` and `POST /e/<endpoint>/v1/traffic`), and `GET /metrics` is refused with `403 hosted_request_denied` unless both `PII_GUARD_METRICS=true` and `PII_GUARD_METRICS_TOKEN` are set and the scraper sends `Authorization: Bearer <metrics_token>` (or `X-PII-Guard-Token: <metrics_token>`).
+In hosted mode `/metrics` accepts `GET` only, and is throttled through the anonymous abuse
+bucket (the one the CLI token exchange uses): every missing or wrong token is charged to the
+caller's network, and once that allowance is spent the request is refused with `429` before the
+token is compared. A scrape with the right token is never charged.
 In self-hosted mode, set `PII_GUARD_METRICS_TOKEN` (or `PII_GUARD_API_TOKEN`) and configure Prometheus with `authorization: { credentials: <token> }` on the scrape job.
+Once `PII_GUARD_METRICS_TOKEN` is set, `/metrics` accepts only that token: `PII_GUARD_API_TOKEN` is
+no longer accepted there (`401 unauthorized`), and the metrics token is not accepted on any other
+route.
 
 ## Latency benchmark
 

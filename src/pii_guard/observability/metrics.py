@@ -2,24 +2,68 @@
 
 No client library: fixed-bucket histograms (ms) and counters for the gateway, detectors,
 entities, cache, outbound checks, HTTP routes and live runtime gauges. Labels are stage names,
-modes, outcomes, entity types, route templates and status codes only -- never ids, model names
-from requests, or anything a client controls.
+modes, outcomes, entity types, route templates, status codes and a fixed ``source`` enum only --
+never ids, model names from requests, or anything a client controls.
+
+Every count added is a non-negative int capped at :data:`MAX_COUNT_PER_OBSERVATION` and every
+duration a finite float clamped to ``[0, MAX_MS]``, so one hostile event (remote telemetry is
+self-reported) cannot overflow a series or make the exposition unrenderable (LAB-1731).
 """
 
 from __future__ import annotations
 
+import math
 import threading
 from bisect import bisect_left
 from collections.abc import Mapping
 from typing import Any
 
-__all__ = ["BUCKETS_MS", "NER_STATES", "LatencyMetrics"]
+__all__ = [
+    "BUCKETS_MS",
+    "MAX_COUNT_PER_OBSERVATION",
+    "MAX_MS",
+    "NER_STATES",
+    "SOURCES",
+    "LatencyMetrics",
+]
 
 BUCKETS_MS: tuple[float, ...] = (
     0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000,
 )  # fmt: skip
 
 NER_STATES: tuple[str, ...] = ("off", "loading", "ready", "failed")
+
+# ``local``: traffic this server handled; ``remote``: events a CLI gateway self-reported through
+# ``POST /v1/traffic``. Any other value is recorded as ``local``.
+SOURCES: tuple[str, ...] = ("local", "remote")
+
+MAX_COUNT_PER_OBSERVATION = 10_000_000
+MAX_MS = 3_600_000.0
+
+
+def _count(value: object) -> int:
+    """A count to add: a positive int (never bool) capped per observation, else 0."""
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return min(value, MAX_COUNT_PER_OBSERVATION)
+    return 0
+
+
+def _ms(value: object) -> float | None:
+    """A duration to observe: a finite number (never bool) clamped to [0, MAX_MS], else None."""
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return None
+    try:
+        fval = float(value)
+    except OverflowError:  # an int too large for a float
+        return MAX_MS if value > 0 else 0.0
+    if not math.isfinite(fval):
+        return None
+    return min(max(fval, 0.0), MAX_MS)
+
+
+def _source(value: str) -> str:
+    return value if value in SOURCES else "local"
+
 
 _HISTOGRAMS = {
     "overhead": "pii_guard_gateway_overhead_ms",
@@ -48,6 +92,8 @@ class _Histogram:
         self.sum = 0.0
 
     def observe(self, ms: float) -> None:
+        # Callers pass values already clamped by ``_ms``; clamp again as a last line.
+        ms = min(max(ms, 0.0), MAX_MS) if math.isfinite(ms) else MAX_MS
         self.buckets[bisect_left(BUCKETS_MS, ms)] += 1
         self.count += 1
         self.sum += ms
@@ -68,19 +114,20 @@ def _render_histogram(out: list[str], name: str, label_str: str, hist: _Histogra
     out.append(f"{name}_count{{{label_str}}} {hist.count}")
 
 
-def _render_single_label_counter(
+def _render_counter(
     out: list[str],
     name: str,
     help_text: str,
-    label_key: str,
-    counts: Mapping[str, int],
+    label_keys: tuple[str, ...],
+    counts: Mapping[Any, int],  # keys: tuples of label values, in label_keys order
 ) -> None:
     if not counts:
         return
     out.append(f"# HELP {name} {help_text}")
     out.append(f"# TYPE {name} counter")
     for key, n in sorted(counts.items()):
-        out.append(f'{name}{{{label_key}="{_label(key)}"}} {n}')
+        labels = ",".join(f'{k}="{_label(v)}"' for k, v in zip(label_keys, key, strict=True))
+        out.append(f"{name}{{{labels}}} {n}")
 
 
 def _render_gauges(
@@ -133,32 +180,43 @@ class LatencyMetrics:
         self._series: dict[tuple[str, str, str], _Histogram] = {}
         self._detectors: dict[tuple[str, str], _Histogram] = {}
         self._http_durations: dict[tuple[str, str], _Histogram] = {}
-        self._requests: dict[tuple[str, str], int] = {}
+        # Keys end with the ``source`` label (``local`` or ``remote``).
+        self._requests: dict[tuple[str, str, str], int] = {}
+        self._entities_detected: dict[tuple[str, str], int] = {}
+        self._entities_masked: dict[tuple[str, str], int] = {}
+        self._image_regions: dict[tuple[str, str, str], int] = {}
+        self._blocked_entities: dict[tuple[str, str, str], int] = {}
+        self._upstream_tokens: dict[tuple[str, str], int] = {}
         self._http_requests: dict[tuple[str, str, int], int] = {}
-        self._entities_detected: dict[str, int] = {}
-        self._entities_masked: dict[str, int] = {}
-        self._image_regions: dict[tuple[str, str], int] = {}
-        self._blocked_entities: dict[tuple[str, str], int] = {}
-        self._outbound_checks: dict[str, int] = {}
-        self._cache: dict[str, int] = {}
-        self._upstream_tokens: dict[str, int] = {}
+        self._outbound_checks: dict[tuple[str], int] = {}
+        self._cache: dict[tuple[str], int] = {}
         self._unresolved_placeholders: int = 0
 
-    def _observe(self, name: str, labels: tuple[str, str], ms: float | None) -> None:
+    @staticmethod
+    def _bump(table: dict[Any, int], key: Any, value: object) -> None:
+        n = _count(value)
+        if n:
+            table[key] = table.get(key, 0) + n
+
+    def _observe(self, name: str, labels: tuple[str, str], value: object) -> None:
+        ms = _ms(value)
         if ms is None:
             return
         key = (name, *labels)
         hist = self._series.get(key)
         if hist is None:
             hist = self._series[key] = _Histogram()
-        hist.observe(float(ms))
+        hist.observe(ms)
 
-    def _observe_detector_locked(self, mode: str, detector: str, ms: float) -> None:
+    def _observe_detector_locked(self, mode: str, detector: str, value: object) -> None:
+        ms = _ms(value)
+        if ms is None:
+            return
         key = (mode, detector)
         hist = self._detectors.get(key)
         if hist is None:
             hist = self._detectors[key] = _Histogram()
-        hist.observe(float(ms))
+        hist.observe(ms)
 
     def observe(
         self,
@@ -166,61 +224,64 @@ class LatencyMetrics:
         outcome: str,
         timing: Mapping[str, Any],
         event: Mapping[str, Any] | None = None,
+        *,
+        source: str = "local",
     ) -> None:
+        src = _source(source)
         with self._lock:
-            self._requests[(mode, outcome)] = self._requests.get((mode, outcome), 0) + 1
-            for key in ("overhead", "total", "upstream", "added_ttft"):
-                self._observe(_HISTOGRAMS[key], (mode, ""), timing.get(f"{key}_ms"))
-            for stage, ms in (timing.get("stages_ms") or {}).items():
-                if ms:
-                    self._observe("pii_guard_gateway_stage_ms", (mode, stage), ms)
-            for detector, ms in (timing.get("detectors_ms") or {}).items():
-                if ms:
-                    self._observe_detector_locked(mode, str(detector), float(ms))
+            key = (mode, outcome, src)
+            self._requests[key] = self._requests.get(key, 0) + 1
+            for name in ("overhead", "total", "upstream", "added_ttft"):
+                self._observe(_HISTOGRAMS[name], (mode, ""), timing.get(f"{name}_ms"))
+            stages = timing.get("stages_ms")
+            if isinstance(stages, Mapping):
+                for stage, ms in stages.items():
+                    if ms:
+                        self._observe("pii_guard_gateway_stage_ms", (mode, str(stage)), ms)
+            detectors = timing.get("detectors_ms")
+            if isinstance(detectors, Mapping):
+                for detector, ms in detectors.items():
+                    if ms:
+                        self._observe_detector_locked(mode, str(detector), ms)
             if event is not None:
-                self._observe_event_locked(outcome, event)
+                self._observe_event_locked(outcome, event, src)
 
-    def _observe_event_locked(self, outcome: str, event: Mapping[str, Any]) -> None:
+    def _observe_event_locked(self, outcome: str, event: Mapping[str, Any], source: str) -> None:
         entities = event.get("entities")
         if isinstance(entities, Mapping):
-            self._add_entities_locked(
-                entities.get("detected"),
-                entities.get("masked"),
-            )
+            self._add_entities_locked(entities.get("detected"), entities.get("masked"), source)
             images = entities.get("images")
             if isinstance(images, Mapping):
-                self._add_image_regions_locked(images.get("masked"), images.get("kept"))
-        self._observe_outbound_and_blocked_locked(outcome, event)
-        self._observe_cache_and_upstream_locked(event)
+                self._add_image_regions_locked(images.get("masked"), images.get("kept"), source)
+        self._observe_outbound_and_blocked_locked(outcome, event, source)
+        self._observe_cache_and_upstream_locked(event, source)
 
-    def _observe_outbound_and_blocked_locked(self, outcome: str, event: Mapping[str, Any]) -> None:
+    def _observe_outbound_and_blocked_locked(
+        self, outcome: str, event: Mapping[str, Any], source: str
+    ) -> None:
         outbound = event.get("outbound_check")
         outbound_hits = None
         if isinstance(outbound, Mapping):
             result = outbound.get("result")
             if isinstance(result, str) and result:
-                self._outbound_checks[result] = self._outbound_checks.get(result, 0) + 1
+                self._bump(self._outbound_checks, (result,), 1)
             hits = outbound.get("hits")
             if isinstance(hits, Mapping) and hits:
                 outbound_hits = hits
-                self._add_blocked_locked("outbound", hits)
+                self._add_blocked_locked("outbound", hits, source)
         if outcome == "blocked" and outbound_hits is None:
             error = event.get("error")
             if isinstance(error, Mapping):
-                self._add_blocked_locked("inbound", error.get("entity_types"))
+                self._add_blocked_locked("inbound", error.get("entity_types"), source)
 
-    def _observe_cache_and_upstream_locked(self, event: Mapping[str, Any]) -> None:
+    def _observe_cache_and_upstream_locked(self, event: Mapping[str, Any], source: str) -> None:
         cache = event.get("cache")
         if isinstance(cache, Mapping):
             for field, label in (("hits", "hit"), ("misses", "miss"), ("seeded", "seeded")):
-                count = cache.get(field)
-                if isinstance(count, int) and not isinstance(count, bool) and count > 0:
-                    self._cache[label] = self._cache.get(label, 0) + count
+                self._bump(self._cache, (label,), cache.get(field))
         upstream = event.get("upstream")
         if isinstance(upstream, Mapping):
-            unresolved = upstream.get("unresolved_placeholders")
-            if isinstance(unresolved, int) and not isinstance(unresolved, bool) and unresolved > 0:
-                self._unresolved_placeholders += unresolved
+            self._unresolved_placeholders += _count(upstream.get("unresolved_placeholders"))
         usage = event.get("usage")
         if isinstance(usage, Mapping):
             tokens_in = usage.get("prompt_tokens")
@@ -229,49 +290,37 @@ class LatencyMetrics:
             tokens_out = usage.get("completion_tokens")
             if tokens_out is None:
                 tokens_out = usage.get("output_tokens")
-            if isinstance(tokens_in, int) and not isinstance(tokens_in, bool) and tokens_in > 0:
-                self._upstream_tokens["input"] = self._upstream_tokens.get("input", 0) + tokens_in
-            if isinstance(tokens_out, int) and not isinstance(tokens_out, bool) and tokens_out > 0:
-                self._upstream_tokens["output"] = (
-                    self._upstream_tokens.get("output", 0) + tokens_out
-                )
+            self._bump(self._upstream_tokens, ("input", source), tokens_in)
+            self._bump(self._upstream_tokens, ("output", source), tokens_out)
 
     def _add_entities_locked(
         self,
         detected: Mapping[str, int] | None,
         masked: Mapping[str, int] | None,
+        source: str,
     ) -> None:
-        if isinstance(detected, Mapping):
-            for entity_type, n in detected.items():
-                if isinstance(n, int) and not isinstance(n, bool) and n > 0:
-                    self._entities_detected[str(entity_type)] = (
-                        self._entities_detected.get(str(entity_type), 0) + n
-                    )
-        if isinstance(masked, Mapping):
-            for entity_type, n in masked.items():
-                if isinstance(n, int) and not isinstance(n, bool) and n > 0:
-                    self._entities_masked[str(entity_type)] = (
-                        self._entities_masked.get(str(entity_type), 0) + n
-                    )
+        for table, counts in ((self._entities_detected, detected), (self._entities_masked, masked)):
+            if isinstance(counts, Mapping):
+                for entity_type, n in counts.items():
+                    self._bump(table, (str(entity_type), source), n)
 
     def _add_image_regions_locked(
         self,
         masked: Mapping[str, int] | None,
         kept: Mapping[str, int] | None,
+        source: str,
     ) -> None:
         for action, counts in (("masked", masked), ("kept", kept)):
             if isinstance(counts, Mapping):
                 for entity_type, n in counts.items():
-                    if isinstance(n, int) and not isinstance(n, bool) and n > 0:
-                        key = (str(entity_type), action)
-                        self._image_regions[key] = self._image_regions.get(key, 0) + n
+                    self._bump(self._image_regions, (str(entity_type), action, source), n)
 
-    def _add_blocked_locked(self, stage: str, counts: Mapping[str, int] | None) -> None:
+    def _add_blocked_locked(
+        self, stage: str, counts: Mapping[str, int] | None, source: str
+    ) -> None:
         if isinstance(counts, Mapping):
             for entity_type, n in counts.items():
-                if isinstance(n, int) and not isinstance(n, bool) and n > 0:
-                    key = (stage, str(entity_type))
-                    self._blocked_entities[key] = self._blocked_entities.get(key, 0) + n
+                self._bump(self._blocked_entities, (stage, str(entity_type), source), n)
 
     def observe_entities(
         self,
@@ -280,7 +329,7 @@ class LatencyMetrics:
         masked: Mapping[str, int] | None = None,
     ) -> None:
         with self._lock:
-            self._add_entities_locked(detected, masked)
+            self._add_entities_locked(detected, masked, "local")
 
     def observe_image_regions(
         self,
@@ -289,82 +338,79 @@ class LatencyMetrics:
         kept: Mapping[str, int] | None = None,
     ) -> None:
         with self._lock:
-            self._add_image_regions_locked(masked, kept)
+            self._add_image_regions_locked(masked, kept, "local")
 
     def observe_blocked(self, stage: str, counts: Mapping[str, int]) -> None:
         with self._lock:
-            self._add_blocked_locked(stage, counts)
+            self._add_blocked_locked(stage, counts, "local")
 
     def observe_unresolved(self, count: int) -> None:
-        if count > 0:
+        n = _count(count)
+        if n:
             with self._lock:
-                self._unresolved_placeholders += count
+                self._unresolved_placeholders += n
 
     def observe_http(self, method: str, path: str, status: int, duration_ms: float) -> None:
+        ms = _ms(duration_ms)
         with self._lock:
             req_key = (method, path, int(status))
             self._http_requests[req_key] = self._http_requests.get(req_key, 0) + 1
+            if ms is None:
+                return
             dur_key = (method, path)
             hist = self._http_durations.get(dur_key)
             if hist is None:
                 hist = self._http_durations[dur_key] = _Histogram()
-            hist.observe(max(float(duration_ms), 0.0))
+            hist.observe(ms)
 
     def _render_counters(self, out: list[str]) -> None:
-        _render_single_label_counter(
+        _render_counter(
             out,
             "pii_guard_entities_detected_total",
-            "Detected PII spans by entity type.",
-            "entity_type",
+            "Detected PII spans by entity type and source.",
+            ("entity_type", "source"),
             self._entities_detected,
         )
-        _render_single_label_counter(
+        _render_counter(
             out,
             "pii_guard_entities_masked_total",
-            "Masked PII occurrences by entity type.",
-            "entity_type",
+            "Masked PII occurrences by entity type and source.",
+            ("entity_type", "source"),
             self._entities_masked,
         )
-        if self._image_regions:
-            out.append(
-                "# HELP pii_guard_image_regions_total Image PII regions by entity type and action."
-            )
-            out.append("# TYPE pii_guard_image_regions_total counter")
-            for (entity_type, action), n in sorted(self._image_regions.items()):
-                out.append(
-                    f'pii_guard_image_regions_total{{entity_type="{_label(entity_type)}",'
-                    f'action="{_label(action)}"}} {n}'
-                )
-        if self._blocked_entities:
-            out.append(
-                "# HELP pii_guard_blocked_entities_total "
-                "Blocked entity occurrences by stage and entity type."
-            )
-            out.append("# TYPE pii_guard_blocked_entities_total counter")
-            for (stage, entity_type), n in sorted(self._blocked_entities.items()):
-                out.append(
-                    f'pii_guard_blocked_entities_total{{stage="{_label(stage)}",'
-                    f'entity_type="{_label(entity_type)}"}} {n}'
-                )
-        _render_single_label_counter(
+        _render_counter(
+            out,
+            "pii_guard_image_regions_total",
+            "Image PII regions by entity type, action and source.",
+            ("entity_type", "action", "source"),
+            self._image_regions,
+        )
+        _render_counter(
+            out,
+            "pii_guard_blocked_entities_total",
+            "Blocked entity occurrences by stage, entity type and source.",
+            ("stage", "entity_type", "source"),
+            self._blocked_entities,
+        )
+        _render_counter(
             out,
             "pii_guard_outbound_checks_total",
             "Outbound re-checks by result.",
-            "result",
+            ("result",),
             self._outbound_checks,
         )
-        _render_single_label_counter(
+        _render_counter(
             out,
             "pii_guard_detection_cache_total",
             "Detection cache lookups and seeds.",
-            "result",
+            ("result",),
             self._cache,
         )
-        _render_single_label_counter(
+        _render_counter(
             out,
             "pii_guard_upstream_tokens_total",
-            "Upstream LLM tokens by direction.",
-            "direction",
+            "Upstream LLM tokens by direction and source.",
+            ("direction", "source"),
             self._upstream_tokens,
         )
         if self._unresolved_placeholders:
@@ -394,14 +440,14 @@ class LatencyMetrics:
     ) -> str:
         """The Prometheus text exposition format (version 0.0.4)."""
         out = [
-            "# HELP pii_guard_gateway_requests_total Gateway requests by mode and outcome.",
+            "# HELP pii_guard_gateway_requests_total Gateway requests by mode, outcome and source.",
             "# TYPE pii_guard_gateway_requests_total counter",
         ]
         with self._lock:
-            for (mode, outcome), n in sorted(self._requests.items()):
+            for (mode, outcome, source), n in sorted(self._requests.items()):
                 out.append(
                     f'pii_guard_gateway_requests_total{{mode="{_label(mode)}",'
-                    f'outcome="{_label(outcome)}"}} {n}'
+                    f'outcome="{_label(outcome)}",source="{source}"}} {n}'
                 )
             names = sorted({k[0] for k in self._series})
             for name in names:

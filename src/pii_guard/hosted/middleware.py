@@ -182,6 +182,7 @@ BODY_READ_SECONDS = 10
 # held in the guest ingress pool under one shared principal, never charged inference quota.
 CLI_TOKEN_MAX_BODY = 1024
 _CLI_TOKEN_PRINCIPAL = Principal("cli-token-exchange", False, "guest")
+_METRICS_PRINCIPAL = Principal("metrics-scrape", False, "guest")
 
 
 def _extract_metrics_token(headers: Headers) -> str | None:
@@ -319,9 +320,16 @@ class HostedMiddleware:
         await self._forward(ctx, raw, keep_authorization=method == "DELETE")
 
     async def _execute_metrics(self, ctx: _RequestContext, headers: Headers) -> None:
-        """``GET``/``HEAD /metrics`` in hosted mode when ``PII_GUARD_METRICS_TOKEN`` is set."""
-        if ctx.scope.get("method") not in _READ_METHODS:
+        """``GET /metrics`` in hosted mode, only with ``PII_GUARD_METRICS_TOKEN`` (LAB-1731).
+
+        GET only. Throttled as anonymous work in the same bucket as the CLI token exchange:
+        a network whose allowance is spent is refused before the token is compared, and every
+        missing or wrong token is charged, so guesses are rate limited while a scraper with
+        the right token is never charged (a 15 s scrape interval stays under the hourly cap).
+        """
+        if ctx.scope.get("method") != "GET":
             raise HostedRequestError("This endpoint is unavailable in hosted mode")
+        self.service.abuse.check_anonymous(headers)
         app = ctx.scope.get("app")
         obs = getattr(getattr(app, "state", None), "observability", None)
         token_secret = getattr(getattr(obs, "settings", None), "metrics_token", None)
@@ -334,6 +342,12 @@ class HostedMiddleware:
             or not provided
             or not hmac.compare_digest(provided.encode(), expected.encode())
         ):
+            self.service.abuse.admit(
+                headers,
+                principal_id=_METRICS_PRINCIPAL.id,
+                authenticated=False,
+                anonymous_sponsored=True,
+            )
             raise HostedRequestError("This endpoint is unavailable in hosted mode")
         ctx.state["metrics_authenticated"] = True
         await self._forward(ctx, bytearray())
