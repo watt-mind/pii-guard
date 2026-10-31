@@ -341,11 +341,11 @@ def test_overhead_excludes_the_upstream_delay_non_streaming(
     assert t["added_ttft_ms"] is None
     header = r.headers["server-timing"]
     assert "overhead;dur=" in header and "upstream;dur=" in header
-    assert 'pii_guard_gateway_requests_total{mode="audit",outcome="ok"} 1' in metrics
-    assert 'pii_guard_entities_masked_total{entity_type="EMAIL"} 1' in metrics
+    assert 'pii_guard_gateway_requests_total{mode="audit",outcome="ok",source="local"} 1' in metrics
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL",source="local"} 1' in metrics
     assert 'pii_guard_outbound_checks_total{result="passed"} 1' in metrics
-    assert 'pii_guard_upstream_tokens_total{direction="input"} 10' in metrics
-    assert 'pii_guard_upstream_tokens_total{direction="output"} 5' in metrics
+    assert 'pii_guard_upstream_tokens_total{direction="input",source="local"} 10' in metrics
+    assert 'pii_guard_upstream_tokens_total{direction="output",source="local"} 5' in metrics
     chat_metric = (
         'pii_guard_http_requests_total{method="POST",path="/v1/chat/completions",status="200"} 1'
     )
@@ -367,8 +367,8 @@ def test_metrics_include_rest_routes_and_gauges() -> None:
         )
         assert unmask_res.status_code == 200
         metrics = client.get("/metrics").text
-    assert 'pii_guard_entities_detected_total{entity_type="EMAIL"} 2' in metrics
-    assert 'pii_guard_entities_masked_total{entity_type="EMAIL"} 1' in metrics
+    assert 'pii_guard_entities_detected_total{entity_type="EMAIL",source="local"} 2' in metrics
+    assert 'pii_guard_entities_masked_total{entity_type="EMAIL",source="local"} 1' in metrics
     assert "pii_guard_unresolved_placeholders_total 1" in metrics
     for path in ("/v1/analyze", "/v1/mask", "/v1/unmask"):
         assert f'pii_guard_http_requests_total{{method="POST",path="{path}",status="200"}} 1' in (
@@ -376,6 +376,37 @@ def test_metrics_include_rest_routes_and_gauges() -> None:
         )
     assert 'path="/metrics"' not in metrics
     assert "pii_guard_vault_active_sessions 1" in metrics
+
+
+def test_metrics_token_isolates_scraper_from_self_hosted_api_token() -> None:
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY,
+        upstream_base_url=UPSTREAM_URL,
+        api_token="synthetic-api-token",  # noqa: S106
+    )
+    app = create_app(
+        settings,
+        ObservabilitySettings(metrics=True, metrics_token="synthetic-scrape-token"),  # noqa: S106
+    )
+    with TestClient(app) as client:
+        assert client.get("/metrics").status_code == 401
+        assert (
+            client.get(
+                "/metrics", headers={"Authorization": "Bearer synthetic-api-token"}
+            ).status_code
+            == 401
+        )
+        assert (
+            client.post(
+                "/v1/analyze",
+                json={"text": "hello"},
+                headers={"Authorization": "Bearer synthetic-scrape-token"},
+            ).status_code
+            == 401
+        )
+        scraped = client.get("/metrics", headers={"Authorization": "Bearer synthetic-scrape-token"})
+        assert scraped.status_code == 200
+        assert "pii_guard_vault_active_sessions" in scraped.text
 
 
 def test_overhead_and_added_ttft_streaming(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -336,6 +336,25 @@ class HostedService:
 
         return TrafficFeedView(feed, include, runtime.observability.traffic.level)
 
+    def live_session_count(self) -> int:
+        """Number of non-expired sessions across active hosted owner and guest runtimes."""
+        with self._lock:
+            runtimes = list(self._runtimes.values())
+        return sum(len(runtime.vault.live_sessions()) for runtime in runtimes)
+
+    def metrics_snapshot(self) -> dict[str, int]:
+        """Point-in-time hosted multi-tenant runtime gauges for Prometheus scraping."""
+        with self._lock:
+            owner_runtimes = sum(not r.guest for r in self._runtimes.values())
+            guest_runtimes = sum(r.guest for r in self._runtimes.values())
+            active_streams = sum(self._streams.values())
+        return {
+            "owner_runtimes": owner_runtimes,
+            "guest_runtimes": guest_runtimes,
+            "active_streams": active_streams,
+            "sponsored_available": 1 if self.sponsored_enabled else 0,
+        }
+
     def provider_settings(self, request: Request) -> Settings:
         connection = getattr(request.state, "hosted_connection", None)
         return self.settings.model_copy(
@@ -510,12 +529,13 @@ class HostedService:
         # The owner's traffic log, scrubbing the provider key this request may send (the
         # sponsored key or the selected connection's), as the local and project gateways do.
         credential = provider.upstream_api_key
+        app_obs = getattr(request.app.state, "observability", None)
         observability = Observability(
             runtime.observability.settings,
             secrets=[credential.get_secret_value()] if credential is not None else [],
         )
         observability.traffic = runtime.observability.traffic
-        observability.metrics = runtime.observability.metrics
+        observability.metrics = getattr(app_obs, "metrics", None)
         gateway = Gateway(
             settings=provider,
             vault=runtime.vault,

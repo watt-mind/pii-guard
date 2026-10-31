@@ -683,3 +683,50 @@ async def test_local_gateway_exports_scrubbed_telemetry_to_remote_dashboard() ->
         assert "[[EMAIL_" in json.dumps(ev["request"]["masked"])
         assert "original" not in ev["request"]
         assert "unmasked" not in (ev["response"] or {})
+
+
+def test_ingest_hostile_counts_and_durations_keep_metrics_renderable() -> None:
+    """LAB-1731: 4300-digit token counts and 1e308 ms used to make every scrape 500."""
+    app = create_app(
+        Settings(_env_file=None, detectors=("rules",), ner_fallback="off"),
+        observability=ObservabilitySettings(traffic_log=TrafficLevel.MASKED, metrics=True),
+    )
+    huge = int("9" * 4300)
+    event = _sample_event(level="stats", request=None, response=None)
+    event["usage"] = {"prompt_tokens": huge, "completion_tokens": True, "evil": huge}
+    event["cache"] = {"hits": huge, "misses": 1.5, "extra": huge}
+    event["upstream"] = {"unresolved_placeholders": huge, "status": huge}
+    event["entities"] = {"detected": {"EMAIL": huge, "NOT_A_TYPE": 5}, "masked": {"EMAIL": True}}
+    event["timing"] = {
+        "overhead_ms": 1e308,
+        "total_ms": 1e308,
+        "upstream_ms": huge,
+        "stages_ms": {"detect": 1e308},
+        "detectors_ms": {"rules": 1e308},
+    }
+    with TestClient(app) as client:
+        res = client.post("/v1/traffic", json={"events": [event, event]})
+        assert res.status_code == 200, res.text
+        scraped = client.get("/metrics")
+        assert scraped.status_code == 200
+        again = client.get("/metrics")
+        assert again.status_code == 200
+    text = scraped.text
+    cap = 10_000_000
+    assert f'pii_guard_upstream_tokens_total{{direction="input",source="remote"}} {2 * cap}' in text
+    assert 'direction="output"' not in text  # a bool is not a token count
+    assert f'pii_guard_detection_cache_total{{result="hit"}} {2 * cap}' in text
+    assert 'result="miss"' not in text
+    assert f"pii_guard_unresolved_placeholders_total {2 * cap}" in text
+    assert (
+        f'pii_guard_entities_detected_total{{entity_type="EMAIL",source="remote"}} {2 * cap}'
+        in text
+    )
+    assert "NOT_A_TYPE" not in text and "pii_guard_entities_masked_total" not in text
+    assert 'pii_guard_gateway_requests_total{mode="fast",outcome="ok",source="remote"} 2' in text
+    # Durations clamped to one hour: two observations sum to 7,200,000 ms, never inf.
+    assert 'pii_guard_gateway_overhead_ms_sum{mode="fast"} 7200000.000' in text
+    assert 'pii_guard_gateway_upstream_ms_sum{mode="fast"} 7200000.000' in text
+    assert 'pii_guard_gateway_stage_ms_sum{mode="fast",stage="detect"} 7200000.000' in text
+    assert 'pii_guard_detector_duration_ms_sum{mode="fast",detector="rules"} 7200000.000' in text
+    assert "inf" not in text.lower().replace("+inf", "")
