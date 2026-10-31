@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
+import time
 from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -13,7 +16,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from pii_guard.vault.placeholders import PLACEHOLDER_RE
+from pii_guard.vault import PLACEHOLDER_RE, SessionNotFoundError, normalize_value
 
 __all__ = [
     "SCRIPTED_MODEL",
@@ -410,3 +413,198 @@ class Recorder:
             yield "data: [DONE]\n\n"
 
         return events()
+
+
+@dataclass
+class RunResult:
+    client: str
+    client_version: str
+    upstream: str
+    model: str
+    ner: bool
+    client_exit: int
+    client_output: str
+    requests: int
+    gateway_statuses: list[int]
+    refused: int
+    placeholders_upstream: int
+    gold_checked: list[str]
+    gold_upstream: list[str]
+    gaps_upstream: dict[str, int]
+    files_written: list[str]
+    restored_in_files: list[str]
+    placeholders_in_files: int
+    placeholders_by_type: dict[str, int] = field(default_factory=dict)
+    request_keys: dict[str, list[str]] = field(default_factory=dict)
+    seconds: float = 0.0
+    #: Multi-word gold values (names) not upstream whole, but with a word of them upstream
+    #: (a partly masked name). Reported, not part of :attr:`ok` (the whole-value check).
+    gold_partial_upstream: list[str] = field(default_factory=list)
+    #: How the client reached a vault session (``--session``) and what the gateway reported.
+    session: str = "path"
+    sessions: int = 0
+    session_sources: dict[str, int] = field(default_factory=dict)
+    #: Gold values the upstream saw under more than one placeholder (0: stable across turns),
+    #: and the most placeholders one gold value had.
+    gold_unstable: int = 0
+    gold_max_placeholders: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return (
+            self.client_exit == 0
+            and self.refused == 0
+            and not self.gold_upstream
+            and self.placeholders_upstream > 0
+            and self.placeholders_in_files == 0
+            # One session from the connect path URL: one placeholder per value. The other
+            # modes split a task over several sessions (Muse: one per prompt_cache_key).
+            and (self.gold_unstable == 0 or self.session != "path")
+        )
+
+
+def _ner_available() -> bool:
+    from pii_guard.gateway.detection import _ner_available as available
+
+    return available()
+
+
+def _by_type(text: str) -> dict[str, int]:
+    """Distinct placeholders per entity type."""
+    counts: dict[str, int] = {}
+    for kind, _ in set(PLACEHOLDER_RE.findall(text)):
+        counts[kind] = counts.get(kind, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _request_keys(bodies: list[str]) -> dict[str, list[str]]:
+    """The fields the client sent (names only): what the allow-list had to cover."""
+    top: set[str] = set()
+    message: set[str] = set()
+    roles: set[str] = set()
+    items: set[str] = set()
+    for raw in bodies:
+        body = json.loads(raw)
+        top |= set(body)
+        for m in body.get("messages") or []:
+            message |= set(m)
+            roles.add(str(m.get("role")))
+        inputs = body.get("input")
+        for item in inputs if isinstance(inputs, list) else []:
+            if isinstance(item, dict):
+                kind = str(item.get("type") or "message")
+                items.add(kind)
+                message |= {f"{kind}.{key}" for key in item}
+                if "role" in item:
+                    roles.add(str(item["role"]))
+    out = {"top_level": sorted(top), "message": sorted(message), "roles": sorted(roles)}
+    if items:
+        out["input_items"] = sorted(items)
+    return out
+
+
+def _written(work: Path, before: set[Path]) -> tuple[list[str], str]:
+    after = {p.relative_to(work) for p in work.rglob("*") if p.is_file()}
+    new = sorted(after - before)
+    texts = "\n".join((work / p).read_text(encoding="utf-8", errors="replace") for p in new)
+    return [str(p) for p in new], texts
+
+
+def _partial(values: list[str], upstream_text: str) -> list[str]:
+    """Multi-word values whose words (3+ letters) appear upstream as words, case-sensitive."""
+
+    def found(word: str) -> bool:
+        return re.search(rf"(?<![\w.@]){re.escape(word)}(?![\w@])", upstream_text) is not None
+
+    out = []
+    for value in values:
+        words = [w for w in value.split() if len(w) >= 3 and w.isalpha()]
+        if len(words) > 1 and value not in upstream_text and any(found(w) for w in words):
+            out.append(value)
+    return out
+
+
+def _result(
+    *,
+    client: str,
+    version: str,
+    upstream: str | None,
+    model: str | None,
+    proc: Any,
+    output: str,
+    recorder: Recorder,
+    statuses: list[int],
+    written: list[str],
+    texts: str,
+    gold: dict[str, Any],
+    ner: bool,
+    started: float,
+    app: FastAPI,
+    calls: list[tuple[str, str]],
+    session: str,
+) -> RunResult:
+    checked = list(gold["rules"]) + (list(gold["ner"]) if ner else [])
+    gaps = {kind: list(values) for kind, values in gold["known_gaps"].items()}
+    upstream_text = "\n".join(
+        json.dumps(json.loads(b), ensure_ascii=False) for b in recorder.bodies
+    )
+    upstream_text += "\n" + "\n".join(recorder.bodies)
+    return RunResult(
+        client=client,
+        client_version=version,
+        upstream=upstream or "scripted mock",
+        model=model or SCRIPTED_MODEL,
+        ner=ner,
+        client_exit=proc.returncode,
+        client_output=output.strip()[-2000:],
+        requests=len(recorder.bodies),
+        gateway_statuses=statuses,
+        refused=sum(1 for s in statuses if s != 200),
+        placeholders_upstream=len(set(PLACEHOLDER_RE.findall(upstream_text))),
+        gold_checked=checked,
+        gold_upstream=[v for v in checked if v in upstream_text],
+        gaps_upstream={k: sum(1 for v in vs if v in upstream_text) for k, vs in gaps.items()},
+        files_written=written,
+        restored_in_files=[v for v in checked if v in texts],
+        placeholders_in_files=len(PLACEHOLDER_RE.findall(texts)),
+        placeholders_by_type=_by_type(upstream_text),
+        request_keys=_request_keys(recorder.bodies) if recorder.bodies else {},
+        seconds=round(time.monotonic() - started, 1),
+        gold_partial_upstream=_partial(checked, upstream_text),
+        session=session,
+        **_stability(app, calls, upstream_text, checked),
+    )
+
+
+def _stability(
+    app: FastAPI, calls: list[tuple[str, str]], upstream_text: str, checked: list[str]
+) -> dict[str, Any]:
+    """Sessions, their sources and per gold value the placeholders the upstream saw.
+
+    Each placeholder is looked up in the sessions the gateway reported (only the session
+    that issued it knows it), in this process; only counts leave this function.
+    """
+    sources: dict[str, int] = {}
+    for _, source in calls:
+        sources[source or "-"] = sources.get(source or "-", 0) + 1
+    session_ids = sorted({sid for sid, _ in calls if sid})
+    gateway: Any = getattr(app.state, "gateway", None)
+    tokens = sorted({m.group(0) for m in PLACEHOLDER_RE.finditer(upstream_text)})
+    by_value: dict[str, set[str]] = {}
+    for sid in session_ids if gateway is not None else []:
+        try:
+            session = gateway.vault.session(sid)
+        except SessionNotFoundError:
+            continue
+        # One unmask per session: the other sessions' tokens stay as they are.
+        restored = session.unmask_with_report("\n".join(tokens)).text.split("\n")
+        for token, original in zip(tokens, restored, strict=True):
+            if original != token:
+                by_value.setdefault(normalize_value(original), set()).add(token)
+    counts = [len(by_value.get(normalize_value(v), ())) for v in checked]
+    return {
+        "sessions": len(session_ids),
+        "session_sources": dict(sorted(sources.items())),
+        "gold_unstable": sum(1 for n in counts if n > 1),
+        "gold_max_placeholders": max(counts, default=0),
+    }

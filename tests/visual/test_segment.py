@@ -275,3 +275,220 @@ def test_report_keeps_segmenter_runs_apart() -> None:
     assert report_cli._drawn(index, "segmenter-recall.svg")
     assert report_cli._drawn(index, "visual-recall.svg")
     assert not report_cli._drawn({"visual": []}, "segmenter-recall.svg")
+
+
+# --- coverage without optional cv2/numpy extras & segment_eval orchestration -------------------
+
+
+class _FakeArray:
+    """Minimal 3D RGB/BGR array stand-in when numpy is not installed."""
+
+    def __init__(self, width: int, height: int, channels: int = 3) -> None:
+        self.shape = (height, width, channels)
+
+    def __getitem__(self, item: Any) -> _FakeArray:
+        return self
+
+    def copy(self) -> _FakeArray:
+        return _FakeArray(self.shape[1], self.shape[0], self.shape[2])
+
+
+def test_local_segmenter_with_stubbed_cv2_and_numpy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import types
+
+    body = b"fake-yunet-weights"
+    digest = hashlib.sha256(body).hexdigest()
+    monkeypatch.setattr(
+        segment,
+        "YUNET",
+        ModelFile("yunet.onnx", "https://example.invalid/y.onnx", digest, len(body), "MIT"),
+    )
+    monkeypatch.setenv(segment.MODEL_DIR_ENV_VAR, str(tmp_path))
+
+    created: list[Any] = []
+
+    class _StubDetector:
+        def __init__(self) -> None:
+            self.sizes: list[tuple[int, int]] = []
+            self.calls = 0
+
+        def setInputSize(self, size: tuple[int, int]) -> None:
+            self.sizes.append(size)
+
+        def detect(self, image: Any) -> tuple[int, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                return 1, None
+            scale = image.shape[1] / 640.0
+            # Include one valid face box and one degenerate zero-width box (_clip -> None)
+            return 1, [
+                [100.0 * scale, 120.0 * scale, 80.0 * scale, 100.0 * scale, *([0.0] * 10), 0.92],
+                [50.0 * scale, 50.0 * scale, 0.0, 0.0, *([0.0] * 10), 0.80],
+            ]
+
+    class _StubClahe:
+        def apply(self, grey: Any) -> Any:
+            return grey
+
+    fake_cv2 = types.ModuleType("cv2")
+    fake_cv2.COLOR_BGR2GRAY = 1  # type: ignore[attr-defined]
+    fake_cv2.COLOR_GRAY2BGR = 2  # type: ignore[attr-defined]
+    fake_cv2.INTER_AREA = 3  # type: ignore[attr-defined]
+    fake_cv2.INTER_LINEAR = 4  # type: ignore[attr-defined]
+    fake_cv2.cvtColor = lambda img, _code: img  # type: ignore[attr-defined]
+    fake_cv2.createCLAHE = lambda **_kw: _StubClahe()  # type: ignore[attr-defined]
+    fake_cv2.resize = lambda img, size, interpolation=None: _FakeArray(size[0], size[1])  # type: ignore[attr-defined]
+    fake_cv2.utils = types.SimpleNamespace(  # type: ignore[attr-defined]
+        logging=types.SimpleNamespace(LOG_LEVEL_ERROR=0, setLogLevel=lambda _lvl: None)
+    )
+
+    def _create_detector(path: str, *_args: Any) -> _StubDetector:
+        if Path(path).read_bytes() == b"corrupt":
+            raise RuntimeError("bad model")
+        det = _StubDetector()
+        created.append(det)
+        return det
+
+    fake_cv2.FaceDetectorYN = types.SimpleNamespace(create=_create_detector)  # type: ignore[attr-defined]
+
+    fake_np = types.ModuleType("numpy")
+    fake_np.asarray = lambda pil_img: _FakeArray(pil_img.size[0], pil_img.size[1])  # type: ignore[attr-defined]
+
+    monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
+    monkeypatch.setitem(sys.modules, "numpy", fake_np)
+
+    # Missing model file
+    with pytest.raises(DetectionError, match="is missing"):
+        LocalSegmenter()
+
+    model_file = tmp_path / "yunet.onnx"
+    model_file.write_bytes(b"corrupt")
+    with pytest.raises(DetectionError, match="SHA-256 mismatch"):
+        LocalSegmenter()
+    with pytest.raises(DetectionError, match="could not be loaded"):
+        LocalSegmenter(verify=False)
+
+    model_file.write_bytes(body)
+    seg = LocalSegmenter()
+    regions = seg.segment(_png(640, 400))
+    assert [r.entity_type for r in regions] == [EntityType.FACE, EntityType.ID_PHOTO]
+
+    # Also exercise injected detector (self._cv2 is None) resize path with PIL stub
+    injected = LocalSegmenter(detector=_StubDetector())
+    monkeypatch.setattr(
+        Image, "fromarray", lambda arr: Image.new("RGB", (arr.shape[1], arr.shape[0]))
+    )
+    regions_injected = injected.segment(_png(640, 400), [EntityType.FACE])
+    assert [r.entity_type for r in regions_injected] == [EntityType.FACE]
+
+    # Also exercise segment.main(["fetch"])
+    monkeypatch.setattr(segment, "fetch_model", lambda: model_file)
+    assert segment.main(["fetch"]) == 0
+
+
+def test_segment_eval_orchestration_and_reporting(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from pii_guard.visual import segment_eval as se
+
+    # _Timed and _Combined
+    class _Part:
+        model = "part-model"
+
+        def __init__(self, region: Region) -> None:
+            self.region = region
+
+        def segment(self, image: bytes, entity_types: Any = None) -> list[Region]:
+            return [self.region]
+
+    r_face = Region(EntityType.FACE, Box(10, 10, 50, 50), 0.95, "yunet")
+    r_sig = Region(EntityType.SIGNATURE, Box(100, 100, 180, 130), 0.90, "yolos")
+    timed = se._Timed(_Part(r_face))
+    assert timed.model == "part-model"
+    assert timed.segment(b"img") == [r_face]
+    assert timed.last_ms >= 0.0
+
+    combined = se._Combined(_Part(r_face), _Part(r_sig))
+    assert combined.segment(b"img") == [r_face, r_sig]
+
+    # visual_cache_dir and set_paths
+    monkeypatch.setenv("PII_GUARD_VISUAL_CACHE", str(tmp_path / "cache"))
+    assert se.visual_cache_dir() == tmp_path / "cache"
+    monkeypatch.delenv("PII_GUARD_VISUAL_CACHE", raising=False)
+    assert len(se.set_paths("fictional")) == 3
+
+    # run(), build_card(), _notes(), to_record() on the committed fictional set
+    from pii_guard.eval.visual import ExpectedRegion, Specimen
+
+    one_specimen = [
+        Specimen(
+            id="hu-id_card-front",
+            country="HU",
+            doc_type="id_card",
+            side="front",
+            sha256="0" * 64,
+            path=FICTIONAL_CARD,
+            regions=(
+                ExpectedRegion("portrait", (0.05, 0.1, 0.3, 0.7)),
+                ExpectedRegion("signature", (0.4, 0.7, 0.8, 0.9)),
+            ),
+            language="hu",
+        )
+    ]
+    monkeypatch.setattr("pii_guard.eval.visual.load_specimens", lambda *_a, **_kw: one_specimen)
+
+    cand_local = se.Candidate(
+        "local",
+        (se._yunet_detector(),),
+        "MIT",
+        100_000,
+        lambda _t: _Part(r_face),
+    )
+    done = se.run(cand_local, "fictional")
+    assert len(done.results) == 1
+    card = se.build_card(cand_local, "fictional", done, transport=None)
+    assert card["segmenter"]["candidate"] == "local"
+    notes = se._notes(card)
+    assert any("LAB-1229" in n for n in notes)
+    rec = se.to_record(card, cand_local, "fictional", "unit-slug")
+    assert rec["cost"]["usd"] == 0.0
+
+    # Also test hybrid/transport branch and error branch in run()
+    class _FakeTransport:
+        recorded_ms = (12.5, 8.0)
+        calls = 2
+        live_calls = 0
+        cached_calls = 2
+        total_ms = 20.5
+
+    class _HybridStub:
+        def __init__(self) -> None:
+            self.local = timed
+
+        def segment(self, image: bytes, entity_types: Any = None) -> list[Region]:
+            timed.segment(image, entity_types)
+            raise DetectionError("simulated sam error")
+
+    cand_hybrid = se.Candidate(
+        "hybrid",
+        (se._yunet_detector(),),
+        "MIT",
+        100_000,
+        lambda _t: _HybridStub(),
+    )
+    done_h = se.run(cand_hybrid, "fictional", transport=_FakeTransport())
+    assert done_h.results[0].error is not None
+
+    # e2e_summary and add_e2e
+    summary = se.e2e_summary(
+        {"hybrid": [[10.0, 20.0], [12.0, 22.0]]},
+        {"hybrid": [1, 2]},
+        {"hybrid": 0},
+    )
+    assert summary["hybrid"]["rounds"] == 2
+    assert summary["hybrid"]["sam_calls_per_image"] == 1.5
+    se.add_e2e(card, {"modes": summary}, "hybrid")
+    assert card["latency_ms"]["mask_image_per_image_p50"] == summary["hybrid"]["p50_median"]
+    se.add_e2e(card, {"modes": summary}, "missing-mode")
