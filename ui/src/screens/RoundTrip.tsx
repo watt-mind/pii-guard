@@ -30,6 +30,8 @@ interface Props {
   onAnswer: (a: string) => void;
   running: boolean;
   onRun: () => void;
+  /** The latest mask failure, so the empty state can show it instead of a dead button (LAB-1714). */
+  maskError: RunError | null;
 }
 
 type View =
@@ -38,7 +40,7 @@ type View =
   | { kind: "done"; restoration: Restoration; streamed: { chunks: string[] } | null; freshFrom: number }
   | { kind: "error"; error: RunError };
 
-export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: Props) {
+export function RoundTrip({ client, result, answer, onAnswer, running, onRun, maskError }: Props) {
   const [view, setView] = useState<View>({ kind: "idle" });
   const [speed, setSpeed] = useState<SpeedId>("normal");
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
             {running ? "Masking…" : "Mask the sample document"}
           </Button>
         </EmptyState>
+        {maskError && <BlockedNotice error={maskError} onRetry={onRun} />}
       </div>
     );
   }
@@ -296,16 +299,18 @@ export function RoundTrip({ client, result, answer, onAnswer, running, onRun }: 
             {view.kind === "streaming" ? "Streaming the answer" : view.kind === "done" ? `Answer restored, ${restoredCount} values put back` : ""}
           </div>
           {view.kind === "error" ? (
-            <div className="space-y-3">
-              {/* An expired session recovers via "Mask the document again" below; any other
-                  inbound failure retries the restore in place (LAB-1714). */}
-              <BlockedNotice error={view.error} phase="inbound" onRetry={view.error.code === "not_found" ? undefined : () => void restoreNow()} />
-              {view.error.code === "not_found" && (
-                <Button variant="secondary" onClick={onRun} busy={running}>
+            // An expired session recovers via "Mask the document again" in the notice's
+            // action slot; any other inbound failure retries the restore in place (LAB-1714).
+            <BlockedNotice
+              error={view.error}
+              phase="inbound"
+              onRetry={view.error.code === "not_found" ? undefined : () => void restoreNow()}
+              action={view.error.code === "not_found" ? (
+                <Button size="sm" onClick={onRun} busy={running}>
                   Mask the document again
                 </Button>
-              )}
-            </div>
+              ) : undefined}
+            />
           ) : restoration ? (
             <div className="space-y-4">
               <RestoredText segments={restoration.segments} activeKey={activeKey} onActivate={activate} freshFrom={freshFrom} />
