@@ -496,20 +496,25 @@ evicted first, some containing a recent value. A restart clears it; so does
 
 ## Traffic log
 
-Every call to `POST /v1/chat/completions` produces one event, kept **in memory only**, when the
-traffic log is on:
+Every call to `POST /v1/chat/completions`, `POST /v1/responses` or `POST /v1/messages` produces
+one event, kept **in memory only**, when the traffic log is on or a remote dashboard exporter
+is configured:
 
 | Setting | Values | Default |
 |---|---|---|
 | `PII_GUARD_TRAFFIC_LOG` | `off`, `masked`, `full` | `off` (`masked` in the demo) |
 | `PII_GUARD_TRAFFIC_LOG_SIZE` | events kept (ring buffer) | `200` |
+| `PII_GUARD_REMOTE_URL` | dashboard origin (`https://guard.watt-mind.com`), `/v1` or `/e/<endpoint>/v1` | unset |
+| `PII_GUARD_REMOTE_KEY` | bearer credential (`pg_live_...`, `pg_ep_...`, or self-hosted `PII_GUARD_API_TOKEN`) | unset |
+| `PII_GUARD_REMOTE_LEVEL` | `masked` (scrubbed placeholder payloads + stats), `stats` (counts, entity types, model, usage and timings only) | `masked` |
 
 | Endpoint | What it returns |
 |---|---|
 | `GET /v1/traffic?limit=50&after=<seq>` | `{"level", "size", "boot", "events": [...]}`, oldest first |
+| `POST /v1/traffic` (and `POST /e/<endpoint>/v1/traffic`) | `{"accepted", "boot"}`; ingests 1–50 scrubbed `masked` or `stats` events from a local gateway (`422 invalid_request` if `level="full"`, `request.original` or `response.unmasked` is present) |
 | `GET /v1/traffic/stream?replay=10` | Server-sent events: one `traffic` event per call (`id:` = `seq`), a keep-alive comment every 15 s |
 
-Both answer `404 traffic_log_disabled` while the log is off.
+All three answer `404 traffic_log_disabled` while the log is off.
 
 `seq` counts from 1 in each server process. `boot` is a random id (`b_` + 16 hex) chosen at
 startup: a poller that sees it change knows the server restarted and its `after` cursor is

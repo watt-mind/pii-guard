@@ -141,6 +141,9 @@ def _build_lifespan(
             close = getattr(getattr(app.state, "gateway", None), "aclose", None)
             if close is not None:
                 await close()
+            obs_close = getattr(getattr(app.state, "observability", None), "close", None)
+            if obs_close is not None:
+                obs_close()
             if settings.hosted:
                 await app.state.hosted.close()
             app.state.projects.close()

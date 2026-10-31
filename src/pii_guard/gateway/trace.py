@@ -103,7 +103,9 @@ class CallTrace:
         # even refused calls with the id of the traffic event recorded for them.
         self.request_id = request_id or new_request_id()
         self.recording = observability is not None and observability.recording
-        self.payloads = observability is not None and observability.traffic.enabled
+        self.payloads = observability is not None and getattr(
+            observability, "payloads", observability.traffic.enabled
+        )
         self.full = observability is not None and observability.traffic.full
         # The client's request, before masking rewrites it in place (``full`` only).
         self.original: Any = copy.deepcopy(body) if self.full else None
@@ -253,10 +255,11 @@ class CallTrace:
         model_checked = outbound is not None and not outbound.hits
         model = self._resolve_model(model_checked)
         detectors = self._record_detectors()
+        event_level = obs.traffic.level.value if obs.traffic.enabled else "masked"
         event: dict[str, Any] = {
             "id": self.request_id,
             "time": datetime.now(UTC).isoformat(timespec="milliseconds"),
-            "level": obs.traffic.level.value,
+            "level": event_level,
             "outcome": outcome,
             "error": error,
             "mode": self.mode,

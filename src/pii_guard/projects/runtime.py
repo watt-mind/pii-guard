@@ -200,6 +200,10 @@ class ProjectService:
                     SessionDirectory(self.settings.vault_max_sessions),
                 )
                 self._runtimes[namespace] = runtime
+            if endpoint is not None:
+                runtime.observability.traffic.labels = {
+                    "endpoint": {"id": endpoint.id, "name": endpoint.name}
+                }
             runtime.active += 1
             runtime.touched = now
             return runtime

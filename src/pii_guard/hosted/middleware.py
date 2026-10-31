@@ -349,6 +349,8 @@ def _classify_route(
     expected_origin: str,
 ) -> _RoutePlan:
     canonical = routed[1] if routed else _SESSION_PREFIX_RE.sub("", path)
+    if routed is not None and canonical == "/v1/traffic" and method != "POST":
+        raise HostedRequestError("Endpoint traffic route accepts POST only")
     # Hosted images (ADR 0014): signed-in Google owners only, never by key or as a
     # guest, never through an endpoint path, and only while the operator offers them.
     image = canonical == IMAGE_PATH and hosted_images
@@ -384,6 +386,9 @@ def _classify_route(
     # First run (LAB-1455) provisions the owner's default endpoint and its first key:
     # a signed-in owner's, like key management, and free like the account itself.
     first_run = canonical == "/v1/account/first-run"
+    # Scrubbed traffic telemetry from a local gateway spends no inference quota;
+    # the abuse read bucket and text body limit bound it (LAB-1704).
+    traffic_ingest = canonical == "/v1/traffic" and method == "POST"
     # /v1/account is free under every method: it never admits, reserves budget or
     # takes a runtime, so cookieless calls cannot exhaust capacity (LAB-1412).
     account = canonical == "/v1/account"
@@ -395,7 +400,7 @@ def _classify_route(
         needs_runtime = not (account or preflight or credentials)
         # Reads (the console polls them) spend no daily request or token budget and
         # hold no inference concurrency; the abuse read bucket bounds them instead.
-        work = not (account or preflight or read or first_run)
+        work = not (account or preflight or read or first_run or traffic_ingest)
     return _RoutePlan(
         path=path,
         canonical=canonical,
@@ -404,7 +409,7 @@ def _classify_route(
         needs_runtime=needs_runtime,
         work=work,
         paid=canonical in _PAID_ROUTES,
-        read_or_first_run=read or first_run,
+        read_or_first_run=read or first_run or traffic_ingest,
         account=account,
     )
 
@@ -600,6 +605,11 @@ class HostedMiddleware:
         deadline = asyncio.get_running_loop().time() + min(
             BODY_READ_SECONDS, self.service.settings.hosted_request_timeout
         )
+        endpoint_limit = (
+            self.service.settings.hosted_max_body_bytes
+            if plan.canonical == "/v1/traffic"
+            else self.service.settings.hosted_endpoint_max_body_bytes
+        )
         if principal.authenticated and plan.canonical not in {"/v1/account", "/v1/demo"}:
             ctx.state = await anyio.to_thread.run_sync(
                 prepare_project,
@@ -614,7 +624,7 @@ class HostedMiddleware:
                     ctx.scope,
                     ctx.receive,
                     ctx.state,
-                    self.service.settings.hosted_endpoint_max_body_bytes,
+                    endpoint_limit,
                 )
         headers = Headers(scope=ctx.scope)
         # Text routes stay text-sized; the image route gets its own bounded limit, and
@@ -627,10 +637,10 @@ class HostedMiddleware:
             and plan.routed is None
         )
         # Endpoint routes carry coding agents' prompts and tool schemas: their own limit
-        # (LAB-1651); the console and guard API keys keep the text limit.
+        # (LAB-1651); the console, guard API keys and traffic telemetry keep the text limit.
         text_limit = (
             self.service.settings.hosted_endpoint_max_body_bytes
-            if plan.routed is not None
+            if plan.routed is not None and plan.canonical != "/v1/traffic"
             else self.service.settings.hosted_max_body_bytes
         )
         if plan.image:
@@ -924,7 +934,10 @@ class HostedMiddleware:
             ctx.runtime.observability.traffic.labels = {
                 "endpoint": {"id": selected_endpoint.id, "name": selected_endpoint.name}
             }
-        elif plan.canonical in {"/v1/traffic", "/v1/traffic/stream"}:
+        elif (
+            plan.canonical in {"/v1/traffic", "/v1/traffic/stream"}
+            and ctx.scope.get("method") in _READ_METHODS
+        ):
             # No endpoint selected: the project's own runtime plus its endpoints'
             # (LAB-1492). Vault and session routes stay on one runtime.
             ctx.state["hosted_traffic"] = self.service.project_traffic(ctx.runtime, project_id)

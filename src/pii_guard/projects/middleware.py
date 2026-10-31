@@ -19,7 +19,7 @@ from pii_guard.projects.runtime import ProjectAccessError, ProjectService
 from pii_guard.types import PiiGuardError
 
 ENDPOINT_PATH = re.compile(
-    r"^/e/([A-Za-z0-9_-]{1,128})(/v1/(?:chat/completions|responses|models)|/muse-code/models)$"
+    r"^/e/([A-Za-z0-9_-]{1,128})(/v1/(?:chat/completions|responses|models|traffic)|/muse-code/models)$"
 )
 #: Muse Code reads its catalog at the root of its base URL, so an endpoint base URL
 #: (``/e/<id>/v1``) sends the endpoint key here; it is served as ``/e/<id>/muse-code/models``
@@ -113,7 +113,9 @@ def _apply_endpoint_model_policy(body: dict[str, Any], endpoint: Any) -> None:
         )
 
 
-async def _read_endpoint_json_body(receive: Receive, endpoint: Any, maximum: int) -> bytearray:
+async def _read_endpoint_json_body(
+    receive: Receive, endpoint: Any, maximum: int, *, apply_model_policy: bool = True
+) -> bytearray:
     raw = bytearray()
     async with asyncio.timeout(10):
         while True:
@@ -131,7 +133,8 @@ async def _read_endpoint_json_body(receive: Receive, endpoint: Any, maximum: int
         raise ProjectAccessError("Invalid endpoint JSON request") from None
     if not isinstance(body, dict):
         raise ProjectAccessError("Endpoint request must be an object")
-    _apply_endpoint_model_policy(body, endpoint)
+    if apply_model_policy:
+        _apply_endpoint_model_policy(body, endpoint)
     # Compact, so the re-serialised body the hosted limit checks next is no larger than
     # what the client sent (default separators add about 1-2%, LAB-1651).
     return bytearray(json.dumps(body, separators=(",", ":")).encode())
@@ -145,10 +148,17 @@ async def endpoint_body(
     if routed is None:
         return scope, receive
     endpoint, canonical = state["project_endpoint"], routed[1]
+    if canonical == "/v1/traffic" and scope.get("method") != "POST":
+        raise ProjectAccessError("Endpoint key can only post traffic events")
     policy = state["project_policy"]
     _check_endpoint_control_headers(Headers(scope=scope), policy)
     raw = (
-        await _read_endpoint_json_body(receive, endpoint, maximum)
+        await _read_endpoint_json_body(
+            receive,
+            endpoint,
+            maximum,
+            apply_model_policy=canonical != "/v1/traffic",
+        )
         if scope.get("method") not in {"GET", "HEAD", "OPTIONS"}
         else bytearray()
     )
