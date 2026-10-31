@@ -20,11 +20,13 @@ export interface TrafficProps {
   connect?: (o: TrafficConnectOptions) => { close(): void };
   sendDemo?: typeof sendDemoTraffic;
   fixtureIntervalMs?: number;
+  /** Waits between quiet retries of an offline first contact (tests shorten them). */
+  offlineRetries?: readonly number[];
   /** The page's host name (originals are shown only on localhost). */
   pageHost?: string;
 }
 
-export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureIntervalMs"> {
+export interface LogsProps extends Omit<TrafficProps, "connect" | "fixtureIntervalMs" | "offlineRetries"> {
   t: TrafficHandle;
   /** The server's upstream is the offline mock (`/v1/status`): its "model" only echoes. */
   mockUpstream?: boolean;
@@ -135,8 +137,8 @@ function LogControlsBar({ t, demoTraffic, sendDemo, cleared, onClear, modes, typ
 let reopenAfterSwitch: string | null = null;
 
 /** The Logs screen with its own traffic connection (tests, and embedding on its own). */
-export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession" | "focus">) {
-  const t = useTraffic({ forceFixture, connect, fixtureIntervalMs });
+export function Traffic({ forceFixture = false, connect, fixtureIntervalMs, offlineRetries, ...rest }: TrafficProps & Pick<LogsProps, "demoTraffic" | "onOpenSession" | "focus">) {
+  const t = useTraffic({ forceFixture, connect, fixtureIntervalMs, offlineRetries });
   return <Logs t={t} forceFixture={forceFixture} {...rest} />;
 }
 
