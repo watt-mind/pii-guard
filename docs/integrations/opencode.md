@@ -25,8 +25,14 @@ default when a key is set, or any self-hosted PII Guard URL):
 export PII_GUARD_DASHBOARD_KEY=<your-endpoint-or-dashboard-key>
 pii-guard run opencode --endpoint ep_abc123
 # Self-hosted dashboard:
-pii-guard run opencode --dashboard https://pii-guard.internal.example.com --dashboard-key <key>
+pii-guard run opencode --dashboard https://pii-guard.internal.example.com
 ```
+
+Keep the key in `PII_GUARD_DASHBOARD_KEY` (or name a variable with `--dashboard-key-env`):
+`--dashboard-key <key>` works but puts the key in `ps` and your shell history. The agent itself
+never sees a provider or dashboard key: `run` starts it with those variables removed, so it can
+only reach the model through the local gateway. Dashboard and upstream URLs come from flags or
+the real environment, never from a project's `./.env`.
 
 Extra arguments after `--` are passed straight to `opencode` (e.g.
 `pii-guard run opencode -- run --auto "summarise client-letter.md"`).

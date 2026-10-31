@@ -23,13 +23,14 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import socket
 import subprocess
 import sys
 import threading
 import time
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,8 +42,9 @@ from pii_guard.app_bundle import MockServer
 from pii_guard.config import Settings, get_settings
 from pii_guard.gateway import GatewayConfig, Mode
 from pii_guard.gateway.config import cli_mode
-from pii_guard.integrations import snippets
+from pii_guard.integrations import muse_code, pi, snippets
 from pii_guard.integrations.common import ConnectError, fetch_models
+from pii_guard.observability import resolve_ingest_url
 from pii_guard.upstreams import PRESETS, Upstream, by_url
 
 __all__ = [
@@ -53,9 +55,11 @@ __all__ = [
     "ResolvedUpstream",
     "build_agent_invocation",
     "build_parser",
+    "child_base_env",
     "main",
     "resolve_dashboard",
     "resolve_upstream",
+    "run_agent",
     "split_agent_argv",
 ]
 
@@ -176,8 +180,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="KEY",
         help=(
-            "remote dashboard API token or pg_ep_ endpoint key "
-            "(env: PII_GUARD_DASHBOARD_KEY, PII_GUARD_ENDPOINT_KEY, or PII_GUARD_REMOTE_KEY)"
+            "remote dashboard API token or pg_ep_ endpoint key; discouraged, since argv shows "
+            "in ps and shell history: prefer PII_GUARD_DASHBOARD_KEY or --dashboard-key-env"
         ),
     )
     parser.add_argument(
@@ -235,6 +239,16 @@ def _env_or_dotenv(name: str) -> str | None:
     return raw if raw else None
 
 
+def _env(name: str) -> str | None:
+    """Read ``name`` from the real environment only.
+
+    Where traffic goes (upstream and dashboard URLs, endpoint, telemetry level) is never taken
+    from a project's ``./.env``: a cloned repo must not be able to redirect the upstream or
+    switch on monitoring (LAB-1705). Keys may still come from ``./.env``.
+    """
+    return os.environ.get(name) or None
+
+
 def _resolve_preset_upstream(args: argparse.Namespace) -> ResolvedUpstream:
     if args.upstream_url:
         raise ConnectError("pass --upstream or --upstream-url, not both")
@@ -277,7 +291,7 @@ def resolve_upstream(args: argparse.Namespace) -> ResolvedUpstream:
         return ResolvedUpstream(base_url="mock", api_key="", label="mock", mock=True)
     if args.upstream is not None:
         return _resolve_preset_upstream(args)
-    explicit_url = args.upstream_url or _env_or_dotenv("PII_GUARD_UPSTREAM_BASE_URL")
+    explicit_url = args.upstream_url or _env("PII_GUARD_UPSTREAM_BASE_URL")
     if explicit_url:
         return _resolve_explicit_url_upstream(args, explicit_url)
     if args.client == "claude-code":
@@ -327,15 +341,11 @@ def resolve_dashboard(args: argparse.Namespace) -> DashboardTarget:
     """Resolve remote dashboard telemetry settings from CLI flags and environment."""
     level = (
         args.telemetry_level
-        or _env_or_dotenv("PII_GUARD_REMOTE_LEVEL")
-        or _env_or_dotenv("PII_GUARD_TELEMETRY_LEVEL")
+        or _env("PII_GUARD_REMOTE_LEVEL")
+        or _env("PII_GUARD_TELEMETRY_LEVEL")
         or "masked"
     )
-    raw_url = (
-        args.dashboard
-        or _env_or_dotenv("PII_GUARD_DASHBOARD_URL")
-        or _env_or_dotenv("PII_GUARD_REMOTE_URL")
-    )
+    raw_url = args.dashboard or _env("PII_GUARD_DASHBOARD_URL") or _env("PII_GUARD_REMOTE_URL")
     if raw_url and raw_url.strip().lower() in ("off", "none", "false", "0"):
         return DashboardTarget(
             remote_url=None, remote_key=None, remote_level=level, display_url=None
@@ -347,11 +357,11 @@ def resolve_dashboard(args: argparse.Namespace) -> DashboardTarget:
     else:
         key = (
             args.dashboard_key
-            or _env_or_dotenv("PII_GUARD_DASHBOARD_KEY")
-            or _env_or_dotenv("PII_GUARD_REMOTE_KEY")
-            or _env_or_dotenv("PII_GUARD_ENDPOINT_KEY")
+            or _env("PII_GUARD_DASHBOARD_KEY")
+            or _env("PII_GUARD_REMOTE_KEY")
+            or _env("PII_GUARD_ENDPOINT_KEY")
         )
-    endpoint = args.endpoint or _env_or_dotenv("PII_GUARD_ENDPOINT_ID")
+    endpoint = args.endpoint or _env("PII_GUARD_ENDPOINT_ID")
     if not raw_url and not key and not endpoint:
         return DashboardTarget(
             remote_url=None, remote_key=None, remote_level=level, display_url=None
@@ -365,6 +375,10 @@ def resolve_dashboard(args: argparse.Namespace) -> DashboardTarget:
         remote_url = f"{base}/e/{ep_id}/v1"
     else:
         remote_url = base
+    try:
+        resolve_ingest_url(remote_url)  # https only (http for loopback), no credentials
+    except ValueError as exc:
+        raise ConnectError(f"--dashboard: {exc}") from None
     return DashboardTarget(
         remote_url=remote_url,
         remote_key=key,
@@ -425,6 +439,30 @@ def _opencode_config_json(
     return json.dumps(base, separators=(",", ":"))
 
 
+# The gateway token the agents authenticate with; every other PII Guard variable stays private.
+_KEEP_PII_GUARD = frozenset({snippets.TOKEN_ENV})
+
+
+def child_base_env(
+    environ: dict[str, str] | None = None, *, extra_secret_envs: Sequence[str | None] = ()
+) -> dict[str, str]:
+    """The environment the agent starts from: no provider key, dashboard key or gateway setting.
+
+    The agent must only ever reach the model through the local gateway. A provider key left in
+    its environment would let it (or a built-in provider it supports) go around the filter, and
+    any shell tool could print it into a transcript (LAB-1705).
+    """
+    source = dict(os.environ if environ is None else environ)
+    secret_envs = {p.key_env for p in PRESETS.values()}
+    secret_envs |= {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"}
+    secret_envs |= {e for e in extra_secret_envs if e}
+    return {
+        k: v
+        for k, v in source.items()
+        if k not in secret_envs and (not k.startswith("PII_GUARD_") or k in _KEEP_PII_GUARD)
+    }
+
+
 def build_agent_invocation(
     client: str,
     binary: str,
@@ -436,9 +474,14 @@ def build_agent_invocation(
     token: str | None = None,
     agent_dir: str | None = None,
     muse_dir: str | None = None,
+    configure: bool = True,
 ) -> tuple[list[str], dict[str, str]]:
-    """Build ``(command_argv, child_env)`` to launch ``client`` behind ``session_url``."""
-    env = dict(os.environ if base_env is None else base_env)
+    """Build ``(command_argv, child_env)`` to launch ``client`` behind ``session_url``.
+
+    ``base_env`` defaults to :func:`child_base_env`. ``configure=False`` skips writing pi's and
+    Muse Code's config files (``--print-env``).
+    """
+    env = child_base_env() if base_env is None else dict(base_env)
     extra = list(agent_args)
     if client == "opencode":
         token_env = snippets.TOKEN_ENV if token else None
@@ -466,6 +509,8 @@ def build_agent_invocation(
     if client == "claude-code":
         base = session_url[: -len("/v1")] if session_url.endswith("/v1") else session_url
         env["ANTHROPIC_BASE_URL"] = base
+        env.pop("ANTHROPIC_API_KEY", None)
+        env.pop("ANTHROPIC_AUTH_TOKEN", None)
         if token:
             env["ANTHROPIC_AUTH_TOKEN"] = token
         else:
@@ -477,7 +522,7 @@ def build_agent_invocation(
         c_args = ["pi", "--gateway", session_url, "--model", model]
         if agent_dir:
             c_args += ["--agent-dir", agent_dir]
-        if connect_main(c_args, stdout=io.StringIO()) != 0:
+        if configure and connect_main(c_args, stdout=io.StringIO()) != 0:
             raise ConnectError("failed to configure pi models.json")
         return [binary, "--provider", "pii-guard", "--model", model, *extra], env
     from pii_guard.integrations.cli import main as connect_main
@@ -485,9 +530,10 @@ def build_agent_invocation(
     c_args = ["muse-code", "--gateway", session_url]
     if muse_dir:
         c_args += ["--muse-dir", muse_dir]
-    if connect_main(c_args, stdout=io.StringIO()) != 0:
+    if configure and connect_main(c_args, stdout=io.StringIO()) != 0:
         raise ConnectError("failed to configure Muse Code settings.json")
-    env.setdefault("META_API_KEY", "pii-guard-local")
+    # Always the placeholder: Muse Code sends it as its bearer to the local gateway.
+    env["META_API_KEY"] = "pii-guard-local"
     return [binary, *extra], env
 
 
@@ -514,6 +560,65 @@ def _discover_model(
     if upstream.preset and upstream.preset.default_model:
         return upstream.preset.default_model
     return snippets.FALLBACK_MODEL
+
+
+def _config_files(args: argparse.Namespace) -> list[Path]:
+    """The agent config files ``run`` writes for this client (restored afterwards)."""
+    if args.client == "pi":
+        return [Path(pi.config_path(args.agent_dir))]
+    if args.client == "muse-code":
+        return [Path(muse_code.config_path(args.muse_dir))]
+    return []
+
+
+@contextmanager
+def _restored_files(paths: Sequence[Path]) -> Iterator[None]:
+    """Put ``paths`` back as they were, and drop the backups written meanwhile.
+
+    ``run`` points pi and Muse Code at a throwaway port; left behind, a plain ``muse`` would
+    send its bearer to whatever takes that port next (LAB-1705).
+    """
+    saved = {p: p.read_bytes() if p.exists() else None for p in paths}
+    backups = {p: set(p.parent.glob(f"{p.name}.pii-guard-backup-*")) for p in paths}
+    try:
+        yield
+    finally:
+        for p, old in saved.items():
+            if old is None:
+                p.unlink(missing_ok=True)
+            else:
+                p.write_bytes(old)
+            for new_backup in set(p.parent.glob(f"{p.name}.pii-guard-backup-*")) - backups[p]:
+                new_backup.unlink(missing_ok=True)
+
+
+def run_agent(cmd: Sequence[str], env: dict[str, str]) -> int:
+    """Run the agent to completion and return its exit status (``128 + n`` for signal ``n``).
+
+    Ctrl-C reaches the agent from the terminal (same process group) and means "cancel this
+    turn" to interactive agents, so this process ignores SIGINT while waiting instead of
+    killing the agent. SIGTERM and SIGHUP sent to this process are forwarded to the agent, so
+    it never outlives its gateway.
+    """
+    proc = subprocess.Popen(list(cmd), env=env)  # noqa: S603
+
+    def forward(signum: int, _frame: object) -> None:
+        with suppress(ProcessLookupError):
+            proc.send_signal(signum)
+
+    handlers: dict[int, Any] = {}
+    if threading.current_thread() is threading.main_thread():
+        handlers[signal.SIGINT] = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        for name in ("SIGTERM", "SIGHUP"):
+            signum = getattr(signal, name, None)
+            if signum is not None:
+                handlers[signum] = signal.signal(signum, forward)
+    try:
+        code = proc.wait()
+    finally:
+        for signum, previous in handlers.items():
+            signal.signal(signum, previous)
+    return 128 - code if code < 0 else code
 
 
 @contextmanager
@@ -547,8 +652,9 @@ def _local_gateway(
     from pii_guard.api.app import create_app
 
     mock_server: MockServer | None = None
+    # No SO_REUSEADDR: on macOS it can let 127.0.0.1:<port> bind while another server holds
+    # 0.0.0.0:<port>, hiding a collision with a running `pii-guard up`.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         sock.bind(("127.0.0.1", args.port))
     except OSError as exc:
@@ -658,6 +764,8 @@ def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any =
     try:
         upstream = resolve_upstream(args)
         dashboard = resolve_dashboard(args)
+        # Taken before the gateway's overrides go into os.environ, minus every secret.
+        base_env = child_base_env(extra_secret_envs=(args.api_key_env, args.dashboard_key_env))
         binary = "dry-run" if args.print_env else _resolve_binary(args.client, args.agent_bin)
         with _local_gateway(args, upstream, dashboard) as (gateway_root, _app):
             session_id = f"c_{secrets.token_hex(16)}"
@@ -665,39 +773,45 @@ def main(argv: Sequence[str] | None = None, *, stdout: Any = None, stderr: Any =
             token_secret = get_settings().api_token
             token = token_secret.get_secret_value() if token_secret is not None else None
             model = _discover_model(args, upstream, f"{gateway_root}/v1", token)
-            cmd, child_env = build_agent_invocation(
-                args.client,
-                binary,
-                session_url,
-                model,
-                agent_args,
-                token=token,
-                agent_dir=args.agent_dir,
-                muse_dir=args.muse_dir,
-            )
-            if args.print_env:
-                info = {
-                    "client": args.client,
-                    "gateway_url": f"{gateway_root}/v1",
-                    "session_url": session_url,
-                    "upstream": upstream.base_url,
-                    "model": model,
-                    "mode": args.mode,
-                    "remote_url": dashboard.remote_url,
-                    "remote_level": dashboard.remote_level if dashboard.remote_url else None,
-                    "dashboard_url": dashboard.display_url,
-                    "command": cmd,
-                }
-                print(json.dumps(info, indent=2), file=stdout)
-                return 0
-            _print_banner(
-                args.client, gateway_root, model, args.mode, upstream, dashboard, stderr=stderr
-            )
-            try:
-                completed = subprocess.run(cmd, env=child_env, check=False)  # noqa: S603
-                return int(completed.returncode)
-            except KeyboardInterrupt:
-                return 130
+            restore = _restored_files([] if args.print_env else _config_files(args))
+            with restore:
+                cmd, child_env = build_agent_invocation(
+                    args.client,
+                    binary,
+                    session_url,
+                    model,
+                    agent_args,
+                    base_env=base_env,
+                    token=token,
+                    agent_dir=args.agent_dir,
+                    muse_dir=args.muse_dir,
+                    configure=not args.print_env,
+                )
+                if not args.print_env:
+                    _print_banner(
+                        args.client,
+                        gateway_root,
+                        model,
+                        args.mode,
+                        upstream,
+                        dashboard,
+                        stderr=stderr,
+                    )
+                    return run_agent(cmd, child_env)
+            info = {
+                "client": args.client,
+                "gateway_url": f"{gateway_root}/v1",
+                "session_url": session_url,
+                "upstream": upstream.base_url,
+                "model": model,
+                "mode": args.mode,
+                "remote_url": dashboard.remote_url,
+                "remote_level": dashboard.remote_level if dashboard.remote_url else None,
+                "dashboard_url": dashboard.display_url,
+                "command": cmd,
+            }
+            print(json.dumps(info, indent=2), file=stdout)
+            return 0
     except ConnectError as exc:
         print(f"pii-guard run: {exc}", file=stderr)
         return 2

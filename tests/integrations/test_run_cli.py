@@ -8,6 +8,7 @@ from __future__ import annotations
 import io
 import json
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,9 +22,11 @@ from pii_guard.integrations.run import (
     _resolve_binary,
     build_agent_invocation,
     build_parser,
+    child_base_env,
     main,
     resolve_dashboard,
     resolve_upstream,
+    run_agent,
     split_agent_argv,
 )
 from pii_guard.upstreams import PRESETS
@@ -409,18 +412,28 @@ def test_run_print_env_and_end_to_end_subprocess(
         ")\n"
         "with urllib.request.urlopen(req, timeout=10) as resp:\n"
         "    reply = json.loads(resp.read().decode('utf-8'))\n"
+        "root = base_url.split('/s/')[0]\n"
+        "with urllib.request.urlopen(root + '/v1/traffic', timeout=10) as resp:\n"
+        "    traffic = json.loads(resp.read().decode('utf-8'))\n"
         f"with open({str(out_file)!r}, 'w', encoding='utf-8') as f:\n"
-        "    json.dump({'argv': sys.argv[1:], 'reply': reply}, f)\n"
+        "    json.dump({'argv': sys.argv[1:], 'reply': reply, 'traffic': traffic,\n"
+        "               'env': sorted(os.environ)}, f)\n"
         "sys.exit(0)\n",
         encoding="utf-8",
     )
     fake_agent.chmod(fake_agent.stat().st_mode | stat.S_IEXEC)
 
+    # Secrets in the parent's environment must not reach the agent (LAB-1705).
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-synthetic-openai-0001")
+    monkeypatch.setenv("META_API_KEY", "synthetic-meta-0001")
+    monkeypatch.setenv("PII_GUARD_DASHBOARD_KEY", "synthetic-dashboard-0001")
     exit_code = root_main(
         [
             "run",
             "opencode",
             "--mock",
+            "--dashboard",
+            "off",
             "--agent-bin",
             str(fake_agent),
             "--",
@@ -434,3 +447,130 @@ def test_run_print_env_and_end_to_end_subprocess(
     content = recorded["reply"]["choices"][0]["message"]["content"]
     # The mock upstream echoed the masked placeholder, and the local gateway restored the email
     assert "jane.placeholder@example.net" in content
+    # What was forwarded upstream held a placeholder, never the email.
+    [event] = recorded["traffic"]["events"]
+    forwarded = json.dumps(event["request"]["masked"])
+    assert "jane.placeholder@example.net" not in forwarded
+    assert "[[EMAIL_" in forwarded
+    leaked = {"OPENAI_API_KEY", "META_API_KEY", "PII_GUARD_DASHBOARD_KEY", "PII_GUARD_REMOTE_KEY"}
+    assert leaked.isdisjoint(recorded["env"])
+
+
+def test_resolve_dashboard_refuses_plaintext_remote() -> None:
+    args = build_parser().parse_args(["opencode", "--dashboard", "http://dash.example"])
+    with pytest.raises(ConnectError, match="https"):
+        resolve_dashboard(args)
+
+
+def test_child_base_env_drops_provider_and_dashboard_secrets() -> None:
+    env = child_base_env(
+        {
+            "PATH": "/usr/bin",
+            "HOME": "/home/synthetic",
+            "OPENAI_API_KEY": "x",
+            "ANTHROPIC_API_KEY": "x",
+            "META_API_KEY": "x",
+            "MY_PROVIDER_KEY": "x",
+            "PII_GUARD_REMOTE_KEY": "x",
+            "PII_GUARD_UPSTREAM_API_KEY": "x",
+            "PII_GUARD_TENANT_KEY": "x",
+            "PII_GUARD_API_TOKEN": "gateway-token",
+        },
+        extra_secret_envs=("MY_PROVIDER_KEY", None),
+    )
+    assert env == {
+        "PATH": "/usr/bin",
+        "HOME": "/home/synthetic",
+        "PII_GUARD_API_TOKEN": "gateway-token",
+    }
+    _cmd, muse_env = build_agent_invocation(
+        "muse-code", "muse", "http://127.0.0.1:1/s/c_x/v1", "m", [], base_env={}, configure=False
+    )
+    assert muse_env["META_API_KEY"] == "pii-guard-local"
+    _cmd, claude_env = build_agent_invocation(
+        "claude-code",
+        "claude",
+        "http://127.0.0.1:1/s/c_x/v1",
+        "m",
+        [],
+        base_env={"ANTHROPIC_API_KEY": "real"},
+        token="gateway-token",  # noqa: S106 - fictional
+    )
+    assert "ANTHROPIC_API_KEY" not in claude_env
+    assert claude_env["ANTHROPIC_AUTH_TOKEN"] == "gateway-token"  # noqa: S105 - fictional
+
+
+def test_run_restores_muse_settings_and_leaves_no_backup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_provider_env(monkeypatch)
+    muse_dir = tmp_path / "muse"
+    muse_dir.mkdir()
+    settings = muse_dir / "settings.json"
+    original = b'{"theme": "dark"}\n'
+    settings.write_bytes(original)
+    seen = tmp_path / "seen.json"
+    fake = tmp_path / "fake-muse"
+    fake.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, pathlib, sys\n"
+        f"cfg = json.loads(pathlib.Path({str(settings)!r}).read_text())\n"
+        f"pathlib.Path({str(seen)!r}).write_text(json.dumps(cfg))\n",
+        encoding="utf-8",
+    )
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    code = main(
+        [
+            "muse-code",
+            "--mock",
+            "--dashboard",
+            "off",
+            "--muse-dir",
+            str(muse_dir),
+            "--agent-bin",
+            str(fake),
+        ],
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+    assert code == 0
+    # The agent ran against the local gateway...
+    assert "127.0.0.1" in json.loads(seen.read_text())["endpoint_transport"]["base_url"]
+    # ...and the user's file is back, byte for byte, with no backup left behind.
+    assert settings.read_bytes() == original
+    assert sorted(p.name for p in muse_dir.iterdir()) == ["settings.json"]
+
+    # --print-env writes nothing.
+    main(
+        ["muse-code", "--mock", "--dashboard", "off", "--muse-dir", str(muse_dir), "--print-env"],
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+    assert settings.read_bytes() == original
+
+
+def test_run_agent_survives_ctrl_c_and_forwards_sigterm(tmp_path: Path) -> None:
+    import os
+    import signal
+    import threading
+    import time
+
+    ready = tmp_path / "ready"
+    child = (
+        "import pathlib, signal, sys, time\n"
+        "signal.signal(signal.SIGTERM, lambda *_: sys.exit(7))\n"
+        f"pathlib.Path({str(ready)!r}).touch()\n"
+        "time.sleep(20)\n"
+    )
+
+    def signal_parent() -> None:
+        deadline = time.monotonic() + 10
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        os.kill(os.getpid(), signal.SIGINT)  # ignored: the agent decides what Ctrl-C means
+        time.sleep(0.2)
+        os.kill(os.getpid(), signal.SIGTERM)  # forwarded to the agent
+
+    threading.Thread(target=signal_parent, daemon=True).start()
+    assert run_agent([sys.executable, "-c", child], dict(os.environ)) == 7
