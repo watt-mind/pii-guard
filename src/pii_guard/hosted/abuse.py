@@ -250,6 +250,31 @@ class AbuseAdmission:
                     )
                 )
 
+    def check_anonymous(self, headers: Headers) -> None:
+        """Refuse, without charging, when this network's anonymous allowance is spent.
+
+        For a route that should only pay for failures (``GET /metrics``: a good scrape token
+        costs nothing, a bad guess is charged with :meth:`admit`). No-op with source off.
+        """
+        if self.source == "off":
+            return
+        network, aggregate = self._network_keys(headers)
+        levels = (
+            (self._aggregates, aggregate, *AGGREGATE_RATE, AGGREGATE_HOURLY),
+            (self._networks, network, *NETWORK_RATE, NETWORK_HOURLY),
+        )
+        with self._lock:
+            now = self._now()
+            wait, sign_in = 0, False
+            for table, key, burst, rate, hourly in levels:
+                bucket = table.get(key)
+                if bucket is None:
+                    continue
+                level_wait, level_sign_in = self._charge_wait(bucket, now, burst, rate, hourly)
+                wait, sign_in = max(wait, level_wait), sign_in or level_sign_in
+        if wait:
+            raise AbuseAdmissionError(wait, sign_in=sign_in)
+
     def _charge(
         self,
         levels: tuple[
