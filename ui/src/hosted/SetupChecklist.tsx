@@ -4,7 +4,7 @@ import type { Account, Requester } from "./api";
 import { SETUP_STEPS, getLastRead, loadSetup, publish, subscribe, type SetupState } from "./setup";
 
 /** One ordered setup list with ticks and one primary action: the next step not yet done. */
-export function SetupChecklist({ call, account, active, calls }: { call: Requester; account: Account; active: boolean; calls: number }) {
+export function SetupChecklist({ call, account, active, calls, retryDelayMs = 2000 }: { call: Requester; account: Account; active: boolean; calls: number; retryDelayMs?: number }) {
   const state = useSyncExternalStore(subscribe, getLastRead, () => null);
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -12,15 +12,19 @@ export function SetupChecklist({ call, account, active, calls }: { call: Request
   useEffect(() => {
     if (!active) return;
     let live = true;
-    loadSetup(call, account).then(
-      (s) => { if (live) { publish(s); setFailed(false); setLoading(false); } },
-      // Preserve the last good progress, but make failed refreshes recoverable.
-      () => { if (live) { publish(getLastRead()); setFailed(true); setLoading(false); } },
-    );
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const done = (s: SetupState) => { if (live) { publish(s); setFailed(false); setLoading(false); } };
+    // Preserve the last good progress, but make failed refreshes recoverable.
+    const fail = () => { if (live) { publish(getLastRead()); setFailed(true); setLoading(false); } };
+    // One quiet retry first: a deploy's revision swap or a network blip shouldn't raise a warning (LAB-1703).
+    loadSetup(call, account).then(done, () => {
+      if (live) retry = setTimeout(() => loadSetup(call, account).then(done, fail), retryDelayMs);
+    });
     return () => {
       live = false;
+      clearTimeout(retry);
     };
-  }, [call, account, active, revision]);
+  }, [call, account, active, revision, retryDelayMs]);
   // Don't flash the spinner text for a quick refresh when earlier progress is already showing.
   // Keyed to the refresh it belongs to, so a finished refresh never makes the next one show at once.
   const [lateFor, setLateFor] = useState<number | null>(null);

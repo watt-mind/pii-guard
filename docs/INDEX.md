@@ -5,6 +5,8 @@
 | [why-pii-guard.md](why-pii-guard.md) | What is different about PII Guard, each claim with its evidence and status |
 | [vision.md](vision.md) | The problem, who it is for, goals and non-goals |
 | [architecture.md](architecture.md) | Components, data flow, APIs, the gateway and streaming re-identification |
+| [operations.md](operations.md) | Operations runbook: gateway commands, wheel build, smoke tests, metrics and demo stack |
+| [releasing.md](releasing.md) | Release process: semantic versioning, CI provenance gate, tag-driven publishing to PyPI and GHCR |
 | [private-dev.md](private-dev.md) | Tailnet-only dev networking, proxy credentials, app-only releases and live activation gates |
 | [hosted.md](hosted.md) | Hosted deployment, trust boundary, actual retention, release gates and rollback |
 | [api.md](api.md) | API guide: OpenAI SDK quickstart, API token vs endpoint keys, sessions and restore, generated error table; the read-only reference is [openapi.json](openapi.json), rendered at [guard.watt-mind.com/#api](https://guard.watt-mind.com/#api) |

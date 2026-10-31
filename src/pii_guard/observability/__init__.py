@@ -70,5 +70,5 @@ class Observability:
 
     def record(self, event: dict[str, Any]) -> None:
         if self.metrics is not None:
-            self.metrics.observe(event["mode"] or "-", event["outcome"], event["timing"])
+            self.metrics.observe(event["mode"] or "-", event["outcome"], event["timing"], event)
         self.traffic.publish(event)

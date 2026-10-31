@@ -175,9 +175,30 @@ async def traffic_stream(
     )
 
 
+def _live_session_count(state: Any) -> int:
+    total = 0
+    vault = getattr(state, "vault", None)
+    if vault is not None:
+        total += len(vault.live_sessions())
+    projects = getattr(state, "projects", None)
+    if projects is not None:
+        total += projects.live_session_count()
+    return total
+
+
 @router.get("/metrics", include_in_schema=False)
 def metrics(request: Request) -> PlainTextResponse:
-    obs = _observability(request)
+    state = request.app.state
+    obs = (
+        _observability(request)
+        if getattr(getattr(state, "settings", None), "hosted", False)
+        else getattr(state, "observability", None) or _observability(request)
+    )
     if obs.metrics is None:
         raise MetricsDisabledError("metrics are off; set PII_GUARD_METRICS=true")
-    return PlainTextResponse(obs.metrics.render(), media_type="text/plain; version=0.0.4")
+    warmup = getattr(state, "ner_warmup", None)
+    body = obs.metrics.render(
+        active_sessions=_live_session_count(state),
+        ner_state=getattr(warmup, "state", None),
+    )
+    return PlainTextResponse(body, media_type="text/plain; version=0.0.4")
