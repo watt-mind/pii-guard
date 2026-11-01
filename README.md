@@ -7,7 +7,7 @@
 
 [![Try it live](https://img.shields.io/badge/try%20it%20live-guard.watt--mind.com-b6f36b)](https://guard.watt-mind.com)
 [![Demo Video](https://img.shields.io/badge/demo%20video-3--min%20walkthrough-blue)](https://youtu.be/Lsr74ddhxRo)
-[![CI](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml)
+[![CI](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml)
 [![Model on Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20model-pii--guard--ner--xlmr--base-yellow)](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 

@@ -1,9 +1,7 @@
 # Hosted deployment pipeline
 
 This prepares reviewed deployment automation for **develop → dev** and **main → prod**.
-The repository default branch is `main`, the production branch: it only moves on a release
-(a `develop` → `main` pull request), so clones and `git+` installs get the last release. Work
-lands on `develop`. The existing
+The repository default branch is `develop`; `main` is the production branch. The existing
 version-tag workflow continues to publish the self-hosted image and Python distributions.
 It does not deploy the hosted application.
 

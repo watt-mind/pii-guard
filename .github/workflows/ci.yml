@@ -7,8 +7,7 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
-  # Nightly full run of develop (checked out explicitly: schedules fire on the default branch,
-  # main, which only moves on a release): every test, including the slow ones.
+  # Nightly full run on the default branch (develop): every test, including the slow ones.
   schedule:
     - cron: "23 2 * * *"
 
@@ -25,8 +24,6 @@ env:
   # Keep in step with the uv image pinned in Dockerfile/Dockerfile.hosted.
   UV_VERSION: "0.13.6"
   FORCE_COLOR: "1"
-  # The nightly tests develop; every other event checks out its own ref (empty = the default).
-  CHECKOUT_REF: ${{ github.event_name == 'schedule' && 'develop' || '' }}
 
 jobs:
   changes:
@@ -42,7 +39,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           # Full history for the merge base, without file contents: only names are compared.
           fetch-depth: 0
           filter: blob:none
@@ -62,7 +58,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -81,7 +76,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -106,7 +100,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -166,7 +159,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -197,7 +189,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -216,7 +207,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build
@@ -256,7 +246,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - name: Install pinned Bicep compiler (no Azure login)
         run: az bicep install --version v0.48.1
@@ -289,7 +278,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build hosted UI and pinned CPU NER image
@@ -338,7 +326,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - id: tag
         name: Image reference
@@ -391,7 +378,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -422,7 +408,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -472,7 +457,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -498,7 +482,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -522,7 +505,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
@@ -542,7 +524,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           fetch-depth: 0
           persist-credentials: false
       - name: Secrets in the commits this change adds
@@ -558,7 +539,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.CHECKOUT_REF }}
           persist-credentials: false
       - name: Relative links in README.md and docs/** (offline; external links run weekly)
         run: scripts/ci/lychee.sh --offline
@@ -618,7 +598,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue create --repo "${{ github.repository }}" \
-            --title "Nightly CI failed on develop" \
+            --title "Nightly CI failed on develop (${{ github.sha }})" \
             --body "The scheduled full run failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Triage the failure and file follow-ups in Linear (project PII Guard, team LAB)."
 
   # Disabled until reviewed identity, network, durable budget and release gates are configured.
