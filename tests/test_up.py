@@ -362,6 +362,14 @@ def test_banner_names_the_ner_model_or_why_there_is_none(
         UpOptions(port=18999), Status(upstream="mock", detectors=["rules"]), "masked", ui=True
     )
     assert "free-text names need NER" in text and "[ner]" in text
+    # Intel macOS has no PyTorch build: point at Docker, not at a reinstall (LAB-1743).
+    from pii_guard.detect import stack
+
+    monkeypatch.setattr(stack, "no_torch_build", lambda: True)
+    text = _banner(
+        UpOptions(port=18999), Status(upstream="mock", detectors=["rules"]), "masked", ui=True
+    )
+    assert "no Intel macOS build" in text and "Docker" in text and "[ner]" not in text
 
 
 _UP_ENV = (

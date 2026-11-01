@@ -190,7 +190,7 @@ text='Hi, I am Zorblat Quimbleworth, write to zorblat.quimbleworth@example.com'
 reply="$(post /v1/chat/completions "{\"model\":\"pii-guard-mock\",\"messages\":[{\"role\":\"user\",\"content\":\"$text\"}]}")"
 grep -q "Echo: $text" <<<"$reply" || fail "chat reply was not restored: $reply"
 last="$(curl -fsS "$base/v1/traffic?limit=1")"
-python3 - "$last" <<'PY' || fail "the traffic log does not show the chat call masked: $last"
+python3 - "$last" "$expect_ner" <<'PY' || fail "the traffic log does not show the chat call masked: $last"
 import json, sys
 
 events = json.loads(sys.argv[1])["events"]
@@ -200,7 +200,9 @@ masked = (e.get("entities") or {}).get("masked") or {}
 assert masked.get("EMAIL"), f"no masked EMAIL: {masked}"
 assert (e.get("outbound_check") or {}).get("result") == "passed", e.get("outbound_check")
 assert e.get("outcome") == "ok", e.get("outcome")
-assert "zorblat" not in json.dumps(e).lower(), "the masked event contains the original"
+# Rules only (no NER) mask the e-mail address, not the free-text name.
+original = "zorblat.quimbleworth@example.com" if sys.argv[2] == "off" else "zorblat"
+assert original not in json.dumps(e).lower(), "the masked event contains the original"
 print(f"traffic: masked {masked}, outbound check passed")
 PY
 resp_reply="$(post /v1/responses "{\"model\":\"pii-guard-mock\",\"input\":\"$text\"}")"

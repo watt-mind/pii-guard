@@ -167,10 +167,15 @@ def default_detector_names(settings: Settings) -> tuple[str, ...]:
     return ("rules",)
 
 
-def _missing_ner_reason() -> str:
+def no_torch_build() -> bool:
+    """Intel macOS: PyTorch publishes no wheel, so the install skips it (LAB-1743)."""
     import platform
 
-    if sys.platform == "darwin" and platform.machine() == "x86_64":
+    return sys.platform == "darwin" and platform.machine() == "x86_64"
+
+
+def _missing_ner_reason() -> str:
+    if no_torch_build():
         # The torch dependency is skipped there (pyproject.toml): no wheel exists (LAB-1743).
         return (
             "PyTorch has no Intel macOS build; for rules + NER run the Docker image "
