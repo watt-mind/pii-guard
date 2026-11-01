@@ -218,6 +218,21 @@ def _text_slot(holder: dict[str, Any] | list[Any], key: Any, kind: str) -> TextS
     return TextSlot(hidden, write, kind)
 
 
+def dumps_utf8(value: Any) -> str:
+    """``json.dumps`` that can always be sent as UTF-8.
+
+    JSON may carry a lone surrogate escape (``"\\ud83d"``, a tool output truncated mid-emoji).
+    Decoded, it cannot be encoded to UTF-8; such a value is re-escaped as ASCII instead of
+    failing the request with a 500.
+    """
+    text = json.dumps(value, ensure_ascii=False)
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return json.dumps(value)
+    return text
+
+
 # Tool outputs commonly contain JSON serialized into a text field. Decode only complete
 # structured JSON, with explicit byte/tree/layer bounds; re-encode each string layer after
 # its decoded contents have been masked (LAB-1755). A tool JSON text over its size, node or
@@ -260,7 +275,7 @@ def _collect_tool_output(
                 _collect_json(decoded, 0, out, "tool", string_collector=collect_leaf)
 
                 def serialize() -> None:
-                    holder[key] = json.dumps(decoded[0], ensure_ascii=False)
+                    holder[key] = dumps_utf8(decoded[0])
 
                 out.finalizers.append(serialize)
                 return
@@ -883,7 +898,7 @@ def _collect_arguments(function: dict[str, Any], where: str, out: CollectedTexts
     _collect_json(holder, 0, out)
 
     def reserialize() -> None:
-        function["arguments"] = json.dumps(holder[0], ensure_ascii=False)
+        function["arguments"] = dumps_utf8(holder[0])
 
     out.finalizers.append(reserialize)
 

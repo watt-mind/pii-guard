@@ -234,3 +234,69 @@ def test_json_root_strings_and_arrays_remain_valid_json(case: str, shape: str) -
         assert PLACEHOLDER_RE.fullmatch(masked[0])
         assert PLACEHOLDER_RE.fullmatch(masked[1]["number"])
         assert masked[2] == 7
+
+
+def _echo_answer(path: str, text: str) -> dict[str, Any]:
+    if path.endswith("responses"):
+        return {
+            "object": "response",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": text}],
+                }
+            ],
+        }
+    if path.endswith("messages"):
+        return {"type": "message", "role": "assistant", "content": [{"type": "text", "text": text}]}
+    return {"choices": [{"index": 0, "message": {"role": "assistant", "content": text}}]}
+
+
+def _answer_text(case: str, body: dict[str, Any]) -> str:
+    if case.startswith("responses"):
+        return body["output"][0]["content"][0]["text"]
+    if case.startswith("messages"):
+        return body["content"][0]["text"]
+    return body["choices"][0]["message"]["content"]
+
+
+@pytest.mark.parametrize("case", ["chat-string", "responses-string", "messages-string"])
+@pytest.mark.parametrize("surrogate", ["\ud83d", "\udc00"])
+def test_lone_surrogates_in_tool_json_are_masked_and_restored(case: str, surrogate: str) -> None:
+    forwarded: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        forwarded.append(body)
+        tokens = PLACEHOLDER_RE.findall(json.dumps(body))
+        echo = " ".join(f"[[{kind}_{tag}]]" for kind, tag in tokens)
+        return httpx.Response(200, json=_echo_answer(request.url.path, f"Saw {echo}."))
+
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY,
+        upstream_base_url=UPSTREAM_URL,
+        upstream_api_key=UPSTREAM_KEY,
+        detection_profile="local-only",
+        detectors=("rules",),
+    )
+    app = make_app(
+        transport=httpx.MockTransport(handler),
+        settings=settings,
+        config=GatewayConfig(mode=Mode.FAST),
+    )
+    email = "fixture.user@example.com"
+    # A tool output truncated mid-emoji: valid JSON, but its decoded string is not UTF-8.
+    text = json.dumps({"note": surrogate + " truncated", "mail": email})
+    path, body = payload(case, text)
+    with TestClient(app) as client:
+        response = client.post(
+            path, content=json.dumps(body).encode(), headers={"content-type": "application/json"}
+        )
+    assert response.status_code == 200, response.text
+    sent = json.loads(output_of(case, forwarded[0]))
+    assert sent["note"] == surrogate + " truncated"
+    assert PLACEHOLDER_RE.fullmatch(sent["mail"])
+    assert email not in json.dumps(forwarded[0])
+    assert _answer_text(case, response.json()) == f"Saw {email}."

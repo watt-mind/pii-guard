@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import logging
 import re
 import threading
@@ -79,6 +78,7 @@ from pii_guard.gateway.request import (
     ImageSlot,
     InvalidChatRequestError,
     TextSlot,
+    dumps_utf8,
 )
 from pii_guard.gateway.sessions import (
     SESSION_HEADER,
@@ -511,11 +511,11 @@ class Gateway:
         add_note: Callable[[dict[str, Any]], None],
     ) -> bytes:
         """The masked body as sent upstream, with the placeholder note if it needs one."""
-        text = json.dumps(body, ensure_ascii=False)
+        text = dumps_utf8(body)
         if self.config.placeholder_note and needs_note(text, session):
             add_note(body)
             stats.note = True
-            text = json.dumps(body, ensure_ascii=False)
+            text = dumps_utf8(body)
         return text.encode("utf-8")
 
     _forwarded = forwarded
