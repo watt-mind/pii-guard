@@ -98,6 +98,9 @@ logger = logging.getLogger("pii_guard.gateway")
 
 REQUEST_ID_HEADER = "X-PII-Guard-Request-Id"
 MODE_HEADER = "X-PII-Guard-Mode"
+#: Escalate mode: texts sent to the LLM as masked windows in this request (LAB-1766).
+ESCALATIONS_HEADER = "X-PII-Guard-Escalations"
+ESCALATION_FAILURES_HEADER = "X-PII-Guard-Escalation-Failures"
 LANGUAGE_HEADER = "X-PII-Guard-Language"
 # Opt-in: "masked" echoes back what the upstream saw (the masked messages) and said (its
 # masked answer), for UIs that show the boundary. Masked text only, never the values.
@@ -165,6 +168,10 @@ class RequestStats:
     outbound: OutboundCheck | None = None
     #: Reasoning items/blocks removed for an opaque blob not issued in this session.
     opaque_stripped: int = 0
+    #: Escalate mode (LAB-1766): texts sent to the LLM as masked windows, and the calls of
+    #: those that failed closed. Always 0 in fast and audit mode.
+    audit_escalations: int = 0
+    escalation_failures: int = 0
 
     def headers(self, session_id: str) -> dict[str, str]:
         out = {
@@ -188,6 +195,10 @@ class RequestStats:
                 f'299 pii-guard "{MODE_HEADER}: {self.mode_alias} is deprecated, '
                 f'use {self.mode.value}"'
             )
+        if self.mode is Mode.ESCALATE:
+            out[ESCALATIONS_HEADER] = str(self.audit_escalations)
+            if self.escalation_failures:
+                out[ESCALATION_FAILURES_HEADER] = str(self.escalation_failures)
         if self.images:
             out["X-PII-Guard-Images"] = str(self.images)
             out["X-PII-Guard-Image-Regions-Masked"] = str(sum(self.image_masked.values()))
@@ -208,6 +219,9 @@ class RequestStats:
             fields["outbound_check"] = self.outbound.result
         if self.opaque_stripped:
             fields["opaque_reasoning_stripped"] = self.opaque_stripped
+        if self.mode is Mode.ESCALATE:
+            fields["audit_escalations"] = self.audit_escalations
+            fields["escalation_failures"] = self.escalation_failures
         if self.images:
             fields["images"] = self.images
             fields["image_masked"] = _counts(self.image_masked)

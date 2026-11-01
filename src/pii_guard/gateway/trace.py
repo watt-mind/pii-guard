@@ -291,6 +291,10 @@ class CallTrace:
             "request": None,
             "response": None,
         }
+        if self.mode == "escalate":
+            # Texts escalate mode sent to the LLM as masked windows (LAB-1766); the key is only
+            # in escalate-mode events, so fast and audit events are unchanged.
+            event["audit_escalations"] = stats.audit_escalations if stats is not None else 0
         upstream_answer, answer = self._apply_upstream_answer(event, model_checked)
         if self.payloads:
             self._attach_payloads(obs, event, model, upstream_answer, answer)

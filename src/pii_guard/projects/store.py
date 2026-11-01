@@ -454,7 +454,7 @@ class ProjectStore:
             or not isinstance(language, str)
             or not 2 <= len(language) <= 16
             or not all(char.isascii() and (char.isalpha() or char == "-") for char in language)
-            or mode not in {"fast", "audit"}
+            or mode not in {"fast", "escalate", "audit"}
             or data.get("detection_profile", self._profile) != self._profile
             or (self._profile == "local-only" and mode != "fast")
         ):
