@@ -959,6 +959,11 @@ def _print_banner(
             f"({project}telemetry={dashboard.remote_level})",
             file=stderr,
         )
+    else:
+        print(
+            f"pii-guard run {client}: web console off; add --dashboard local to open it",
+            file=stderr,
+        )
 
 
 def main(
