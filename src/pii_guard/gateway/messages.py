@@ -46,6 +46,7 @@ from starlette.responses import Response
 from pii_guard.gateway.messages_request import collect_message_texts
 from pii_guard.gateway.messages_restore import MessagesSseRestorer, restore_message, stream_error
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
+from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, validate
 from pii_guard.gateway.placeholder_note import add_messages_note
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_restore import iter_sse_events, sse_message
@@ -274,6 +275,7 @@ class MessagesGateway:
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
         try:
+            validate(session, "messages", collected)
             with timer.span("detect"):
                 spans = await gw.detect_all(collected.slots, detector, session, language, stats)
                 # The model id's words count as declared names too (Claude Code, LAB-1605).
@@ -486,6 +488,7 @@ class MessagesGateway:
             trace.upstream_body = raw
         building = time.perf_counter()
         masked_output = _flatten(answer.get("content")) if masked_input is not None else None
+        observe(session, "messages", answer)
         self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         try:
             report = restore_message(session, answer)
@@ -520,7 +523,9 @@ class MessagesGateway:
     ) -> tuple[Response, RequestStats]:
         issued = self.gateway.issued_ids
         restorer = MessagesSseRestorer(
-            session, on_ids=lambda ids: issued.add(session.session_id, ids)
+            session,
+            on_ids=lambda ids: issued.add(session.session_id, ids),
+            opaque=OpaqueStream(session, "messages"),
         )
         trace.streaming = True
         timeout = self.gateway.config.upstream_stream_timeout

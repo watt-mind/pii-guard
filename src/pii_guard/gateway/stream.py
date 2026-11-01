@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from pii_guard.gateway.opaque_ids import upstream_ids
+from pii_guard.gateway.opaque_reasoning import OpaqueStream
 from pii_guard.gateway.restore import (
     MESSAGE_TEXT_FIELDS,
     JsonEscapingSession,
@@ -236,12 +237,14 @@ class SseRestorer:
         on_ids: Callable[[list[str]], None] | None = None,
         *,
         keep_restored_tools: bool = False,
+        opaque: OpaqueStream | None = None,
     ) -> None:
         """``on_ids`` receives the ids each chunk carries, raw (LAB-1469).
 
         ``keep_restored_tools`` also retains the restored tool-call arguments (traffic log
         level ``full``); the masked ones are always retained, under the same cap (LAB-1189).
         """
+        self._opaque = opaque
         self._session = session
         self._on_ids = on_ids
         # One budget for the whole response: every choice, field and tool call (LAB-1350).
@@ -402,6 +405,8 @@ class SseRestorer:
             ]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(chunk))
+        if self._opaque is not None:
+            self._opaque.observe(chunk)
         self._process_choices(chunk)
         self.chunks += 1
         return [json.dumps(chunk, ensure_ascii=False)]

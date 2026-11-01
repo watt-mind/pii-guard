@@ -73,6 +73,7 @@ def test_cli_serve_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[0]["app"] == "pii_guard.api.app:create_app"
     assert calls[0]["factory"] is True
     assert calls[0]["port"] == 8787
+    assert calls[0]["access_log"] is False
 
     monkeypatch.setenv("PII_GUARD_PORT", "9999")
     from pii_guard.config import get_settings
@@ -81,6 +82,7 @@ def test_cli_serve_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cli.main(["serve", "--host", "0.0.0.0"]) == 0  # noqa: S104
     assert calls[1]["port"] == 9999
     assert calls[1]["host"] == "0.0.0.0"  # noqa: S104
+    assert calls[1]["access_log"] is False
 
 
 def test_python_dash_m() -> None:

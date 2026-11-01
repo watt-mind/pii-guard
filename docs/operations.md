@@ -448,6 +448,11 @@ decoder reads SAM output (logged once at info level); limits and fail-closed che
 
 ## Exposure and authentication
 
+The built-in `serve` and `up` launchers disable Uvicorn access logging: raw request URLs can
+contain session handles and personal data in query parameters. The application access log
+records route templates, status codes and timings instead. When starting Uvicorn yourself,
+use `--no-access-log`, and configure any reverse proxy to omit or sanitize request URLs too.
+
 **There is no authentication by default.** Anyone who can reach the API can mask and unmask,
 read the traffic log and `/metrics`, and use the gateway. With `PII_GUARD_UPSTREAM_API_KEY` set,
 the upstream key is shared by every caller: an exposed gateway is an open relay that spends it.

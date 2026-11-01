@@ -25,6 +25,7 @@ from pii_guard.gateway.config import Mode
 from pii_guard.gateway.detection import ModeDetector
 from pii_guard.gateway.meter import client_chunk, record_payload, record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
+from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, validate
 from pii_guard.gateway.outbound import OUTBOUND_CHECK_HEADER, OutboundCheck
 from pii_guard.gateway.placeholder_note import NOTE_HEADER, add_chat_note
 from pii_guard.gateway.request import CollectedTexts, TextSlot, collect_texts
@@ -360,6 +361,7 @@ async def mask_chat_request(
     timer.add("parse", time.perf_counter() - timer.started)
     kept: list[list[Span]] = []
     try:
+        validate(session, "chat", collected)
         with timer.span("detect"):
             spans = await gateway.detect_all(
                 collected.slots, detector, session, language, stats, kept
@@ -472,6 +474,7 @@ async def complete_chat_json(
         raise UpstreamError("upstream returned a body that is not a JSON object")
     masked_answer = _masked_answer(answer) if echo_data is not None else None
     gateway.issued_ids.add(session.session_id, upstream_ids(answer))
+    observe(session, "chat", answer)
     report = restore_completion(session, answer)
     stats.unresolved = len(report.unresolved)
     gateway.seed_cache(session, language, detector, report.restored_spans, stats)
@@ -505,6 +508,7 @@ def complete_chat_stream(
 ) -> tuple[Response, RequestStats]:
     restorer = SseRestorer(
         session,
+        opaque=OpaqueStream(session, "chat"),
         on_ids=lambda ids: gateway.issued_ids.add(session.session_id, ids),
         keep_restored_tools=trace.full,
     )

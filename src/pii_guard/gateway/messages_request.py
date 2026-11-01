@@ -23,6 +23,7 @@ What is masked:
 
 ``thinking.signature`` and ``redacted_thinking.data`` are forwarded untouched: they are the
 provider's own signed or encrypted reasoning from an earlier turn, produced from masked input.
+The gateway requires the exact blob to have been observed upstream in the same vault session.
 The masked thinking text is the text the model wrote (placeholders and all), so its signature
 still matches.
 
@@ -199,9 +200,8 @@ def _block_type(
         raise InvalidChatRequestError(f"{where} must be an object")
     block_type = block.get("type")
     if not isinstance(block_type, str) or block_type not in allowed:
-        shown = block_type if isinstance(block_type, str) and len(block_type) <= 32 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: content blocks of type {shown!r} are not supported; the gateway masks "
+            f"{where}: unsupported content block type; the gateway masks "
             "text, inline images, tool use and results, and thinking, and does not forward "
             "what it cannot mask"
         )
@@ -241,15 +241,17 @@ def _collect_block(
         if not isinstance(thinking, str):
             raise InvalidChatRequestError(f"{where}.thinking must be a string")
         out.slots.append(_text_slot(block, "thinking", "reasoning"))
-        _opaque(block, "signature", where)
+        _opaque(block, "signature", where, out)
     else:  # redacted_thinking: the provider's encrypted reasoning, forwarded as is
-        _opaque(block, "data", where)
+        _opaque(block, "data", where, out)
 
 
-def _opaque(block: dict[str, Any], key: str, where: str) -> None:
+def _opaque(block: dict[str, Any], key: str, where: str, out: CollectedTexts) -> None:
     value = block.get(key)
     if value is not None and not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
+    if isinstance(value, str):
+        out.opaque.append((key, value))
 
 
 def _collect_text_block(block: dict[str, Any], where: str, out: CollectedTexts, kind: str) -> None:
@@ -332,9 +334,8 @@ def _collect_one_tool(tool: Any, where: str, out: CollectedTexts) -> None:
         raise InvalidChatRequestError(f"{where} must be an object")
     tool_type = tool.get("type", "custom")
     if tool_type != "custom":
-        shown = tool_type if isinstance(tool_type, str) and len(tool_type) <= 40 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: tools of type {shown!r} are not supported; server tools act upstream "
+            f"{where}: unsupported tool type; server tools act upstream "
             "on data the gateway never sees (client tools with an input_schema are)"
         )
     _reject_unknown(tool, _TOOL_KEYS, where, "tool")

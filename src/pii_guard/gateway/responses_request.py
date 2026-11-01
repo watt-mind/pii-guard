@@ -27,6 +27,7 @@ What is masked:
 
 ``reasoning.encrypted_content`` is forwarded untouched: it is the provider's own encrypted
 reasoning from an earlier turn, produced from masked input, and nothing here can read it.
+The gateway accepts it only after observing the exact blob upstream in the same vault session.
 
 Rejected: remote and ``file_id`` images (never fetched), file and audio parts, hosted tools
 (``web_search``, ``file_search``, ``mcp``, ...: they act upstream on data the gateway never
@@ -194,9 +195,8 @@ def _collect_input(body: dict[str, Any], out: CollectedTexts) -> None:
         item_type = item.get("type", "message" if "role" in item else None)
         allowed = _ITEM_KEYS.get(item_type) if isinstance(item_type, str) else None
         if allowed is None or not isinstance(item_type, str):
-            shown = item_type if isinstance(item_type, str) and len(item_type) <= 32 else "unknown"
             raise UnsupportedContentError(
-                f"{where}: input items of type {shown!r} are not supported; the gateway forwards "
+                f"{where}: unsupported input item type; the gateway forwards "
                 "messages, function calls and their outputs, and reasoning items only"
             )
         _reject_unknown(item, allowed, where, f"{item_type} item")
@@ -253,9 +253,8 @@ def _collect_part(part: object, where: str, out: CollectedTexts, parts: list[Any
         )
     allowed = _PART_KEYS.get(part_type) if isinstance(part_type, str) else None
     if allowed is None or not isinstance(part_type, str):
-        shown = part_type if isinstance(part_type, str) and len(part_type) <= 32 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: content parts of type {shown!r} are not supported; the gateway masks "
+            f"{where}: unsupported content part type; the gateway masks "
             "text parts only and does not forward what it cannot mask"
         )
     _reject_unknown(part, allowed, where, "content part")
@@ -319,6 +318,8 @@ def _collect_reasoning(item: dict[str, Any], where: str, out: CollectedTexts) ->
     blob = item.get("encrypted_content")
     if blob is not None and not isinstance(blob, str):  # opaque, forwarded untouched
         raise InvalidChatRequestError(f"{where}.encrypted_content must be a string or null")
+    if isinstance(blob, str):
+        out.opaque.append(("encrypted_content", blob))
 
 
 def _collect_string(
@@ -349,9 +350,8 @@ def _collect_tool(tool: object, where: str, out: CollectedTexts, *, nested: bool
         raise InvalidChatRequestError(f"{where} must be an object")
     tool_type = tool.get("type")
     if tool_type not in _TOOL_TYPES or (nested and tool_type == "namespace"):
-        shown = tool_type if isinstance(tool_type, str) and len(tool_type) <= 32 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: tools of type {shown!r} are not supported; hosted tools act upstream "
+            f"{where}: unsupported tool type; hosted tools act upstream "
             "on data the gateway never sees (function, custom and namespace tools are)"
         )
     if tool_type != "namespace":

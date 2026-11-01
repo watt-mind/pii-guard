@@ -80,7 +80,6 @@ def claude_code_body(**extra: Any) -> dict[str, Any]:
                     {
                         "type": "thinking",
                         "thinking": "Mail Minta Mária too.",
-                        "signature": SIGNATURE,
                     },
                     {"type": "text", "text": "Reading the file."},
                     {
@@ -274,7 +273,7 @@ def test_claude_code_request_is_masked_everywhere_and_the_answer_restored() -> N
     assert sent["system"][0] == {"type": "text", "text": PLACEHOLDER_NOTE}
     assert sent["system"][2]["cache_control"] == {"type": "ephemeral"}
     assistant = sent["messages"][1]["content"]
-    assert assistant[0]["signature"] == SIGNATURE  # opaque, untouched
+    assert "signature" not in assistant[0]  # imported opaque history is not trusted
     assert "[[PERSON_" in assistant[0]["thinking"]
     assert "[[PERSON_" in assistant[2]["input"]["command"]
     assert sent["messages"][2]["content"][0]["tool_use_id"] == "toolu_01"
@@ -403,7 +402,7 @@ def test_upstream_error_keeps_only_its_type() -> None:
     [
         ({"mcp_servers": [{"type": "url", "url": "https://mcp.test"}]}, "mcp_servers"),
         ({"tools": [{"type": "web_search_20250305", "name": "web_search"}]}, "server tools"),
-        ({"surprise": 1}, "surprise"),
+        ({"surprise": 1}, "unsupported request field"),
         (
             {
                 "messages": [
@@ -413,7 +412,7 @@ def test_upstream_error_keeps_only_its_type() -> None:
                     }
                 ]
             },
-            "document",
+            "unsupported content block type",
         ),
         (
             {
@@ -430,7 +429,7 @@ def test_upstream_error_keeps_only_its_type() -> None:
         ),
         (
             {"messages": [{"role": "user", "content": [{"type": "text", "text": "a", "x": 1}]}]},
-            "messages.0.content.0.x",
+            "messages.0.content.0.#2",
         ),
     ],
 )

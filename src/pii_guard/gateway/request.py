@@ -183,6 +183,7 @@ class CollectedTexts:
     slots: list[TextSlot]
     finalizers: list[Callable[[], None]]
     images: list[ImageSlot] = field(default_factory=list)
+    opaque: list[tuple[str, str]] = field(default_factory=list, repr=False)
 
     def finalize(self) -> None:
         for finalize in self.finalizers:
@@ -216,7 +217,11 @@ def _setter(container: dict[str, Any] | list[Any], key: Any) -> Callable[[str], 
 
 # --- the allow-list ----------------------------------------------------------------------
 
-_FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+# Only schema-owned vocabulary may be printed in a location. A caller-controlled
+# key can look like an ordinary identifier while still containing a secret (LAB-1753).
+_FIELD_NAMES = _SCHEMA_KEYWORDS | frozenset(
+    {"function", "custom", "name", "parameters", "schema", "grammar", "definition", "syntax"}
+)
 _TOP_SCALAR = frozenset(
     {
         "frequency_penalty",
@@ -343,8 +348,8 @@ _TOOL_CALL_CUSTOM_KEYS = frozenset({"name", "input"})
 
 
 def _field(where: str, key: object, position: int) -> str:
-    """``where.key`` if the key looks like a field name, else ``where.#position``."""
-    shown = key if isinstance(key, str) and _FIELD_NAME_RE.match(key) else f"#{position}"
+    """Name trusted schema fields; locate arbitrary caller keys by position only."""
+    shown = key if isinstance(key, str) and key in _FIELD_NAMES else f"#{position}"
     return f"{where}.{shown}" if where else str(shown)
 
 
@@ -573,6 +578,8 @@ def _collect_reasoning_blocks(
                 _check_json(block, key, f"{at}.{key}", out)
             elif not isinstance(block[key], str | None):
                 raise InvalidChatRequestError(f"{at}.{key} must be a string")
+            elif isinstance(block[key], str):
+                out.opaque.append((key, block[key]))
 
 
 def _collect_message_audio(message: dict[str, Any], where: str, out: CollectedTexts) -> None:
@@ -640,9 +647,8 @@ def _collect_part(
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
     if not isinstance(part_type, str) or (allowed := _PART_KEYS.get(part_type)) is None:
-        shown = part_type if isinstance(part_type, str) and len(part_type) <= 32 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: content parts of type {shown!r} are not supported; the gateway masks "
+            f"{where}: unsupported content part type; the gateway masks "
             "text and inline images only and does not forward what it cannot mask"
         )
     _reject_unknown(part, allowed | {"type"}, where, "content part")

@@ -12,7 +12,7 @@ code a ``/v1`` route can return, with its status and when (the wording of
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any, cast, get_args
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -250,9 +250,46 @@ async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
     return error_response(exc.status_code, code, message)
 
 
-async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
-    # Only locations and error kinds: pydantic's own messages may quote the input value.
-    fields = sorted({".".join(str(p) for p in err.get("loc", ())) for err in exc.errors()})
+def _validation_field_names(request: Request) -> set[str]:
+    """Vocabulary from the route's schema, never from the submitted body (LAB-1753)."""
+    names = {"body", "query", "path", "header", "cookie"}
+    route = request.scope.get("route")
+    dependant = getattr(route, "dependant", None)
+    for kind in ("body_params", "query_params", "path_params", "header_params", "cookie_params"):
+        for parameter in getattr(dependant, kind, ()):
+            names.add(parameter.alias)
+            annotations = [parameter.field_info.annotation]
+            while annotations:
+                model = annotations.pop()
+                annotations.extend(get_args(model))
+                if not (isinstance(model, type) and issubclass(model, BaseModel)):
+                    continue
+                pending = [model.model_json_schema()]
+                while pending:
+                    item = pending.pop()
+                    if isinstance(item, dict):
+                        properties = item.get("properties")
+                        if isinstance(properties, dict):
+                            names.update(properties)
+                        pending.extend(item.values())
+                    elif isinstance(item, list):
+                        pending.extend(item)
+    return names
+
+
+async def _validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Pydantic locations include arbitrary dictionary keys and extra field names too.
+    # Print only schema-owned names and array indices, never those caller values.
+    names = _validation_field_names(request)
+    fields = sorted(
+        {
+            ".".join(
+                str(p) if isinstance(p, int) or p in names else "<field>"
+                for p in err.get("loc", ())
+            )
+            for err in exc.errors()
+        }
+    )
     message = "invalid request body"
     if fields:
         message += ": " + ", ".join(fields)

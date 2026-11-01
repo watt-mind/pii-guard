@@ -35,6 +35,7 @@ from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 from pii_guard.gateway.opaque_ids import upstream_ids
+from pii_guard.gateway.opaque_reasoning import OpaqueStream
 from pii_guard.gateway.restore import (
     JsonEscapingSession,
     RestoreReport,
@@ -261,9 +262,14 @@ class ResponsesSseRestorer:
     :meth:`finish`. Each returns ``(event name, data)`` pairs to emit."""
 
     def __init__(
-        self, session: VaultSession, on_ids: Callable[[list[str]], None] | None = None
+        self,
+        session: VaultSession,
+        on_ids: Callable[[list[str]], None] | None = None,
+        *,
+        opaque: OpaqueStream | None = None,
     ) -> None:
         """``on_ids`` receives the ids each event carries, raw (LAB-1469)."""
+        self._opaque = opaque
         self._session = session
         self._on_ids = on_ids
         # One budget for every event of the stream (LAB-1350), charged once per logical
@@ -368,6 +374,8 @@ class ResponsesSseRestorer:
             ]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(parsed))
+        if self._opaque is not None:
+            self._opaque.observe(parsed)
         if event_type in _DELTAS:
             _, _, kind = _DELTAS[event_type]
             return [

@@ -61,7 +61,7 @@ def fake_tesseract(monkeypatch: pytest.MonkeyPatch) -> FakeTesseract:
     fake = FakeTesseract()
     module = types.ModuleType("pytesseract")
     module.Output = FakeTesseract.Output  # type: ignore[attr-defined]
-    module.image_to_data = fake.image_to_data  # type: ignore[attr-defined]
+    monkeypatch.setattr("pii_guard.visual.ocr.image_to_data", fake.image_to_data)
     monkeypatch.setitem(sys.modules, "pytesseract", module)
     return fake
 

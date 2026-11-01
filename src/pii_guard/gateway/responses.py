@@ -40,6 +40,7 @@ from starlette.responses import Response
 
 from pii_guard.gateway.meter import record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
+from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, validate
 from pii_guard.gateway.placeholder_note import add_responses_note
 from pii_guard.gateway.request import CollectedTexts, InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
@@ -232,6 +233,7 @@ class ResponsesGateway:
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
         try:
+            validate(session, "responses", collected)
             with timer.span("detect"):
                 spans = await gw.detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
@@ -431,6 +433,7 @@ class ResponsesGateway:
         if not isinstance(answer, dict):
             raise UpstreamError("upstream returned a body that is not a JSON object")
         masked_output = _masked_output(answer) if echo else None
+        observe(session, "responses", answer)
         self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         report = restore_response(session, answer)
         stats.unresolved = len(report.unresolved)
@@ -462,7 +465,9 @@ class ResponsesGateway:
     ) -> tuple[Response, RequestStats]:
         issued = self.gateway.issued_ids
         restorer = ResponsesSseRestorer(
-            session, on_ids=lambda ids: issued.add(session.session_id, ids)
+            session,
+            on_ids=lambda ids: issued.add(session.session_id, ids),
+            opaque=OpaqueStream(session, "responses"),
         )
         trace.streaming = True
         timeout = self.gateway.config.upstream_stream_timeout

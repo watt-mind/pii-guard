@@ -462,10 +462,26 @@ def test_serialized_scan_sees_what_the_walker_does_not() -> None:
 
 def test_a_value_in_an_opaque_blob_blocks_the_request_end_to_end() -> None:
     upstream = MockUpstream()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        answer = upstream.handler(request).json()
+        answer["choices"][0]["message"]["reasoning_details"] = [
+            {"type": "reasoning.encrypted", "signature": PERSON}
+        ]
+        return httpx.Response(200, json=answer)
+
     body = _blind_spot_body()
     body["messages"][0]["content"] = f"Szia, {PERSON} vagyok."  # the session learns it here
-    with TestClient(make_app(upstream)) as client:
-        response = client.post("/v1/chat/completions", json=body)
+    with TestClient(make_app(transport=httpx.MockTransport(handler))) as client:
+        # First obtain the exact blob upstream. Provenance is necessary, but never exempts
+        # an issued blob from the serialized-body check once its contents are known PII.
+        first = client.post(
+            "/s/opaque-recheck/v1/chat/completions",
+            json={"model": "m", "messages": [{"role": "user", "content": "hello"}]},
+        )
+        assert first.status_code == 200
+        upstream.requests.clear()
+        response = client.post("/s/opaque-recheck/v1/chat/completions", json=body)
     assert_blocked(response, upstream, PERSON=1)
 
 
