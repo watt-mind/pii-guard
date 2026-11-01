@@ -19,7 +19,7 @@ on:
         type: string
         default: develop
   pull_request:
-    branches: [main]
+    branches: [main, develop]  # TEMP (LAB-1743 proof run): develop to be removed
   workflow_call:
     inputs:
       wheel-artifact:
