@@ -300,3 +300,70 @@ def test_lone_surrogates_in_tool_json_are_masked_and_restored(case: str, surroga
     assert PLACEHOLDER_RE.fullmatch(sent["mail"])
     assert email not in json.dumps(forwarded[0])
     assert _answer_text(case, response.json()) == f"Saw {email}."
+
+
+ESCAPED = json.dumps({"name": NAME})  # ASCII escapes: the name is not readable in the raw text
+ESCAPED_VARIANTS = {
+    "jsonl": ESCAPED + "\n" + json.dumps({"x": 1}) + "\n",
+    "crlf-jsonl": ESCAPED + "\r\n" + json.dumps({"x": 1}),
+    "prefix": "Result: " + ESCAPED,
+    "fence": "```json\n" + ESCAPED + "\n```",
+    "bom": "\ufeff" + ESCAPED,
+    "trailing": ESCAPED + " ok",
+    "plain-escapes": "Name: " + json.dumps(NAME)[1:-1],
+    "double-escaped": "Result: " + json.dumps(ESCAPED),
+}
+
+
+@pytest.mark.parametrize("case", ["chat-string", "responses-string", "messages-part"])
+@pytest.mark.parametrize("variant", ESCAPED_VARIANTS)
+def test_escaped_known_values_never_leave_readable(case: str, variant: str) -> None:
+    client, forwarded = client_for("block")
+    with client:
+        path, body = payload(case, ESCAPED_VARIANTS[variant])
+        response = client.post(path, json=body, headers=known_session(client))
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] in {"blocked_entity", "outbound_check_failed"}
+    assert NAME not in response.text
+    assert not forwarded
+
+
+@pytest.mark.parametrize("variant", ["jsonl", "crlf-jsonl", "fence", "bom"])
+def test_json_lines_fences_and_bom_are_masked_with_their_shape(variant: str) -> None:
+    client, forwarded = client_for()
+    text = ESCAPED_VARIANTS[variant]
+    with client:
+        path, body = payload("chat-string", text)
+        response = client.post(path, json=body, headers=known_session(client))
+        assert response.status_code == 200, response.text
+    sent = output_of("chat-string", forwarded[0])
+    assert NAME not in sent
+    assert "\\u00f3" not in sent
+    # Only the masked value changed: the BOM, the fence and every line break are kept.
+    match = PLACEHOLDER_RE.search(sent)
+    assert match is not None
+    assert sent == text.replace(ESCAPED, json.dumps({"name": match.group(0)}))
+
+
+def test_ordinary_backslashes_are_not_over_blocked() -> None:
+    client, forwarded = client_for("block")
+    text = (
+        "C:\\new\\table\\Users\\fixture\\notes.txt\n"
+        "pattern: ^\\d{3}-\\w+\\s*$ and \\\\server\\share\n"
+        'json: {"path": "C:\\\\temp", "quote": "\\"ok\\"", "unicode": "caf\\u00e9"}'
+    )
+    with client:
+        path, body = payload("chat-string", text)
+        response = client.post(path, json=body, headers=known_session(client))
+        assert response.status_code == 200, response.text
+        assert response.headers["X-PII-Guard-Outbound-Check"] == "passed"
+    assert output_of("chat-string", forwarded[0]) == text
+
+
+def test_unescaped_views_decode_json_escapes() -> None:
+    from pii_guard.gateway.outbound import unescaped_views
+
+    assert unescaped_views("no escapes") == []
+    assert unescaped_views('caf\\u00e9 \\ud83d\\ude00 \\"q\\" a\\/b') == ['café 😀 "q" a/b']
+    assert unescaped_views("lone \\ud83d stays") == []
+    assert unescaped_views("\\\\u00e9") == ["\\u00e9", "é"]

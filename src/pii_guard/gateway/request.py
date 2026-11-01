@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import json
 import re
 from collections.abc import Callable, Iterator
@@ -240,6 +241,53 @@ def dumps_utf8(value: Any) -> str:
 # existed, so a large tool result never breaks an agent session (LAB-1759).
 MAX_TOOL_JSON_CHARS = 1024 * 1024
 MAX_TOOL_JSON_LAYERS = 4
+_BOM = "\ufeff"
+_FENCE_RE = re.compile(
+    r"\A([ \t]*```[ \t]*(?:json|jsonl|ndjson)?[ \t]*\r?\n)(.*?)(\r?\n[ \t]*```\s*)\Z", re.S
+)
+_JSON_START = ("{", "[", '"')
+
+
+def _decode_json(text: str) -> list[str | list[Any]] | None:
+    """``text`` as literal pieces and decoded JSON values (each a one-item list), or ``None``.
+
+    Besides one JSON text: a leading BOM, one fenced ```` ```json ```` block and JSON Lines
+    (every non-empty line a JSON object or array). Joining the pieces, each value serialized,
+    rebuilds the text's shape exactly; a value's own JSON is reserialized (LAB-1755).
+    """
+    prefix = _BOM if text.startswith(_BOM) else ""
+    body = text[len(prefix) :]
+    suffix = ""
+    if fence := _FENCE_RE.match(body):
+        prefix, body, suffix = prefix + fence.group(1), fence.group(2), fence.group(3)
+    if not body.lstrip().startswith(_JSON_START):
+        return None
+    try:
+        return [prefix, [json.loads(body)], suffix]
+    except ValueError:
+        pass  # Plain tool text may begin with a bracket or quote; or it is JSON Lines.
+    lines = body.split("\n")
+    if len(lines) < 2:
+        return None
+    pieces: list[str | list[Any]] = [prefix]
+    for i, line in enumerate(lines):
+        if i:
+            pieces.append("\n")
+        stripped = line.strip()
+        if not stripped:
+            pieces.append(line)
+            continue
+        if not stripped.startswith(("{", "[")):
+            return None
+        lead = line[: len(line) - len(line.lstrip())]
+        trail = line[len(line.rstrip()) :]
+        try:
+            value = json.loads(stripped)
+        except ValueError:
+            return None
+        pieces += [lead, [value], trail]
+    pieces.append(suffix)
+    return pieces
 
 
 def _collect_tool_output(
@@ -251,34 +299,36 @@ def _collect_tool_output(
     decode_depth: int = 0,
 ) -> None:
     text: str = holder[key]
-    if text.lstrip().startswith(("{", "[", '"')) and len(text) <= MAX_TOOL_JSON_CHARS:
-        try:
-            parsed = json.loads(text)
-        except (RecursionError, ValueError):
-            pass  # Too deep to decode, or plain tool text beginning with a bracket or quote.
-        else:
-            if decode_depth >= MAX_TOOL_JSON_LAYERS:
-                raise InvalidChatRequestError("structured tool output exceeds the JSON layer limit")
-            if out.fits_tool_structure(parsed):
-                decoded = [parsed]
+    pieces: list[str | list[Any]] | None = None
+    if len(text) <= MAX_TOOL_JSON_CHARS:
+        with contextlib.suppress(RecursionError):  # too deep: detected as plain text below
+            pieces = _decode_json(text)
+    if pieces is not None:
+        if decode_depth >= MAX_TOOL_JSON_LAYERS:
+            raise InvalidChatRequestError("structured tool output exceeds the JSON layer limit")
+        decoded = [piece[0] for piece in pieces if isinstance(piece, list)]
+        if out.fits_tool_structure(decoded):
 
-                def collect_leaf(
-                    container: dict[str, Any] | list[Any],
-                    field_key: Any,
-                    collected: CollectedTexts,
-                    _kind: str,
-                ) -> None:
-                    _collect_tool_output(
-                        container, field_key, collected, decode_depth=decode_depth + 1
-                    )
+            def collect_leaf(
+                container: dict[str, Any] | list[Any],
+                field_key: Any,
+                collected: CollectedTexts,
+                _kind: str,
+            ) -> None:
+                _collect_tool_output(container, field_key, collected, decode_depth=decode_depth + 1)
 
-                _collect_json(decoded, 0, out, "tool", string_collector=collect_leaf)
+            for i in range(len(decoded)):
+                _collect_json(decoded, i, out, "tool", string_collector=collect_leaf)
 
-                def serialize() -> None:
-                    holder[key] = dumps_utf8(decoded[0])
+            def serialize(pieces: list[str | list[Any]] = pieces) -> None:
+                values = iter(decoded)
+                holder[key] = "".join(
+                    dumps_utf8(next(values)) if isinstance(piece, list) else piece
+                    for piece in pieces
+                )
 
-                out.finalizers.append(serialize)
-                return
+            out.finalizers.append(serialize)
+            return
     slot = _text_slot(holder, key, "tool")
     slot.message = message
     out.slots.append(slot)

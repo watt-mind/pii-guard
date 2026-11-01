@@ -1033,7 +1033,8 @@ a request refused by the re-check gets `422 outbound_check_failed` with
 `X-PII-Guard-Outbound-Check: blocked` (policy and short-value rules:
 [architecture-gateway.md](architecture-gateway.md#outbound-re-check)). Besides re-reading the
 walker's texts, the re-check scans the serialized masked body as one text, so a field no
-walker slot covers can't carry a session value out either (LAB-1563).
+walker slot covers can't carry a session value out either (LAB-1563). Texts are also searched
+with their JSON escapes decoded, so an escaped value cannot pass the re-check (LAB-1755).
 
 ## Gateway chat streaming (implemented)
 
@@ -1068,7 +1069,9 @@ itself could be a value), never the value.
 Treatments:
 
 - **structured tool output**: complete JSON objects, arrays and quoted strings in tool-result
-  text are decoded before detection, so JSON Unicode escapes cannot hide known values.
+  text are decoded before detection, so JSON Unicode escapes cannot hide known values. So are
+  JSON Lines (every non-empty line an object or array), one fenced ```` ```json ```` block and
+  JSON after a byte-order mark; the text around the values is kept exactly.
   Decoded keys, text and long numbers receive the same masking/block policies as other JSON.
   Nested JSON string layers are limited to four (excess fails closed with
   `400 invalid_request`). A tool JSON text over 1,048,576 characters, 50,000 nodes, depth 64

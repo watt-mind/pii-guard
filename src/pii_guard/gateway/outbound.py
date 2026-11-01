@@ -41,6 +41,14 @@ exemptions (a kept tool-name value and an issued id — the JSON string enclosin
 occurrence — do not block). Counts merge by taking the larger count per entity type, so a
 value both scans see is not counted twice.
 
+**Through JSON escapes (LAB-1755).** A tool output that is not decodable JSON (a prefix, a
+trailing note, plain text with ``\\u00f3``) can still carry a value JSON-escaped, which the
+upstream model reads as the value. Every text with a backslash is therefore also searched in
+its JSON-unescaped views (``\\uXXXX`` including surrogate pairs, ``\\"``, ``\\\\``,
+``\\/``, ``\\n`` ...; repeated for nested escaping), with the same thresholds. Unescaping
+only reveals text the upstream would read: ordinary backslashes (Windows paths, regexes)
+do not create a value that is not there.
+
 Cost: one fold per text (the session's memo serves the texts masking left unchanged) and one
 substring search per session value over all of them, plus one serialization and one search
 over it; a value is matched text by text only when it can occur at all.
@@ -49,6 +57,7 @@ over it; a value is matched text by text only when it can occur at all.
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping
@@ -131,6 +140,47 @@ class OutboundCheck:
         }
 
 
+_ESCAPE_RE = re.compile(
+    r"\\u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})"
+    r"|\\u([0-9a-fA-F]{4})|\\([\"\\/bfnrt])"
+)
+_SIMPLE_ESCAPES = {
+    '"': '"',
+    "\\": "\\",
+    "/": "/",
+    "b": "\b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+}
+#: Nested escaping levels searched (a JSON text in a JSON string in a tool output ...).
+MAX_UNESCAPE_LAYERS = 5
+
+
+def _unescape_once(match: re.Match[str]) -> str:
+    high, low, code, simple = match.groups()
+    if high is not None:
+        return chr(0x10000 + ((int(high, 16) - 0xD800) << 10) + (int(low, 16) - 0xDC00))
+    if code is not None:
+        point = int(code, 16)
+        # A lone surrogate is kept escaped: it is no readable character.
+        return match.group(0) if 0xD800 <= point <= 0xDFFF else chr(point)
+    return _SIMPLE_ESCAPES[simple]
+
+
+def unescaped_views(text: str) -> list[str]:
+    """``text`` with its JSON escapes decoded, once per nesting level (none: no escapes)."""
+    views: list[str] = []
+    while "\\" in text and len(views) < MAX_UNESCAPE_LAYERS:
+        view = _ESCAPE_RE.sub(_unescape_once, text)
+        if view == text:
+            break
+        views.append(view)
+        text = view
+    return views
+
+
 def blocks(occurrence: Unmasked) -> bool:
     """Whether an occurrence left in the request refuses it: the short-value policy."""
     if occurrence.known:
@@ -155,8 +205,20 @@ def check_slots(
         known = {normalize_value(v.value) for v in session.known_values.values()}
         tool_names = tool_names - known
     texts = [slot.text for slot in slots]
+    # The JSON-unescaped views of a text are checked as the text itself (LAB-1755).
+    owners = list(range(len(slots)))
+    for index, slot in enumerate(slots):
+        if slot.kind != "identifier" and "\\" in slot.text:
+            views = unescaped_views(slot.text)
+            texts += views
+            owners += [index] * len(views)
     for occurrence in session.unmasked(texts, language):
-        slot = slots[occurrence.index]
+        slot = slots[owners[occurrence.index]]
+        if occurrence.index >= len(slots):
+            if blocks(occurrence):
+                check.hits[occurrence.entity_type.value] += 1
+            # A short occurrence in a view is the text's own, counted there already.
+            continue
         if slot.kind == "identifier" and not occurrence.known:
             if slot.text in issued:
                 continue

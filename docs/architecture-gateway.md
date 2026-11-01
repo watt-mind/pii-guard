@@ -183,7 +183,11 @@ and summary sent after a masked image, in Chat Completions and the Responses API
 not. The values are those detected in this request and in earlier ones on the session, and
 the operator's pre-loaded known values. They are matched with the vault's own occurrence
 patterns: case, whitespace, Unicode form, `ß`/`ss` and the language's inflection, so
-`TESZT ELEK-nek` is found for `Teszt Elek`. Placeholders never count.
+`TESZT ELEK-nek` is found for `Teszt Elek`. Placeholders never count. A text with a
+backslash is also searched with its JSON escapes decoded (`\u00f3`, surrogate pairs, `\"`,
+`\n` ..., nested levels too), so a value JSON-escaped in a tool output that is not decodable
+JSON (`Result: {...}`, trailing notes, plain text) is found as the upstream would read it
+(LAB-1755). Ordinary backslashes (Windows paths, regexes) reveal no value and pass.
 
 A value found there refuses the request: `422 outbound_check_failed`, the message lists entity
 types and counts only, `X-PII-Guard-Outbound-Check: blocked`, and nothing is sent. Since the
