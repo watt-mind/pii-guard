@@ -1,7 +1,9 @@
 # Release on a version tag (v*): the container image to GHCR and the wheel (web UI bundled) +
 # sdist on the GitHub release, so `docker run ghcr.io/watt-mind/pii-guard:<version>` and
 # `uvx --from <release wheel URL> pii-guard up` work (LAB-1276).
-# Only this workflow can write: packages (the image) and contents (the release).
+# Only this workflow can write: packages (the image) and contents (the release). The release
+# and PyPI wait for judge-path (judge-path.yml: the wheel installed and run on Linux and macOS
+# with a fresh uv cache); after PyPI, pypi-smoke runs the README's PyPI command (LAB-1741).
 #
 # PyPI (distribution `wattmind-pii-guard`): trusted publishing, off until the repository
 # variable PYPI_PUBLISH is "true". PyPI side, once: a (pending) trusted publisher with owner
@@ -88,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -111,22 +113,54 @@ jobs:
         run: scripts/ci/wheel_smoke.sh dist/*.whl
       - name: Sdist
         run: uv build --sdist
+      # The judge-path job tests exactly these files before the release exists.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-dist
+          path: dist/*
+          retention-days: 7
+          if-no-files-found: error
+
+  # Required (LAB-1741): the built wheel installed and run as a judge would, with a fresh uv
+  # cache on Linux and macOS (judge-path.yml). Red = no GitHub release, nothing on PyPI.
+  judge-path:
+    name: judge-path
+    needs: wheel
+    permissions:
+      contents: read
+    uses: ./.github/workflows/judge-path.yml # zizmor: ignore[self-repository]
+    with:
+      wheel-artifact: release-dist
+
+  github-release:
+    name: github-release
+    needs: [wheel, judge-path]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-dist
+          path: dist
       - name: Attach to the GitHub release (created if missing)
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo "$REPO" --clobber
           else
-            gh release create "$TAG" dist/* --generate-notes --verify-tag
+            gh release create "$TAG" dist/* --repo "$REPO" --generate-notes --verify-tag
           fi
 
   # Publishes exactly the files attached to the release. Off by default: set the repository
   # variable PYPI_PUBLISH=true once the PyPI project and its trusted publisher exist.
   pypi:
     name: pypi
-    needs: wheel
+    needs: [github-release, judge-path]
     if: vars.PYPI_PUBLISH == 'true' && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -149,3 +183,36 @@ jobs:
         run: gh release download "$TAG" --repo "$REPO" --dir dist --pattern '*.whl' --pattern '*.tar.gz'
       - name: Publish to PyPI (trusted publishing)
         run: uv publish --trusted-publishing always dist/*
+
+  # After the upload (LAB-1741): the README's PyPI command, `uvx --python 3.12 --from
+  # wattmind-pii-guard==<version> pii-guard up`, on Linux and macOS. Non-blocking (the release
+  # is out); a red run files an issue instead, like ci.yml's nightly-notify.
+  pypi-smoke:
+    name: pypi-smoke
+    needs: pypi
+    permissions:
+      contents: read
+    uses: ./.github/workflows/judge-path.yml # zizmor: ignore[self-repository]
+    with:
+      pypi-version: ${{ github.ref_name }} # the tag; judge-path drops the leading v
+
+  pypi-smoke-notify:
+    name: pypi-smoke-notify
+    needs: pypi-smoke
+    if: ${{ always() && needs.pypi-smoke.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: File an issue for the red post-publish smoke
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create --repo "$REPO" \
+            --title "Post-publish PyPI smoke failed for $TAG" \
+            --body "uvx --python 3.12 --from wattmind-pii-guard==${TAG#v} pii-guard up failed on Linux or macOS after the PyPI upload. Run: $RUN_URL. Triage the failure and file follow-ups in Linear (project PII Guard, team LAB)."
