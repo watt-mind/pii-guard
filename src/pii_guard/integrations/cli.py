@@ -80,7 +80,7 @@ from pii_guard.integrations.common import (
     write_json,
 )
 
-__all__ = ["build_parser", "main"]
+__all__ = ["CLIENT_ALIASES", "build_parser", "main"]
 
 #: Clients ``connect`` writes a config file for (and can ``--check``).
 CONFIGURED = ("pi", "muse-code")
@@ -90,6 +90,8 @@ CONFIGURED = ("pi", "muse-code")
 BLOCK_CHECKED = ("codex", "opencode")
 #: Every tool with a quickstart block (``--print``).
 CLIENTS = snippets.TOOL_IDS
+#: Short binary-name aliases accepted for ``client`` (e.g. ``muse`` -> ``muse-code``).
+CLIENT_ALIASES: dict[str, str] = {"muse": "muse-code", "claude": "claude-code"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -97,7 +99,13 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pii-guard connect",
         description="Put a coding agent behind the pii-guard gateway (docs/integrations/).",
     )
-    parser.add_argument("client", choices=CLIENTS, help="the client to configure")
+    parser.add_argument(
+        "client",
+        type=lambda v: CLIENT_ALIASES.get(v, v),
+        choices=CLIENTS,
+        help="the client to configure (muse-code/muse, pi, codex, opencode, curl, python, "
+        "claude-code/claude)",
+    )
     parser.add_argument(
         "--gateway",
         default=None,
@@ -270,7 +278,8 @@ def _muse(args: argparse.Namespace, out: list[str]) -> int:
         return _muse_check(path, existing, args, out)
     transport = existing.get("endpoint_transport")
     gateway = _gateway(args, transport.get("base_url") if isinstance(transport, dict) else None)
-    new = muse_code.render(existing, old, gateway)
+    model = (args.model or [None])[0]
+    new = muse_code.render(existing, old, gateway, model=model)
     diff = json_diff(path, old, new)
     if args.dry_run:
         out.append(diff or f"{path} is already up to date")

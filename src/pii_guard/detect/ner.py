@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import bisect
+import contextlib
 import importlib.util
 import logging
 import os
@@ -392,6 +393,10 @@ class TransformersBackend:
             )
         import torch
         from transformers import AutoModelForTokenClassification, AutoTokenizer
+        from transformers.utils import logging as hf_logging
+
+        with contextlib.suppress(Exception):
+            hf_logging.disable_progress_bar()
 
         self._torch = torch
         self.device = select_device(device)

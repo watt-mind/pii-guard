@@ -550,12 +550,18 @@ def test_sse_restorer_passes_signatures_and_unknown_events() -> None:
     assert restorer.process("ping", "not json") == [("ping", "not json")]
 
 
-def image_app(upstream: MessagesUpstream, sam: Sam) -> FastAPI:
+def image_app(
+    upstream: MessagesUpstream,
+    sam: Sam,
+    *,
+    image_render: str = "opaque",
+    ocr: Any = None,
+) -> FastAPI:
     settings = Settings(
         tenant_key=TEST_TENANT_KEY,
         upstream_base_url=UPSTREAM_URL,
         upstream_api_key=UPSTREAM_KEY,
-        image_render="opaque",
+        image_render=image_render,  # type: ignore[arg-type]
     )
     config = GatewayConfig(mode=Mode.AUDIT)
     app = create_app(settings)
@@ -566,7 +572,7 @@ def image_app(upstream: MessagesUpstream, sam: Sam) -> FastAPI:
         detectors=build_mode_detectors(settings, config, llm_detector=FakeLlm()),
         transport=upstream.transport(),
         sam=SamClient(api_key="test-key", transport=httpx.MockTransport(sam), max_retries=0),
-        ocr=FakeOcr(),  # type: ignore[arg-type]
+        ocr=ocr or FakeOcr(),
     )
     return app
 
@@ -597,6 +603,41 @@ def test_inline_image_blocks_are_masked_before_forwarding() -> None:
     assert TAJ_VALUE not in upstream.requests[0].content.decode()
     assert leaked_values(upstream.requests[0].content) == []
     assert r.headers["X-PII-Guard-Images"] == "2"
+
+
+def test_inline_image_blocks_in_labels_mode_share_placeholders_with_text_and_annotate() -> None:
+    """In ``image_render="labels"`` mode on ``POST /v1/messages``, ID cards in user messages
+    and inside ``tool_result`` blocks receive ``Document summary`` + ``Masked transcript``
+    annotations and share the exact same placeholders with the surrounding text."""
+    upstream, sam = MessagesUpstream(), Sam()
+    body = claude_code_body()
+    body["messages"][0]["content"].insert(0, image_block(png()))
+    body["messages"][0]["content"].append(
+        {"type": "text", "text": f"Check TAJ {TAJ_VALUE} for Teszt Elek."}
+    )
+    body["messages"][2]["content"][0]["content"] = [image_block(png())]
+    with TestClient(image_app(upstream, sam, image_render="labels")) as http:
+        r = http.post("/v1/messages", json=body)
+    assert r.status_code == 200, r.text
+    sent = upstream.raw_bodies[0]
+    user_blocks = sent["messages"][0]["content"]
+    tool_blocks = sent["messages"][2]["content"][0]["content"]
+    assert user_blocks[0]["type"] == "image"
+    assert user_blocks[1]["type"] == "text"
+    assert "Document summary:" in user_blocks[1]["text"]
+    assert "Masked transcript:" in user_blocks[1]["text"]
+    assert tool_blocks[0]["type"] == "image"
+    assert tool_blocks[1]["type"] == "text"
+    assert "Document summary:" in tool_blocks[1]["text"]
+    # The TAJ placeholder in the user text matches the TAJ placeholder in both card transcripts.
+    taj_match = PLACEHOLDER_RE.search(user_blocks[-1]["text"])
+    assert taj_match is not None
+    taj_placeholder = taj_match.group(0)
+    assert taj_placeholder in user_blocks[1]["text"]
+    assert taj_placeholder in tool_blocks[1]["text"]
+    assert TAJ_VALUE not in upstream.requests[0].content.decode()
+    assert leaked_values(upstream.requests[0].content) == []
+    assert TAJ_VALUE in r.json()["content"][0]["text"]
 
 
 # --- Claude Code's own vocabulary under fast-mode false positives (found live, LAB-1605) ---
