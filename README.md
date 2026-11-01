@@ -56,7 +56,8 @@ uvx --python 3.12 --from wattmind-pii-guard \
   without the web console; everything else is the same.
 - **First run:** downloads PyTorch and the NER once (the NER is 1.1 GB); `/healthz` reports
   `"ner": "ready"` when detection is live.
-- **Platforms:** macOS 14+ on Apple silicon, Linux (x86_64, arm64) and Windows. On Linux add
+- **Platforms:** macOS 14+ on Apple silicon and Linux (x86_64, arm64); on Windows use WSL2
+  (it is Linux) or Docker, native Windows is not tested yet. On Linux and WSL2 add
   `--torch-backend cpu` after `uvx` to skip the multi-GB CUDA build of PyTorch. Intel Macs and
   macOS 13 have no PyTorch build: Intel Macs install text masking with rules only and refuse images
   (the banner says so); the [Docker demo](docs/operations.md#docker) runs everything on either.
