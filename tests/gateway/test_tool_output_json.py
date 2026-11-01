@@ -178,21 +178,10 @@ def test_nested_json_string_layers_are_masked_before_reserialization(case: str) 
 
 
 @pytest.mark.parametrize("case", ["chat-string", "responses-string", "messages-string"])
-@pytest.mark.parametrize("limit", ["size", "depth", "layers", "nodes"])
-def test_tool_json_limits_fail_closed(
-    case: str, limit: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    if limit == "size":
-        monkeypatch.setattr(walker, "MAX_TOOL_JSON_CHARS", 16)
-        text = json.dumps({"value": "x" * 32})
-    elif limit == "depth":
-        text = "[" * 80 + "0" + "]" * 80
-    elif limit == "layers":
-        text = json.dumps({"name": NAME})
-        for _ in range(walker.MAX_TOOL_JSON_LAYERS):
-            text = json.dumps(text)
-    else:
-        text = json.dumps([0] * 21000)
+def test_tool_json_layer_limit_fails_closed(case: str) -> None:
+    text = json.dumps({"name": NAME})
+    for _ in range(walker.MAX_TOOL_JSON_LAYERS):
+        text = json.dumps(text)
     client, forwarded = client_for()
     with client:
         path, body = payload(case, text)
@@ -200,6 +189,33 @@ def test_tool_json_limits_fail_closed(
     assert response.status_code == 400, response.text
     assert response.json()["error"]["code"] == "invalid_request"
     assert not forwarded
+
+
+@pytest.mark.parametrize("case", ["chat-string", "responses-string", "messages-string"])
+@pytest.mark.parametrize("limit", ["size", "depth", "nodes"])
+def test_over_budget_tool_json_is_masked_as_plain_text(
+    case: str, limit: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Over its own budget, a tool JSON text is detected as one text slot (LAB-1759): never
+    # a 400 that breaks the agent session, and never forwarded unmasked.
+    if limit == "size":
+        monkeypatch.setattr(walker, "MAX_TOOL_JSON_CHARS", 16)
+        text = json.dumps({"value": "x" * 32, "name": NAME}, ensure_ascii=False)
+    elif limit == "depth":
+        text = "[" * 80 + json.dumps(NAME, ensure_ascii=False) + "]" * 80
+    else:
+        monkeypatch.setattr(walker, "MAX_TOOL_JSON_NODES", 40)
+        text = json.dumps([{"id": i, "name": NAME} for i in range(20)], ensure_ascii=False)
+    client, forwarded = client_for()
+    with client:
+        path, body = payload(case, text)
+        response = client.post(path, json=body, headers=known_session(client))
+        assert response.status_code == 200, response.text
+        assert response.headers["X-PII-Guard-Outbound-Check"] == "passed"
+    sent = output_of(case, forwarded[0])
+    assert NAME not in sent
+    assert PLACEHOLDER_RE.search(sent)
+    assert sent.count("[") >= text.count("[")  # shape kept: one masked text, not re-encoded
 
 
 @pytest.mark.parametrize("case", ["chat-string", "responses-string", "messages-string"])

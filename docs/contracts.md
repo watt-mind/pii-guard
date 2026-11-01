@@ -1051,9 +1051,9 @@ Self-hosted gateway POSTs reject an explicit non-JSON or repeated `Content-Type`
 SDKs without browser headers may omit the header. Browser mutations must be same-origin,
 including requests through session and endpoint URLs. Hosted mode retains its own checks.
 
-Before collecting text, every gateway request has a cumulative 20,000-node JSON budget and
-a maximum container depth of 64. Keys count as nodes; decoded argument and tool-output JSON
-share the same budget. Over-budget or over-deep requests fail with `400 invalid_request`
+Before collecting text, every gateway request has a cumulative 1,000,000-node JSON budget
+and a maximum container depth of 64. Keys count as nodes; decoded argument and tool-output
+JSON share the same budget. Over-budget or over-deep requests fail with `400 invalid_request`
 before detection or forwarding. Finalizers run in linear-time postorder.
 
 `POST /v1/chat/completions` walks the whole body against an allow-list
@@ -1070,9 +1070,12 @@ Treatments:
 - **structured tool output**: complete JSON objects, arrays and quoted strings in tool-result
   text are decoded before detection, so JSON Unicode escapes cannot hide known values.
   Decoded keys, text and long numbers receive the same masking/block policies as other JSON.
-  Nested JSON string layers are limited to four and each JSON text to 1,048,576 characters;
-  excess fails closed with `400 invalid_request`. Masked structures are serialized back to
-  the original text field. Non-JSON text keeps its normal text/gutter handling. This applies
+  Nested JSON string layers are limited to four (excess fails closed with
+  `400 invalid_request`). A tool JSON text over 1,048,576 characters, 50,000 nodes, depth 64
+  or the request's remaining budget is not decoded: it is detected as one plain text, as any
+  non-JSON tool output, so large tool results never break a session. Masked structures are
+  serialized back to the original text field. Non-JSON text keeps its normal text/gutter
+  handling (the outbound re-check still sees through JSON escapes in it). This applies
   to Chat `tool`/`function` output, Responses function/custom tool output, and Messages
   `tool_result`, including their text parts/blocks and token-count requests.
 - **mask**: free text. Detected values are replaced by placeholders and restored in the

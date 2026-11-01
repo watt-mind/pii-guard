@@ -7,10 +7,13 @@ import json
 from types import SimpleNamespace
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
-from gateway_helpers import MockUpstream, make_app
+from gateway_helpers import TEST_TENANT_KEY, UPSTREAM_KEY, UPSTREAM_URL, MockUpstream, make_app
 
+from pii_guard.config import Settings
+from pii_guard.gateway import GatewayConfig, Mode
 from pii_guard.gateway import request as walker
 from pii_guard.gateway.messages_request import collect_message_texts
 from pii_guard.gateway.responses_request import collect_response_texts
@@ -55,6 +58,7 @@ COLLECTORS = {
 def test_structure_is_rejected_before_any_text_slots_are_allocated(
     protocol: str, shape: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(walker, "MAX_JSON_NODES", 20_000)
     value: Any = [{} for _ in range(40_000)] if shape == "wide" else "fixture"
     if shape == "deep":
         for _ in range(walker.MAX_JSON_DEPTH + 1):
@@ -152,3 +156,94 @@ def test_endpoint_body_decoder_recursion_failure_is_sanitized(
 
     with pytest.raises(ProjectAccessError, match=r"^Invalid endpoint JSON request$"):
         asyncio.run(_read_endpoint_json_body(receive, SimpleNamespace(), len(raw) + 1))
+
+
+def _agent_session(rounds: int, tools: int) -> dict[str, Any]:
+    """A Claude Code-shaped Messages body: many tool definitions and tool rounds."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "A file path"},
+            "limit": {"type": "integer", "description": "How many lines"},
+        },
+        "required": ["path"],
+    }
+    messages: list[dict[str, Any]] = [{"role": "user", "content": "Fix the failing test."}]
+    for i in range(rounds):
+        call = f"toolu_{i:05d}"
+        messages.append(
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": "Reading the file."},
+                    {
+                        "type": "tool_use",
+                        "id": call,
+                        "name": "read",
+                        "input": {"path": f"src/module_{i}.py", "limit": 40},
+                    },
+                ],
+            }
+        )
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": call,
+                        "content": [{"type": "text", "text": f"1|def fixture_{i}():\n2|    pass"}],
+                    }
+                ],
+            }
+        )
+    return {
+        "model": "test-model",
+        "max_tokens": 64,
+        "system": [{"type": "text", "text": "You are a coding agent."}],
+        "tools": [
+            {"name": f"tool_{t}", "description": "A tool", "input_schema": schema}
+            for t in range(tools)
+        ],
+        "messages": messages,
+    }
+
+
+def test_long_agent_sessions_fit_the_request_budget() -> None:
+    body = _agent_session(rounds=500, tools=25)
+    budget = walker._JsonBudget()
+    budget.check(body)
+    assert budget.nodes > 20_000  # the old budget refused this ordinary session
+    forwarded: list[bytes] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        forwarded.append(request.content)
+        return httpx.Response(200, json={"type": "message", "role": "assistant", "content": []})
+
+    settings = Settings(
+        tenant_key=TEST_TENANT_KEY,
+        upstream_base_url=UPSTREAM_URL,
+        upstream_api_key=UPSTREAM_KEY,
+        detection_profile="local-only",
+        detectors=("rules",),
+    )
+    app = make_app(
+        transport=httpx.MockTransport(handler),
+        settings=settings,
+        config=GatewayConfig(mode=Mode.FAST),
+    )
+    with TestClient(app) as client:
+        response = client.post("/v1/messages", json=body)
+    assert response.status_code == 200, response.text
+    assert len(forwarded) == 1
+
+
+def test_over_budget_tool_json_does_not_spend_the_request_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(walker, "MAX_TOOL_JSON_NODES", 10)
+    out = walker.CollectedTexts([], [])
+    holder = [json.dumps([{} for _ in range(20)])]
+    walker._collect_tool_output(holder, 0, out)
+    assert [slot.kind for slot in out.slots] == ["tool"]
+    assert out._json_budget.nodes == 0

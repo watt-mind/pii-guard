@@ -99,8 +99,12 @@ class UnsupportedContentError(PiiGuardError):
     status_code = 400
 
 
-MAX_JSON_NODES = 20_000
+# Whole-request budget: generous enough for long agent sessions (hundreds of tool rounds,
+# large tool results), still linear-time and bounded far below the body-size limit's worst
+# case. Each JSON text decoded out of a tool result gets its own, smaller budget (LAB-1759).
+MAX_JSON_NODES = 1_000_000
 MAX_JSON_DEPTH = 64
+MAX_TOOL_JSON_NODES = 50_000
 
 
 def _json_children(value: dict[str, Any] | list[Any]) -> Iterator[Any]:
@@ -122,8 +126,18 @@ class _JsonBudget:
         self.checked: dict[int, object] = {}
 
     def check(self, value: Any) -> None:
+        if not self._scan(value, MAX_JSON_NODES - self.nodes):
+            raise InvalidChatRequestError("request JSON exceeds structural limits")
+
+    def fits(self, value: Any, limit: int) -> bool:
+        """Spend at most ``limit`` (and the request's remainder) on ``value``, or nothing."""
+        return self._scan(value, min(limit, MAX_JSON_NODES - self.nodes))
+
+    def _scan(self, value: Any, limit: int) -> bool:
         if isinstance(value, dict | list) and id(value) in self.checked:
-            return
+            return True
+        nodes = 0
+        containers: list[object] = []
         stack: list[tuple[Iterator[Any], int]] = [(iter((value,)), 0)]
         while stack:
             children, depth = stack[-1]
@@ -132,14 +146,17 @@ class _JsonBudget:
             except StopIteration:
                 stack.pop()
                 continue
-            self.nodes += 1
-            if self.nodes > MAX_JSON_NODES or depth > MAX_JSON_DEPTH:
-                raise InvalidChatRequestError("request JSON exceeds structural limits")
+            nodes += 1
+            if nodes > limit or depth > MAX_JSON_DEPTH:
+                return False
             if isinstance(node, dict | list):
                 # A generator visits at most the remaining budget's children, even for a
                 # very wide container. Never first allocate a list of all its descendants.
-                self.checked[id(node)] = node
+                containers.append(node)
                 stack.append((_json_children(node), depth + 1))
+        self.nodes += nodes
+        self.checked.update((id(node), node) for node in containers)
+        return True
 
 
 @dataclass(slots=True)
@@ -203,7 +220,9 @@ def _text_slot(holder: dict[str, Any] | list[Any], key: Any, kind: str) -> TextS
 
 # Tool outputs commonly contain JSON serialized into a text field. Decode only complete
 # structured JSON, with explicit byte/tree/layer bounds; re-encode each string layer after
-# its decoded contents have been masked (LAB-1755).
+# its decoded contents have been masked (LAB-1755). A tool JSON text over its size, node or
+# depth budget is not an error: it is detected as one plain-text slot, as before decoding
+# existed, so a large tool result never breaks an agent session (LAB-1759).
 MAX_TOOL_JSON_CHARS = 1024 * 1024
 MAX_TOOL_JSON_LAYERS = 4
 
@@ -217,38 +236,34 @@ def _collect_tool_output(
     decode_depth: int = 0,
 ) -> None:
     text: str = holder[key]
-    if text.lstrip().startswith(("{", "[", '"')):
-        if len(text) > MAX_TOOL_JSON_CHARS:
-            raise InvalidChatRequestError("structured tool output exceeds the JSON size limit")
+    if text.lstrip().startswith(("{", "[", '"')) and len(text) <= MAX_TOOL_JSON_CHARS:
         try:
             parsed = json.loads(text)
-        except RecursionError:
-            raise InvalidChatRequestError(
-                "structured tool output exceeds the JSON depth limit"
-            ) from None
-        except ValueError:
-            pass  # Plain tool text may begin with a bracket or quote.
+        except (RecursionError, ValueError):
+            pass  # Too deep to decode, or plain tool text beginning with a bracket or quote.
         else:
             if decode_depth >= MAX_TOOL_JSON_LAYERS:
                 raise InvalidChatRequestError("structured tool output exceeds the JSON layer limit")
-            out.check_structure(parsed)
-            decoded = [parsed]
+            if out.fits_tool_structure(parsed):
+                decoded = [parsed]
 
-            def collect_leaf(
-                container: dict[str, Any] | list[Any],
-                field_key: Any,
-                collected: CollectedTexts,
-                _kind: str,
-            ) -> None:
-                _collect_tool_output(container, field_key, collected, decode_depth=decode_depth + 1)
+                def collect_leaf(
+                    container: dict[str, Any] | list[Any],
+                    field_key: Any,
+                    collected: CollectedTexts,
+                    _kind: str,
+                ) -> None:
+                    _collect_tool_output(
+                        container, field_key, collected, decode_depth=decode_depth + 1
+                    )
 
-            _collect_json(decoded, 0, out, "tool", string_collector=collect_leaf)
+                _collect_json(decoded, 0, out, "tool", string_collector=collect_leaf)
 
-            def serialize() -> None:
-                holder[key] = json.dumps(decoded[0], ensure_ascii=False)
+                def serialize() -> None:
+                    holder[key] = json.dumps(decoded[0], ensure_ascii=False)
 
-            out.finalizers.append(serialize)
-            return
+                out.finalizers.append(serialize)
+                return
     slot = _text_slot(holder, key, "tool")
     slot.message = message
     out.slots.append(slot)
@@ -284,6 +299,9 @@ class CollectedTexts:
 
     def check_structure(self, value: Any) -> None:
         self._json_budget.check(value)
+
+    def fits_tool_structure(self, value: Any) -> bool:
+        return self._json_budget.fits(value, MAX_TOOL_JSON_NODES)
 
     def finalize(self) -> None:
         for finalize in self.finalizers:
