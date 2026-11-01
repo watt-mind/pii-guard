@@ -91,7 +91,7 @@ class PolicyRequest(NameRequest):
     language: str = Field(
         default="hu", min_length=2, max_length=16, description="Detection language tag."
     )
-    mode: Literal["fast", "audit"] = Field(
+    mode: Literal["fast", "escalate", "audit"] = Field(
         default="fast", description="Detection mode; hosted policies require fast."
     )
     detection_profile: Literal["standard", "local-only"] | None = Field(

@@ -116,6 +116,17 @@ def _static_status(request: Request) -> dict[str, Any]:
                     "available": fast_error is None,
                     "reason": fast_error,
                 },
+                "escalate": {
+                    "detectors": [*fast, "llm"],
+                    "available": fast_error is None and audit_reason is None,
+                    "reason": fast_error
+                    or (
+                        audit_reason.replace("audit mode", "escalate mode", 1)
+                        if audit_reason
+                        else None
+                    ),
+                    "model": model,
+                },
                 "audit": {
                     "detectors": [*fast, "llm"],
                     "available": fast_error is None and audit_reason is None,

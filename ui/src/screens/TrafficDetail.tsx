@@ -171,6 +171,9 @@ function CallMetaGrid({ event: e, mockUpstream }: { event: TrafficEvent; mockUps
       <Meta label="Model provider answered" value={e.upstream?.status ? `HTTP ${e.upstream.status}` : "not called"} />
       <Meta label="Tokens" value={tokensText(e.usage)} />
       <Meta label="Detection cache" value={cacheText(e.cache)} />
+      {e.audit_escalations != null && (
+        <Meta label="LLM escalations" value={`${e.audit_escalations} text${e.audit_escalations === 1 ? "" : "s"}, masked windows`} />
+      )}
     </dl>
   );
 }

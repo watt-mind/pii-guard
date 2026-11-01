@@ -23,14 +23,65 @@ speculatively (LAB-1756).
 | Mode | Detection | Model call per message | Use it for |
 |---|---|---|---|
 | `fast` (default) | rules + the in-process NER (rules only without a checkpoint) | none: local, nothing leaves the machine | production: the request path |
+| `escalate` (opt-in) | fast, then the LLM detector on fast mode's uncertain spans only, as masked windows | none when nothing is uncertain, else one per uncertain text, carrying about ±200 characters of context per uncertain place ([measured](#escalate-mode)) | trying an LLM second look on production-like traffic at a fraction of audit's cost and exposure |
 | `audit` | rules + NER + an LLM detector | one, to the detector endpoint (about 2 s, $2.5–3 per 1k messages) | a second opinion: sampled or offline quality checks, label generation, the benchmark upper bound |
 
-Fast mode is the default (`PII_GUARD_GATEWAY_MODE`, code default `fast`); opt into audit per
-request with `X-PII-Guard-Mode: audit`, or for the whole server with
-`PII_GUARD_GATEWAY_MODE=audit`. Audit mode is not meant for production traffic: it sends every
+Fast mode is the default (`PII_GUARD_GATEWAY_MODE`, code default `fast`); opt into escalate or
+audit per request with `X-PII-Guard-Mode: escalate` / `audit`, or for the whole server with
+`PII_GUARD_GATEWAY_MODE`. Audit mode is not meant for production traffic: it sends every
 message to the detector endpoint. Current numbers for both:
 [benchmarks.md](benchmarks.md#smoke). Old mode names and the rename:
 [operations.md](operations.md#modes).
+
+## Escalate mode
+
+`X-PII-Guard-Mode: escalate` (LAB-1766, `src/pii_guard/detect/escalate.py`) runs the fast
+pipeline unchanged, then asks Muse Spark Open (the audit-mode detector, same key and settings)
+about only what fast mode was unsure of:
+
+1. **Select.** NER spans scored under `PII_GUARD_GATEWAY_ESCALATE_LOW_SCORE` (0.75); a
+   capitalised word no detector covered, right after a form of address (`Mr`, `Frau`,
+   `Kedves`; before Hungarian `úr`) or next to a `PERSON` span; a run of six or more digits no
+   rule matched (dates and amounts with a currency left out); a rules-vs-NER type conflict
+   where the rules span is not checksum- or format-validated. No candidate, no call: the
+   result is fast mode's.
+2. **Window.** About `PII_GUARD_GATEWAY_ESCALATE_WINDOW` (200) characters each side of a
+   candidate, snapped to whitespace and never cutting a found span, at most
+   `_ESCALATE_MAX_WINDOWS` (4) per text and `_ESCALATE_MAX_TEXTS` (8) texts per request. Every
+   span fast mode found is replaced by a placeholder (`[[EMAIL_1]]`; a conflicting span by a
+   neutral `[[ENTITY_1]]`), so no value already found leaves the machine. The windows of one
+   text go out as one call.
+3. **Align, verbatim only.** A value the model returns is kept only where it occurs exactly in
+   the windows, not across two windows and not halfway into a placeholder. A value that
+   includes a placeholder (`Jane [[PERSON_1]]`) maps onto the original text under it, so the
+   model can widen a span or settle its type.
+4. **Merge, add-only.** The model's spans join fast mode's in the resolver with the LLM as type
+   adjudicator, as in audit mode. A losing span keeps its characters masked, and validated
+   rules spans keep winning: the model can add or retype, never unmask.
+
+**Failing closed.** A call past `PII_GUARD_GATEWAY_ESCALATE_TIMEOUT` (10 s) or any error masks
+the uncertain words that were still unmasked (names as `PERSON`, numbers as `ID_DOCUMENT`) and
+the request goes on; `PII_GUARD_GATEWAY_ESCALATE_ON_FAILURE=keep` keeps the rules + NER result
+instead. Either way `X-PII-Guard-Escalation-Failures` counts it. Without a key escalate mode is
+unavailable (`503 detection_unavailable`, nothing sent), the `local-only` profile refuses it
+(`detection_profile_denied`), and the hosted service accepts fast mode only.
+
+**Cache and counts.** Decisions are cached in memory per vault session (and session
+incarnation), keyed by a hash of the masked windows: the same uncertain text in the same
+session is not sent twice, and, as in every mode, a text already detected in the session comes
+from the detection cache. `X-PII-Guard-Escalations` and the traffic record's
+`audit_escalations` give the texts sent per request; the console's call detail shows it.
+
+**What leaves the machine:** the uncertain words and the unmasked context around them, to the
+LLM endpoint. Values the session knows ([known values](api.md#sessions-and-restore)) are added
+after detection, so a known value fast mode did not find can be in a window.
+
+**Measured** on 706 fictional documents
+([results](../eval/results/2026-11-01-lab-1766-escalate/README.md)): 30–46 % of documents had an
+uncertain place; $0.57–0.89 per 1,000 messages (audit: about $2.5); about 1.4 s added at p50
+on an escalated message, 2.9 s at p95. Leak went from 3 to 2 values of 583 on the hand-written
+set and did not change on Ai4Privacy (8 of 2,185); over-masking rose by one span on the
+hand-written set. That is within noise: escalate stays opt-in and fast mode stays the default.
 
 ## Run it
 
@@ -103,7 +154,8 @@ for chunk in stream:
 |---|---|---|
 | `X-PII-Guard-Session` | both | The conversation. Same session = same placeholders, and history is not detected again. Unknown or expired → 404. Without it the gateway picks a sticky session (below); the response carries its id, so a client can send it back. |
 | `X-PII-Guard-Session-Source` | response | Which step chose the session: `header`, `path`, `prompt_cache_key` or `default`. Also in the traffic record (`session_source`). |
-| `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default) or `audit` (+ the LLM detector). The response carries the mode that ran. |
+| `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default), `escalate` (+ the LLM detector on uncertain spans only, as masked windows) or `audit` (+ the LLM detector on every message). The response carries the mode that ran. |
+| `X-PII-Guard-Escalations` / `X-PII-Guard-Escalation-Failures` | response | Escalate mode only: texts sent to the LLM detector as masked windows in this request, and the calls of those that timed out or failed (and were masked closed; sent only when non-zero). Also in the traffic record (`audit_escalations`). |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
 | `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]` (a choice whose masked copy passed the 1M-character retention cap is listed as `{"index": i, "content": null, "truncated": true}`, not left out). Both also carry `kept_spans`: per client message, the values detected but kept by policy as `{"type", "start", "end"}` (code-point offsets into the message as sent; `[]` for a message whose content is not one string or is decoded structured tool output), never the values. Decoded JSON offsets cannot be projected onto the original escaped text. Masked text only; for UIs that show the boundary (the demo's Chat screen). `placeholder_note` says whether the [placeholder note](#placeholder-note) was added. |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |

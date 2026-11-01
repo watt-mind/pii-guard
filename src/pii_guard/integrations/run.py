@@ -167,9 +167,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         type=lambda v: cli_mode(v, "pii-guard run"),
-        choices=("fast", "audit"),
+        choices=("fast", "escalate", "audit"),
         default="fast",
-        help="gateway masking mode (default: fast, local rules + NER)",
+        help="gateway masking mode (default: fast, local rules + NER; escalate sends only "
+        "uncertain spans, masked, to the LLM detector)",
     )
     parser.add_argument(
         "--language",

@@ -433,9 +433,10 @@ export function PolicyForm({ policy, template, endpoints, preferred = null, late
               </Select>
             </Field>
             {!hosted && (
-              <Field label="Detection mode" hint="Audit mode needs a server with the audit detectors.">
+              <Field label="Detection mode" hint="Escalate and audit need a server with the LLM detector's key.">
                 <Select value={mode} onChange={(e) => setMode(e.target.value)}>
                   <option value="fast">Fast</option>
+                  <option value="escalate">Escalate</option>
                   <option value="audit">Audit</option>
                 </Select>
               </Field>

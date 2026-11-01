@@ -4,6 +4,9 @@
   ``rules`` + ``ner`` when available, the same stack the REST API runs without
   ``PII_GUARD_DETECTORS``. A configured (``PII_GUARD_NER_MODEL``) but missing NER raises
   ``DetectionError`` at startup.
+- ``escalate`` (LAB-1766): the fast pipeline, then only its uncertain spans go to the LLM
+  detector as small masked windows (:class:`~pii_guard.detect.escalate.EscalatingDetector`).
+  Unavailable without an LLM detector key, like audit.
 - ``audit`` (formerly ``strict``): the fast detectors + the LLM detector, resolved by
   :class:`~pii_guard.detect.pipeline.DetectionPipeline`. Without an LLM detector key it is
   *unavailable* (LAB-1290): :meth:`ModeDetector.require_available` refuses every audit request
@@ -199,18 +202,74 @@ def _ner_available() -> bool:
     return stack.ner_available()
 
 
+def _record_llm_ms(ms: float) -> None:
+    timings = _timings.get()
+    if timings is not None:
+        timings["llm"] = timings.get("llm", 0.0) + ms
+
+
+def _escalate_detector(
+    settings: Settings,
+    config: GatewayConfig,
+    base: Sequence[Detector],
+    llm: Detector,
+    policies: PolicySet,
+) -> ModeDetector:
+    """Escalate mode: the fast pipeline (with raw-span recording for type conflicts) and the
+    LLM, built from the gateway's ``escalate_*`` settings."""
+    from pii_guard.detect.escalate import EscalatingDetector, RawRecorder
+
+    fast = DetectionPipeline(
+        [RawRecorder(_Timed(_CheckedBatch(d))) for d in base], keep_types=policies.keep_types
+    )
+    escalating = EscalatingDetector(
+        fast,
+        llm,
+        radius=config.escalate_window,
+        max_windows=config.escalate_max_windows,
+        low_score=config.escalate_low_score,
+        timeout=config.escalate_timeout,
+        on_failure=config.escalate_on_failure,
+        settings=settings,
+        on_llm_ms=_record_llm_ms,
+    )
+    parts = [
+        *(d.name for d in base),
+        "llm",
+        f"model={escalating.model}",
+        f"window={config.escalate_window}",
+        f"windows={config.escalate_max_windows}",
+        f"low={config.escalate_low_score:g}",
+        f"on_failure={config.escalate_on_failure}",
+        "policies=" + policies.fingerprint(),
+    ]
+    return ModeDetector(
+        Mode.ESCALATE,
+        escalating,
+        "escalate:" + ";".join(parts),
+        policies,
+        unavailable_reason(base) or escalating.unavailable_reason,
+        batches=True,
+    )
+
+
 def build_mode_detectors(
     settings: Settings,
     config: GatewayConfig,
     *,
     base: Sequence[Detector] | None = None,
     llm_detector: Detector | None = None,
+    escalate_llm: Detector | None = None,
 ) -> dict[Mode, ModeDetector]:
-    """The fast and audit detectors.
+    """The fast, escalate and audit detectors.
 
     ``base`` defaults to :func:`~pii_guard.detect.stack.default_detector_names` (``rules`` +
     ``ner`` when available, built from the settings); ``llm_detector`` defaults to
-    :class:`~pii_guard.detect.llm.LlmDetector` from the settings. Both are injectable for tests.
+    :class:`~pii_guard.detect.llm.LlmDetector` from the settings. ``escalate_llm`` is escalate
+    mode's LLM detector: by default ``llm_detector`` when one is passed, else an
+    :class:`~pii_guard.detect.llm.LlmDetector` with ``escalate_timeout`` and no empty-answer
+    challenge (its found spans are masked, so the rules have nothing left to point at). All
+    are injectable for tests. The local-only profile builds fast mode only.
     """
     if base is None:
         base = build_detectors(stack.default_detector_names(settings), settings)
@@ -236,10 +295,23 @@ def build_mode_detectors(
                 batches=True,
             )
         }
+    injected_llm = llm_detector is not None
     if llm_detector is None:
         from pii_guard.detect.llm import LlmDetector
 
         llm_detector = LlmDetector(settings=settings, reasoning_effort=config.llm_reasoning_effort)
+    if escalate_llm is None:
+        if injected_llm:
+            escalate_llm = llm_detector
+        else:
+            from pii_guard.detect.llm import LlmDetector
+
+            escalate_llm = LlmDetector(
+                settings=settings,
+                reasoning_effort=config.llm_reasoning_effort,
+                timeout=config.escalate_timeout,
+                challenge_empty=False,
+            )
     policies = gateway_policies(settings, config)
 
     def build(mode: Mode, detectors: Iterable[Detector]) -> ModeDetector:
@@ -263,6 +335,7 @@ def build_mode_detectors(
 
     detectors = {
         Mode.FAST: build(Mode.FAST, base),
+        Mode.ESCALATE: _escalate_detector(settings, config, base, escalate_llm, policies),
         Mode.AUDIT: build(Mode.AUDIT, [*base, llm_detector]),
     }
     logger.info(

@@ -57,7 +57,7 @@ _MAX_INGEST_EVENTS = 50
 _VALID_OUTCOMES = frozenset(
     {"ok", "upstream_error", "upstream_failed", "blocked", "refused", "error"}
 )
-_VALID_MODES = frozenset({"fast", "audit", "strict", "-"})
+_VALID_MODES = frozenset({"fast", "escalate", "audit", "strict", "-"})
 _VALID_STAGES = frozenset(STAGES)
 _VALID_DETECTORS = frozenset({"rules", "ner", "llm", "known"})
 _VALID_ENTITY_TYPES = frozenset(t.value for t in EntityType)
