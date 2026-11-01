@@ -884,6 +884,8 @@ def _local_gateway(
                 host="127.0.0.1",
                 port=actual_port,
                 log_level="warning",
+                # Raw request lines (paths, query strings) never reach the log (LAB-1753).
+                access_log=False,
                 lifespan="auto",
                 timeout_graceful_shutdown=2,
             )
