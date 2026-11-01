@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PII Guard",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Privacy firewall for AI agents: reversible PII masking. This is the public, read-only reference for the OpenAI-compatible gateway and the native masking routes. Guide, authentication and examples: https://github.com/watt-mind/pii-guard/blob/develop/docs/api.md. Every example is fictional.",
     "license": {
       "name": "Apache-2.0",
