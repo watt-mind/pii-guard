@@ -243,10 +243,28 @@ def dumps_utf8(value: Any) -> str:
 MAX_TOOL_JSON_CHARS = 1024 * 1024
 MAX_TOOL_JSON_LAYERS = 4
 _BOM = "\ufeff"
-_FENCE_RE = re.compile(
-    r"\A([ \t]*```[ \t]*(?:json|jsonl|ndjson)?[ \t]*\r?\n)(.*?)(\r?\n[ \t]*```\s*)\Z", re.S
-)
+_FENCE_LANGS = frozenset({"", "json", "jsonl", "ndjson"})
 _JSON_START = ("{", "[", '"')
+
+
+def _fence(text: str) -> tuple[str, str, str] | None:
+    """``text`` as (opening line, body, closing line) of one fenced json block, or ``None``.
+
+    Parsed with string operations, not a regex: linear on any input.
+    """
+    first = text.find("\n")
+    last = text.rstrip().rfind("\n")
+    if first < 0 or last <= first:
+        return None
+    opening, closing = text[: first + 1], text[last:]
+    if not opening.strip().startswith("```") or closing.strip() != "```":
+        return None
+    if opening.strip()[3:].strip().lower() not in _FENCE_LANGS:
+        return None
+    body = text[first + 1 : last]
+    if body.endswith("\r"):
+        body, closing = body[:-1], "\r" + closing
+    return opening, body, closing
 
 
 def _decode_json(text: str) -> list[str | list[Any]] | None:
@@ -259,8 +277,8 @@ def _decode_json(text: str) -> list[str | list[Any]] | None:
     prefix = _BOM if text.startswith(_BOM) else ""
     body = text[len(prefix) :]
     suffix = ""
-    if fence := _FENCE_RE.match(body):
-        prefix, body, suffix = prefix + fence.group(1), fence.group(2), fence.group(3)
+    if fence := _fence(body):
+        prefix, body, suffix = prefix + fence[0], fence[1], fence[2]
     if not body.lstrip().startswith(_JSON_START):
         return None
     try:
