@@ -19,7 +19,9 @@ on:
         type: string
         default: develop
   pull_request:
-    branches: [main]
+    # TEMPORARY (LAB-1741): develop, limited to these paths, to prove the workflow before merge.
+    branches: [main, develop]
+    paths: [.github/workflows/judge-path.yml, scripts/ci/wheel_smoke.sh]
   workflow_call:
     inputs:
       wheel-artifact:
