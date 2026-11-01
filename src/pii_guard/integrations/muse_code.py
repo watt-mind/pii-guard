@@ -92,10 +92,14 @@ def load(path: Path) -> tuple[dict[str, Any], str | None]:
     return data, raw
 
 
-def merge(existing: Mapping[str, Any], gateway_url: str) -> dict[str, Any]:
+def merge(
+    existing: Mapping[str, Any], gateway_url: str, *, model: str | None = None
+) -> dict[str, Any]:
     """``existing`` with ``endpoint_transport`` pointed at the gateway (a new dict)."""
     out: dict[str, Any] = dict(existing)
     out.setdefault("schema_version", SCHEMA_VERSION)
+    if model is not None:
+        out["model"] = model
     transport = dict(out.get("endpoint_transport") or {})
     transport["base_url"] = gateway_url.rstrip("/")
     transport["auth"] = "bearer"
@@ -103,9 +107,15 @@ def merge(existing: Mapping[str, Any], gateway_url: str) -> dict[str, Any]:
     return out
 
 
-def render(existing: Mapping[str, Any], raw: str | None, gateway_url: str) -> str:
+def render(
+    existing: Mapping[str, Any],
+    raw: str | None,
+    gateway_url: str,
+    *,
+    model: str | None = None,
+) -> str:
     """The new ``settings.json`` text (unchanged text when it already points at the gateway)."""
-    merged = merge(existing, gateway_url)
+    merged = merge(existing, gateway_url, model=model)
     if raw is not None and raw.strip() and json.loads(raw) == merged:
         return raw
     return render_json(merged)

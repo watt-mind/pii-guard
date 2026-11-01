@@ -87,11 +87,12 @@ baselines: ## compare with Presidio, LLM Guard and PrivAiTe (first run downloads
 # fallback model (docs/models.md), downloaded once (about 1.1 GB) into ~/.cache/pii-guard/models.
 # MODE=rules: rules only, offline, no model download (torch/transformers stay installed, unused).
 MODE ?= fast
-DEMO_EXTRAS := --extra local-vision
+DEMO_EXTRAS := --extra ocr --extra local-vision
 
 demo: ## start API + gateway + UI on a mock upstream, fast mode (rules + NER); MODE=rules: offline
 	uv sync $(DEMO_EXTRAS)
 	uv run --no-sync python -m pii_guard.visual.segment fetch
+	uv run --no-sync python -m pii_guard.visual.segmenters fetch
 	uv run --no-sync python scripts/demo.py --mode $(MODE)
 
 demo-traffic: ## send scripted fictional hu/en/de requests through the running demo gateway

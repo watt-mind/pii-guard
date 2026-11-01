@@ -114,7 +114,7 @@ delivery jobs sit outside `ci-ok`: `hosted-image-push` (develop pushes only, OID
 registry) and `hosted-deployment` (called after `ci-ok`, off unless explicitly enabled).
 
 Pull requests, the merge queue and pushes to `develop` run a **fast** suite; pushes to `main`,
-the nightly run and manual runs run **everything**. The fast test step itself recently took
+the nightly run (of `develop`) and manual runs run **everything**. The fast test step itself recently took
 roughly 1.5-2.5 minutes, while a complete PR that also selects the hosted image took about
 4-5 minutes end to end (measured 2026-10-29; runner load moves this by tens of percent):
 
@@ -211,6 +211,9 @@ When a gate fails:
 
 ## Commits and pull requests
 
+- **Open pull requests against `develop`**, not the default branch. `main` is the last release:
+  it only takes the `develop` → `main` release pull request, and GitHub proposes it as the base,
+  so change the base when you open the PR (`gh pr create --base develop`).
 - Conventional commit messages: `feat(detect): add IBAN checksum rule`,
   `fix(gateway): split placeholders across stream chunks`.
 - Keep pull requests focused on one change. Describe what changed, why, and how you verified
