@@ -27,7 +27,7 @@
 <p align="center"><sub>990 fictional documents (de, en, hu), drawn by <code>pii-guard eval report</code> from the <a href="eval/results/runs/">run records</a>. <a href="#results">All sets</a> · <a href="docs/benchmarks/README.md">Shareable PNGs</a></sub></p>
 <!-- intro:end -->
 
-<p align="center"><sub>Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026) · <a href="https://youtu.be/Lsr74ddhxRo">3-minute video walkthrough</a>. Version 0.1.0, installed from git; no tagged release yet. <a href="docs/why-pii-guard.md#what-is-not-here-yet">Known gaps</a>.</sub></p>
+<p align="center"><sub>Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026) · <a href="https://youtu.be/Lsr74ddhxRo">3-minute video walkthrough</a>. Released on PyPI as <code>wattmind-pii-guard</code>. <a href="docs/why-pii-guard.md#what-is-not-here-yet">Known gaps</a>.</sub></p>
 
 ## Quickstart
 
@@ -36,24 +36,24 @@
 **No install:** the [live demo](https://guard.watt-mind.com) runs as a guest with no sign-up
 (fictional data only; capped sponsored allowance).
 
-**On your machine** (needs [uv](https://docs.astral.sh/uv/)): the API and the gateway on
-http://127.0.0.1:8787, with a mock model that echoes what it receives:
+**On your machine** (needs [uv](https://docs.astral.sh/uv/)): the web console, the API and the
+gateway on http://127.0.0.1:8787, with a mock model that echoes what it receives:
 
 ```bash
-uvx --python 3.12 \
-  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
-  pii-guard up
+uvx --python 3.12 --from wattmind-pii-guard pii-guard up
 ```
 
 **Launch a coding agent directly** ([OpenCode](docs/integrations/opencode.md), [Codex](docs/integrations/codex.md), [Claude Code](docs/integrations/claude-code.md), [pi](docs/integrations/pi.md), [Muse Code](docs/integrations/muse-code.md)) behind an in-process local gateway with Meta's `muse-spark-1.3`:
 
 ```bash
 export META_API_KEY=<your-key>
-uvx --python 3.12 \
-  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
+uvx --python 3.12 --from wattmind-pii-guard \
   pii-guard run opencode --upstream meta --model muse-spark-1.3
 ```
 
+- **The package is `wattmind-pii-guard`**: `pii-guard` on PyPI is an unrelated project. The
+  latest `develop` builds from git (`--from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard@develop'`)
+  without the web console; everything else is the same.
 - **First run:** downloads PyTorch and the NER once (the NER is 1.1 GB); `/healthz` reports
   `"ner": "ready"` when detection is live.
 - **A real model:** `--upstream meta` with `META_API_KEY`; `openai`, `fireworks`, `openrouter`

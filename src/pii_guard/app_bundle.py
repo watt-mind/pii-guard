@@ -226,7 +226,8 @@ padding:0 16px}}</style></head>
 <p>The API and the OpenAI-compatible gateway are up, but this install has no web UI bundled
 (it was built from source, not from a release wheel).</p>
 <ul>
-<li>Release wheel with the UI: see the README, "Try it".</li>
+<li>With the UI, from PyPI:
+<code>uvx --python 3.12 --from wattmind-pii-guard pii-guard up</code></li>
 <li>From a checkout: <code>make wheel</code>, or <code>make demo</code> (UI with Node).</li>
 </ul>
 <p>Everything else works: <a href="/healthz">/healthz</a>, <a href="/docs">/docs</a>,

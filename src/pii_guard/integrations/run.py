@@ -934,9 +934,11 @@ def _print_banner(
                 file=stderr,
             )
     if dashboard.local_ui:
+        from pii_guard.app_bundle import ui_available
+
+        where = f"{gateway_root}/#traffic" if ui_available() else f"{gateway_root}/v1/traffic"
         print(
-            f"pii-guard run {client}: local dashboard {gateway_root}/#traffic "
-            f"(traffic log={traffic_log})",
+            f"pii-guard run {client}: local dashboard {where} (traffic log={traffic_log})",
             file=stderr,
         )
     elif dashboard.display_url:
