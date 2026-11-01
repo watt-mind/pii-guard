@@ -124,8 +124,11 @@ jobs:
           VERSION: ${{ inputs.pypi-version }}
         run: |
           VERSION="${VERSION#v}"
+          # uv installs from the simple index, which can lag the JSON API after an upload.
+          wheel="wattmind_pii_guard-$VERSION-py3-none-any.whl"
           for _ in $(seq 1 30); do
-            curl -fsS -o /dev/null "https://pypi.org/pypi/wattmind-pii-guard/$VERSION/json" && exit 0
+            curl -fsS -H "Cache-Control: no-cache" https://pypi.org/simple/wattmind-pii-guard/ \
+              | grep -qF "$wheel" && exit 0
             sleep 10
           done
           echo "::error::PyPI does not serve wattmind-pii-guard $VERSION"
