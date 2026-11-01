@@ -1,0 +1,163 @@
+# The judge's path (LAB-1741): install and run pii-guard the way the README tells someone on a
+# clean machine to, on Linux and macOS (arm64), with a fresh uv cache, and prove that it serves
+# the UI, masks and restores a chat call, takes an image and stops on Ctrl-C
+# (scripts/ci/wheel_smoke.sh). Not on develop PRs or pushes; it runs:
+#   - by hand (workflow_dispatch, any ref; default develop);
+#   - on release PRs (pull_request to main);
+#   - from release.yml (workflow_call): against the exact wheel it built, before anything is
+#     published (wheel-artifact), and after the PyPI upload against the published version
+#     (pypi-version).
+# Windows is not in the matrix: the smoke stops the server with SIGINT, which Git Bash cannot
+# deliver to a native Windows process; a Windows run needs its own stop logic (PowerShell).
+name: judge-path
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to test
+        type: string
+        default: develop
+  pull_request:
+    branches: [main]
+  workflow_call:
+    inputs:
+      wheel-artifact:
+        description: Artifact (this run) holding the built wheel; tests that wheel only
+        type: string
+        default: ""
+      pypi-version:
+        description: Published version (or its v tag) to install from PyPI (wattmind-pii-guard==<version>)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  # Keep in step with ci.yml / release.yml (and the uv image pinned in the Dockerfiles).
+  UV_VERSION: "0.13.6"
+  # Dispatch: the input; PR: the head commit (fetchable by uv over git+https); otherwise the
+  # caller's commit.
+  JUDGE_REF: ${{ inputs.ref || github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  # A wheel built the way release.yml builds it (UI bundled, no caches), unless the caller
+  # hands one over or names a PyPI version.
+  build:
+    name: build wheel
+    if: ${{ !inputs.wheel-artifact && !inputs.pypi-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.JUDGE_REF }}
+          persist-credentials: false
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: ui/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+      - name: Wheel with the web UI bundled (make wheel, as release.yml)
+        run: make wheel
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: judge-wheel
+          path: dist/*.whl
+          retention-days: 3
+          if-no-files-found: error
+
+  judge:
+    name: judge (${{ matrix.os }}, ${{ matrix.source }})
+    needs: build
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+        # The git+ source (README "On your machine") only where we built from a commit.
+        source: ${{ fromJSON(inputs.pypi-version && '["pypi"]' || inputs.wheel-artifact && '["wheel"]' || '["wheel", "git"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.sha || env.JUDGE_REF }}
+          persist-credentials: false
+      # Fresh uv cache on purpose: this is the judge's cold path, no caches restored.
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+      # Image masking needs the tesseract binary with the languages the OCR reads (hun+eng),
+      # installed as docs/operations.md says.
+      - name: Tesseract (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends tesseract-ocr tesseract-ocr-hun
+      - name: Tesseract (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install tesseract tesseract-lang
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: matrix.source == 'wheel'
+        with:
+          name: ${{ inputs.wheel-artifact || 'judge-wheel' }}
+          path: ${{ runner.temp }}/dist
+      - name: Wait until PyPI serves the version
+        if: matrix.source == 'pypi'
+        env:
+          VERSION: ${{ inputs.pypi-version }}
+        run: |
+          VERSION="${VERSION#v}"
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null "https://pypi.org/pypi/wattmind-pii-guard/$VERSION/json" && exit 0
+            sleep 10
+          done
+          echo "::error::PyPI does not serve wattmind-pii-guard $VERSION"
+          exit 1
+      - name: uvx --python 3.12 --from <source> pii-guard up, then healthz, UI, chat, image, Ctrl-C
+        env:
+          SOURCE: ${{ matrix.source }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ needs.build.outputs.sha || env.JUDGE_REF }}
+          VERSION: ${{ inputs.pypi-version }}
+          DIST: ${{ runner.temp }}/dist
+          PII_GUARD_SMOKE_PORT: "18790"
+          PII_GUARD_SMOKE_LOG: ${{ runner.temp }}/pii-guard-up.log
+        run: |
+          case "$SOURCE" in
+            wheel)
+              wheel="$(find "$DIST" -name '*.whl' | head -n 1)"
+              scripts/ci/wheel_smoke.sh --python 3.12 --image "$wheel" ;;
+            git)
+              # No UI in a source install (ui/dist is not committed): the page must say so.
+              scripts/ci/wheel_smoke.sh --python 3.12 --image --no-ui \
+                --from "wattmind-pii-guard @ git+https://github.com/$REPO@$SHA" ;;
+            pypi)
+              VERSION="${VERSION#v}"
+              scripts/ci/wheel_smoke.sh --python 3.12 --image --from "wattmind-pii-guard==$VERSION" ;;
+          esac
+      # The server log holds fictional data only (the smoke sends nothing else).
+      - name: Upload the server log on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: judge-path-log-${{ matrix.os }}-${{ matrix.source }}
+          path: ${{ runner.temp }}/pii-guard-up.log
+          retention-days: 3
+          if-no-files-found: ignore

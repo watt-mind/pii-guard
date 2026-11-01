@@ -107,8 +107,11 @@ The push of `v*` activates [`.github/workflows/release.yml`](../.github/workflow
 flowchart LR
     Tag["Push v0.1.0"] --> Gate["Job: gate\n(Prove canonical ci-ok)"]
     Gate --> Image["Job: image\n(Build & push GHCR container)"]
-    Gate --> Wheel["Job: wheel\n(Bundle UI, wheel_smoke, attach to GitHub release)"]
-    Wheel --> PyPI["Job: pypi\n(OIDC Trusted Publishing to PyPI)"]
+    Gate --> Wheel["Job: wheel\n(Bundle UI, wheel_smoke, upload artifact)"]
+    Wheel --> Judge["Job: judge-path\n(the wheel on Linux + macOS, fresh uv cache)"]
+    Judge --> Release["Job: github-release\n(attach wheel + sdist)"]
+    Release --> PyPI["Job: pypi\n(OIDC Trusted Publishing to PyPI)"]
+    PyPI --> Smoke["Job: pypi-smoke\n(README PyPI command, non-blocking)"]
 ```
 
 1. **`gate`**: Executes `scripts/ci/release_gate.py` to confirm the tagged commit has a completed `success` run for `ci-ok` on `main` or `develop`.
@@ -117,11 +120,29 @@ flowchart LR
    - Builds web console assets (`pnpm build`).
    - Copies dist into `src/pii_guard/_ui/` and packages wheel + sdist.
    - Runs `scripts/ci/wheel_smoke.sh` ensuring the wheel size is under 5 MiB and smoke tests `pii-guard up`.
-   - Creates or updates the GitHub Release with `.whl` and `.tar.gz`.
-4. **`pypi`**:
+   - Uploads `.whl` and `.tar.gz` as the `release-dist` artifact.
+4. **`judge-path`** ([`judge-path.yml`](../.github/workflows/judge-path.yml), required): installs
+   that exact wheel with `uvx --python 3.12 --from <wheel> pii-guard up` and a fresh uv cache on
+   `ubuntu-latest` and `macos-14`, waits for `"ner":"ready"`, then checks the UI, one masked
+   and restored chat call, one image and a clean Ctrl-C. Red here means nothing is published.
+5. **`github-release`**: creates or updates the GitHub Release with `.whl` and `.tar.gz`.
+6. **`pypi`**:
    - Downloads the release artifacts.
    - Authenticates via GitHub Actions OIDC against PyPI Trusted Publishing.
    - Uploads distribution files with `uv publish`.
+7. **`pypi-smoke`** (after `pypi`, non-blocking): the README's PyPI command,
+   `uvx --python 3.12 --from wattmind-pii-guard==X.Y.Z pii-guard up`, on Linux and macOS through
+   the same judge-path checks. A red run files a GitHub issue (`pypi-smoke-notify`).
+
+The judge path also runs on every release pull request (`develop` -> `main`) and by hand
+(**Actions -> judge-path -> Run workflow**, input `ref`), there against a wheel built from that
+commit and the `git+https://github.com/watt-mind/pii-guard@<sha>` install (which has no UI;
+the page at `/` must say so). It does not run on `develop` pull requests or pushes. Run it
+before tagging when the release PR is not open yet:
+
+```bash
+gh workflow run judge-path.yml --repo watt-mind/pii-guard -f ref=develop
+```
 
 Monitor the release run via CLI:
 ```bash
