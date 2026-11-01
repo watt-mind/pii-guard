@@ -20,7 +20,8 @@ Read [docs/INDEX.md](docs/INDEX.md) before changing anything non-trivial.
 Maintainers track work in Linear: team **`LAB`**, project **`PII Guard`**. The conventions
 that apply in this repository are in
 [CONTRIBUTING.md](CONTRIBUTING.md#issues-and-tracking). Follow-ups discovered mid-work →
-file an issue in `Triage` (do not expand the current ticket's scope). PR body:
+file an issue in `Triage` (do not expand the current ticket's scope). PRs target `develop`
+(`gh pr create --base develop`; the default branch `main` takes only release PRs). PR body:
 `Fixes LAB-XX`. Commit format: `feat(scope): summary (LAB-XX)`.
 
 ## Non-negotiables
