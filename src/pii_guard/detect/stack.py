@@ -29,6 +29,7 @@ what they return, so ``/v1/mask`` and gateway fast mode can't drift apart:
 from __future__ import annotations
 
 import logging
+import sys
 import threading
 import time
 from collections.abc import Iterable, Sequence
@@ -162,8 +163,20 @@ def default_detector_names(settings: Settings) -> tuple[str, ...]:
         return ("rules",)
     if settings.ner_model:
         raise DetectionError(NER_EXTRA_MISSING)
-    _warn_no_ner_once("torch and transformers are not installed")
+    _warn_no_ner_once(_missing_ner_reason())
     return ("rules",)
+
+
+def _missing_ner_reason() -> str:
+    import platform
+
+    if sys.platform == "darwin" and platform.machine() == "x86_64":
+        # The torch dependency is skipped there (pyproject.toml): no wheel exists (LAB-1743).
+        return (
+            "PyTorch has no Intel macOS build; for rules + NER run the Docker image "
+            "(docs/operations.md)"
+        )
+    return "torch and transformers are not installed"
 
 
 def rest_detector_names(settings: Settings) -> tuple[str, ...]:

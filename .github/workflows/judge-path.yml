@@ -79,13 +79,20 @@ jobs:
           if-no-files-found: error
 
   judge:
-    name: judge (${{ matrix.os }}, ${{ matrix.source }})
+    name: judge (${{ matrix.platform }}, ${{ matrix.source }})
     needs: build
     if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-14]
+        # linux: the README command as is (PyTorch with CUDA); linux-cpu: with --torch-backend
+        # cpu, no CUDA package; macos-intel: no PyTorch build exists, so rules only (LAB-1743).
+        platform: [linux, linux-cpu, macos-arm, macos-intel]
+        include:
+          - { platform: linux, os: ubuntu-latest, flags: "--expect-ner on" }
+          - { platform: linux-cpu, os: ubuntu-latest, flags: "--torch-backend cpu --expect-ner on" }
+          - { platform: macos-arm, os: macos-14, flags: "--expect-ner on" }
+          - { platform: macos-intel, os: macos-15-intel, flags: "--expect-ner off" }
         # The git+ source (README "On your machine") only where we built from a commit.
         source: ${{ fromJSON(inputs.pypi-version && '["pypi"]' || inputs.wheel-artifact && '["wheel"]' || '["wheel", "git"]') }}
     runs-on: ${{ matrix.os }}
@@ -136,6 +143,7 @@ jobs:
       - name: uvx --python 3.12 --from <source> pii-guard up, then healthz, UI, chat, image, Ctrl-C
         env:
           SOURCE: ${{ matrix.source }}
+          FLAGS: ${{ matrix.flags }}
           REPO: ${{ github.repository }}
           SHA: ${{ needs.build.outputs.sha || env.JUDGE_REF }}
           VERSION: ${{ inputs.pypi-version }}
@@ -143,24 +151,26 @@ jobs:
           PII_GUARD_SMOKE_PORT: "18790"
           PII_GUARD_SMOKE_LOG: ${{ runner.temp }}/pii-guard-up.log
         run: |
+          # FLAGS is a list of options: split on purpose.
+          # shellcheck disable=SC2086
           case "$SOURCE" in
             wheel)
               wheel="$(find "$DIST" -name '*.whl' | head -n 1)"
-              scripts/ci/wheel_smoke.sh --python 3.12 --image "$wheel" ;;
+              scripts/ci/wheel_smoke.sh --python 3.12 $FLAGS --image "$wheel" ;;
             git)
               # No UI in a source install (ui/dist is not committed): the page must say so.
-              scripts/ci/wheel_smoke.sh --python 3.12 --image --no-ui \
+              scripts/ci/wheel_smoke.sh --python 3.12 $FLAGS --image --no-ui \
                 --from "wattmind-pii-guard @ git+https://github.com/$REPO@$SHA" ;;
             pypi)
               VERSION="${VERSION#v}"
-              scripts/ci/wheel_smoke.sh --python 3.12 --image --from "wattmind-pii-guard==$VERSION" ;;
+              scripts/ci/wheel_smoke.sh --python 3.12 $FLAGS --image --from "wattmind-pii-guard==$VERSION" ;;
           esac
       # The server log holds fictional data only (the smoke sends nothing else).
       - name: Upload the server log on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: judge-path-log-${{ matrix.os }}-${{ matrix.source }}
+          name: judge-path-log-${{ matrix.platform }}-${{ matrix.source }}
           path: ${{ runner.temp }}/pii-guard-up.log
           retention-days: 3
           if-no-files-found: ignore

@@ -14,6 +14,10 @@
 #   --python V   the interpreter uv runs it on, as the README does (`uvx --python 3.12`)
 #   --no-ui      expect the no-UI fallback page at / (a source install has no UI bundled)
 #   --image      also send one image (needs the `tesseract` binary: /healthz must say ocr on)
+#   --torch-backend B  passed to uv (`cpu` on Linux: the CPU build of PyTorch); with `cpu`, no
+#                CUDA package may be downloaded
+#   --expect-ner on|off  fail unless /healthz ends at "ner":"ready" (on) or "ner":"off" (off,
+#                e.g. Intel macOS, which has no PyTorch build); default: either
 #
 # Env: PII_GUARD_SMOKE_PORT (default 18999), PII_GUARD_SMOKE_LOG (keep the server log there,
 # e.g. to upload it from CI), PII_GUARD_SMOKE_READY_TIMEOUT (seconds to wait for the NER,
@@ -25,6 +29,8 @@ source_spec=""
 python_version=""
 expect_ui=true
 image=false
+torch_backend=""
+expect_ner=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --size-only) size_only=true; shift ;;
@@ -32,6 +38,8 @@ while [ $# -gt 0 ]; do
     --python) python_version="${2:?--python needs a value}"; shift 2 ;;
     --no-ui) expect_ui=false; shift ;;
     --image) image=true; shift ;;
+    --torch-backend) torch_backend="${2:?--torch-backend needs a value}"; shift 2 ;;
+    --expect-ner) expect_ner="${2:?--expect-ner needs on or off}"; shift 2 ;;
     --) shift; break ;;
     -*) echo "wheel-smoke: unknown option $1" >&2; exit 2 ;;
     *) break ;;
@@ -96,6 +104,7 @@ log="${PII_GUARD_SMOKE_LOG:-$(mktemp)}"
 : >"$log"
 uv_args="--isolated"
 [ -n "$python_version" ] && uv_args="$uv_args --python $python_version"
+[ -n "$torch_backend" ] && uv_args="$uv_args --torch-backend $torch_backend"
 echo "source: $source_spec"
 # A clean environment: no developer upstream, key or .env leaks into the run. TMPDIR is kept
 # (pytesseract writes the image there); UV_CACHE_DIR only if the caller set one.
@@ -145,6 +154,13 @@ case "$health" in
   *) fail "the NER was not ready within ${ready_timeout}s: ${health:-no /healthz answer}" ;;
 esac
 echo "time-to-ready: $((SECONDS - started))s (healthz: $health)"
+case "$expect_ner" in
+  on) case "$health" in *'"ner":"ready"'*) ;; *) fail "expected the NER, /healthz says: $health" ;; esac ;;
+  off) case "$health" in *'"ner":"off"'*) ;; *) fail "expected rules only, /healthz says: $health" ;; esac ;;
+esac
+if [ "$torch_backend" = cpu ] && grep -qi 'nvidia-' "$log"; then
+  fail "--torch-backend cpu still downloaded CUDA packages"
+fi
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   echo "- \`$source_spec\` on $(uname -sm): /healthz after ${up_at}s, NER ready after $((SECONDS - started))s" >>"$GITHUB_STEP_SUMMARY"
 fi
