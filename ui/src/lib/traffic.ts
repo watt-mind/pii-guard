@@ -137,9 +137,9 @@ export interface ModeStats {
   max: number;
 }
 
-const MODE_ORDER = ["fast", "audit"];
+const MODE_ORDER = ["fast", "escalate", "audit"];
 
-/** Modes in display order: fast (the default), audit, then any other name alphabetically. */
+/** Modes in display order: fast (the default), escalate, audit, then any other name alphabetically. */
 export function modeOrder(modes: readonly string[]): string[] {
   return [...modes].sort((a, b) => (MODE_ORDER.indexOf(a) + 1 || 9) - (MODE_ORDER.indexOf(b) + 1 || 9) || a.localeCompare(b));
 }
