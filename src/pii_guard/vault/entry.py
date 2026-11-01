@@ -602,17 +602,45 @@ class _Plan:
     aliases: tuple[str, ...] = ()
 
 
-def _plan_in_word(text: str, span: Span, matcher: InflectionMatcher) -> _Plan | None:
+def _plan_in_word(
+    text: str,
+    span: Span,
+    matcher: InflectionMatcher,
+    confirmed: set[tuple[EntityType, str]],
+    next_start: int,
+) -> _Plan | None:
     """Plan a span that ends inside a word (``Teszt Elek|nek``), or ``None`` if whole-word."""
     value, end = span.text, span.end
     if not (_is_word_char(value[-1]) and end < len(text) and _is_word_char(text[end])):
         return None
     run = following_suffix(text, end)
-    agree = (
-        next((c for c in splits(matcher, value + run, span.entity_type) if c.stem == value), None)
-        if run
-        else None
+    candidates = splits(matcher, value + run, span.entity_type) if run else []
+    # A subword NER span may stop one consonant short of a doubled-consonant lemma at a
+    # simplified triple-consonant boundary (Erika Musterman|nak for Erika Mustermann + -nak);
+    # widen the stem when the longer lemma is confirmed or occurs standalone in the text.
+    wider = next(
+        (
+            c
+            for c in candidates
+            if len(value) < len(c.stem) <= next_start - span.start
+            and (
+                (span.entity_type, _value_key(span.entity_type, c.lemma)) in confirmed
+                or _occurs_alone(text, c.lemma, span)
+            )
+        ),
+        None,
     )
+    if wider is not None:
+        widened = Span(
+            start=span.start,
+            end=span.start + len(wider.stem),
+            entity_type=span.entity_type,
+            text=wider.stem,
+            score=span.score,
+            detector=span.detector,
+        )
+        return _Plan(widened, wider.lemma, len(wider.stem))
+    agree = next((c for c in candidates if c.stem == value), None)
     lemma = agree.lemma if agree is not None else value
     return _Plan(span, lemma, len(value))
 
@@ -670,7 +698,8 @@ def plan_spans(
     # Lemma -> the distinct surface forms that can be read as it ("Eleknek", "Eleket").
     votes: dict[tuple[EntityType, str], set[str]] = {}
     for index, span in enumerate(ordered):
-        in_word = _plan_in_word(text, span, matcher)
+        next_start = ordered[index + 1].start if index + 1 < len(ordered) else len(text)
+        in_word = _plan_in_word(text, span, matcher, confirmed, next_start)
         if in_word is not None:
             plans.append(in_word)
             confirmed.add((span.entity_type, _value_key(span.entity_type, in_word.lemma)))

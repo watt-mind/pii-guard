@@ -283,9 +283,24 @@ def _unchanged_splits(surface: str, folded: str) -> list[Split]:
         lemma = surface[:cut]
         if suffix in _HU_HYPHENATED and lemma[-1].casefold() not in _HU_VOWELS:
             continue
+        # Bare -n/-t never attaches directly to n/t (Márton + -on -> Mártonon, Bálint + -ot ->
+        # Bálintot), so a doubled final consonant (Mariann, Mustermann, Bernadett) is not read
+        # as a 1-consonant lemma plus bare -n/-t.
+        if len(suffix) == 1 and lemma[-1].casefold() == suffix:
+            continue
         if _last_token_letters(lemma) < _MIN_LEMMA_LETTERS + 1:
             continue
         found.append(Split(lemma, lemma, surface[cut:]))
+        # Triple-consonant simplification (AkH. 62): Mariann|ak -> Mariann, Bernadett|ől ->
+        # Bernadett, Mustermann|ak -> Mustermann (alongside the 1-consonant reading above).
+        if (
+            len(suffix) >= 2
+            and _is_consonant(surface[cut])
+            and lemma[-1].casefold() == surface[cut].casefold()
+            and (cut < 2 or surface[cut - 2].casefold() != surface[cut].casefold())
+        ):
+            doubled = surface[: cut + 1]
+            found.append(Split(doubled, doubled, surface[cut + 1 :]))
     return found
 
 
@@ -314,7 +329,11 @@ class HungarianSuffixMatcher:
             suffixes |= {f"{sound}al", f"{sound}el", f"{sound}á", f"{sound}é"}
         elif _hu_doubled(value):
             # Kiss -> Kissel, Bernadett -> Bernadettel: the v assimilates, no third letter.
-            suffixes |= set(_HU_DOUBLED_ENDINGS)
+            # AkH. 62 also drops the third consonant when a suffix starts with the same letter
+            # (Mariann -> Mariannak, Mustermann -> Mustermannak, Bernadett -> Bernadettől).
+            suffixes |= set(_HU_DOUBLED_ENDINGS) | {
+                s[1:] for s in _HU_SUFFIXES if len(s) >= 2 and s[0] == last
+            }
         elif last.isalpha() and not value.casefold().endswith(_HU_DIGRAPHS):
             suffixes |= {f"{last}al", f"{last}el", f"{last}á", f"{last}é"}
         plain = (
@@ -404,7 +423,13 @@ class HungarianSuffixMatcher:
             if c.strong:
                 return c
             folded = c.suffix.casefold()
-            if c.stem == c.lemma and folded in _HU_UNAMBIGUOUS_ENDINGS:
+            # When the boundary consonant is doubled (Mustermannak: Musterman+nak vs
+            # Mustermann+ak), wait for the vault's confirmed lemma instead of guessing.
+            if (
+                c.stem == c.lemma
+                and folded in _HU_UNAMBIGUOUS_ENDINGS
+                and c.lemma[-1].casefold() != folded[0]
+            ):
                 return c
             digraph = _hu_digraph(c.lemma)
             if (
@@ -459,4 +484,11 @@ class HungarianSuffixMatcher:
             if len(lemma) >= 2 and lemma[-2].casefold() == lemma[-1].casefold():
                 return lemma + suffix[1:]  # Kiss + vel -> Kissel
             return lemma + lemma[-1] + suffix[1:]  # Elek + vel -> Elekkel
+        if (
+            _hu_doubled(lemma)
+            and len(folded) >= 2
+            and folded in _HU_SUFFIXES
+            and folded[0] == lemma[-1].casefold()
+        ):
+            return lemma + suffix[1:]  # Mariann + nak -> Mariannak, Bernadett + től -> Bernadettől
         return lemma + suffix

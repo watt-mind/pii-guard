@@ -83,6 +83,9 @@ def test_inflected_names_split_at_the_stem(
         "Teszt Zsolt",
         "Teszt Tihamérért",
         "Minta Dórát",
+        # Doubled consonant at the suffix boundary (Musterman+nak vs Mustermann+ak): wait for vault.
+        "Erika Mustermannak",
+        "Minta Bernadettől",
         # Two lexicon readings (Kis + sel, Kiss + el): no guess.
         "Teszt Kissel",
         # Not a name ending: nothing to split.
