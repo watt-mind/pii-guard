@@ -203,7 +203,16 @@ uvx --python 3.12 --from wattmind-pii-guard pii-guard up
 uvx --from https://github.com/watt-mind/pii-guard/releases/download/vX.Y.Z/wattmind_pii_guard-X.Y.Z-py3-none-any.whl pii-guard up
 # From source: API + gateway only (a git build has no UI; / says how to get it)
 uvx --from git+https://github.com/watt-mind/pii-guard pii-guard up
+# Linux: the CPU build of PyTorch (about 190 MB) instead of the CUDA one (several GB)
+uvx --python 3.12 --torch-backend cpu --from wattmind-pii-guard pii-guard up
+# pip: the same, from the PyTorch CPU index
+pip install wattmind-pii-guard --extra-index-url https://download.pytorch.org/whl/cpu
 ```
+
+PyTorch publishes no build for Intel macOS (and none for macOS 13 or older), so on an Intel Mac
+the install skips it and `pii-guard up` masks text with rules only and refuses images (the
+signature detector needs PyTorch; fail closed), with a warning that names the reason.
+For rules + NER there, or on macOS 13, run the [Docker demo](#docker) (a Linux image).
 
 The distribution is `wattmind-pii-guard` (the name `pii-guard` on PyPI is an unrelated
 project); the command is `pii-guard` and the import package `pii_guard`.

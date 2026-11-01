@@ -218,3 +218,17 @@ def test_checked_detector_hides_exception_text() -> None:
     assert "Teszt" not in str(info.value)
     good = [Span(0, 10, EntityType.PERSON, "Teszt Elek", 0.9, "x")]
     assert check_spans(good, TEXT, "x") == good
+
+
+def test_missing_ner_reason_names_intel_macos(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PyTorch has no Intel macOS build, so the rules-only warning says why (LAB-1743)."""
+    import platform
+    import sys
+
+    from pii_guard.detect import stack
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(platform, "machine", lambda: "x86_64")
+    assert "Intel macOS" in stack._missing_ner_reason()
+    monkeypatch.setattr(platform, "machine", lambda: "arm64")
+    assert stack._missing_ner_reason() == "torch and transformers are not installed"

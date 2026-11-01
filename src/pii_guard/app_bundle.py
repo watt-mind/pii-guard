@@ -38,7 +38,7 @@ from starlette.types import Scope
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings, get_settings
-from pii_guard.detect import ner_resolve
+from pii_guard.detect import ner_resolve, stack
 from pii_guard.security_headers import SecurityHeadersMiddleware
 
 __all__ = [
@@ -453,6 +453,9 @@ def _banner(opts: UpOptions, status: Status, traffic_log: str, *, ui: bool) -> s
             # The extra is there, but no model resolved (fallback off, or not cached).
             lines.append(f"{pad}{status.ner}")
             lines.append(f"{pad}PII_GUARD_NER_FALLBACK=download downloads the NER model once")
+        elif stack.no_torch_build():
+            lines.append(f"{pad}free-text names need NER, and PyTorch has no Intel macOS build:")
+            lines.append(f"{pad}for rules + NER run the Docker demo (docs/operations.md#docker)")
         else:
             # torch/transformers are core dependencies (LAB-1733) but missing here (the
             # rules-only Docker image, or an install that skipped them): a fresh install has
