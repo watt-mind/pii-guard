@@ -549,6 +549,35 @@ def test_run_print_env_and_end_to_end_subprocess(
     assert leaked.isdisjoint(recorded["env"])
 
 
+@pytest.mark.parametrize(
+    ("flag", "hint_expected"),
+    [("off", True), ("local", False), ("https://dash.example/e/ep_abc123/v1", False)],
+)
+def test_banner_hints_how_to_open_the_web_console(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, flag: str, hint_expected: bool
+) -> None:
+    """LAB-1771: with no dashboard, the banner says how to get the local web console."""
+    _clear_provider_env(monkeypatch, tmp_path)
+    args = build_parser().parse_args(["opencode", "--dashboard", flag])
+    dashboard = resolve_dashboard(args)
+    upstream = ResolvedUpstream(base_url="http://127.0.0.1:9/v1", api_key="", label="mock")
+    err = io.StringIO()
+    run_module._print_banner(
+        "opencode",
+        "http://127.0.0.1:8799",
+        "mock-model",
+        "audit",
+        "off",
+        upstream,
+        dashboard,
+        stderr=err,
+    )
+    hint = "pii-guard run opencode: web console off; add --dashboard local to open it"
+    assert (hint in err.getvalue()) is hint_expected
+    if flag == "local":
+        assert "local dashboard http://127.0.0.1:8799/" in err.getvalue()
+
+
 def test_resolve_dashboard_refuses_plaintext_remote() -> None:
     args = build_parser().parse_args(["opencode", "--dashboard", "http://dash.example"])
     with pytest.raises(ConnectError, match="https"):

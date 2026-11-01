@@ -48,8 +48,11 @@ uvx --python 3.12 --from wattmind-pii-guard pii-guard up
 ```bash
 export META_API_KEY=<your-key>
 uvx --python 3.12 --from wattmind-pii-guard \
-  pii-guard run opencode --upstream meta --model muse-spark-1.3
+  pii-guard run opencode --upstream meta --model muse-spark-1.3 --dashboard local
 ```
+
+`--dashboard local` also serves the web console on the gateway port: open the
+`local dashboard http://127.0.0.1:<port>/#traffic` URL that `run` prints at startup.
 
 - **The package is `wattmind-pii-guard`**: `pii-guard` on PyPI is an unrelated project. The
   latest `develop` builds from git (`--from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard@develop'`)
