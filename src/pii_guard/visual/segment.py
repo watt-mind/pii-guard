@@ -236,6 +236,9 @@ class LocalSegmenter:
         with contextlib.suppress(AttributeError):  # OpenCV 5's DNN backend notice is not an error
             cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
         path = Path(model_path) if model_path else model_dir() / YUNET.filename
+        if not path.is_file() and model_path is None and not os.environ.get(MODEL_DIR_ENV_VAR):
+            with contextlib.suppress(Exception):
+                fetch_model(YUNET, path.parent)
         if not path.is_file():
             raise DetectionError(
                 f"local segmenter model {path.name} is missing (pii-guard models fetch yunet)"

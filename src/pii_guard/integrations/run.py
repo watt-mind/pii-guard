@@ -4,7 +4,7 @@
 pii-guard run opencode [--upstream meta|openai|fireworks|openrouter] [--model ID]
                        [--dashboard URL|local|off] [--dashboard-key KEY] [--endpoint ID]
                        [--telemetry-level masked|stats] [-- <agent_args>...]
-pii-guard run codex|claude-code|pi|muse-code [options] [-- <agent_args>...]
+pii-guard run codex|claude-code|pi|muse-code|muse [options] [-- <agent_args>...]
 ```
 
 All PII detection and masking run locally in-process on ``127.0.0.1`` and the masked prompt goes
@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import logging
 import os
 import re
 import secrets
@@ -59,6 +60,7 @@ from pii_guard.upstreams import PRESETS, Upstream, by_url
 
 __all__ = [
     "AUTO_UPSTREAM_ORDER",
+    "CLIENT_ALIASES",
     "DEFAULT_DASHBOARD_URL",
     "RUNNABLE_CLIENTS",
     "DashboardTarget",
@@ -75,12 +77,14 @@ __all__ = [
 ]
 
 RUNNABLE_CLIENTS = ("opencode", "codex", "claude-code", "pi", "muse-code")
+#: Short binary-name aliases accepted for ``client`` (e.g. ``pii-guard run muse``).
+CLIENT_ALIASES: dict[str, str] = {"muse": "muse-code", "claude": "claude-code"}
 AUTO_UPSTREAM_ORDER = ("meta", "openai", "openrouter", "fireworks")
 DEFAULT_DASHBOARD_URL = "https://guard.watt-mind.com"
 ANTHROPIC_UPSTREAM_URL = "https://api.anthropic.com/v1"
 ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-5"
 MOCK_DEFAULT_MODEL = "pii-guard-mock"
-_ENDPOINT_ID_RE = re.compile(r"^(?:/?e/)?([A-Za-z0-9_-]{1,64})(?:/v1(?:/traffic)?)?/?$")
+_ENDPOINT_ID_RE = re.compile(r"^(?:/)?(?:e/)?([A-Za-z0-9_-]{1,64})(?:/v1(?:/traffic)?)?/?$")
 
 
 @dataclass(frozen=True)
@@ -120,11 +124,16 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pii-guard run",
         description=(
             "Start a local on-device PII Guard gateway and launch a coding agent "
-            "(opencode, codex, claude-code, pi, muse-code) with optional remote or local "
-            "dashboard telemetry."
+            "(opencode, codex, claude-code/claude, pi, muse-code/muse) with optional remote or "
+            "local dashboard telemetry."
         ),
     )
-    parser.add_argument("client", choices=RUNNABLE_CLIENTS, help="coding agent to launch")
+    parser.add_argument(
+        "client",
+        type=lambda v: CLIENT_ALIASES.get(v, v),
+        choices=RUNNABLE_CLIENTS,
+        help="coding agent to launch (opencode, codex, claude-code/claude, pi, muse-code/muse)",
+    )
     parser.add_argument(
         "--upstream",
         choices=sorted(PRESETS),
@@ -576,7 +585,7 @@ def _opencode_config_json(
         "npm": "@ai-sdk/openai-compatible",
         "name": "pii-guard",
         "options": options,
-        "models": {model: {}},
+        "models": {model: dict(snippets.OPENCODE_MODEL_CAPABILITIES)},
     }
     base["provider"] = providers
     base["model"] = f"pii-guard/{model}"
@@ -625,6 +634,7 @@ def build_agent_invocation(
     ``base_env`` defaults to :func:`child_base_env`. ``configure=False`` skips writing pi's and
     Muse Code's config files (``--print-env``).
     """
+    client = CLIENT_ALIASES.get(client, client)
     env = child_base_env() if base_env is None else dict(base_env)
     extra = list(agent_args)
     if client == "opencode":
@@ -671,7 +681,7 @@ def build_agent_invocation(
         return [binary, "--provider", "pii-guard", "--model", model, *extra], env
     from pii_guard.integrations.cli import main as connect_main
 
-    c_args = ["muse-code", "--gateway", session_url]
+    c_args = ["muse-code", "--gateway", session_url, "--model", model]
     if muse_dir:
         c_args += ["--muse-dir", muse_dir]
     if configure and connect_main(c_args, stdout=io.StringIO()) != 0:
@@ -826,6 +836,11 @@ def _local_gateway(
         upstream_url = upstream.base_url
 
     tenant_key = _env_or_dotenv("PII_GUARD_TENANT_KEY") or secrets.token_hex(32)
+    meta_key = (
+        upstream.api_key
+        if (upstream.preset and upstream.preset.id == "meta" and upstream.api_key)
+        else _env_or_dotenv("META_API_KEY")
+    )
     env_overrides: dict[str, str | None] = {
         "PII_GUARD_HOST": "127.0.0.1",
         "PII_GUARD_PORT": str(actual_port),
@@ -835,53 +850,61 @@ def _local_gateway(
         "PII_GUARD_REMOTE_KEY": dashboard.remote_key,
         "PII_GUARD_REMOTE_LEVEL": dashboard.remote_level if dashboard.remote_url else None,
     }
+    stack_logger = logging.getLogger("pii_guard.gateway.detection")
+    prev_stack_level = stack_logger.level
+    if args.mode == "fast":
+        stack_logger.setLevel(logging.ERROR)
     with _TemporaryEnv(env_overrides):
-        settings = Settings(
-            host="127.0.0.1",
-            port=actual_port,
-            tenant_key=SecretStr(tenant_key),
-            upstream_base_url=upstream_url,
-            upstream_api_key=SecretStr(upstream.api_key) if upstream.api_key else None,
-            default_language=args.language,
-        )
-        app = _create_gateway_app(
-            settings,
-            local_ui=dashboard.local_ui,
-            mode=args.mode,
-            upstream_label="mock" if upstream.mock else upstream.label,
-        )
-        config = uvicorn.Config(
-            app,
-            host="127.0.0.1",
-            port=actual_port,
-            log_level="warning",
-            lifespan="auto",
-            timeout_graceful_shutdown=2,
-        )
-        server = uvicorn.Server(config)
-        thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
-        thread.start()
-        deadline = time.monotonic() + 15.0
-        while not server.started:
-            if time.monotonic() > deadline or not thread.is_alive():
+        try:
+            settings = Settings(
+                host="127.0.0.1",
+                port=actual_port,
+                tenant_key=SecretStr(tenant_key),
+                upstream_base_url=upstream_url,
+                upstream_api_key=SecretStr(upstream.api_key) if upstream.api_key else None,
+                meta_api_key=SecretStr(meta_key) if meta_key else None,
+                default_language=args.language,
+            )
+            app = _create_gateway_app(
+                settings,
+                local_ui=dashboard.local_ui,
+                mode=args.mode,
+                upstream_label="mock" if upstream.mock else upstream.label,
+            )
+            config = uvicorn.Config(
+                app,
+                host="127.0.0.1",
+                port=actual_port,
+                log_level="warning",
+                lifespan="auto",
+                timeout_graceful_shutdown=2,
+            )
+            server = uvicorn.Server(config)
+            thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
+            thread.start()
+            deadline = time.monotonic() + 15.0
+            while not server.started:
+                if time.monotonic() > deadline or not thread.is_alive():
+                    server.should_exit = True
+                    sock.close()
+                    if mock_server is not None:
+                        mock_server.stop()
+                    raise ConnectError("local gateway did not start")
+                time.sleep(0.02)
+            try:
+                yield f"http://127.0.0.1:{actual_port}", app
+            finally:
+                obs = getattr(app.state, "observability", None)
+                flush = getattr(obs, "flush", None)
+                if callable(flush):
+                    flush()
                 server.should_exit = True
+                thread.join(timeout=5.0)
                 sock.close()
                 if mock_server is not None:
                     mock_server.stop()
-                raise ConnectError("local gateway did not start")
-            time.sleep(0.02)
-        try:
-            yield f"http://127.0.0.1:{actual_port}", app
         finally:
-            obs = getattr(app.state, "observability", None)
-            flush = getattr(obs, "flush", None)
-            if callable(flush):
-                flush()
-            server.should_exit = True
-            thread.join(timeout=5.0)
-            sock.close()
-            if mock_server is not None:
-                mock_server.stop()
+            stack_logger.setLevel(prev_stack_level)
 
 
 def _print_banner(
