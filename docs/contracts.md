@@ -244,7 +244,8 @@ gateway (LAB-1270). Without `PII_GUARD_DETECTORS` the REST API runs the gateway 
 `rules`, plus `ner` when torch and transformers import (the default install; the rules-only
 base Docker image skips them). An explicit `PII_GUARD_DETECTORS`
 (`rules,llm`, say) wins for the REST API only; the gateway keeps its per-mode set: `fast`, the
-default, or `audit`, which adds the LLM detector, chosen by `PII_GUARD_GATEWAY_MODE` or the
+default, `escalate`, which sends only fast mode's uncertain spans to the LLM detector as masked
+windows, or `audit`, which adds the LLM detector, chosen by `PII_GUARD_GATEWAY_MODE` or the
 `X-PII-Guard-Mode` header (old mode names: [operations.md](operations.md#modes)). NER fails
 closed (ADR 0006): with `PII_GUARD_NER_MODEL` set but torch/transformers missing, startup raises
 `DetectionError` ("ner configured but torch and transformers are not installed") in both; with neither,

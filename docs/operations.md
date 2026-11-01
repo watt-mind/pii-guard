@@ -116,6 +116,18 @@ spend. This is a secondary abuse signal, without an external CAPTCHA or bot-proo
   CPU, $0, and nothing leaves the machine. It needs no model key. What it adds per request is
   measured, not estimated: see [gateway latency](benchmarks.md#gateway-latency) (the README
   quotes one cell of it).
+- **`escalate`** (LAB-1766) runs fast mode, then sends only the spans it is unsure of to the
+  LLM detector: about 200 characters each side of each uncertain place, with every value fast
+  mode found already replaced by a placeholder. The LLM can add spans or settle a type, never
+  unmask one; a timeout or error masks the uncertain words (or, with
+  `PII_GUARD_GATEWAY_ESCALATE_ON_FAILURE=keep`, keeps the rules + NER result). A text with
+  nothing uncertain makes no call. It needs the same key as audit mode (no key: `503
+  detection_unavailable`, "escalate mode needs PII_GUARD_LLM_DETECTOR_API_KEY"), is refused by
+  the local-only profile and by the hosted service, and is never the default. Windows of the
+  original text do leave the machine: the uncertain words and their unmasked context. The
+  response carries `X-PII-Guard-Escalations` (texts sent) and, after a fail-closed call,
+  `X-PII-Guard-Escalation-Failures`. Selector, settings and measured cost:
+  [architecture-gateway.md](architecture-gateway.md#escalate-mode).
 - **`audit`** adds an LLM detector (Muse Spark Open on Baseten by default) to every message: a
   second opinion for sampled or offline quality checks, generating labels and teacher data for
   the NER, and the benchmark upper bound. It is not meant for production traffic: each
@@ -608,9 +620,10 @@ runtime.
 | `outbound_check` | The [outbound re-check](architecture-gateway.md#outbound-re-check) of the masked request: `result` (`passed` or `blocked`), `texts` checked, `hits` (blocking occurrences per entity type), `short` (occurrences too short to block), `ms`; `null` when the call was refused before it |
 | `mode`, `language`, `stream`, `model` | As requested; `model` is `"[withheld]"` unless it passed its identifier check (refused, blocked and failed calls), here and in the `full` original (LAB-1358) |
 | `session_ref`, `session_new`, `session_source` | Hashed session (see above); whether the call started the conversation; which step chose it: `header`, `path`, `prompt_cache_key` or `default` ([architecture-gateway.md](architecture-gateway.md#sessions)) |
-| `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`) |
+| `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`; escalate mode lists `llm` only when a text had uncertain spans) |
 | `entities` | `detected` and `masked` counts per entity type, number of texts; `images` (count, regions masked / kept, OCR) |
 | `cache` | Detection cache `hits`, `misses`, `seeded` (retained for compatibility, now always zero: response restoration is not a complete detection result) |
+| `audit_escalations` | Escalate mode only: texts sent to the LLM detector as masked windows (0 when nothing was uncertain or every decision came from the session cache); absent in fast and audit events |
 | `upstream` | HTTP status, the model it reported (`"[withheld]"` when it is not model-id shaped, for example holds an e-mail address), `unresolved_placeholders` (placeholders the model invented) |
 | `usage` | Token usage as the upstream reported it (streams: when `stream_options.include_usage` is set) |
 | `timing` | See [Timing](#timing) |

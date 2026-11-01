@@ -121,14 +121,14 @@ for a request path at 9.4 s per document (p50). So it labeled the training text 
 
 > In the default fast mode, every model that sees original personal data runs on your machine.
 > Audit mode (Muse Spark Open) and SAM 3.1 are opt-in and receive originals at the endpoint you
-> configure.
+> configure; escalate mode (Muse Spark Open) is opt-in and sends it masked windows only.
 
 | Job | Meta model |
 |---|---|
 | Fast-mode NER (CPU) | **XLM-RoBERTa base** (FacebookAI, MIT), fine-tuned: [model card](training/ner/model-card.md), [training](docs/models.md#ner-v4-v41-and-v42-v42-is-published) |
 | Teacher: labels training text | **Muse Glimmer 30B** (open weights, Apache-2.0): [distillation](docs/models.md#distilled-from-muse-glimmer) |
 | Benchmark writer; demo model | **Muse Spark** (Meta Model API): [which model does what](docs/models.md#which-model-does-what) |
-| Audit mode, red team | **Muse Spark Open** (open weights): [audit runs](docs/benchmarks.md#smoke), [red team](eval/results/2026-10-27-redteam/README.md) |
+| Escalate and audit modes, red team | **Muse Spark Open** (open weights): [escalate runs](eval/results/2026-11-01-lab-1766-escalate/README.md), [audit runs](docs/benchmarks.md#smoke), [red team](eval/results/2026-10-27-redteam/README.md) |
 | Fictional ID specimens | **Muse Image**: painted the portraits, signatures and stamps ([generation record](eval/fixtures/visual/generation.json)) |
 | Signatures in images | **SAM 3.1** (Meta Model API, decoded with Meta's `meta_sam_parser`); faces stay on the device (YuNet): [specimen results](eval/results/visual/specimens.md) |
 
@@ -149,6 +149,7 @@ original exactly.
 |---|---|---|
 | `fast` (default): everyday traffic | Rules + on-device NER; no LLM call | Only the masked request, to your LLM provider |
 | `fast` with `PII_GUARD_DETECTORS=rules`: offline runs, CI, structured data | Rules only; free-text names only as [known values](docs/api.md#sessions-and-restore) your app registers | Only the masked request |
+| `escalate` (opt-in, `X-PII-Guard-Mode: escalate`): an LLM second look only where fast mode is unsure | Fast, then Muse Spark Open on the uncertain spans only; the LLM can add or retype spans, never unmask; a failed call masks the uncertain words | Nothing when nothing is uncertain; else small windows of the original text (about 200 characters around each uncertain word, every value already found replaced by a placeholder), to the LLM endpoint you configure ([measured](docs/architecture-gateway.md#escalate-mode)) |
 | `audit` (opt-in, `X-PII-Guard-Mode: audit`): measuring the upper bound, training labels | Rules + NER + an LLM detector; fails closed if that call fails | The original text, to the audit endpoint you configure |
 
 **Grammar-aware.** In Hungarian a name changes with every case; the ending stays outside the
