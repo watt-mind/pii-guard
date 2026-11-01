@@ -58,8 +58,8 @@ uvx --python 3.12 --from wattmind-pii-guard \
   `"ner": "ready"` when detection is live.
 - **Platforms:** macOS 14+ on Apple silicon, Linux (x86_64, arm64) and Windows. On Linux add
   `--torch-backend cpu` after `uvx` to skip the multi-GB CUDA build of PyTorch. Intel Macs and
-  macOS 13 have no PyTorch build: Intel Macs install rules only (the banner says so), and the
-  [Docker demo](docs/operations.md#docker) runs rules + NER on either.
+  macOS 13 have no PyTorch build: Intel Macs install text masking with rules only and refuse images
+  (the banner says so); the [Docker demo](docs/operations.md#docker) runs everything on either.
 - **A real model:** `--upstream meta` with `META_API_KEY`; `openai`, `fireworks`, `openrouter`
   or any `--upstream-url` work the same way ([`pii-guard up` options](docs/operations.md#one-command-pii-guard-up), [coding agent integrations](docs/integrations/README.md)).
 - **No auth by default**, bound to 127.0.0.1: set `PII_GUARD_API_TOKEN` before exposing it

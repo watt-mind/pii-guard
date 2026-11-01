@@ -262,9 +262,15 @@ def _yolos(  # pragma: no cover - needs torch, transformers and the pinned files
         from transformers import AutoImageProcessor, AutoModelForObjectDetection
         from transformers.utils import logging as hf_logging
     except ImportError as exc:
+        from pii_guard.detect.stack import no_torch_build
+
+        where = (
+            "PyTorch has no Intel macOS build; run the Docker demo for images"
+            if no_torch_build()
+            else "part of the default install; the rules-only base Docker image skips them"
+        )
         raise DetectionError(
-            "the signature detector needs torch and transformers (part of the default install; "
-            "the rules-only base Docker image skips them)"
+            f"the signature detector needs torch and transformers ({where})"
         ) from exc
     with contextlib.suppress(Exception):
         hf_logging.disable_progress_bar()

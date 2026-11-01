@@ -210,7 +210,8 @@ pip install wattmind-pii-guard --extra-index-url https://download.pytorch.org/wh
 ```
 
 PyTorch publishes no build for Intel macOS (and none for macOS 13 or older), so on an Intel Mac
-the install skips it and `pii-guard up` runs rules only, with a warning that names the reason.
+the install skips it and `pii-guard up` masks text with rules only and refuses images (the
+signature detector needs PyTorch; fail closed), with a warning that names the reason.
 For rules + NER there, or on macOS 13, run the [Docker demo](#docker) (a Linux image).
 
 The distribution is `wattmind-pii-guard` (the name `pii-guard` on PyPI is an unrelated

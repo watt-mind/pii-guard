@@ -224,10 +224,20 @@ png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 
 png += chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 print(base64.b64encode(png).decode())')"
   img_body="{\"model\":\"pii-guard-mock\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is in this picture?\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/png;base64,$png\"}}]}]}"
-  post /v1/chat/completions "$img_body" >/dev/null
-  outcome="$(curl -fsS "$base/v1/traffic?limit=1" | python3 -c 'import json, sys; print(json.load(sys.stdin)["events"][0]["outcome"])')"
-  [ "$outcome" = ok ] || fail "the image request's traffic event says $outcome"
-  echo "image: masked and forwarded (200)"
+  if [ "$expect_ner" = off ]; then
+    # No PyTorch (Intel macOS): the signature detector cannot run, so images fail closed.
+    code="$(curl -sS -o "$workdir/img.json" -w '%{http_code}' "$base/v1/chat/completions" \
+      -H 'content-type: application/json' -d "$img_body")"
+    if [ "$code" != 503 ] || ! grep -q 'Docker' "$workdir/img.json"; then
+      fail "without PyTorch an image must be refused with a Docker hint: $code $(cat "$workdir/img.json")"
+    fi
+    echo "image: refused without PyTorch (503, fail closed)"
+  else
+    post /v1/chat/completions "$img_body" >/dev/null
+    outcome="$(curl -fsS "$base/v1/traffic?limit=1" | python3 -c 'import json, sys; print(json.load(sys.stdin)["events"][0]["outcome"])')"
+    [ "$outcome" = ok ] || fail "the image request's traffic event says $outcome"
+    echo "image: masked and forwarded (200)"
+  fi
 fi
 
 kill -INT "$pid"
