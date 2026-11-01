@@ -335,3 +335,19 @@ def test_muse_code_run_check_edge_cases() -> None:
     )
     res, _ = muse_code.run_check("http://gw.test/v1", "m", client=client)
     assert "the answer has no pii_guard echo" in (res.error or "")
+
+
+def test_muse_alias_and_model_in_settings(tmp_path: Path) -> None:
+    code, out = run(
+        "muse",
+        "--gateway",
+        "http://127.0.0.1:8787/v1",
+        "--model",
+        "muse-spark-1.3",
+        "--muse-dir",
+        str(tmp_path),
+    )
+    assert code == 0 and "wrote" in out
+    data = json.loads((tmp_path / "settings.json").read_text())
+    assert data["model"] == "muse-spark-1.3"
+    assert data["endpoint_transport"]["auth"] == "bearer"

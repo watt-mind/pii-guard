@@ -20,9 +20,11 @@ dependencies = [
     "cryptography>=46.0.0",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
+    "opencv-python-headless>=4.10",
     "pillow>=13.0.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
+    "pytesseract>=0.3.13",
     "uvicorn>=0.54.0",
     # On-device NER is part of the default install (LAB-1733): fast mode is rules + NER. The
     # model itself is fetched once, pinned by revision and SHA-256, on first use; the rules-only

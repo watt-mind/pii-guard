@@ -289,6 +289,11 @@ def test_build_agent_invocation_all_clients(tmp_path: Path) -> None:
     assert cfg["provider"]["other"] == {"name": "other"}
     assert cfg["provider"]["pii-guard"]["options"]["baseURL"] == session_url
     assert cfg["provider"]["pii-guard"]["options"]["apiKey"] == "{env:PII_GUARD_API_TOKEN}"
+    assert cfg["provider"]["pii-guard"]["models"]["muse-spark-1.3"]["attachment"] is True
+    assert cfg["provider"]["pii-guard"]["models"]["muse-spark-1.3"]["modalities"]["input"] == [
+        "text",
+        "image",
+    ]
     assert cfg["model"] == "pii-guard/muse-spark-1.3"
 
     _, env_malformed = build_agent_invocation(
@@ -377,6 +382,9 @@ def test_build_agent_invocation_all_clients(tmp_path: Path) -> None:
     assert cmd_muse == ["/usr/local/bin/muse", "exec", "hi"]
     assert env_muse["META_API_KEY"] == "pii-guard-local"
     assert (muse_dir / "settings.json").is_file()
+    assert json.loads((muse_dir / "settings.json").read_text())["model"] == "muse-spark-1.3"
+    assert build_parser().parse_args(["muse"]).client == "muse-code"
+    assert build_parser().parse_args(["claude"]).client == "claude-code"
 
 
 def test_discover_model_and_resolve_binary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

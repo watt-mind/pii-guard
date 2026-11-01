@@ -4,9 +4,11 @@ Modes (:data:`SEGMENTER_MODES`):
 
 - ``hybrid`` (default): :class:`HybridSegmenter`. ``FACE`` and ``ID_PHOTO`` on the CPU with
   YuNet (:class:`~pii_guard.visual.segment.LocalSegmenter`), everything else (``SIGNATURE``,
-  and ``STAMP`` when its policy is not ``keep``) with SAM 3.1 on the Meta API. Two SAM calls per
-  image with the default policies (``signature``, ``squiggly line``) instead of five. The image
-  still leaves the machine for the signature prompts: a latency and cost win, not a privacy one.
+  and ``STAMP`` when its policy is not ``keep``) with SAM 3.1 on the Meta API (or the on-device
+  YOLOS-tiny :class:`SignatureDetector` for ``SIGNATURE`` when ``META_API_KEY`` is not set).
+  Two SAM calls per image with the default policies (``signature``, ``squiggly line``) instead
+  of five. The image still leaves the machine for the signature prompts when SAM is configured:
+  a latency and cost win, not a privacy one.
 - ``sam-api``: :class:`~pii_guard.visual.sam.SamClient` for every type (the previous default):
   one call per prompt, ``face``, ``signature``, ``squiggly line``, ``photo of a person``,
   ``stamp``.
@@ -42,7 +44,9 @@ Get the signature detector once (pinned Hugging Face revision, SHA-256 checked):
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
 import sys
 import threading
 from collections.abc import Callable, Sequence
@@ -59,6 +63,7 @@ from pii_guard.visual.regions import Box, Region
 from pii_guard.visual.sam import SamClient
 from pii_guard.visual.segment import (
     LOCAL_ENTITY_TYPES,
+    MODEL_DIR_ENV_VAR,
     LocalSegmenter,
     ModelFile,
     Segmenter,
@@ -109,16 +114,28 @@ VISUAL_ENTITY_TYPES: tuple[EntityType, ...] = (
 class HybridSegmenter:
     """``FACE`` / ``ID_PHOTO`` with ``local``, every other requested type with ``sam``.
 
-    ``local=None`` sends everything to SAM (the fallback when YuNet is unavailable). The two
-    run concurrently; either failing raises (no partial result).
+    ``local=None`` sends everything to SAM (the fallback when YuNet is unavailable). When
+    ``sam`` has no API key configured and ``local`` is available, ``SIGNATURE`` falls back to
+    the on-device :class:`SignatureDetector` so ``pii-guard up`` and ``pii-guard run`` work out
+    of the box without ``META_API_KEY``. The two run concurrently; either failing raises (no
+    partial result).
     """
 
     name = "hybrid"
 
-    def __init__(self, *, sam: SamClient, local: Segmenter | None) -> None:
+    def __init__(
+        self,
+        *,
+        sam: SamClient,
+        local: Segmenter | None,
+        signatures: Callable[[], Segmenter] | None = None,
+    ) -> None:
         self.sam = sam
         self.local = local
         self.local_types: tuple[EntityType, ...] = LOCAL_ENTITY_TYPES if local is not None else ()
+        self._build_signatures: Callable[[], Segmenter] = signatures or SignatureDetector
+        self._signatures: Segmenter | None = None
+        self._sig_lock = threading.Lock()
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pii-guard-yunet")
 
     @property
@@ -133,6 +150,14 @@ class HybridSegmenter:
 
     def __repr__(self) -> str:
         return f"HybridSegmenter(local={self.local!r}, sam={self.sam!r})"
+
+    def signatures(self) -> Segmenter:
+        """The on-device signature detector, built lazily when ``sam`` has no API key."""
+        if self._signatures is None:
+            with self._sig_lock:
+                if self._signatures is None:
+                    self._signatures = self._build_signatures()
+        return self._signatures
 
     def split(
         self, entity_types: Sequence[EntityType | str] | None
@@ -152,7 +177,16 @@ class HybridSegmenter:
             else None
         )
         try:
-            remote = self.sam.segment(image, sam_types) if sam_types else []
+            if not sam_types:
+                remote: list[Region] = []
+            elif (
+                not self.sam.configured
+                and self.local is not None
+                and set(sam_types) <= {EntityType.SIGNATURE}
+            ):
+                remote = self.signatures().segment(image, sam_types)
+            else:
+                remote = self.sam.segment(image, sam_types)
         finally:
             local = future.result() if future is not None else []  # raises its error
         return local + remote
@@ -226,11 +260,14 @@ def _yolos(  # pragma: no cover - needs torch, transformers and the pinned files
     try:
         import torch
         from transformers import AutoImageProcessor, AutoModelForObjectDetection
+        from transformers.utils import logging as hf_logging
     except ImportError as exc:
         raise DetectionError(
             "the signature detector needs torch and transformers (part of the default install; "
             "the rules-only base Docker image skips them)"
         ) from exc
+    with contextlib.suppress(Exception):
+        hf_logging.disable_progress_bar()
     try:
         processor = AutoImageProcessor.from_pretrained(str(path), local_files_only=True)
         network = AutoModelForObjectDetection.from_pretrained(
@@ -289,6 +326,13 @@ class SignatureDetector:
             self._boxes = boxes
             return
         path = Path(model_path) if model_path else model_dir() / SIGNATURE_DETECTOR_DIR
+        if (
+            model_path is None
+            and not os.environ.get(MODEL_DIR_ENV_VAR)
+            and not all((path / m.filename).is_file() for m in SIGNATURE_DETECTOR)
+        ):
+            with contextlib.suppress(Exception):
+                fetch_signature_detector(path)
         for model in SIGNATURE_DETECTOR:
             file = path / model.filename
             if not file.is_file():
@@ -433,6 +477,12 @@ def sam_calls(segmenter: Any, entity_types: Sequence[EntityType]) -> int:
     """How many SAM API requests one image costs with ``segmenter`` and ``entity_types``."""
     if isinstance(segmenter, HybridSegmenter):
         _, sam_types = segmenter.split(entity_types)
+        if (
+            not segmenter.sam.configured
+            and segmenter.local is not None
+            and set(sam_types) <= {EntityType.SIGNATURE}
+        ):
+            return 0
         return sum(len(segmenter.sam.prompts.get(t, ())) for t in sam_types)
     if isinstance(segmenter, SamClient):
         return sum(len(segmenter.prompts.get(t, ())) for t in entity_types)

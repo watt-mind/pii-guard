@@ -10,14 +10,16 @@ document summary. The model answers with placeholders; the gateway restores the 
     uv run python examples/which_parties_have_an_id.py                 # mocked upstream
     uv run python examples/which_parties_have_an_id.py --live          # Baseten (BASETEN_API_KEY)
     uv run python examples/which_parties_have_an_id.py --render opaque # the "before": black boxes
+    uv run python examples/which_parties_have_an_id.py --ocr tesseract --sam local --out demo/
     uv run python examples/which_parties_have_an_id.py --ocr tesseract --sam live --out demo/
     uv run python examples/which_parties_have_an_id.py --record-run RUN_ID   # a run record
 
 Everything is fictional (ADR 0005): the cards are the LAB-1121 specimens in
 ``eval/fixtures/visual/`` (one with its expiry date reprinted in the past). By default the
-recorded OCR words are used and SAM is off (faces and signatures stay visible; ``--sam live``
-masks them, ``META_API_KEY``). Keys are read from the environment or ``.env`` and never
-printed. ``--out DIR`` writes the forwarded (masked) request, the masked images and the answer.
+recorded OCR words are used and SAM is off (faces and signatures stay visible; ``--sam local``
+masks them on-device via YuNet + YOLOS-tiny; ``--sam live`` uses SAM 3, ``META_API_KEY``). Keys
+are read from the environment or ``.env`` and never printed. ``--out DIR`` writes the forwarded
+(masked) request, the masked images and the answer.
 """
 
 from __future__ import annotations
@@ -132,6 +134,11 @@ def run(
         engine = demo.ocr
     if sam == "live":
         sam_client: Any = SamClient(api_key=_env("META_API_KEY"))
+    elif sam == "local":
+        from pii_guard.visual.segment import LocalSegmenter
+        from pii_guard.visual.segmenters import LocalSignatureSegmenter
+
+        sam_client = LocalSignatureSegmenter(LocalSegmenter())
     else:
         sam_client = NoSam()
     app = create_app(settings)
@@ -203,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--live", action="store_true", help="ask Baseten instead of the mock")
     parser.add_argument("--render", choices=("labels", "opaque"), default="labels")
     parser.add_argument("--ocr", choices=("cached", "tesseract"), default="cached")
-    parser.add_argument("--sam", choices=("off", "live"), default="off")
+    parser.add_argument("--sam", choices=("off", "local", "live"), default="off")
     parser.add_argument("--out", type=Path, help="write the forwarded request, images, answer")
     parser.add_argument("--record-run", metavar="RUN_ID", help="write a run record")
     args = parser.parse_args(argv)

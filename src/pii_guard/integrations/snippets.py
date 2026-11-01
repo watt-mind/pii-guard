@@ -45,6 +45,7 @@ __all__ = [
     "CLAUDE_CODE_VERSION",
     "CODEX_VERSION",
     "ENDPOINT_KEY_ENV",
+    "OPENCODE_MODEL_CAPABILITIES",
     "OPENCODE_VERSION",
     "PI_VERSION",
     "TESTED",
@@ -75,6 +76,12 @@ TOKEN_ENV = "PII_GUARD_API_TOKEN"  # noqa: S105 - the variable's name, not a tok
 #: Where an endpoint's blocks (``/e/<endpoint>/v1``) read its ``pg_ep_`` key from.
 ENDPOINT_KEY_ENV = "PII_GUARD_ENDPOINT_KEY"
 MODEL_PLACEHOLDER = "<model-id>"
+#: OpenCode defaults custom provider models to text-only unless attachment + image input
+#: modality are declared on the model entry.
+OPENCODE_MODEL_CAPABILITIES: dict[str, Any] = {
+    "attachment": True,
+    "modalities": {"input": ["text", "image"], "output": ["text"]},
+}
 #: The fictional request the cURL and Python blocks send (ADR 0005).
 #: No free-text name: on a rules-only server (no NER) a name would reach the model as written.
 SAMPLE_PROMPT = (
@@ -182,7 +189,7 @@ def _opencode(url: str, model: str, key: str | None) -> tuple[str, str]:
                 "npm": "@ai-sdk/openai-compatible",
                 "name": "pii-guard",
                 "options": options,
-                "models": {model: {}},
+                "models": {model: dict(OPENCODE_MODEL_CAPABILITIES)},
             }
         },
         "model": f"pii-guard/{model}",

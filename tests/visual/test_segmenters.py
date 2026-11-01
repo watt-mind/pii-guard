@@ -278,3 +278,25 @@ def test_e2e_summary_takes_medians_of_the_rounds_and_feeds_the_record() -> None:
     add_e2e(card, {"modes": summary}, "local")  # not benched: unchanged
     args = build_parser().parse_args(["--e2e-bench", "--set", "fictional", "--rounds", "2"])
     assert (args.e2e_bench, args.rounds, args.candidate) == (True, 2, None)
+
+
+def test_hybrid_without_sam_key_falls_back_to_local_signature_detector() -> None:
+    class FakeSig:
+        name = "yolos-signature"
+        model = "yolos-tiny-signature"
+
+        def segment(
+            self, image: bytes, entity_types: Sequence[EntityType | str] | None = None
+        ) -> list[Region]:
+            return [Region(EntityType.SIGNATURE, Box(200, 200, 300, 240), 0.95, "yolos")]
+
+    unconfigured_sam = SamClient(api_key=None)
+    seg = HybridSegmenter(
+        sam=unconfigured_sam,
+        local=FakeLocal(),
+        signatures=lambda: FakeSig(),  # type: ignore[arg-type]
+    )
+    regions = seg.segment(_png())
+    assert sorted(r.entity_type.value for r in regions) == ["FACE", "ID_PHOTO", "SIGNATURE"]
+    assert {r.source for r in regions} == {"yunet", "yolos"}
+    assert sam_calls(seg, [EntityType.FACE, EntityType.SIGNATURE, EntityType.ID_PHOTO]) == 0
