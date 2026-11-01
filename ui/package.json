@@ -1,7 +1,7 @@
 {
   "name": "pii-guard-ui",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Demo UI for pii-guard: what the model saw vs what you got back",
   "license": "Apache-2.0",

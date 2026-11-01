@@ -7,8 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Planned as the first tagged release, `0.1.0` (the version in `pyproject.toml`). Nothing is
-tagged or published yet; move these entries under `## [0.1.0] - <date>` when the tag is pushed.
+## [0.1.1] - 2026-11-01
+
+### Added
+
+- Judge-path check (LAB-1741): before a release is published, the wheel is installed with a fresh
+  uv cache on Linux and macOS and must serve the web console, load the NER, mask and restore a
+  request and accept an image; after the PyPI upload the published version is checked the same way.
+
+### Changed
+
+- OCR (`pytesseract`) and on-device vision (`opencv-python-headless`) are core dependencies, so
+  `uvx --from wattmind-pii-guard pii-guard up` masks images without extras (#458).
+- The README quickstart installs the PyPI wheel, which bundles the web console (LAB-1740).
+
+### Fixed
+
+- Hungarian triple-consonant names (`Mustermann` + `-nak` is written `Mustermannak`) are masked
+  and restored without a stray letter, and short names such as `Ann` no longer mask words like
+  `annak` (#458, LAB-1737).
+- Coding-agent harness and local demo fixes for all five supported agents (#456).
+
+## [0.1.0] - 2026-10-31
+
+First tagged release.
 
 ### Added
 
@@ -32,7 +54,6 @@ tagged or published yet; move these entries under `## [0.1.0] - <date>` when the
   - Tag-driven release workflow (`.github/workflows/release.yml`) for PyPI as `wattmind-pii-guard` via OIDC Trusted Publishing and for container images on `ghcr.io/watt-mind/pii-guard`, behind a CI provenance gate.
   - Size-budgeted wheel builds with automated isolated smoke tests (`scripts/ci/wheel_smoke.sh`).
 
-[Unreleased]: https://github.com/watt-mind/pii-guard/commits/develop
 
 ### Changed
 
@@ -42,3 +63,7 @@ tagged or published yet; move these entries under `## [0.1.0] - <date>` when the
 ### Removed
 
 - The `gliner` extra and the `[tool.uv] conflicts` it needed (`gliner` pins `transformers < 5.17`). The GLiNER comparison (LAB-1150) can be reproduced from commit `13e2aaf` or earlier.
+
+[Unreleased]: https://github.com/watt-mind/pii-guard/compare/v0.1.1...develop
+[0.1.1]: https://github.com/watt-mind/pii-guard/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/watt-mind/pii-guard/releases/tag/v0.1.0

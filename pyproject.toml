@@ -2,7 +2,7 @@
 # The PyPI distribution (`pii-guard` there is an unrelated project). The command stays
 # `pii-guard` and the import package `pii_guard`; pii_guard.__version__ looks this name up.
 name = "wattmind-pii-guard"
-version = "0.1.0"
+version = "0.1.1"
 description = "An open-source privacy firewall for AI agents: reversible PII masking for text, documents and images."
 readme = "README.md"
 license = "Apache-2.0"
