@@ -9,7 +9,8 @@
      (``Mr``, ``Frau``, ``Kedves``, before Hungarian ``úr``) or next to a ``PERSON`` span;
    - ``number``: a run of at least six digits no detector covered (rules found no checksum or
      cue); dates and amounts with a currency are left out;
-   - ``conflict``: a rules span and an NER span of different types over the same text.
+   - ``conflict``: a rules span and an NER span of different types over the same text, unless
+     the rules span is checksum- or format-validated (it wins in the resolver anyway).
 
    Text with no candidate makes no remote call: the result is fast mode's, unchanged.
 
@@ -59,7 +60,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 from pii_guard.detect.ner_orgs import HONORIFICS
-from pii_guard.detect.pipeline import DEFAULT_KEEP_TYPES, resolve_spans
+from pii_guard.detect.pipeline import DEFAULT_KEEP_TYPES, STRUCTURED_TYPES, resolve_spans
+from pii_guard.detect.rules._base import VALIDATED_ID_DOCUMENT
 from pii_guard.detect.suffix_trim import trim_name_suffixes
 from pii_guard.types import Detector, EntityType, Span
 
@@ -215,6 +217,12 @@ def _number_candidates(text: str, spans: Sequence[Span]) -> list[Candidate]:
     return out
 
 
+def _validated(span: Span) -> bool:
+    return span.entity_type in STRUCTURED_TYPES or (
+        span.entity_type is EntityType.ID_DOCUMENT and span.subtype == VALIDATED_ID_DOCUMENT
+    )
+
+
 def select_candidates(
     text: str,
     spans: Sequence[Span],
@@ -235,7 +243,9 @@ def select_candidates(
     fitting = [
         s for s in raw if 0 <= s.start < s.end <= len(text) and text[s.start : s.end] == s.text
     ]
-    rules = [s for s in fitting if s.detector == "rules"]
+    # A checksum- or format-validated rules span wins its conflict in the resolver whatever
+    # the LLM says, so asking about it would only cost a call.
+    rules = [s for s in fitting if s.detector == "rules" and not _validated(s)]
     ner = [s for s in fitting if s.detector == "ner"]
     for r in rules:
         for n in ner:

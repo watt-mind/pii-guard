@@ -154,13 +154,22 @@ def test_selects_low_confidence_ner_spans_only() -> None:
 
 
 def test_selects_rules_vs_ner_type_conflicts() -> None:
+    text = "Born 1990-01-02 here."
+    raw = [
+        Span(5, 15, EntityType.DATE_OF_BIRTH, "1990-01-02", 0.9, "rules"),
+        Span(5, 15, EntityType.ID_DOCUMENT, "1990-01-02", 0.9, "ner"),
+    ]
+    resolved = [raw[0]]
+    assert kinds(select_candidates(text, resolved, raw), text) == [("conflict", "1990-01-02")]
+
+
+def test_a_validated_rules_span_is_not_a_conflict() -> None:
     text = "Code 12345678 here."
     raw = [
         Span(5, 13, EntityType.PHONE, "12345678", 1.0, "rules"),
         Span(5, 13, EntityType.ID_DOCUMENT, "12345678", 0.9, "ner"),
     ]
-    resolved = [raw[0]]
-    assert kinds(select_candidates(text, resolved, raw), text) == [("conflict", "12345678")]
+    assert select_candidates(text, [raw[0]], raw) == []
 
 
 # --- windows and the masked view ---
