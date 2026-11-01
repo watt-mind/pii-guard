@@ -157,6 +157,7 @@ def test_without_ui_root_explains_how_to_get_it(tmp_path: Path) -> None:
     page = client.get("/")
     assert page.status_code == 200
     assert "no web UI bundled" in page.text
+    assert "--from wattmind-pii-guard pii-guard up" in page.text
     assert "make wheel" in page.text
     assert client.get("/healthz").status_code == 200
 
