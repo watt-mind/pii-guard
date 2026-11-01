@@ -186,10 +186,18 @@ def _atomic_write(path: Path, data: bytes, *, mode: int = 0o600, gid: int | None
             stream.flush()
             # Restore the authorized group before enabling any group permission. Failure
             # leaves the original intact and the staging file private until cleanup.
-            if gid is not None and os.fstat(stream.fileno()).st_gid != gid:
+            # Windows has neither call (nor POSIX groups); its mkstemp file is owner-only.
+            if (
+                gid is not None
+                and hasattr(os, "fchown")
+                and os.fstat(stream.fileno()).st_gid != gid
+            ):
                 os.fchown(stream.fileno(), -1, gid)
-            os.fchmod(stream.fileno(), mode)
+            if hasattr(os, "fchmod"):
+                os.fchmod(stream.fileno(), mode)
             os.fsync(stream.fileno())
+        if not hasattr(os, "fchmod"):
+            tmp.chmod(mode)
         tmp.replace(path)
     finally:
         tmp.unlink(missing_ok=True)

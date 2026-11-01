@@ -197,6 +197,18 @@ def test_group_restore_failure_keeps_original_private_and_intact(
     assert not list(tmp_path.glob(".*.pii-guard-*"))
 
 
+def test_atomic_write_works_without_fchmod_and_fchown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Windows has neither call; the write still publishes the bytes with the mode applied.
+    path = tmp_path / "settings.json"
+    monkeypatch.delattr(common.os, "fchmod")
+    monkeypatch.delattr(common.os, "fchown")
+    common._atomic_write(path, OLD, mode=0o600, gid=tmp_path.stat().st_gid + 1)
+    assert path.read_bytes() == OLD and mode(path) == 0o600
+    assert not list(tmp_path.glob(".*.pii-guard-*"))
+
+
 def test_write_and_run_restore_snapshot_the_original_group(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
