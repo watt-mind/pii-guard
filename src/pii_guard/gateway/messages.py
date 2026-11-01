@@ -46,7 +46,7 @@ from starlette.responses import Response
 from pii_guard.gateway.messages_request import collect_message_texts
 from pii_guard.gateway.messages_restore import MessagesSseRestorer, restore_message, stream_error
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
-from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, validate
+from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, strip_unverified
 from pii_guard.gateway.placeholder_note import add_messages_note
 from pii_guard.gateway.request import InvalidChatRequestError
 from pii_guard.gateway.responses_restore import iter_sse_events, sse_message
@@ -275,7 +275,11 @@ class MessagesGateway:
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
         try:
-            validate(session, "messages", collected)
+            stats.opaque_stripped = strip_unverified(
+                session, "messages", collected, lambda: collect_message_texts(body)
+            )
+            stats.texts = len(collected.slots)
+            stats.images = len(collected.images)
             with timer.span("detect"):
                 spans = await gw.detect_all(collected.slots, detector, session, language, stats)
                 # The model id's words count as declared names too (Claude Code, LAB-1605).

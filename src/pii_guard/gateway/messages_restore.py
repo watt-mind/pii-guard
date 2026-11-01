@@ -280,4 +280,6 @@ class MessagesSseRestorer:
         if self._done:
             return []
         self._done = True
+        if self._opaque is not None:
+            self._opaque.finish()  # a stream may end without finish_reason or a stop event
         return self._flush_open()

@@ -43,6 +43,7 @@ from typing import Any
 from pii_guard.gateway.request import (
     CollectedTexts,
     InvalidChatRequestError,
+    OpaqueBlob,
     TextSlot,
     UnsupportedContentError,
     _check_json,
@@ -58,6 +59,7 @@ from pii_guard.gateway.request import (
     _require_scalars,
     _setter,
     _text_slot,
+    remove_item,
 )
 
 __all__ = ["collect_response_texts"]
@@ -207,10 +209,16 @@ def _collect_input(body: dict[str, Any], out: CollectedTexts) -> None:
         for key in _ITEM_CHECKED:
             if item.get(key) is not None:
                 _check_json(item, key, f"{where}.{key}", out)
-        _collect_item(item, item_type, where, out)
+        _collect_item(item, item_type, where, out, items)
 
 
-def _collect_item(item: dict[str, Any], item_type: str, where: str, out: CollectedTexts) -> None:
+def _collect_item(
+    item: dict[str, Any],
+    item_type: str,
+    where: str,
+    out: CollectedTexts,
+    items: list[Any],
+) -> None:
     if item_type == "message":
         _collect_message(item, where, out)
     elif item_type in ("function_call", "custom_tool_call"):
@@ -225,7 +233,7 @@ def _collect_item(item: dict[str, Any], item_type: str, where: str, out: Collect
     elif item_type in ("function_call_output", "custom_tool_call_output"):
         _collect_output(item, where, out)
     else:
-        _collect_reasoning(item, where, out)
+        _collect_reasoning(item, where, out, items)
 
 
 def _collect_message(item: dict[str, Any], where: str, out: CollectedTexts) -> None:
@@ -305,7 +313,9 @@ def _collect_output(item: dict[str, Any], where: str, out: CollectedTexts) -> No
         raise InvalidChatRequestError(f"{where}.output must be a string or an array")
 
 
-def _collect_reasoning(item: dict[str, Any], where: str, out: CollectedTexts) -> None:
+def _collect_reasoning(
+    item: dict[str, Any], where: str, out: CollectedTexts, items: list[Any]
+) -> None:
     for key, part_type in _REASONING_PARTS.items():
         parts = item.get(key)
         if parts is None:
@@ -326,7 +336,7 @@ def _collect_reasoning(item: dict[str, Any], where: str, out: CollectedTexts) ->
     if blob is not None and not isinstance(blob, str):  # opaque, forwarded untouched
         raise InvalidChatRequestError(f"{where}.encrypted_content must be a string or null")
     if isinstance(blob, str):
-        out.opaque.append(("encrypted_content", blob))
+        out.opaque.append(OpaqueBlob("encrypted_content", blob, remove_item(items, item)))
 
 
 def _collect_string(

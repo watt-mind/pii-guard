@@ -44,6 +44,7 @@ from pii_guard.gateway.request import (
     CollectedTexts,
     ImageSlot,
     InvalidChatRequestError,
+    OpaqueBlob,
     TextSlot,
     UnsupportedContentError,
     _check_json,
@@ -55,6 +56,7 @@ from pii_guard.gateway.request import (
     _require_scalars,
     _setter,
     _text_slot,
+    remove_item,
 )
 
 __all__ = ["collect_message_texts"]
@@ -243,17 +245,20 @@ def _collect_block(
         if not isinstance(thinking, str):
             raise InvalidChatRequestError(f"{where}.thinking must be a string")
         out.slots.append(_text_slot(block, "thinking", "reasoning"))
-        _opaque(block, "signature", where, out)
+        _opaque(block, "signature", where, out, content)
     else:  # redacted_thinking: the provider's encrypted reasoning, forwarded as is
-        _opaque(block, "data", where, out)
+        _opaque(block, "data", where, out, content)
 
 
-def _opaque(block: dict[str, Any], key: str, where: str, out: CollectedTexts) -> None:
+def _opaque(
+    block: dict[str, Any], key: str, where: str, out: CollectedTexts, content: list[Any]
+) -> None:
     value = block.get(key)
     if value is not None and not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
     if isinstance(value, str):
-        out.opaque.append((key, value))
+        # Unverified, the whole block is dropped: signed thinking text is not forwarded alone.
+        out.opaque.append(OpaqueBlob(key, value, remove_item(content, block)))
 
 
 def _collect_text_block(block: dict[str, Any], where: str, out: CollectedTexts, kind: str) -> None:

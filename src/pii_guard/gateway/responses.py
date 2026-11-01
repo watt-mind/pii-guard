@@ -40,7 +40,7 @@ from starlette.responses import Response
 
 from pii_guard.gateway.meter import record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
-from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, validate
+from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, strip_unverified
 from pii_guard.gateway.placeholder_note import add_responses_note
 from pii_guard.gateway.request import CollectedTexts, InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
@@ -233,7 +233,11 @@ class ResponsesGateway:
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
         try:
-            validate(session, "responses", collected)
+            stats.opaque_stripped = strip_unverified(
+                session, "responses", collected, lambda: collect_response_texts(body)
+            )
+            stats.texts = len(collected.slots)
+            stats.images = len(collected.images)
             with timer.span("detect"):
                 spans = await gw.detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)

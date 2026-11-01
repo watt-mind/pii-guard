@@ -23,6 +23,7 @@ __all__ = [
     "CollectedTexts",
     "ImageSlot",
     "InvalidChatRequestError",
+    "OpaqueBlob",
     "TextSlot",
     "UnsupportedContentError",
     "collect_texts",
@@ -354,13 +355,43 @@ class ImageSlot:
         return True
 
 
+def remove_item(container: list[Any], item: object) -> Callable[[], None]:
+    """Remove ``item`` (by identity) from ``container``; a no-op once it is gone."""
+
+    def remove() -> None:
+        for i, candidate in enumerate(container):
+            if candidate is item:
+                del container[i]
+                return
+
+    return remove
+
+
+@dataclass(slots=True)
+class OpaqueBlob:
+    """A provider-signed or encrypted reasoning value, and how to drop what carries it."""
+
+    key: str
+    value: str = field(repr=False)
+    #: Removes the whole reasoning item or block holding the value from the request.
+    drop: Callable[[], None] = field(default=lambda: None, repr=False)
+
+
 @dataclass(slots=True)
 class CollectedTexts:
     slots: list[TextSlot]
     finalizers: list[Callable[[], None]]
     images: list[ImageSlot] = field(default_factory=list)
-    opaque: list[tuple[str, str]] = field(default_factory=list, repr=False)
+    opaque: list[OpaqueBlob] = field(default_factory=list, repr=False)
     _json_budget: _JsonBudget = field(default_factory=_JsonBudget, repr=False)
+
+    def replace_with(self, other: CollectedTexts) -> None:
+        """Take ``other``'s collection in place (callers may hold this object)."""
+        self.slots[:] = other.slots
+        self.finalizers[:] = other.finalizers
+        self.images[:] = other.images
+        self.opaque[:] = other.opaque
+        self._json_budget = other._json_budget
 
     def check_structure(self, value: Any) -> None:
         self._json_budget.check(value)
@@ -773,7 +804,19 @@ def _collect_reasoning_blocks(
             elif not isinstance(block[key], str | None):
                 raise InvalidChatRequestError(f"{at}.{key} must be a string")
             elif isinstance(block[key], str):
-                out.opaque.append((key, block[key]))
+                drop = _drop_reasoning(message, name, block)
+                out.opaque.append(OpaqueBlob(key, block[key], drop))
+
+
+def _drop_reasoning(message: dict[str, Any], name: str, block: object) -> Callable[[], None]:
+    remove = remove_item(message[name], block)
+
+    def drop() -> None:
+        remove()
+        if not message.get(name):
+            message.pop(name, None)
+
+    return drop
 
 
 def _collect_message_audio(message: dict[str, Any], where: str, out: CollectedTexts) -> None:

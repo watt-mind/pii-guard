@@ -1132,14 +1132,20 @@ is exempt: a value found by format or checksum (a tax ID, an IBAN, ...) is maske
 appears, and a tool named after one is `400 unsupported_content` (LAB-1348). Values the operator
 pre-loaded (`known`) are never exempt.
 - **pass**: numbers, booleans and null only (strings are `400 invalid_request`), or an opaque
-  provider-issued blob forwarded untouched. Opaque reasoning is accepted only when its
+  provider-issued blob forwarded untouched. Opaque reasoning is forwarded only when its
   exact value was observed in an upstream response in the **same live vault session**
-  (LAB-1753); otherwise `400 unsupported_content`, before forwarding. Imported histories,
-  expired/recreated sessions and evicted provenance entries must omit these blobs and start
-  a fresh conversation. Authorization retains bounded SHA-256 digests (1024 per session;
-  blobs over 1,048,576 characters are not authorized), never the blobs themselves. Streamed
-  signatures and Chat reasoning fragments have a 4,194,304-character cap and authorize only when
-  their block/choice finishes; partial failed streams do not authorize fragments.
+  (LAB-1753). Any other blob is **stripped**, never forwarded: the whole reasoning item
+  (Responses), `thinking`/`redacted_thinking` block (Messages, including the block's
+  readable `thinking` text) or reasoning detail (Chat) is removed before detection, and the
+  response carries `X-PII-Guard-Opaque-Reasoning-Stripped: <count>`. Imported histories,
+  gateway restarts, expired/recreated sessions and evicted provenance entries therefore keep
+  working without the old reasoning (an upstream that requires a tool loop's thinking block
+  may reject that turn: an upstream error, not a leak). Authorization retains bounded
+  SHA-256 digests (1024 per session; blobs over 1,048,576 characters are not authorized),
+  never the blobs themselves. Streamed signatures and Chat reasoning fragments have a
+  4,194,304-character cap and authorize when their block/choice finishes or the stream
+  ends; Chat details without an `index` are keyed by their `id` (else `type`), and each
+  such fragment also authorizes on its own.
 
 | Where | Key | Treatment |
 | --- | --- | --- |
@@ -1158,7 +1164,7 @@ pre-loaded (`known`) are never exempt.
 | message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
 | message | `content` | string mask (line-number gutters hidden during detection, restored when forwarding); array of content parts, below; applies to every role, including tool/function output |
 | message | `refusal`, `reasoning_content`, `reasoning` | mask (strings use the same gutter treatment; a non-string value: mask JSON) |
-| message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass only with same-session upstream provenance (opaque, provider-signed) |
+| message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass only with same-session upstream provenance, else the block is stripped (opaque, provider-signed) |
 | message | `audio` | `transcript` mask; `id` check; `expires_at` pass |
 | message | `annotations` | mask JSON |
 | message | `name` | detected personal data removes the field; for `role: function` it is checked instead (it must match the call) |
@@ -1206,7 +1212,7 @@ with the treatments of the table above. Any other key, item type or part type is
 | `custom_tool_call` item | `name` check; `input` | mask |
 | `custom_tool_call_output` item | `output` | as `function_call_output` |
 | `reasoning` item | `summary[]` (`summary_text`), `content[]` (`reasoning_text`) | `text` mask |
-| `reasoning` item | `encrypted_content` | pass only with same-session upstream provenance (opaque, provider-encrypted) |
+| `reasoning` item | `encrypted_content` | pass only with same-session upstream provenance, else the item is stripped (opaque, provider-encrypted) |
 | other items (`item_reference`, `web_search_call`, ...) | | `400` |
 
 A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
@@ -1330,8 +1336,8 @@ the treatments of the chat table. Any other key, block type or tool type is
 | `image` block | `source` | inline `base64` PNG/JPEG: the masked image (and, with placeholder labels, its transcript as a `text` block after it); `url`/`file` sources `400` |
 | `tool_use` block | `id`, `name` check; `input` | mask JSON (every string, keys included, and long numbers), as chat tool-call arguments |
 | `tool_result` block | `tool_use_id` check; `is_error` pass; `content` | string mask, or `text` and `image` blocks as above |
-| `thinking` block | `thinking` mask; `signature` | pass only with same-session upstream provenance (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
-| `redacted_thinking` block | `data` | pass only with same-session upstream provenance (opaque) |
+| `thinking` block | `thinking` mask; `signature` | pass only with same-session upstream provenance, else the whole block is stripped (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
+| `redacted_thinking` block | `data` | pass only with same-session upstream provenance, else the block is stripped (opaque) |
 | other blocks (`document`, `search_result`, `server_tool_use`, ...) | | `400` |
 
 **Placeholder note.** When the masked body holds a placeholder, the note goes in front of

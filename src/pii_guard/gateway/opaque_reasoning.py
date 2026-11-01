@@ -1,19 +1,33 @@
-"""Authorize opaque reasoning only after it was observed upstream (LAB-1753).
+"""Forward opaque reasoning only after it was observed upstream (LAB-1753).
 
 Digests live on the vault session, so recreated sessions cannot inherit authorization.
 Only bounded hashes are retained; streamed fragments are bounded and authorized as a whole.
+
+An opaque blob (a thinking ``signature``, ``redacted_thinking`` data, ``encrypted_content``)
+cannot be masked, so a client could smuggle plaintext through one. A blob this vault session
+did not see upstream is therefore stripped from the request: the whole reasoning item or
+block carrying it is removed, including a thinking block's readable text, so nothing
+unverifiable is forwarded (owner decision, 11-01). Stripping cannot leak: it only removes
+content. It is what a gateway restart, an expired session or a rotated vault looks like to a
+long agent conversation, which keeps working. An upstream that insists on a tool loop's
+thinking block may then reject that turn: an upstream error, not a leak.
 """
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
-from pii_guard.gateway.request import CollectedTexts, UnsupportedContentError
+from pii_guard.gateway.request import CollectedTexts
 from pii_guard.vault import VaultSession
 
+logger = logging.getLogger("pii_guard.gateway")
+
+#: Response header: how many reasoning items/blocks were stripped (absent: none).
+OPAQUE_STRIPPED_HEADER = "X-PII-Guard-Opaque-Reasoning-Stripped"
 MAX_BLOB_CHARS = 1024 * 1024
 MAX_BLOBS = 1024
 MAX_STREAM_CHARS = 4 * MAX_BLOB_CHARS
@@ -37,17 +51,40 @@ def remember(session: VaultSession, protocol: str, key: str, value: str) -> None
             state.popitem(last=False)
 
 
-def validate(session: VaultSession, protocol: str, collected: CollectedTexts) -> None:
+def verified(session: VaultSession, protocol: str, key: str, value: str) -> bool:
+    """Whether ``value`` was issued upstream in this session, for this protocol and field."""
+    if not value:
+        return True  # an empty field carries nothing
+    if len(value) > MAX_BLOB_CHARS:
+        return False
     with _LOCK:
-        state = session.opaque_reasoning
-        for key, value in collected.opaque:
-            if value and (
-                len(value) > MAX_BLOB_CHARS or _digest(protocol, key, value) not in state
-            ):
-                raise UnsupportedContentError(
-                    "opaque reasoning must have been issued upstream in this vault session; "
-                    "start a new conversation without imported opaque reasoning"
-                )
+        return _digest(protocol, key, value) in session.opaque_reasoning
+
+
+def strip_unverified(
+    session: VaultSession,
+    protocol: str,
+    collected: CollectedTexts,
+    recollect: Callable[[], CollectedTexts],
+) -> int:
+    """Remove every reasoning item or block whose opaque blob this session did not issue.
+
+    Returns how many were removed. ``collected`` is then rebuilt in place from the stripped
+    body (``recollect``), so no text of a removed item is detected, masked or checked.
+    Only the count is logged, never content.
+    """
+    unverified = [
+        blob for blob in collected.opaque if not verified(session, protocol, blob.key, blob.value)
+    ]
+    if not unverified:
+        return 0
+    for blob in unverified:
+        blob.drop()
+    collected.replace_with(recollect())
+    if any(not verified(session, protocol, b.key, b.value) for b in collected.opaque):
+        raise AssertionError("an unverified opaque reasoning blob survived stripping")
+    logger.info("opaque reasoning stripped protocol=%s count=%d", protocol, len(unverified))
+    return len(unverified)
 
 
 def _fields(block: Any, keys: frozenset[str] = OPAQUE_KEYS) -> Iterator[tuple[str, str]]:
@@ -69,13 +106,17 @@ def _chat_blocks(body: dict[str, Any]) -> Iterator[tuple[Any, Any]]:
         if not isinstance(message, dict):
             continue
         for name in ("reasoning_details", "thinking_blocks"):
-            for i, block in enumerate(_list(message.get(name))):
-                if (
-                    isinstance(block, dict)
-                    and isinstance(choice.get("index", 0), int)
-                    and isinstance(block.get("index", i), int)
-                ):
-                    yield (choice.get("index", 0), name, block.get("index", i)), block
+            for block in _list(message.get(name)):
+                if isinstance(block, dict) and isinstance(choice.get("index", 0), int):
+                    at = block.get("index")
+                    if at is None:
+                        # No index (OpenRouter-style details): each fragment may be a whole
+                        # detail, or one piece of one; keyed by its id or type, not position.
+                        at = ("id", block["id"]) if isinstance(block.get("id"), str) else None
+                        at = at or ("type", str(block.get("type")))
+                    elif not isinstance(at, int) or isinstance(at, bool):
+                        continue
+                    yield (choice.get("index", 0), name, at), block
 
 
 def _response_blocks(body: dict[str, Any]) -> Iterator[tuple[Any, Any]]:
@@ -137,6 +178,9 @@ class OpaqueStream:
         if self.protocol == "chat":
             for index, block in _blocks(self.protocol, body):
                 for key, value in _fields(block):
+                    if not isinstance(index[2], int):
+                        # Unindexed: also a complete detail of its own, as clients may keep it.
+                        remember(self.session, self.protocol, key, value)
                     self._append(index, key, value)
             for choice in _list(body.get("choices")):
                 if isinstance(choice, dict) and choice.get("finish_reason"):
@@ -168,6 +212,8 @@ class OpaqueStream:
             self.finish(body.get("index"))
 
     def finish(self, index: Any = None) -> None:
+        """Remember the assembled blobs at ``index`` (``None``: all, at the stream's end;
+        a stream may end without a ``finish_reason`` or stop event)."""
         for at in list(self.parts):
             if index is None or at[0] == index:
                 remember(self.session, self.protocol, at[1], "".join(self.parts.pop(at)))
