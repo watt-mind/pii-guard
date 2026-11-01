@@ -54,7 +54,6 @@ def muse_body(**extra: Any) -> dict[str, Any]:
                 "type": "reasoning",
                 "id": "rs_1",
                 "summary": [{"type": "summary_text", "text": "Mail Minta Mária first."}],
-                "encrypted_content": BLOB,
             },
             {
                 "type": "message",
@@ -274,8 +273,8 @@ def test_non_streamed_request_is_masked_everywhere_and_answer_restored() -> None
     assert PLACEHOLDER_RE.search(forwarded["tools"][0]["tools"][0]["description"])
     arguments = json.loads(forwarded["input"][4]["arguments"])
     assert PLACEHOLDER_RE.search(arguments["note"])
-    # Structure is untouched: ids, names, the encrypted blob, settings.
-    assert forwarded["input"][2]["encrypted_content"] == BLOB
+    # IDs, names and settings are untouched; imported encrypted history is omitted.
+    assert "encrypted_content" not in forwarded["input"][2]
     assert forwarded["input"][4]["name"] == "muse.read_file"
     assert forwarded["input"][3]["phase"] == "commentary"
     assert forwarded["include"] == ["reasoning.encrypted_content"]
@@ -405,8 +404,11 @@ def test_upstream_error_events_are_replaced() -> None:
             },
             "remote image URLs are not fetched",
         ),
-        ({"input": [{"type": "item_reference", "id": "msg_0"}]}, "'item_reference'"),
-        ({"input": [{"type": "message", "role": "user", "content": "x", "extra": 1}]}, "extra"),
+        ({"input": [{"type": "item_reference", "id": "msg_0"}]}, "unsupported input item type"),
+        (
+            {"input": [{"type": "message", "role": "user", "content": "x", "extra": 1}]},
+            "input.0.#3",
+        ),
         ({"input": [{"type": "reasoning", "summary": [{"type": "x", "text": "y"}]}]}, "summary"),
     ],
 )

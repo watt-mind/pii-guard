@@ -93,9 +93,8 @@ def unmask_text_locked(
     parts.append(text[cursor:])
     result = "".join(parts)
     if unresolved:
-        logger.warning(
-            "unmask left %d unresolved placeholders: %s", len(unresolved), list(unresolved)
-        )
+        # Unknown tokens are caller/upstream content, not trusted guard-issued ids.
+        logger.warning("unmask left %d unresolved placeholders", len(unresolved))
     logger.debug("unmasked %d placeholders", restored)
     return UnmaskResult(result, tuple(unresolved))
 

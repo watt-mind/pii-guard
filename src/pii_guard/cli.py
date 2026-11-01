@@ -159,6 +159,9 @@ def _serve(args: argparse.Namespace) -> int:
         port=args.port or settings.port,
         reload=args.reload,
         log_level=settings.log_level,
+        # Raw URL paths can contain bearer session handles and query values. LoggedRoute
+        # records safe route templates instead; this also applies to reload workers.
+        access_log=False,
     )
     return 0
 

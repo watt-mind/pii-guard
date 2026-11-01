@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import logging
 import re
 import threading
@@ -79,6 +78,7 @@ from pii_guard.gateway.request import (
     ImageSlot,
     InvalidChatRequestError,
     TextSlot,
+    dumps_utf8,
 )
 from pii_guard.gateway.sessions import (
     SESSION_HEADER,
@@ -511,11 +511,11 @@ class Gateway:
         add_note: Callable[[dict[str, Any]], None],
     ) -> bytes:
         """The masked body as sent upstream, with the placeholder note if it needs one."""
-        text = json.dumps(body, ensure_ascii=False)
+        text = dumps_utf8(body)
         if self.config.placeholder_note and needs_note(text, session):
             add_note(body)
             stats.note = True
-            text = json.dumps(body, ensure_ascii=False)
+            text = dumps_utf8(body)
         return text.encode("utf-8")
 
     _forwarded = forwarded
@@ -798,25 +798,6 @@ class Gateway:
             raise OutboundCheckFailedError(stats.outbound.hits)
 
     _recheck = recheck
-
-    def seed_cache(
-        self,
-        session: VaultSession,
-        language: str,
-        detector: ModeDetector,
-        restored: Mapping[int, tuple[str, list[Span]]],
-        stats: RequestStats,
-    ) -> None:
-        """The client sends the restored answer back as history: pre-detect it."""
-        for text, spans in restored.values():
-            if text and any(ch.isalnum() for ch in text):
-                key = self.cache.key(
-                    session.session_id, language, detector.config_id, text, session.incarnation
-                )
-                self.cache.put(key, spans)
-                stats.seeded += 1
-
-    _seed_cache = seed_cache
 
     async def mask_images(
         self,

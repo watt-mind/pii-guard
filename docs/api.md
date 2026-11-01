@@ -178,6 +178,7 @@ codes (`429 quota_exceeded`, `abuse_throttled`, `sign_in_required`, `hosted_capa
 |---|---|---|---|
 | 400 | `unsupported_content` | The body holds a field or content part the gateway can't mask yet (allow-list); nothing is forwarded. | `chat/completions`, `responses` |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token. | every route |
+| 403 | `cross_origin_request_denied` | Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. | every route |
 | 403 | `project_access_denied` | Project owner authorization or selection is denied. | endpoint keys |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. | every route |
 | 404 | `not_found` | Unknown route, or an unknown or expired `session_id`. | `analyze`, `chat/completions`, `mask`, `responses`, `sessions`, `unmask` |
@@ -185,6 +186,7 @@ codes (`429 quota_exceeded`, `abuse_throttled`, `sign_in_required`, `hosted_capa
 | 409 | `session_entry_limit_reached` | An explicit session already holds `PII_GUARD_VAULT_MAX_ENTRIES` placeholders; it is never rotated, so start a new session. | `chat/completions`, `responses` |
 | 413 | `payload_too_large` | The body, text or image is larger than the configured limit. | `analyze`, `chat/completions`, `mask`, `responses`, `sessions`, `unmask`, endpoint keys |
 | 413 | `unmask_output_too_large` | Restoring would output more than `PII_GUARD_UNMASK_MAX_RESTORED_CHARS` characters of original values (one `/v1/unmask` text, or one gateway response). | `chat/completions`, `responses`, `unmask` |
+| 415 | `unsupported_media_type` | The image is not a PNG or JPEG (sniffed from its bytes), `POST /v1/traffic` got a body that is not `application/json`, or a self-hosted gateway POST declared a non-JSON Content-Type (JSON and application/*+json are accepted; SDKs may omit it). | `chat/completions`, `responses` |
 | 422 | `blocked_entity` | An entity type whose policy is `block` was found; nothing is masked or stored. | `chat/completions`, `mask`, `responses` |
 | 422 | `invalid_known_value` | A pre-loaded known value is too short, too long, or has an unknown or visual type. | `sessions` |
 | 422 | `invalid_project_config` | A policy or endpoint configuration is invalid. | endpoint keys |

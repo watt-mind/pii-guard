@@ -1,8 +1,8 @@
 """Text in images: OCR word boxes \u2192 text detectors \u2192 word-box regions.
 
 The OCR engine is pluggable (:class:`OcrEngine`). :class:`TesseractOcr` uses Tesseract through
-``pytesseract`` (install the ``ocr`` extra and the ``tesseract`` binary with the language
-data you need, e.g. ``hun`` and ``eng``).
+stdin/stdout pipes, without image or text files (install the ``ocr`` extra and the
+``tesseract`` binary with the language data you need, e.g. ``hun`` and ``eng``).
 
 The recognised words are joined into one text (single spaces within a line, newlines between
 lines), so a text detector sees ``TAJ: 123 456 788`` exactly as on the page, and each detected
@@ -56,6 +56,7 @@ from pii_guard.visual.ocr_frame import (
     estimate_skew,
     suppress_background,
 )
+from pii_guard.visual.ocr_transport import image_to_data, image_to_osd
 from pii_guard.visual.regions import Box, Region
 
 __all__ = [
@@ -456,8 +457,6 @@ class TesseractOcr:
         """The quarter turn (counter-clockwise) Tesseract's orientation detection puts
         ``image`` upright with, or ``None`` when it can't tell (too little text, no ``osd``
         language data)."""
-        import pytesseract
-
         check_deadline()
         source = image
         factor = min(scale, 2.0)
@@ -466,9 +465,8 @@ class TesseractOcr:
             source = image.resize(target, Image.Resampling.LANCZOS)
         left = remaining()
         try:
-            data = pytesseract.image_to_osd(
+            data = image_to_osd(
                 source,
-                output_type=pytesseract.Output.DICT,
                 timeout=max(left, 0.01) if left is not None else 0,
             )
             rotate = int(data["rotate"]) % 360
@@ -527,8 +525,6 @@ class TesseractOcr:
         """Tesseract on ``source`` enlarged ``scale`` times; boxes at ``source`` resolution
         plus ``offset``, line keys prefixed with ``line_prefix``. ``config`` replaces the
         engine's own Tesseract options."""
-        import pytesseract
-
         check_deadline()
         size = source.size
         if scale > 1.0:
@@ -537,12 +533,11 @@ class TesseractOcr:
         check_deadline()
         left = remaining()
         try:
-            data = pytesseract.image_to_data(
+            data = image_to_data(
                 source,
                 lang=self.lang,
                 config=self.config if config is None else config,
-                output_type=pytesseract.Output.DICT,
-                # pytesseract kills the subprocess when it runs out (0: no limit).
+                # The pipe transport kills and reaps the subprocess on timeout (0: no limit).
                 timeout=max(left, 0.01) if left is not None else 0,
             )
         except RuntimeError as exc:

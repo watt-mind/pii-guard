@@ -12,6 +12,12 @@ is forwarded, and the answer (streamed or not) comes back with the real values r
 is built: [architecture.md](architecture.md#gateway-the-proxy). Running and exposing it:
 [operations.md](operations.md).
 
+The detection cache stores only results from complete request detection. A model answer's
+restored placeholders are not a complete PII scan: previously unseen answer text is detected
+when a later request sends it as history, regardless of its role. Existing request history
+still benefits from cached detections. Responses never populate the detection cache
+speculatively (LAB-1756).
+
 ## Modes
 
 | Mode | Detection | Model call per message | Use it for |
@@ -99,9 +105,10 @@ for chunk in stream:
 | `X-PII-Guard-Session-Source` | response | Which step chose the session: `header`, `path`, `prompt_cache_key` or `default`. Also in the traffic record (`session_source`). |
 | `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default) or `audit` (+ the LLM detector). The response carries the mode that ran. |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
-| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]` (a choice whose masked copy passed the 1M-character retention cap is listed as `{"index": i, "content": null, "truncated": true}`, not left out). Both also carry `kept_spans`: per client message, the values detected but kept by policy as `{"type", "start", "end"}` (code-point offsets into the message as sent; `[]` for a message whose content is not one string), never the values. Masked text only; for UIs that show the boundary (the demo's Chat screen). `placeholder_note` says whether the [placeholder note](#placeholder-note) was added. |
+| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]` (a choice whose masked copy passed the 1M-character retention cap is listed as `{"index": i, "content": null, "truncated": true}`, not left out). Both also carry `kept_spans`: per client message, the values detected but kept by policy as `{"type", "start", "end"}` (code-point offsets into the message as sent; `[]` for a message whose content is not one string or is decoded structured tool output), never the values. Decoded JSON offsets cannot be projected onto the original escaped text. Masked text only; for UIs that show the boundary (the demo's Chat screen). `placeholder_note` says whether the [placeholder note](#placeholder-note) was added. |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
 | `X-PII-Guard-Placeholder-Note` | response | `added` when the [placeholder note](#placeholder-note) went upstream with the request. |
+| `X-PII-Guard-Opaque-Reasoning-Stripped` | response | How many reasoning items/blocks were removed because their opaque blob (signature, `redacted_thinking` data, `encrypted_content`) was not issued upstream in this vault session; absent when none ([contracts](contracts.md#gateway-request-fields-implemented)). |
 | `X-PII-Guard-Outbound-Check` | response | `passed` when the [outbound re-check](#outbound-re-check) found no value the session knows in the masked request; `blocked` on the `422 outbound_check_failed` refusal. Also in the traffic record (`outbound_check`). |
 | `X-PII-Guard-Request-Id` | response | The call's id in the traffic log; with `PII_GUARD_SERVER_TIMING=true` a `Server-Timing` header gives the per-stage latency ([operations.md](operations.md#timing)). |
 
@@ -177,7 +184,11 @@ and summary sent after a masked image, in Chat Completions and the Responses API
 not. The values are those detected in this request and in earlier ones on the session, and
 the operator's pre-loaded known values. They are matched with the vault's own occurrence
 patterns: case, whitespace, Unicode form, `ß`/`ss` and the language's inflection, so
-`TESZT ELEK-nek` is found for `Teszt Elek`. Placeholders never count.
+`TESZT ELEK-nek` is found for `Teszt Elek`. Placeholders never count. A text with a
+backslash is also searched with its JSON escapes decoded (`\u00f3`, surrogate pairs, `\"`,
+`\n` ..., nested levels too), so a value JSON-escaped in a tool output that is not decodable
+JSON (`Result: {...}`, trailing notes, plain text) is found as the upstream would read it
+(LAB-1755). Ordinary backslashes (Windows paths, regexes) reveal no value and pass.
 
 A value found there refuses the request: `422 outbound_check_failed`, the message lists entity
 types and counts only, `X-PII-Guard-Outbound-Check: blocked`, and nothing is sent. Since the

@@ -93,7 +93,9 @@ def get_gateway(request: Request) -> Gateway:
 @router.post(
     "/v1/chat/completions",
     tags=["gateway"],
-    responses=error_responses("detection_profile_denied", "outbound_check_failed"),
+    responses=error_responses(
+        "detection_profile_denied", "outbound_check_failed", "unsupported_media_type"
+    ),
 )
 async def chat_completions(request: Request) -> Response:
     await ensure_connected(request)
@@ -102,7 +104,7 @@ async def chat_completions(request: Request) -> Response:
     received_at = time.perf_counter()  # timing starts once the body is in
     try:
         body = json.loads(raw)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         # Never the decoder's message: it quotes the body.
         raise InvalidChatRequestError("request body is not valid JSON") from None
     # The traffic event id, assigned before detection (LAB-1179): even a refused call

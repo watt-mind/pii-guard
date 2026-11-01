@@ -376,6 +376,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the upstream has no Anthropic Messages API (it answered 404 or 405 on `.../messages`). The message points to an Anthropic-compatible upstream, the OpenAI-compatible routes (`/v1/chat/completions`) and the console's Connect page; the response has `x-should-retry: false`. Only the masked request reached that upstream; the call is one `refused` traffic event. |
 | 400 | `invalid_code` | `POST /v1/cli/token`: the one-time CLI login code is unknown, already used or expired (it is deleted on first use either way). Run `pii-guard login` again. |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
+| 403 | `cross_origin_request_denied` | Self-hosted browser mutations have a foreign, null or ambiguous Origin, or cross-site/same-site Fetch Metadata. No request processing or forwarding occurs. |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
 | 403 | `vault_inspect_not_local` | `PII_GUARD_VAULT_INSPECT=full` and a `/v1/vault/*` connection is not loopback on both ends. |
@@ -551,6 +552,11 @@ there is the per-owner vault.
 
 Cover faces, signatures, ID photos and text personal data in a PNG or JPEG image
 (`pii_guard.api.routes.image`, shared pipeline in `pii_guard.visual.masking`).
+
+Local Tesseract OCR receives an in-memory PNG on stdin and returns text/TSV on stdout,
+including orientation detection. It creates no image or recognized-text temporary files.
+Subprocess failures and timeouts expose fixed error descriptions, never OCR output or
+diagnostics. The existing image deadline also bounds each OCR subprocess.
 
 Request, either form:
 
@@ -1027,7 +1033,8 @@ a request refused by the re-check gets `422 outbound_check_failed` with
 `X-PII-Guard-Outbound-Check: blocked` (policy and short-value rules:
 [architecture-gateway.md](architecture-gateway.md#outbound-re-check)). Besides re-reading the
 walker's texts, the re-check scans the serialized masked body as one text, so a field no
-walker slot covers can't carry a session value out either (LAB-1563).
+walker slot covers can't carry a session value out either (LAB-1563). Texts are also searched
+with their JSON escapes decoded, so an escaped value cannot pass the re-check (LAB-1755).
 
 ## Gateway chat streaming (implemented)
 
@@ -1040,6 +1047,16 @@ call as failed with this code and retains the upstream status, without the rejec
 
 ## Gateway request fields (implemented)
 
+Self-hosted gateway POSTs reject an explicit non-JSON or repeated `Content-Type` with
+`415 unsupported_media_type`. `application/json` and `application/*+json` are accepted;
+SDKs without browser headers may omit the header. Browser mutations must be same-origin,
+including requests through session and endpoint URLs. Hosted mode retains its own checks.
+
+Before collecting text, every gateway request has a cumulative 1,000,000-node JSON budget
+and a maximum container depth of 64. Keys count as nodes; decoded argument and tool-output
+JSON share the same budget. Over-budget or over-deep requests fail with `400 invalid_request`
+before detection or forwarding. Finalizers run in linear-time postorder.
+
 `POST /v1/chat/completions` walks the whole body against an allow-list
 (`pii_guard.gateway.request`) and fails closed (ADR 0006): every key below is masked, checked
 or passed through as stated, and **any other key is rejected** with
@@ -1051,6 +1068,19 @@ itself could be a value), never the value.
 
 Treatments:
 
+- **structured tool output**: complete JSON objects, arrays and quoted strings in tool-result
+  text are decoded before detection, so JSON Unicode escapes cannot hide known values. So are
+  JSON Lines (every non-empty line an object or array), one fenced ```` ```json ```` block and
+  JSON after a byte-order mark; the text around the values is kept exactly.
+  Decoded keys, text and long numbers receive the same masking/block policies as other JSON.
+  Nested JSON string layers are limited to four (excess fails closed with
+  `400 invalid_request`). A tool JSON text over 1,048,576 characters, 50,000 nodes, depth 64
+  or the request's remaining budget is not decoded: it is detected as one plain text, as any
+  non-JSON tool output, so large tool results never break a session. Masked structures are
+  serialized back to the original text field. Non-JSON text keeps its normal text/gutter
+  handling (the outbound re-check still sees through JSON escapes in it). This applies
+  to Chat `tool`/`function` output, Responses function/custom tool output, and Messages
+  `tool_result`, including their text parts/blocks and token-count requests.
 - **mask**: free text. Detected values are replaced by placeholders and restored in the
   answer.
 - **mask JSON**: every string in the value, object keys included, is masked as its own text.
@@ -1102,7 +1132,20 @@ is exempt: a value found by format or checksum (a tax ID, an IBAN, ...) is maske
 appears, and a tool named after one is `400 unsupported_content` (LAB-1348). Values the operator
 pre-loaded (`known`) are never exempt.
 - **pass**: numbers, booleans and null only (strings are `400 invalid_request`), or an opaque
-  provider-issued blob forwarded untouched.
+  provider-issued blob forwarded untouched. Opaque reasoning is forwarded only when its
+  exact value was observed in an upstream response in the **same live vault session**
+  (LAB-1753). Any other blob is **stripped**, never forwarded: the whole reasoning item
+  (Responses), `thinking`/`redacted_thinking` block (Messages, including the block's
+  readable `thinking` text) or reasoning detail (Chat) is removed before detection, and the
+  response carries `X-PII-Guard-Opaque-Reasoning-Stripped: <count>`. Imported histories,
+  gateway restarts, expired/recreated sessions and evicted provenance entries therefore keep
+  working without the old reasoning (an upstream that requires a tool loop's thinking block
+  may reject that turn: an upstream error, not a leak). Authorization retains bounded
+  SHA-256 digests (1024 per session; blobs over 1,048,576 characters are not authorized),
+  never the blobs themselves. Streamed signatures and Chat reasoning fragments have a
+  4,194,304-character cap and authorize when their block/choice finishes or the stream
+  ends; Chat details without an `index` are keyed by their `id` (else `type`), and each
+  such fragment also authorizes on its own.
 
 | Where | Key | Treatment |
 | --- | --- | --- |
@@ -1121,7 +1164,7 @@ pre-loaded (`known`) are never exempt.
 | message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
 | message | `content` | string mask (line-number gutters hidden during detection, restored when forwarding); array of content parts, below; applies to every role, including tool/function output |
 | message | `refusal`, `reasoning_content`, `reasoning` | mask (strings use the same gutter treatment; a non-string value: mask JSON) |
-| message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass (opaque, provider-signed) |
+| message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass only with same-session upstream provenance, else the block is stripped (opaque, provider-signed) |
 | message | `audio` | `transcript` mask; `id` check; `expires_at` pass |
 | message | `annotations` | mask JSON |
 | message | `name` | detected personal data removes the field; for `role: function` it is checked instead (it must match the call) |
@@ -1169,7 +1212,7 @@ with the treatments of the table above. Any other key, item type or part type is
 | `custom_tool_call` item | `name` check; `input` | mask |
 | `custom_tool_call_output` item | `output` | as `function_call_output` |
 | `reasoning` item | `summary[]` (`summary_text`), `content[]` (`reasoning_text`) | `text` mask |
-| `reasoning` item | `encrypted_content` | pass (opaque, provider-encrypted) |
+| `reasoning` item | `encrypted_content` | pass only with same-session upstream provenance, else the item is stripped (opaque, provider-encrypted) |
 | other items (`item_reference`, `web_search_call`, ...) | | `400` |
 
 A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
@@ -1293,8 +1336,8 @@ the treatments of the chat table. Any other key, block type or tool type is
 | `image` block | `source` | inline `base64` PNG/JPEG: the masked image (and, with placeholder labels, its transcript as a `text` block after it); `url`/`file` sources `400` |
 | `tool_use` block | `id`, `name` check; `input` | mask JSON (every string, keys included, and long numbers), as chat tool-call arguments |
 | `tool_result` block | `tool_use_id` check; `is_error` pass; `content` | string mask, or `text` and `image` blocks as above |
-| `thinking` block | `thinking` mask; `signature` | pass (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
-| `redacted_thinking` block | `data` | pass (opaque) |
+| `thinking` block | `thinking` mask; `signature` | pass only with same-session upstream provenance, else the whole block is stripped (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
+| `redacted_thinking` block | `data` | pass only with same-session upstream provenance, else the block is stripped (opaque) |
 | other blocks (`document`, `search_result`, `server_tool_use`, ...) | | `400` |
 
 **Placeholder note.** When the masked body holds a placeholder, the note goes in front of

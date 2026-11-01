@@ -449,7 +449,8 @@ def test_logs_never_contain_values(vault: Vault, caplog: pytest.LogCaptureFixtur
     logged = "\n".join(r.getMessage() for r in caplog.records)
     for value in (NAME, EMAIL, "Teszt", "example.com"):
         assert value not in logged
-    assert "[[PERSON_ffff]]" in logged  # unresolved ids are reported
+    assert "unmask left 1 unresolved placeholders" in logged
+    assert "[[PERSON_ffff]]" not in logged  # unresolved text is not a trusted issued id
 
 
 def test_prefix_helper() -> None:

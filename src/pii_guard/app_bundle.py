@@ -658,7 +658,12 @@ def run_up(opts: UpOptions) -> int:
         # The UI holds the live traffic stream open: without a graceful-shutdown timeout,
         # Ctrl-C would wait for the browser tab to close.
         config = uvicorn.Config(
-            app, host=opts.host, port=opts.port, log_level="warning", timeout_graceful_shutdown=1
+            app,
+            host=opts.host,
+            port=opts.port,
+            log_level="warning",
+            access_log=False,
+            timeout_graceful_shutdown=1,
         )
         server = uvicorn.Server(config)
         quiet = _QuietShutdown(server)
