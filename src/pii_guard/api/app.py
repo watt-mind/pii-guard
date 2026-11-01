@@ -21,7 +21,12 @@ from pii_guard.api.routes.vault import (
     SessionRecorderMiddleware,
     check_inspect_bind,
 )
-from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
+from pii_guard.api.security import (
+    BearerTokenMiddleware,
+    BrowserRequestSecurityMiddleware,
+    LoopbackOnlyMiddleware,
+    allowed_hosts,
+)
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect import stack
 from pii_guard.detect.stack import (
@@ -259,7 +264,7 @@ def _install_middlewares(
 
         app.add_middleware(HostedMiddleware, service=app.state.hosted)
 
-    # Outermost last: Host check, then (full only) loopback sockets, then the token.
+    # Outermost last: Host check, local browser guard, (full only) loopback sockets, token.
     if (
         obs_settings.metrics_token is not None
         and not obs_settings.metrics_token.get_secret_value().strip()
@@ -281,6 +286,8 @@ def _install_middlewares(
         )
     if obs_settings.traffic_log is TrafficLevel.FULL:
         app.add_middleware(LoopbackOnlyMiddleware)
+    if not settings.hosted:
+        app.add_middleware(BrowserRequestSecurityMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts, www_redirect=False)
 
 

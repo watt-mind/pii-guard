@@ -329,6 +329,14 @@ def test_ingest_traffic_refuses_non_json_bodies_and_stamps_remote_source() -> No
             content=json.dumps(_sample_event(level="masked", request=None, response=None)),
             headers={"Content-Type": "text/plain", "Origin": "https://evil.example"},
         )
+        assert res.status_code == 403
+        assert res.json()["error"]["code"] == "cross_origin_request_denied"
+        # Non-browser callers still get the ingest route's JSON-only media check.
+        res = client.post(
+            "/v1/traffic",
+            content=json.dumps(_sample_event(level="masked", request=None, response=None)),
+            headers={"Content-Type": "text/plain"},
+        )
         assert res.status_code == 415
         assert res.json()["error"]["code"] == "unsupported_media_type"
         event = _sample_event(level="masked", outcome="exploded", source="local")

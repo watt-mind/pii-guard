@@ -149,7 +149,7 @@ async def _read_endpoint_json_body(
                 break
     try:
         body = json.loads(raw)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         raise ProjectAccessError("Invalid endpoint JSON request") from None
     if not isinstance(body, dict):
         raise ProjectAccessError("Endpoint request must be an object")

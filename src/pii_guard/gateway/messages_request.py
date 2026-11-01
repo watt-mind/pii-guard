@@ -50,6 +50,7 @@ from pii_guard.gateway.request import (
     _check_text,
     _collect_json,
     _collect_schema,
+    _collect_tool_output,
     _reject_unknown,
     _require_scalars,
     _setter,
@@ -94,6 +95,8 @@ def collect_message_texts(body: object) -> CollectedTexts:
 
     ``POST /v1/messages/count_tokens`` takes the same body without ``max_tokens``/``stream``:
     this walks it too."""
+    out = CollectedTexts([], [])
+    out.check_structure(body)
     if not isinstance(body, dict):
         raise InvalidChatRequestError("request body must be a JSON object")
     if not isinstance(body.get("model"), str) or not body["model"]:
@@ -106,7 +109,6 @@ def collect_message_texts(body: object) -> CollectedTexts:
             )
     allowed = _TOP_SCALAR | _TOP_CHECKED | _TOP_WALKED | frozenset(_TOP_UPSTREAM)
     _reject_unknown(body, allowed, "", "request")
-    out = CollectedTexts([], [])
     _collect_messages(body, out)
     _collect_system(body, out)
     for key in _TOP_SCALAR:
@@ -266,7 +268,10 @@ def _collect_text_block(block: dict[str, Any], where: str, out: CollectedTexts, 
         raise UnsupportedContentError(
             f"{where}.citations: citations point into documents the gateway does not forward"
         )
-    out.slots.append(_text_slot(block, "text", kind))
+    if kind == "tool":
+        _collect_tool_output(block, "text", out)
+    else:
+        out.slots.append(_text_slot(block, "text", kind))
 
 
 def _collect_tool_result(block: dict[str, Any], where: str, out: CollectedTexts) -> None:
@@ -279,7 +284,7 @@ def _collect_tool_result(block: dict[str, Any], where: str, out: CollectedTexts)
     if content is None:
         return
     if isinstance(content, str):
-        out.slots.append(_text_slot(block, "content", "tool"))
+        _collect_tool_output(block, "content", out)
         return
     if not isinstance(content, list):
         raise InvalidChatRequestError(f"{where}.content must be a string or an array")

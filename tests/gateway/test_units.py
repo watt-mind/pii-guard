@@ -441,7 +441,7 @@ def test_chat_gutters_preserve_offsets_and_mask_whole_names(role: str, field: st
 def test_chat_gutter_multiline_mask_never_restores_original_text() -> None:
     message = {"role": "tool", "content": "12|Jane\n13|Placeholder\n14|safe"}
     slot = next(
-        s for s in collect_texts({"model": "m", "messages": [message]}).slots if s.kind == "content"
+        s for s in collect_texts({"model": "m", "messages": [message]}).slots if s.kind == "tool"
     )
     session, _ = make_session()
     value = slot.text[3:22]
@@ -490,7 +490,7 @@ def test_lone_or_unnumbered_pipe_rows_stay_visible_to_detection(text: str) -> No
 def test_gutter_runs_need_consecutive_numbers() -> None:
     message = {"role": "tool", "content": "Header\n5|a\n6|b\n99|c\n 7|d"}
     slots = collect_texts({"model": "m", "messages": [message]}).slots
-    [slot] = [s for s in slots if s.kind == "content"]
+    [slot] = [s for s in slots if s.kind == "tool"]
     assert slot.text == "Header\n  a\n  b\n99|c\n 7|d"
 
 

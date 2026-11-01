@@ -799,25 +799,6 @@ class Gateway:
 
     _recheck = recheck
 
-    def seed_cache(
-        self,
-        session: VaultSession,
-        language: str,
-        detector: ModeDetector,
-        restored: Mapping[int, tuple[str, list[Span]]],
-        stats: RequestStats,
-    ) -> None:
-        """The client sends the restored answer back as history: pre-detect it."""
-        for text, spans in restored.values():
-            if text and any(ch.isalnum() for ch in text):
-                key = self.cache.key(
-                    session.session_id, language, detector.config_id, text, session.incarnation
-                )
-                self.cache.put(key, spans)
-                stats.seeded += 1
-
-    _seed_cache = seed_cache
-
     async def mask_images(
         self,
         images: list[ImageSlot],

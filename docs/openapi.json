@@ -137,19 +137,49 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
                       "error": {
                         "code": "traffic_log_not_local",
                         "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`unsupported_media_type`: The image is not a PNG or JPEG (sniffed from its bytes), `POST /v1/traffic` got a body that is not `application/json`, or a self-hosted gateway POST declared a non-JSON Content-Type (JSON and application/*+json are accepted; SDKs may omit it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unsupported_media_type": {
+                    "summary": "The image is not a PNG or JPEG (sniffed from its bytes), `POST /v1/traffic` got a body that is not `application/json`, or a self-hosted gateway POST declared a non-JSON Content-Type (JSON and application/*+json are accepted; SDKs may omit it).",
+                    "value": {
+                      "error": {
+                        "code": "unsupported_media_type",
+                        "message": "unsupported_media_type"
                       }
                     }
                   }
@@ -634,19 +664,49 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
                       "error": {
                         "code": "traffic_log_not_local",
                         "message": "traffic_log_not_local"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`unsupported_media_type`: The image is not a PNG or JPEG (sniffed from its bytes), `POST /v1/traffic` got a body that is not `application/json`, or a self-hosted gateway POST declared a non-JSON Content-Type (JSON and application/*+json are accepted; SDKs may omit it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unsupported_media_type": {
+                    "summary": "The image is not a PNG or JPEG (sniffed from its bytes), `POST /v1/traffic` got a body that is not `application/json`, or a self-hosted gateway POST declared a non-JSON Content-Type (JSON and application/*+json are accepted; SDKs may omit it).",
+                    "value": {
+                      "error": {
+                        "code": "unsupported_media_type",
+                        "message": "unsupported_media_type"
                       }
                     }
                   }
@@ -1061,13 +1121,22 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
@@ -1223,13 +1292,22 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
@@ -1471,13 +1549,22 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
@@ -1674,13 +1761,22 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
@@ -1902,13 +1998,22 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
@@ -2099,10 +2204,19 @@
             }
           },
           "403": {
-            "description": "`traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "examples": {
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
+                      }
+                    }
+                  },
                   "traffic_log_not_local": {
                     "summary": "`PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
                     "value": {
@@ -2340,7 +2454,7 @@
             }
           },
           "403": {
-            "description": "`project_access_denied`: Project owner authorization or selection is denied. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`project_access_denied`: Project owner authorization or selection is denied. `cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "examples": {
@@ -2350,6 +2464,15 @@
                       "error": {
                         "code": "project_access_denied",
                         "message": "project_access_denied"
+                      }
+                    }
+                  },
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
                       }
                     }
                   },
@@ -2627,7 +2750,7 @@
             }
           },
           "403": {
-            "description": "`project_access_denied`: Project owner authorization or selection is denied. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`project_access_denied`: Project owner authorization or selection is denied. `cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "examples": {
@@ -2637,6 +2760,15 @@
                       "error": {
                         "code": "project_access_denied",
                         "message": "project_access_denied"
+                      }
+                    }
+                  },
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
                       }
                     }
                   },
@@ -2887,7 +3019,7 @@
             }
           },
           "403": {
-            "description": "`project_access_denied`: Project owner authorization or selection is denied. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
+            "description": "`project_access_denied`: Project owner authorization or selection is denied. `cross_origin_request_denied`: Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing. `traffic_log_not_local`: `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends.",
             "content": {
               "application/json": {
                 "examples": {
@@ -2897,6 +3029,15 @@
                       "error": {
                         "code": "project_access_denied",
                         "message": "project_access_denied"
+                      }
+                    }
+                  },
+                  "cross_origin_request_denied": {
+                    "summary": "Self-hosted unsafe browser requests require the server's own origin; ambiguous Origin or Fetch Metadata headers are refused before processing.",
+                    "value": {
+                      "error": {
+                        "code": "cross_origin_request_denied",
+                        "message": "cross_origin_request_denied"
                       }
                     }
                   },

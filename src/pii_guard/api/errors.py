@@ -62,6 +62,11 @@ class ErrorResponse(BaseModel):
 #: ``status_code`` of the :class:`~pii_guard.types.PiiGuardError` subclass that carries
 #: the code (``tests/api/test_openapi_docs.py`` checks both against ``docs/contracts.md``).
 ERROR_CODES: Mapping[str, tuple[int, str]] = {
+    "cross_origin_request_denied": (
+        403,
+        "Self-hosted unsafe browser requests require the server's own origin; ambiguous "
+        "Origin or Fetch Metadata headers are refused before processing.",
+    ),
     "project_access_denied": (403, "Project owner authorization or selection is denied."),
     "project_not_found": (404, "The project resource is unknown or belongs to another owner."),
     "invalid_project_config": (422, "A policy or endpoint configuration is invalid."),
@@ -110,8 +115,9 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
     ),
     "unsupported_media_type": (
         415,
-        "The image is not a PNG or JPEG (sniffed from its bytes), or `POST /v1/traffic` "
-        "got a body that is not `application/json`.",
+        "The image is not a PNG or JPEG (sniffed from its bytes), `POST /v1/traffic` "
+        "got a body that is not `application/json`, or a self-hosted gateway POST declared "
+        "a non-JSON Content-Type (JSON and application/*+json are accepted; SDKs may omit it).",
     ),
     "invalid_request": (
         422,
@@ -168,7 +174,12 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = {
 }
 
 #: Codes every authenticated route can return, whatever it does.
-COMMON_ERRORS = ("unauthorized", "traffic_log_not_local", "internal_error")
+COMMON_ERRORS = (
+    "unauthorized",
+    "cross_origin_request_denied",
+    "traffic_log_not_local",
+    "internal_error",
+)
 
 
 def error_responses(*codes: str, common: bool = True) -> dict[int | str, dict[str, Any]]:

@@ -477,7 +477,6 @@ async def complete_chat_json(
     observe(session, "chat", answer)
     report = restore_completion(session, answer)
     stats.unresolved = len(report.unresolved)
-    gateway.seed_cache(session, language, detector, report.restored_spans, stats)
     out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
     if echo_data is not None:
         answer["pii_guard"] = {**echo_data, "masked_answer": masked_answer}
@@ -523,9 +522,6 @@ def complete_chat_stream(
         stats=stats,
         restorer=restorer,
         session=session,
-        seed_cache=lambda restored: gateway.seed_cache(
-            session, language, detector, restored, stats
-        ),
         on_error=_chat_stream_error,
     )
     out_headers["Cache-Control"] = "no-cache"

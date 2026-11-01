@@ -376,6 +376,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the upstream has no Anthropic Messages API (it answered 404 or 405 on `.../messages`). The message points to an Anthropic-compatible upstream, the OpenAI-compatible routes (`/v1/chat/completions`) and the console's Connect page; the response has `x-should-retry: false`. Only the masked request reached that upstream; the call is one `refused` traffic event. |
 | 400 | `invalid_code` | `POST /v1/cli/token`: the one-time CLI login code is unknown, already used or expired (it is deleted on first use either way). Run `pii-guard login` again. |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
+| 403 | `cross_origin_request_denied` | Self-hosted browser mutations have a foreign, null or ambiguous Origin, or cross-site/same-site Fetch Metadata. No request processing or forwarding occurs. |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
 | 403 | `vault_inspect_not_local` | `PII_GUARD_VAULT_INSPECT=full` and a `/v1/vault/*` connection is not loopback on both ends. |
@@ -1045,6 +1046,16 @@ call as failed with this code and retains the upstream status, without the rejec
 
 ## Gateway request fields (implemented)
 
+Self-hosted gateway POSTs reject an explicit non-JSON or repeated `Content-Type` with
+`415 unsupported_media_type`. `application/json` and `application/*+json` are accepted;
+SDKs without browser headers may omit the header. Browser mutations must be same-origin,
+including requests through session and endpoint URLs. Hosted mode retains its own checks.
+
+Before collecting text, every gateway request has a cumulative 20,000-node JSON budget and
+a maximum container depth of 64. Keys count as nodes; decoded argument and tool-output JSON
+share the same budget. Over-budget or over-deep requests fail with `400 invalid_request`
+before detection or forwarding. Finalizers run in linear-time postorder.
+
 `POST /v1/chat/completions` walks the whole body against an allow-list
 (`pii_guard.gateway.request`) and fails closed (ADR 0006): every key below is masked, checked
 or passed through as stated, and **any other key is rejected** with
@@ -1056,6 +1067,14 @@ itself could be a value), never the value.
 
 Treatments:
 
+- **structured tool output**: complete JSON objects, arrays and quoted strings in tool-result
+  text are decoded before detection, so JSON Unicode escapes cannot hide known values.
+  Decoded keys, text and long numbers receive the same masking/block policies as other JSON.
+  Nested JSON string layers are limited to four and each JSON text to 1,048,576 characters;
+  excess fails closed with `400 invalid_request`. Masked structures are serialized back to
+  the original text field. Non-JSON text keeps its normal text/gutter handling. This applies
+  to Chat `tool`/`function` output, Responses function/custom tool output, and Messages
+  `tool_result`, including their text parts/blocks and token-count requests.
 - **mask**: free text. Detected values are replaced by placeholders and restored in the
   answer.
 - **mask JSON**: every string in the value, object keys included, is masked as its own text.

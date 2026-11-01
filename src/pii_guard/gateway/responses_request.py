@@ -52,6 +52,7 @@ from pii_guard.gateway.request import (
     _collect_image,
     _collect_json,
     _collect_metadata,
+    _collect_tool_output,
     _field,
     _reject_unknown,
     _require_scalars,
@@ -165,8 +166,9 @@ def _collect_response_metadata_fields(body: dict[str, Any], out: CollectedTexts)
 
 def collect_response_texts(body: object) -> CollectedTexts:
     """Every text of a Responses request, as :class:`TextSlot` objects (fail closed)."""
-    checked = _validate_response_body(body)
     out = CollectedTexts([], [])
+    out.check_structure(body)
+    checked = _validate_response_body(body)
     _collect_input(checked, out)
     _collect_top_response_fields(checked, out)
     _collect_tools(checked, out)
@@ -239,7 +241,9 @@ def _collect_message(item: dict[str, Any], where: str, out: CollectedTexts) -> N
         raise InvalidChatRequestError(f"{where}.content must be a string or an array")
 
 
-def _collect_part(part: object, where: str, out: CollectedTexts, parts: list[Any]) -> None:
+def _collect_part(
+    part: object, where: str, out: CollectedTexts, parts: list[Any], *, tool_output: bool = False
+) -> None:
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
@@ -262,7 +266,10 @@ def _collect_part(part: object, where: str, out: CollectedTexts, parts: list[Any
     value = part.get(key)
     if not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
-    out.slots.append(_text_slot(part, key, "content"))
+    if tool_output:
+        _collect_tool_output(part, key, out)
+    else:
+        out.slots.append(_text_slot(part, key, "content"))
     for name in ("annotations", "logprobs"):
         if part.get(name) is not None:
             _collect_json(part, name, out, name)
@@ -290,10 +297,10 @@ def _collect_output(item: dict[str, Any], where: str, out: CollectedTexts) -> No
     """A tool result: a string, or text parts (``input_text`` / ``output_text``)."""
     output = item.get("output")
     if isinstance(output, str):
-        out.slots.append(_text_slot(item, "output", "tool"))
+        _collect_tool_output(item, "output", out)
     elif isinstance(output, list):
         for i, part in enumerate(output):
-            _collect_part(part, f"{where}.output.{i}", out, output)
+            _collect_part(part, f"{where}.output.{i}", out, output, tool_output=True)
     else:
         raise InvalidChatRequestError(f"{where}.output must be a string or an array")
 

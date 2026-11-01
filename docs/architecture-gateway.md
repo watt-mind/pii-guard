@@ -12,6 +12,12 @@ is forwarded, and the answer (streamed or not) comes back with the real values r
 is built: [architecture.md](architecture.md#gateway-the-proxy). Running and exposing it:
 [operations.md](operations.md).
 
+The detection cache stores only results from complete request detection. A model answer's
+restored placeholders are not a complete PII scan: previously unseen answer text is detected
+when a later request sends it as history, regardless of its role. Existing request history
+still benefits from cached detections. Responses never populate the detection cache
+speculatively (LAB-1756).
+
 ## Modes
 
 | Mode | Detection | Model call per message | Use it for |
@@ -99,7 +105,7 @@ for chunk in stream:
 | `X-PII-Guard-Session-Source` | response | Which step chose the session: `header`, `path`, `prompt_cache_key` or `default`. Also in the traffic record (`session_source`). |
 | `X-PII-Guard-Mode` | both | Request: `fast` (rules + NER, no model call; the default) or `audit` (+ the LLM detector). The response carries the mode that ran. |
 | `X-PII-Guard-Language` | request | Language of the conversation (default `PII_GUARD_DEFAULT_LANGUAGE`, `hu`). |
-| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]` (a choice whose masked copy passed the 1M-character retention cap is listed as `{"index": i, "content": null, "truncated": true}`, not left out). Both also carry `kept_spans`: per client message, the values detected but kept by policy as `{"type", "start", "end"}` (code-point offsets into the message as sent; `[]` for a message whose content is not one string), never the values. Masked text only; for UIs that show the boundary (the demo's Chat screen). `placeholder_note` says whether the [placeholder note](#placeholder-note) was added. |
+| `X-PII-Guard-Echo` | request | Opt-in, `masked`: also return what the model saw and said. Non-streamed: a `pii_guard` object (`masked_messages`, `masked_answer`) in the body. Streamed: a `pii_guard.masked_request` event first and a `pii_guard.masked_answer` event before `[DONE]` (a choice whose masked copy passed the 1M-character retention cap is listed as `{"index": i, "content": null, "truncated": true}`, not left out). Both also carry `kept_spans`: per client message, the values detected but kept by policy as `{"type", "start", "end"}` (code-point offsets into the message as sent; `[]` for a message whose content is not one string or is decoded structured tool output), never the values. Decoded JSON offsets cannot be projected onto the original escaped text. Masked text only; for UIs that show the boundary (the demo's Chat screen). `placeholder_note` says whether the [placeholder note](#placeholder-note) was added. |
 | `X-PII-Guard-Cache-Hits` / `-Misses`, `X-PII-Guard-Masked`, `X-PII-Guard-Unresolved` | response | Counts only: texts served from the detection cache, values masked, placeholders the model invented. |
 | `X-PII-Guard-Placeholder-Note` | response | `added` when the [placeholder note](#placeholder-note) went upstream with the request. |
 | `X-PII-Guard-Outbound-Check` | response | `passed` when the [outbound re-check](#outbound-re-check) found no value the session knows in the masked request; `blocked` on the `422 outbound_check_failed` refusal. Also in the traffic record (`outbound_check`). |

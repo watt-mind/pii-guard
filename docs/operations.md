@@ -453,6 +453,12 @@ contain session handles and personal data in query parameters. The application a
 records route templates, status codes and timings instead. When starting Uvicorn yourself,
 use `--no-access-log`, and configure any reverse proxy to omit or sanitize request URLs too.
 
+Self-hosted browser mutations require the application's own origin. Foreign or ambiguous
+Origin headers and cross-site Fetch Metadata are refused before processing, even on loopback.
+Gateway POSTs also refuse explicit non-JSON content types, preventing simple HTML forms from
+using the server's provider credentials. Native SDKs may omit browser headers and Content-Type;
+this does not replace the API token or an authenticating proxy.
+
 **There is no authentication by default.** Anyone who can reach the API can mask and unmask,
 read the traffic log and `/metrics`, and use the gateway. With `PII_GUARD_UPSTREAM_API_KEY` set,
 the upstream key is shared by every caller: an exposed gateway is an open relay that spends it.
@@ -595,7 +601,7 @@ runtime.
 | `session_ref`, `session_new`, `session_source` | Hashed session (see above); whether the call started the conversation; which step chose it: `header`, `path`, `prompt_cache_key` or `default` ([architecture-gateway.md](architecture-gateway.md#sessions)) |
 | `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`) |
 | `entities` | `detected` and `masked` counts per entity type, number of texts; `images` (count, regions masked / kept, OCR) |
-| `cache` | Detection cache `hits`, `misses`, `seeded` |
+| `cache` | Detection cache `hits`, `misses`, `seeded` (retained for compatibility, now always zero: response restoration is not a complete detection result) |
 | `upstream` | HTTP status, the model it reported (`"[withheld]"` when it is not model-id shaped, for example holds an e-mail address), `unresolved_placeholders` (placeholders the model invented) |
 | `usage` | Token usage as the upstream reported it (streams: when `stream_options.include_usage` is set) |
 | `timing` | See [Timing](#timing) |

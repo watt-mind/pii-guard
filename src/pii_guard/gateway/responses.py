@@ -437,7 +437,6 @@ class ResponsesGateway:
         self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         report = restore_response(session, answer)
         stats.unresolved = len(report.unresolved)
-        self.gateway.seed_cache(session, language, detector, report.restored_spans, stats)
         out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
         if echo:
             answer["pii_guard"] = {"masked_input": masked_input, "masked_output": masked_output}
@@ -493,9 +492,6 @@ class ResponsesGateway:
             stats=stats,
             restorer=restorer,
             session=session,
-            seed_cache=lambda restored: self.gateway.seed_cache(
-                session, language, detector, restored, stats
-            ),
             on_error=_responses_stream_error,
         )
         out_headers["Cache-Control"] = "no-cache"

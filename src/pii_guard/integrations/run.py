@@ -28,6 +28,7 @@ import secrets
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -46,7 +47,7 @@ from pii_guard.config import Settings, get_settings
 from pii_guard.gateway import GatewayConfig, Mode
 from pii_guard.gateway.config import cli_mode
 from pii_guard.integrations import muse_code, pi, snippets
-from pii_guard.integrations.common import ConnectError, fetch_models
+from pii_guard.integrations.common import ConnectError, _atomic_write, fetch_models
 from pii_guard.integrations.login import (
     CliProfile,
     TelemetryLevel,
@@ -732,7 +733,13 @@ def _restored_files(paths: Sequence[Path]) -> Iterator[None]:
     ``run`` points pi and Muse Code at a throwaway port; left behind, a plain ``muse`` would
     send its bearer to whatever takes that port next (LAB-1705).
     """
-    saved = {p: p.read_bytes() if p.exists() else None for p in paths}
+    saved: dict[Path, tuple[bytes, int, int] | None] = {}
+    for path in paths:
+        if path.exists():
+            metadata = path.stat()
+            saved[path] = (path.read_bytes(), stat.S_IMODE(metadata.st_mode), metadata.st_gid)
+        else:
+            saved[path] = None
     backups = {p: set(p.parent.glob(f"{p.name}.pii-guard-backup-*")) for p in paths}
     try:
         yield
@@ -741,7 +748,8 @@ def _restored_files(paths: Sequence[Path]) -> Iterator[None]:
             if old is None:
                 p.unlink(missing_ok=True)
             else:
-                p.write_bytes(old)
+                data, mode, gid = old
+                _atomic_write(p, data, mode=mode, gid=gid)
             for new_backup in set(p.parent.glob(f"{p.name}.pii-guard-backup-*")) - backups[p]:
                 new_backup.unlink(missing_ok=True)
 

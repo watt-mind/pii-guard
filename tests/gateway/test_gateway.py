@@ -233,11 +233,11 @@ def test_streamed_placeholders_restored_across_any_chunking(cuts: list[int]) -> 
     assert content == expected
 
 
-# --- AC4: the second turn re-detects only the new message ---------------------------------
+# --- AC4: request history is cached; unseen model answers need detection -----------------
 
 
 @pytest.mark.parametrize("stream", [False, True])
-def test_second_turn_detects_only_the_new_message(stream: bool) -> None:
+def test_second_turn_detects_new_messages_and_the_unchecked_answer(stream: bool) -> None:
     llm = FakeLlm()
     upstream = MockUpstream()
     with TestClient(make_app(upstream, llm=llm)) as http:
@@ -267,9 +267,11 @@ def test_second_turn_detects_only_the_new_message(stream: bool) -> None:
         )
         raw2.parse()
     assert raw2.headers["x-pii-guard-session"] == session
-    assert raw2.headers["x-pii-guard-cache-hits"] == "4"  # system, user 1, the answer, model
-    assert raw2.headers["x-pii-guard-cache-misses"] == "1"  # only the new message
-    assert llm.calls == 4
+    assert raw2.headers["x-pii-guard-cache-hits"] == "3"  # system, user 1, model
+    assert (
+        raw2.headers["x-pii-guard-cache-misses"] == "2"
+    )  # the new user message and the model answer
+    assert llm.calls == 5
     first, second = upstream.bodies[0], upstream.bodies[1]
     # Re-sent history masks identically (deterministic per session).
     assert second["messages"][:2] == first["messages"][:2]

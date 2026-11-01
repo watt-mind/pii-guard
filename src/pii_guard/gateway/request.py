@@ -12,7 +12,7 @@ import base64
 import binascii
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -99,6 +99,49 @@ class UnsupportedContentError(PiiGuardError):
     status_code = 400
 
 
+MAX_JSON_NODES = 20_000
+MAX_JSON_DEPTH = 64
+
+
+def _json_children(value: dict[str, Any] | list[Any]) -> Iterator[Any]:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield key
+            yield child
+    else:
+        yield from value
+
+
+class _JsonBudget:
+    """One iterative, cumulative budget for the request and decoded tool JSON (LAB-1759)."""
+
+    def __init__(self) -> None:
+        self.nodes = 0
+        # Retain checked containers so their ids cannot be reused by a later decoded tree.
+        # Their descendants need not be scanned again when the masking walker reaches them.
+        self.checked: dict[int, object] = {}
+
+    def check(self, value: Any) -> None:
+        if isinstance(value, dict | list) and id(value) in self.checked:
+            return
+        stack: list[tuple[Iterator[Any], int]] = [(iter((value,)), 0)]
+        while stack:
+            children, depth = stack[-1]
+            try:
+                node = next(children)
+            except StopIteration:
+                stack.pop()
+                continue
+            self.nodes += 1
+            if self.nodes > MAX_JSON_NODES or depth > MAX_JSON_DEPTH:
+                raise InvalidChatRequestError("request JSON exceeds structural limits")
+            if isinstance(node, dict | list):
+                # A generator visits at most the remaining budget's children, even for a
+                # very wide container. Never first allocate a list of all its descendants.
+                self.checked[id(node)] = node
+                stack.append((_json_children(node), depth + 1))
+
+
 @dataclass(slots=True)
 class TextSlot:
     """One text to detect and mask, and how to write the masked text back."""
@@ -135,7 +178,7 @@ def _gutters(lines: list[str]) -> dict[int, str]:
     return out
 
 
-def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
+def _text_slot(holder: dict[str, Any] | list[Any], key: Any, kind: str) -> TextSlot:
     """A message text or tool output; a line-number gutter (``12|``) is hidden from detection."""
     text: str = holder[key]
     lines = text.split("\n")
@@ -156,6 +199,59 @@ def _text_slot(holder: dict[str, Any], key: str, kind: str) -> TextSlot:
         holder[key] = "\n".join(out)
 
     return TextSlot(hidden, write, kind)
+
+
+# Tool outputs commonly contain JSON serialized into a text field. Decode only complete
+# structured JSON, with explicit byte/tree/layer bounds; re-encode each string layer after
+# its decoded contents have been masked (LAB-1755).
+MAX_TOOL_JSON_CHARS = 1024 * 1024
+MAX_TOOL_JSON_LAYERS = 4
+
+
+def _collect_tool_output(
+    holder: dict[str, Any] | list[Any],
+    key: Any,
+    out: CollectedTexts,
+    *,
+    message: int | None = None,
+    decode_depth: int = 0,
+) -> None:
+    text: str = holder[key]
+    if text.lstrip().startswith(("{", "[", '"')):
+        if len(text) > MAX_TOOL_JSON_CHARS:
+            raise InvalidChatRequestError("structured tool output exceeds the JSON size limit")
+        try:
+            parsed = json.loads(text)
+        except RecursionError:
+            raise InvalidChatRequestError(
+                "structured tool output exceeds the JSON depth limit"
+            ) from None
+        except ValueError:
+            pass  # Plain tool text may begin with a bracket or quote.
+        else:
+            if decode_depth >= MAX_TOOL_JSON_LAYERS:
+                raise InvalidChatRequestError("structured tool output exceeds the JSON layer limit")
+            out.check_structure(parsed)
+            decoded = [parsed]
+
+            def collect_leaf(
+                container: dict[str, Any] | list[Any],
+                field_key: Any,
+                collected: CollectedTexts,
+                _kind: str,
+            ) -> None:
+                _collect_tool_output(container, field_key, collected, decode_depth=decode_depth + 1)
+
+            _collect_json(decoded, 0, out, "tool", string_collector=collect_leaf)
+
+            def serialize() -> None:
+                holder[key] = json.dumps(decoded[0], ensure_ascii=False)
+
+            out.finalizers.append(serialize)
+            return
+    slot = _text_slot(holder, key, "tool")
+    slot.message = message
+    out.slots.append(slot)
 
 
 @dataclass(slots=True)
@@ -184,6 +280,10 @@ class CollectedTexts:
     finalizers: list[Callable[[], None]]
     images: list[ImageSlot] = field(default_factory=list)
     opaque: list[tuple[str, str]] = field(default_factory=list, repr=False)
+    _json_budget: _JsonBudget = field(default_factory=_JsonBudget, repr=False)
+
+    def check_structure(self, value: Any) -> None:
+        self._json_budget.check(value)
 
     def finalize(self) -> None:
         for finalize in self.finalizers:
@@ -191,6 +291,8 @@ class CollectedTexts:
 
 
 def collect_texts(body: object) -> CollectedTexts:
+    out = CollectedTexts([], [])
+    out.check_structure(body)
     if not isinstance(body, dict):
         raise InvalidChatRequestError("request body must be a JSON object")
     messages = body.get("messages")
@@ -198,7 +300,6 @@ def collect_texts(body: object) -> CollectedTexts:
         raise InvalidChatRequestError("messages must be a non-empty array")
     if not isinstance(body.get("model"), str) or not body["model"]:
         raise InvalidChatRequestError("model must be a non-empty string")
-    out = CollectedTexts([], [])
     for index, message in enumerate(messages):
         if not isinstance(message, dict):
             raise InvalidChatRequestError(f"messages.{index} must be an object")
@@ -498,12 +599,22 @@ def _collect_message_content(
 ) -> None:
     content = message.get("content")
     if isinstance(content, str):
-        slot = _text_slot(message, "content", "content")
-        slot.message = index
-        out.slots.append(slot)
+        if message.get("role") in {"tool", "function"}:
+            _collect_tool_output(message, "content", out, message=index)
+        else:
+            slot = _text_slot(message, "content", "content")
+            slot.message = index
+            out.slots.append(slot)
     elif isinstance(content, list):
         for part_index, part in enumerate(content):
-            _collect_part(part, f"{where}.content.{part_index}", out, content)
+            _collect_part(
+                part,
+                f"{where}.content.{part_index}",
+                out,
+                content,
+                tool_output=message.get("role") in {"tool", "function"},
+                message=index,
+            )
     elif content is not None:
         raise InvalidChatRequestError(f"{where}.content must be a string, an array or null")
 
@@ -641,7 +752,13 @@ def _collect_call_function(function: dict[str, Any], where: str, out: CollectedT
 
 
 def _collect_part(
-    part: object, where: str, out: CollectedTexts, content: list[Any] | None = None
+    part: object,
+    where: str,
+    out: CollectedTexts,
+    content: list[Any] | None = None,
+    *,
+    tool_output: bool = False,
+    message: int | None = None,
 ) -> None:
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
@@ -661,7 +778,10 @@ def _collect_part(
     value = part.get(key)
     if not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
-    out.slots.append(_text_slot(part, key, "content"))
+    if tool_output:
+        _collect_tool_output(part, key, out, message=message)
+    else:
+        out.slots.append(_text_slot(part, key, "content"))
 
 
 def _resolve_image_holder(
@@ -735,9 +855,12 @@ def _collect_arguments(function: dict[str, Any], where: str, out: CollectedTexts
         raise InvalidChatRequestError(f"{where}.arguments must be a JSON string or object")
     try:
         parsed = json.loads(arguments)
+    except RecursionError:
+        raise InvalidChatRequestError("tool arguments exceed the JSON depth limit") from None
     except ValueError:
         out.slots.append(TextSlot(arguments, _setter(function, "arguments"), "arguments"))
         return
+    out.check_structure(parsed)
     holder = [parsed]
     _collect_json(holder, 0, out)
 
@@ -785,22 +908,46 @@ def _number_setter(container: dict[str, Any] | list[Any], key: Any) -> Callable[
 
 
 def _collect_json(
-    container: dict[str, Any] | list[Any], key: Any, out: CollectedTexts, kind: str = "arguments"
+    container: dict[str, Any] | list[Any],
+    key: Any,
+    out: CollectedTexts,
+    kind: str = "arguments",
+    *,
+    string_collector: Callable[[dict[str, Any] | list[Any], Any, CollectedTexts, str], None]
+    | None = None,
+) -> None:
+    value = container[key]
+    if isinstance(value, dict | list):
+        out.check_structure(value)
+    _walk_json(container, key, out, kind, string_collector=string_collector)
+
+
+def _walk_json(
+    container: dict[str, Any] | list[Any],
+    key: Any,
+    out: CollectedTexts,
+    kind: str,
+    *,
+    string_collector: Callable[[dict[str, Any] | list[Any], Any, CollectedTexts, str], None]
+    | None = None,
 ) -> None:
     value = container[key]
     if isinstance(value, str):
-        out.slots.append(TextSlot(value, _setter(container, key), kind))
+        if string_collector is None:
+            out.slots.append(TextSlot(value, _setter(container, key), kind))
+        else:
+            string_collector(container, key, out, kind)
     elif (number := _number_text(value)) is not None:
         literal = json.dumps(value)
         out.slots.append(TextSlot(number, _number_setter(container, key), kind, number=literal))
     elif isinstance(value, list):
         for i in range(len(value)):
-            _collect_json(value, i, out, kind)
+            _walk_json(value, i, out, kind, string_collector=string_collector)
     elif isinstance(value, dict):
         items = [[k, v] for k, v in value.items()]
         for item in items:
-            out.slots.append(TextSlot(item[0], _setter(item, 0), kind))
-            _collect_json(item, 1, out, kind)
+            _walk_json(item, 0, out, kind, string_collector=string_collector)
+            _walk_json(item, 1, out, kind, string_collector=string_collector)
 
         def rebuild(value: dict[str, Any] = value, items: list[list[Any]] = items) -> None:
             rebuilt = dict(items)
@@ -811,7 +958,10 @@ def _collect_json(
             value.clear()
             value.update(rebuilt)
 
-        out.finalizers.insert(0, rebuild)
+        # Child transformations (including reserialized embedded JSON strings) must finish
+        # before their parent copies the transformed key/value pairs. Postorder append is
+        # O(1) per object; prepending here made wide request collection quadratic.
+        out.finalizers.append(rebuild)
 
 
 # --- request metadata: tool definitions, response_format, metadata ---------------------

@@ -20,9 +20,11 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import re
 import secrets
-import shutil
+import stat
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -173,23 +175,68 @@ def json_diff(path: Path, old: str | None, new: str) -> str:
     return "".join(lines)
 
 
+def _atomic_write(path: Path, data: bytes, *, mode: int = 0o600, gid: int | None = None) -> None:
+    """Publish complete bytes atomically; the unpredictable staging file starts private."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.pii-guard-", dir=path.parent)
+    tmp = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            # Restore the authorized group before enabling any group permission. Failure
+            # leaves the original intact and the staging file private until cleanup.
+            if gid is not None and os.fstat(stream.fileno()).st_gid != gid:
+                os.fchown(stream.fileno(), -1, gid)
+            os.fchmod(stream.fileno(), mode)
+            os.fsync(stream.fileno())
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _backup(path: Path, data: bytes, stamp: str) -> Path:
+    """Create a private backup exclusively: never overwrite or follow an existing name."""
+    base = path.with_name(f"{path.name}.pii-guard-backup-{stamp}")
+    backup = base
+    while True:
+        try:
+            fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            break
+        except FileExistsError:
+            backup = base.with_name(f"{base.name}-{secrets.token_hex(8)}")
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        backup.unlink(missing_ok=True)
+        raise
+    return backup
+
+
 def write_json(path: Path, new: str, *, now: datetime | None = None) -> Path | None:
-    """Write ``new`` to ``path``; back up an existing file first. Returns the backup's path.
+    """Atomically update config, preserving its mode and group; new files and backups are private.
 
     Does nothing (and returns ``None``) when the file already has exactly this content.
+    Temporary files are created exclusively with unpredictable names and mode 0600;
+    backups are also 0600 from creation, including when the original was more permissive.
     """
-    old = path.read_text(encoding="utf-8") if path.exists() else None
-    if old == new:
+    try:
+        old = path.read_bytes()
+        metadata = path.stat()
+        mode, gid = stat.S_IMODE(metadata.st_mode), metadata.st_gid
+    except FileNotFoundError:
+        old, mode, gid = None, 0o600, None
+    data = new.encode("utf-8")
+    if old == data:
         return None
     backup = None
     if old is not None:
         stamp = (now or datetime.now(UTC)).strftime("%Y%m%d-%H%M%S")
-        backup = path.with_name(f"{path.name}.pii-guard-backup-{stamp}")
-        shutil.copy2(path, backup)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".pii-guard-tmp")
-    tmp.write_text(new, encoding="utf-8")
-    tmp.replace(path)
+        backup = _backup(path, old, stamp)
+    _atomic_write(path, data, mode=mode, gid=gid)
     return backup
 
 
