@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -32,6 +33,8 @@ def _builder() -> ModuleType:
     spec = importlib.util.spec_from_file_location("build_smoke", FIXTURES / "build_smoke.py")
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    # The per-language modules in eval/fixtures/smoke/ import their helpers from build_smoke.
+    sys.modules["build_smoke"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -46,6 +49,18 @@ def test_committed_fixtures_match_the_builder() -> None:
         assert (FIXTURES / name).read_text(encoding="utf-8") == expected, (
             f"{name} is stale: run `uv run python eval/fixtures/build_smoke.py`"
         )
+
+
+def test_builder_discovers_every_language_module() -> None:
+    """Each ``eval/fixtures/smoke/<code>.py`` builds ``<code>-smoke.jsonl`` (LAB-1773), so a new
+    language pack adds its module and the staleness check above covers it without edits here."""
+    outputs = _builder().OUTPUTS
+    codes = {p.stem for p in (FIXTURES / "smoke").glob("*.py") if not p.name.startswith("_")}
+    assert {"de", "en", "hu", "pl"} <= codes
+    assert {f"{code}-smoke.jsonl" for code in codes} <= set(outputs)
+    assert {"hu-inflection.jsonl"} <= set(outputs)
+    committed = {p.name for p in FIXTURES.glob("*-smoke.jsonl")}
+    assert committed <= set(outputs), "a committed smoke fixture has no builder"
 
 
 def test_hu_smoke_covers_every_text_entity_type() -> None:

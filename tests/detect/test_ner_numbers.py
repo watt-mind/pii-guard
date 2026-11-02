@@ -7,11 +7,14 @@ fictional: order numbers, ids, phone numbers and amounts are made up (ADR 0005).
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
 from pii_guard.detect.ner import NerDetector, RawEntity, model_view
 from pii_guard.detect.ner_numbers import check_numbers, cue_before, number_verdict
+from pii_guard.languages import LanguagePack, register_pack, unregister_pack
 from pii_guard.types import EntityType, Span
 
 E = EntityType
@@ -85,6 +88,50 @@ def test_a_negative_label_drops_the_number(text: str, value: str) -> None:
 )
 def test_a_reference_word_earlier_in_the_sentence_is_no_label(text: str) -> None:
     assert detect(text, ("858761608507", "ID_DOCUMENT")) == [(E.ID_DOCUMENT, "858761608507")]
+
+
+# The generic "number" words of the fr/es/it/nl/ro packs (LAB-1773), so those packs need no
+# edit to ner_numbers.py: as filler they don't count as words between a label and its value,
+# and a pack cue holding one ("numéro de passeport") doesn't turn it into a positive word.
+_NUMBER_WORDS = ["numéro", "número", "numero", "nummer", "număr", "numar", "numărul"]
+
+
+@pytest.mark.parametrize("word", [*_NUMBER_WORDS, "n°", "nº", "n.", "nr.", "Nr"])
+def test_a_generic_number_word_is_filler_between_a_label_and_its_value(word: str) -> None:
+    text = f"order {word} 4500123456"
+    # With room for one word only, just a filler word may stand between the label and the value.
+    assert cue_before(text, text.index("4500"), label_words=1) is False
+    text = f"order reçu {word} 4500123456"
+    assert cue_before(text, text.index("4500"), label_words=1) is None
+
+
+@pytest.fixture
+def numero_pack(tmp_path: Path) -> Iterator[None]:
+    cues = tmp_path / "cues.tsv"
+    cues.write_text(
+        "numéro de passeport\tID_DOCUMENT\nnúmero de pasaporte\tID_DOCUMENT\n"
+        "număr de telefon\tPHONE\nnumero di telefono\tPHONE\n",
+        encoding="utf-8",
+    )
+    register_pack(LanguagePack(code="zz", name="Zedish", cues=cues))
+    try:
+        yield
+    finally:
+        unregister_pack("zz")
+
+
+@pytest.mark.usefixtures("numero_pack")
+@pytest.mark.parametrize("word", _NUMBER_WORDS)
+def test_a_generic_number_word_in_a_pack_cue_is_no_positive_cue(word: str) -> None:
+    text = f"{word} 4500123456"
+    assert cue_before(text, text.index("4500")) is None
+    assert detect(f"Commande {text}", ("4500123456", "ID_DOCUMENT")) == [
+        (E.ID_DOCUMENT, "4500123456")
+    ]
+    # The cue's other words still count.
+    for cue in ("passeport", "pasaporte", "telefon", "telefono"):
+        text = f"{cue} {word} 4500123456"
+        assert cue_before(text, text.index("4500")) is True
 
 
 @pytest.mark.parametrize(

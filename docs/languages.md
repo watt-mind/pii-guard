@@ -78,9 +78,18 @@ a letter, a chat message, a form, and at least one **hard negative** (no persona
 numbers, dates and amounts that look like it). Every value is fictional
 ([ADR 0005](decisions/0005-synthetic-data-only.md)): `example.com` addresses, numbers from
 fiction ranges, checksummed identifiers computed from made-up payloads. Write them with inline
-labels in `eval/fixtures/build_smoke.py` (`{{PERSON|Anna Probst}}`, a detachable suffix outside
-the label: `{{PERSON|Anna}}s`) so offsets are never typed by hand; a test fails if the committed
-JSONL is stale. German: `de_documents()` in that file.
+labels in a new module `eval/fixtures/smoke/<code>.py` (`{{PERSON|Anna Probst}}`, a detachable
+suffix outside the label: `{{PERSON|Anna}}s`) so offsets are never typed by hand. The module
+imports the shared helpers (`iban`, the label shorthands `P`, `A`, `E`, ...) with
+`from build_smoke import ...` and exports `OUTPUTS = {"<code>-smoke.jsonl": <code>_documents}`;
+`uv run python eval/fixtures/build_smoke.py` finds it by file name and writes the JSONL, so you
+edit no shared file, and a test fails if the committed JSONL is stale. German:
+`eval/fixtures/smoke/de.py`.
+
+A fictional identifier that has to pass a validated rule outside the fixture and test
+directories (in your pack's docs or docstrings, say) goes in
+`scripts/ci/pii-allowlist.d/<code>.txt`, one value per line with a comment saying it is
+fictional: the PII-in-diff CI check reads it alongside the shared `pii-allowlist.txt`.
 
 Writing fixtures first gives you a baseline: run `uv run pii-guard eval --fixtures
 eval/fixtures/pl-smoke.jsonl` before any rule exists, and every later step shows its effect.
@@ -167,9 +176,12 @@ und	-
   `rules`, `ner`, `weak` for a poor negative cue such as an amount word, honored by the
   rules check only). Like cues, they run for every text; unlike cues, they are required:
   a language without them falls back to the built-in lists, so its labels never reach the
-  checks first. List the generic "number" word of your language in `_GENERIC` and
-  `_FILLER` in `detect/ner_numbers.py` too (`Nummer`, `numer`), or every cue containing it
-  makes it a positive cue.
+  checks first. The generic "number" word of your language belongs in `_GENERIC` and
+  `_FILLER` in `detect/ner_numbers.py` (`Nummer`, `numer`), or every cue containing it
+  makes it a positive cue. French, Spanish, Italian, Dutch and Romanian are there already
+  (`numéro`, `número`, `numero`, `nummer`, `număr`, and `n°`, `nº`, `n.`, `nr.`), so those
+  packs need no edit to that file; another language adds its word there (folded: lower
+  case, no accents).
 - Check them against `eval/fixtures/negative/` (order numbers, amounts, dates, postcodes and
   references without a cue: nothing may be masked) and add a `<code>-uncued-numbers.jsonl`
   there; `PII_GUARD_RULES_CUED_NUMBERS=false` turns the rule off for comparison.
