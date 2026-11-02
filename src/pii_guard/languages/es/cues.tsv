@@ -1,0 +1,55 @@
+# Cue words for context-cued numbers (languages/cues.py, LAB-1170); format in hu/cues.tsv.
+# Spanish nouns take only a plural ending, so a trailing "*" covers them (teléfono, teléfonos).
+# Matching ignores accents: "telefono" and "teléfono" are one cue.
+teléfono*	PHONE
+tel.	PHONE
+tlf.	PHONE
+tfno.	PHONE
+telf.	PHONE
+móvil*	PHONE
+fax	PHONE
+tarjeta de crédito	BANK_ACCOUNT
+tarjeta de débito	BANK_ACCOUNT
+número de tarjeta	BANK_ACCOUNT
+nº de tarjeta	BANK_ACCOUNT
+cuenta bancaria	BANK_ACCOUNT
+número de cuenta	BANK_ACCOUNT
+nº de cuenta	BANK_ACCOUNT
+cuenta corriente	BANK_ACCOUNT
+DNI	ID_DOCUMENT
+D.N.I.	ID_DOCUMENT
+NIF	ID_DOCUMENT
+N.I.F.	ID_DOCUMENT
+NIE	ID_DOCUMENT
+N.I.E.	ID_DOCUMENT
+CIF	ID_DOCUMENT
+documento nacional de identidad	ID_DOCUMENT
+documento de identidad	ID_DOCUMENT
+tarjeta de residencia	ID_DOCUMENT
+pasaporte*	ID_DOCUMENT
+permiso de conducir	ID_DOCUMENT
+carné de conducir	ID_DOCUMENT
+carnet de conducir	ID_DOCUMENT
+seguridad social	ID_DOCUMENT
+NUSS	ID_DOCUMENT
+número de afiliación	ID_DOCUMENT
+tarjeta sanitaria	ID_DOCUMENT
+pedido*	-
+factura*	-
+albarán*	-
+cliente*	-
+referencia*	-
+ref.	-
+expediente*	-
+presupuesto*	-
+recibo*	-
+seguimiento	-
+envío*	-
+localizador	-
+reserva*	-
+importe*	-
+total	-
+saldo	-
+código postal	-
+C.P.	-
+y	-
