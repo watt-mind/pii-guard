@@ -39,6 +39,6 @@ def bsn_check_digit(payload8: str) -> int | None:
 
 def is_valid_bsn(digits: str) -> bool:
     """True for a 9-digit BSN (or sofinummer) that passes the elfproef and is not all zeros."""
-    if not _digits(digits, 9) or digits == "000000000":
+    if not _digits(digits, 9) or int(digits) == 0:
         return False
     return bsn_check_digit(digits[:8]) == int(digits[8])
