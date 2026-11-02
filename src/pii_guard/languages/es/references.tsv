@@ -1,0 +1,41 @@
+# Reference words: labels that make a number a business number, not personal data
+# (pii_guard/languages/references.py; docs/languages.md). One entry per line, `#` comments,
+# blank lines ignored. A trailing `*` lets the word take suffixes (`factura*`: `facturas`).
+# Accents are optional in the text (`albaran` matches `albarán`). Spanish writes the number
+# word before the noun (`número de pedido 7002...`), so the noun is the label's last word;
+# after the noun it is `n.º`, `nº` or `núm.`, which the shared pattern does not know, so
+# those spellings are listed with the nouns that take them. Optional second column: `both`
+# (the default), `rules`, `ner`, or `weak` (a poor negative cue such as an amount word,
+# honored by the rules check only).
+# Every entry is `rules` for now: a pack word read by the NER check fails the pinned
+# fallback test (tests/detect/test_reference_packs.py); LAB-1787 lifts that, and then these
+# become `both`.
+pedido*	rules
+pedido n.º	rules
+pedido nº	rules
+pedido núm.	rules
+factura*	rules
+factura n.º	rules
+factura nº	rules
+factura núm.	rules
+albarán*	rules
+albarán n.º	rules
+albarán nº	rules
+expediente*	rules
+expediente n.º	rules
+expediente nº	rules
+recibo*	rules
+recibo n.º	rules
+recibo nº	rules
+presupuesto*	rules
+seguimiento	rules
+envío*	rules
+localizador	rules
+reserva*	rules
+cliente	rules
+transacción*	rules
+operación	rules
+importe*	weak
+total	weak
+saldo	weak
+referencia*	weak
