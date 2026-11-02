@@ -221,11 +221,11 @@ function initialVisualPoliciesOf(start: PolicyVersion | undefined): Record<Visua
 }
 
 function visualDetectionHint(hosted: boolean, detection: VisualDetection): string {
-  if (hosted) return "The hosted service detects on its own CPU only; SAM 3.1 needs a self-hosted install.";
+  if (hosted) return "The hosted service sends each image to SAM 3.1 on the Meta Model API to find faces, ID photos and signatures.";
   if (detection === "sam") {
-    return "The original image is sent to Meta's API for signatures and stamps. Needs a SAM key on the server; a server set to on-device detection stays on-device.";
+    return "The default: the original image is sent to SAM 3.1 on the Meta Model API. Needs a SAM key on the server; a server set to on-device detection stays on-device.";
   }
-  return "Faces, ID photos and signatures are found on the guard's CPU. Stamps cannot be detected on-device, so they can only be kept.";
+  return "Optional on-device detectors (not Meta models): images are refused unless the server enables them (PII_GUARD_SEGMENTER=hybrid or local). Stamps cannot be detected on-device, so they can only be kept.";
 }
 
 function PolicyImagesFieldset({
@@ -249,8 +249,8 @@ function PolicyImagesFieldset({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Detection" hint={visualDetectionHint(hosted, detection)}>
           <Select value={detection} onChange={(e) => onDetection(e.target.value as VisualDetection)}>
-            <option value="local">{VISUAL_DETECTION_LABEL.local}</option>
-            <option value="sam" disabled={hosted}>{VISUAL_DETECTION_LABEL.sam}</option>
+            <option value="sam">{VISUAL_DETECTION_LABEL.sam}</option>
+            <option value="local" disabled={hosted}>{VISUAL_DETECTION_LABEL.local}</option>
           </Select>
         </Field>
         {VISUAL_ENTITY_TYPES.map((type) => (
@@ -262,9 +262,9 @@ function PolicyImagesFieldset({
           </Field>
         ))}
       </div>
-      {detection === "local" && visual.STAMP === "mask" && (
+      {!hosted && detection === "local" && visual.STAMP === "mask" && (
         <p role="alert" className="mt-2 text-sm text-warn">
-          {hosted ? "Detection on the PII Guard server" : "On-device detection"} cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.
+          On-device detection cannot find stamps, so every image would be refused. Keep stamps, or choose SAM 3.1.
         </p>
       )}
     </fieldset>
@@ -369,10 +369,12 @@ export interface PolicyFormProps {
 }
 
 function resolveInitialModeAndDetection(start: PolicyVersion | undefined, hosted: boolean) {
-  if (hosted || !start) return { mode: "fast", detection: "local" as VisualDetection };
+  // SAM 3.1 is the default (ADR 0015); a saved "local" stays local, a version saved before
+  // the field reads as the server's segmenter, as the API reads it.
+  if (hosted || !start) return { mode: "fast", detection: "sam" as VisualDetection };
   return {
     mode: start.mode || "fast",
-    detection: (start.visual_detection || "local") as VisualDetection,
+    detection: (start.visual_detection || "sam") as VisualDetection,
   };
 }
 

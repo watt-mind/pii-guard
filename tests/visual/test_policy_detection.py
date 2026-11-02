@@ -242,11 +242,13 @@ def test_policy_segmenter_selection() -> None:
 # --- the policy's visual actions ----------------------------------------------------------
 
 
-def test_visual_detection_defaults_to_local() -> None:
-    assert visual_detection(None) == "local"
-    assert visual_detection({}) == "local"
+def test_visual_detection_defaults_to_the_servers_segmenter() -> None:
+    # Saved before the field: the server's segmenter (SAM 3.1 by default, ADR 0015).
+    assert visual_detection(None) == "sam"
+    assert visual_detection({}) == "sam"
     assert visual_detection({"visual_detection": "sam"}) == "sam"
-    assert visual_detection({"visual_detection": "bogus"}) == "local"
+    assert visual_detection({"visual_detection": "local"}) == "local"
+    assert visual_detection({"visual_detection": "bogus"}) == "local"  # the stricter
 
 
 def test_effective_policies() -> None:
@@ -302,7 +304,7 @@ def test_route_local_policy_reuses_the_servers_faces_and_never_calls_sam() -> No
     chosen = _sam_client(request)
     assert isinstance(chosen, LocalSignatureSegmenter) and chosen.local is faces
     assert _sam_client(request) is chosen  # built once per app
-    assert _sam_client(_request(hybrid, {})) is not hybrid  # saved before the field: local
+    assert _sam_client(_request(hybrid, {})) is hybrid  # saved before the field: the server's
     sam_policy = _sam_client(_request(hybrid, {"visual_detection": "sam"}))
     assert sam_policy is hybrid
     assert sam.prompts == []
@@ -366,6 +368,19 @@ def test_selected_project_policy_drives_a_self_hosted_image(tmp_path: Path) -> N
         projects = client.get("/v1/projects", headers=headers).json()
         project = projects["default_project_id"]
         selected = {**headers, "x-pii-guard-project": project, "content-type": "image/png"}
+        # The default policy uses the server's segmenter (sam, ADR 0015): signatures to SAM.
+        default = client.post("/v1/mask/image", content=_png(), headers=selected)
+        assert default.status_code == 200, default.text
+        assert sam.prompts and "FACE" in {r["entity_type"] for r in default.json()["regions"]}
+        sam.prompts.clear()
+        # An explicit local version: on-device on this hybrid server, no SAM request.
+        family = projects["projects"][0]["default_policy_id"]
+        saved = client.put(
+            f"/v1/projects/{project}/policies/{family}",
+            json={"name": "Local images", "visual_detection": "local"},
+            headers=headers,
+        )
+        assert saved.status_code == 201, saved.text
         response = client.post("/v1/mask/image", content=_png(), headers=selected)
         assert response.status_code == 200, response.text
         types = {r["entity_type"] for r in response.json()["regions"]}
