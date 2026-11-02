@@ -91,7 +91,8 @@ jobs:
         include:
           - { platform: linux, os: ubuntu-latest, flags: "--expect-ner on" }
           - { platform: linux-cpu, os: ubuntu-latest, flags: "--torch-backend cpu --expect-ner on" }
-          - { platform: macos-arm, os: macos-14, flags: "--expect-ner on" }
+          # Pinned, not macos-latest, so the image changes only on purpose (LAB-1782).
+          - { platform: macos-arm, os: macos-15, flags: "--expect-ner on" }
           - { platform: macos-intel, os: macos-15-intel, flags: "--expect-ner off" }
         # The git+ source (README "On your machine") only where we built from a commit.
         source: ${{ fromJSON(inputs.pypi-version && '["pypi"]' || inputs.wheel-artifact && '["wheel"]' || '["wheel", "git"]') }}
