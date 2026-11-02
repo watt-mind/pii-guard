@@ -670,7 +670,7 @@ LAB-1229 asked whether faces, ID photos and signatures can be found **on the dev
 with SAM 3.1 on the Meta API (four API calls and 5-6 s per image, and the image leaves the
 machine). **Answer: faces and ID photos yes, signatures no.** So from LAB-1245 to LAB-1795 the
 default segmenter was **`hybrid`** (`PII_GUARD_SEGMENTER`, see
-[operations.md](operations.md#segmenter-faces-on-the-device-signatures-on-sam-31)): YuNet
+[operations.md](operations.md#segmenter-sam-31-by-default-on-device-engines-optional)): YuNet
 (`pii_guard.visual.segment.LocalSegmenter`) finds faces and ID photos on the CPU, and SAM 3.1
 only the signatures.
 

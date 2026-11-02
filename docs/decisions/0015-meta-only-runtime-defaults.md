@@ -34,17 +34,36 @@ are off by default.
   still work when set explicitly.
 - **Hosted** accepts `sam-api` (the default) or `local` (opt-in). It refuses `hybrid` and `off`
   at startup, as before. The SAM key is the same Key Vault Meta key the sponsored route already
-  uses (`PII_GUARD_SAM_API_KEY` from the `meta-key` secret). Readiness fails without it. Hosted
-  project policies do not choose their detection: the hosted API stores
-  `visual_detection: local` only, so the operator's segmenter serves every policy.
-- **Self-hosted project policies:** a policy with `visual_detection: local` asks for the
-  on-device engines. On a `sam-api` server (the default) its images are refused. They are not
-  sent to SAM instead, because the policy asked for no egress. On a `hybrid` or `local` server,
-  which has opted in, it works as before.
-- **NER:** `PII_GUARD_NER_FALLBACK` gains `published`, the new default. The published
-  checkpoint is still fetched on first use, and the public fallback is never used. When there
-  is no published model, fast mode runs rules only and the startup line says so. `download`
-  (the old default) opts back in to the fallback. `cached` and `off` keep their meaning.
+  uses (`PII_GUARD_SAM_API_KEY` from the `meta-key` secret). Readiness fails without it, and
+  `/v1/status` offers images only while the replica's segmenter can serve the server's visual
+  policies: SAM 3.1 with its key, or the on-device engines while no masked type is one they
+  cannot find. Hosted project policies do not choose their detection. Until now the hosted API
+  stored `visual_detection: local` only, so every existing hosted value is one owners could not
+  choose. The replica's segmenter therefore serves every policy, whatever its
+  `visual_detection`. A stamp-masking policy works on a SAM replica and is refused on an
+  on-device one.
+- **Project policies:** new versions default to `visual_detection: sam`, the server's Meta
+  segmenter (`local` on a `local-only` deployment, which accepts nothing else). Versions saved
+  before LAB-1444, which have no `visual_detection`, read as `sam` too: the server's segmenter
+  served them then. A version saved with `local` keeps it. On a self-hosted `sam-api` server
+  (the default) its images are refused, not sent to SAM instead: `local` is an explicit privacy
+  choice of no egress. On a `hybrid` or `local` server, which has opted in, it works as before.
+  The console defaults new policies to SAM 3.1 and, on hosted, offers nothing else.
+- **NER:** `PII_GUARD_NER_FALLBACK` gains `published`, the new default. The published checkpoint
+  (a fine-tune of Meta's XLM-RoBERTa) is still fetched on first use, and the public fallback is
+  never used. When there is no published model, fast mode runs rules only and the startup line
+  says so. `download` (the old default) opts back in to the fallback. `cached` and `off` keep
+  their meaning.
+
+  *Why a new value instead of defaulting to `off`.* `off` already meant "fetch nothing and never
+  use the fallback". With it as the default, the published Meta model would never be downloaded
+  either, so a fresh install would run rules only, with no NER. Redefining `off` to allow the
+  published download would break what `off` promises today: compose's offline demo
+  (`PII_GUARD_DEMO_NER_FALLBACK=off`), `make demo MODE=rules` and the tests that use `off` as
+  "rules only, no network". `published` says what the default does (only the published model,
+  downloaded when missing) and leaves every existing value's meaning alone.
+- **Status:** `/v1/status` `images.gaps` adds `sam` when the default `sam-api` segmenter has no
+  key, so the console says why images are refused instead of reporting them available.
 - **Docker:** neither `Dockerfile` nor `Dockerfile.hosted` fetches YuNet or YOLOS-tiny by
   default. `--build-arg PII_GUARD_ON_DEVICE_VISION=true` bakes them in. The hosted image runs
   with `PII_GUARD_SEGMENTER=sam-api`.

@@ -66,7 +66,7 @@ data, and confirm the console no longer says mock. Keep its credentials off scre
 
 ### Optional live image preparation
 
-Use the existing [image setup](operations.md#segmenter-faces-on-the-device-signatures-on-sam-31):
+Use the existing [image setup](operations.md#segmenter-sam-31-by-default-on-device-engines-optional):
 Tesseract plus the `ocr` extra and Hungarian/English language data; a configured visual
 segmenter; a tenant key for labeled rendering; and the text detectors required by the
 chosen route. Provision models and authorized SAM access before rehearsing. Confirm

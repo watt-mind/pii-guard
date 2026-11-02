@@ -189,7 +189,8 @@ loaded. Rules alone miss much free-form personal data. This is an explicit cover
 never an automatic fallback when NER is broken.
 
 Images require local Tesseract with the necessary language packs and `SEGMENTER=local` or
-`off`. Provision the pinned YuNet weights explicitly with
+`off` (the default `sam-api` sends images to the Meta Model API and is refused here; YuNet is not
+a Meta model, so this profile is an explicit opt-in out of the Meta-only defaults, ADR 0015). Provision the pinned YuNet weights explicitly with
 `python -m pii_guard.visual.segment fetch` before using `local`; the local loader does not
 download missing weights. YuNet supports faces and estimated ID-photo regions, not signatures
 or stamps. The default `SIGNATURE=mask` therefore refuses local images. The guard does not
@@ -238,21 +239,23 @@ What it does:
   banner and a strip above the UI say so. `--mock` forces it.
 - **Mode.** Fast: rules plus NER (torch and transformers are in the default install). The
   NER model resolves as in [models.md](models.md#which-ner-model-fast-mode-runs): on the
-  first run the published checkpoint or the public fallback is downloaded once (about 1.1 GB).
+  first run the published checkpoint is downloaded once (about 1.1 GB). The public fallback, not
+  a Meta model, is off by default (`PII_GUARD_NER_FALLBACK=download` opts in; ADR 0015).
   The server answers at once and loads (or downloads) it in the background: `/healthz` and
   `/v1/status` say `"ner": "loading"`, and requests that need detection wait for it (up to
   `PII_GUARD_NER_WARMUP_TIMEOUT`, 120 s, then `503 detector_loading` with `Retry-After`;
   LAB-1303). The strip and the banner list the active detectors, the banner
-  names the NER model (`NER model  …@… (public fallback, Apache-2.0)`). Where torch and
+  names the NER model (`NER model  …@… (published pii-guard model, Apache-2.0)`). Where torch and
   transformers are missing (an install that skipped them) it says so and prints the exact
   `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up` line to reinstall
   (`[ner]` is now a no-op alias, kept so the line works on older releases too).
   `PII_GUARD_GATEWAY_MODE` overrides the mode.
-- **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and face detection (the
-  `local-vision` extra with its model, or `META_API_KEY` for SAM 3.1; see
-  [Segmenter](#segmenter-faces-on-the-device-signatures-on-sam-31)). Whatever is missing, image
-  parts are refused (fail closed), the strip says `images: refused (no OCR, face detection)`,
-  and the banner names the missing pieces with the commands to add them. Text works regardless.
+- **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and a key for SAM 3.1,
+  the default segmenter (`PII_GUARD_SAM_API_KEY` or `META_API_KEY`; see
+  [Segmenter](#segmenter-sam-31-by-default-on-device-engines-optional)). Images go to the Meta
+  Model API. Whatever is missing, image parts are refused (fail closed), the strip says
+  `images: refused (no OCR, SAM 3.1 key)`, and the banner names the missing pieces with the
+  commands to add them. Text works regardless.
 - **Traffic log** `masked` by default (the dashboard needs it); `--traffic-log full` only on a
   loopback bind, as everywhere. A fresh tenant key per run unless `PII_GUARD_TENANT_KEY` is set (in the environment or `.env`).
 - It opens the browser (`--no-browser` to skip) and prints the gateway base URL and the
@@ -296,8 +299,9 @@ make smoke-fast       # the same in fast mode with the NER (local)
 PII Guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
 [models.md](models.md#which-ner-model-fast-mode-runs)), pinned to a hub revision and
 checked against its SHA-256, stored in `~/.cache/pii-guard/models/ner/`
-(`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK=cached`
-uses it only if it is already there; `off` (what `MODE=rules` sets) never uses it.
+(`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK`
+(default `published`) never uses the public fallback; `download` opts in to it, `cached` uses
+either model only if it is already there, and `off` (what `MODE=rules` sets) fetches nothing.
 
 `make demo` starts, all bound to 127.0.0.1:
 
@@ -315,10 +319,10 @@ It prints a banner with the URLs and what it found:
   sends `model: pii-guard-mock`; set `PII_GUARD_DEMO_MODEL` for a real upstream. The demo
   traffic is fictional, so it may go to a hosted model.
 - **Fast mode** uses rules + the NER model that resolves (`PII_GUARD_NER_MODEL`, else the
-  published PII Guard checkpoint once it is pinned, else the public fallback) and names it,
-  for example `fast mode  rules + NER: bardsai/eu-pii-anonimization-multilang@62ca57123687
-  (public fallback, Apache-2.0)`. Rules only with `MODE=rules`, or when torch and
-  transformers are missing (the banner says so).
+  published PII Guard checkpoint; the public fallback only with `PII_GUARD_NER_FALLBACK=download`)
+  and names it, for example `fast mode  rules + NER: watt-mind/pii-guard-ner-xlmr-base@33ef18fed56a
+  (published pii-guard model, Apache-2.0)`. Rules only with `MODE=rules`, when no published
+  model can be had, or when torch and transformers are missing (the banner says so).
 - **Audit mode** (opt in with the header `X-PII-Guard-Mode: audit`) is available when an LLM
   detector key is set (`PII_GUARD_LLM_DETECTOR_API_KEY`, or `BASETEN_API_KEY`).
 
@@ -422,22 +426,28 @@ read-only container without one fails every OCR call (`No usable temporary direc
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
 
-### Segmenter: faces on the device, signatures on SAM 3.1
+### Segmenter: SAM 3.1 by default, on-device engines optional
 
-`PII_GUARD_SEGMENTER` picks who finds the visual personal data in images (LAB-1245,
-[contracts.md](contracts.md), [models.md](models.md#local-segmentation)):
+`PII_GUARD_SEGMENTER` picks who finds the visual personal data in images (LAB-1245, LAB-1795,
+[ADR 0015](decisions/0015-meta-only-runtime-defaults.md), [contracts.md](contracts.md),
+[models.md](models.md#local-segmentation)). Only Meta models run by default:
 
 | Value | Faces, ID photos | Signatures | SAM 3.1 calls per image | Image leaves the machine |
 |---|---|---|---:|---|
-| `hybrid` (default) | YuNet on the CPU | SAM 3.1 (`signature`, `squiggly line`) | 2 | yes, for the signature prompts |
-| `sam-api` (the default before LAB-1245) | SAM 3.1 | SAM 3.1 | 5 (with `stamp`) | yes |
-| `local` | YuNet on the CPU | not found: images are refused while `SIGNATURE` is masked | 0 | no |
+| `sam-api` (default) | SAM 3.1 | SAM 3.1 | 5 (with `stamp`) | yes: to the Meta Model API |
+| `hybrid` (opt-in, not Meta-only) | YuNet on the CPU | SAM 3.1 (`signature`, `squiggly line`) | 2 | yes, for the signature prompts |
+| `local` (opt-in, not Meta-only) | YuNet on the CPU | not found: images are refused while `SIGNATURE` is masked | 0 | no |
 | `off` | — | — | 0 | no; every image is refused |
 
-`hybrid` is a latency and cost win, not a privacy win: the image still goes to the Meta API for
-the signature prompts. YuNet (OpenCV model zoo, 0.23 MB, MIT) runs alongside those calls.
-`STAMP` is `keep` by default, so `hybrid` does not ask SAM for stamps; give it another policy
-and it does (one more call).
+`sam-api` needs a key (`PII_GUARD_SAM_API_KEY`, else `META_API_KEY`). Without one every image is
+`503 detection_failed`, `/v1/status` lists the gap `sam`, and nothing falls back to a non-Meta
+model. YuNet (OpenCV model zoo, 0.23 MB, MIT) and the YOLOS-tiny signature detector are not Meta
+models: they run only when you choose `hybrid` or `local` (or a project policy's `local`
+detection on such a server). On a `sam-api` server, a project policy saved with `local`
+detection has its images refused rather than sent to SAM. `hybrid` is a latency and cost win,
+not a privacy win: the image still goes to the Meta API for the signature prompts. `STAMP` is
+`keep` by default, so `hybrid` does not ask SAM for stamps; give it another policy and it does
+(one more call).
 
 **Fallback (fail closed, ADR 0006).** The segmenter is built on the first image. If OpenCV or
 the YuNet model is missing, `hybrid` logs a warning (`on-device face detection unavailable ...;
@@ -445,9 +455,10 @@ faces and ID photos go to SAM 3.1 too`) and sends every type to SAM (4 calls): s
 With no SAM API key either, every image is `503 detection_failed`. `local` never falls back to
 the API, and any SAM or YuNet error while an image is processed refuses the image.
 
-**Getting YuNet.** The Docker image ships it: the `local-vision` extra (OpenCV headless) and the
-model, fetched at build time from its pinned OpenCV model zoo URL and checked against its
-pinned SHA-256 (the build fails on a mismatch), in `/app/models` (`PII_GUARD_MODEL_DIR`). That
+**Getting YuNet (opt-in).** The Docker image ships the `local-vision` extra (OpenCV headless).
+The model is fetched only when you build with `--build-arg PII_GUARD_ON_DEVICE_VISION=true`
+(ADR 0015), from its pinned OpenCV model zoo URL and checked against its pinned SHA-256 (the
+build fails on a mismatch), into `/app/models` (`PII_GUARD_MODEL_DIR`). That
 adds about 160 MB unpacked (`du` inside the container, arm64: 317 MB → 478 MB; `docker image
 inspect` on Docker Desktop: 430 MB → 653 MB): OpenCV headless about 87 MB, numpy about 68 MB, the
 model 0.23 MB. The local-vision change raised the CI size budget from 375 to 525 MB.
@@ -458,7 +469,8 @@ footprint increase supports encrypted configuration without implementing custom 
 Since LAB-1733 the NER (torch, transformers) is a core dependency that this image skips; it then
 measured 544 MB, so LAB-1734 raised the budget to 650 MB: room for ordinary growth, while the NER
 leaking into the base image (about +1 GB) still fails the check.
-`make demo` fetches YuNet too. Elsewhere: `uv sync --extra local-vision`, then
+`make demo` fetches YuNet and YOLOS-tiny too; they stay unused unless you set `hybrid` or
+`local`. Elsewhere: `uv sync --extra local-vision`, then
 `uv run python -m pii_guard.visual.segment fetch` (into `PII_GUARD_MODEL_DIR`, default
 `~/.cache/pii-guard/models`). Model files are never committed.
 

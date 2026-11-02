@@ -236,7 +236,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
 | `PII_GUARD_SAM_API_KEY` | `sam_api_key` | `SecretStr \| None` | unset (falls back to `META_API_KEY`) |
 | `PII_GUARD_SAM_MODEL` | `sam_model` | `str \| None` | unset (SamClient default `sam-3.1`) |
-| `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
+| `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `sam-api` (Meta-only default, ADR 0015) |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
 One factory, `pii_guard.detect.stack`, picks the detectors for both the REST API and the
@@ -276,7 +276,7 @@ Gateway `audit` (including its `strict` alias) is refused before any processing 
 request. Images require `PII_GUARD_SEGMENTER=local|off` and built-in Tesseract OCR; missing
 models/dependencies and unsupported visual `mask`/`block` policies still fail closed. Cached
 remote segmenters and custom OCR engines are refused. Unused endpoint settings and the default
-`hybrid` segmenter do not prevent text-only startup; selecting them for an image does refuse.
+`sam-api` segmenter do not prevent text-only startup; selecting them for an image does refuse.
 Profile refusals use `503 detection_profile_denied`; existing component-specific missing-model
 and unsupported-capability errors remain valid.
 
@@ -588,14 +588,14 @@ uploads are not accepted (they would need an extra dependency).
   "media_type": "image/png",
   "width": 720, "height": 450,
   "regions": [
-    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "local", "detector": "yunet", "score": 0.93, "policy": "mask"},
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask"},
     {"entity_type": "SIGNATURE", "box": [402, 380, 560, 430], "source": "sam", "detector": "sam", "score": null, "policy": "mask"},
     {"entity_type": "NATIONAL_ID_HU_TAJ", "box": [310, 184, 437, 206], "source": "ocr", "detector": "rules", "score": 1.0, "policy": "mask"}
   ],
   "masked": [{"entity_type": "FACE", "count": 1}, {"entity_type": "SIGNATURE", "count": 1}, {"entity_type": "NATIONAL_ID_HU_TAJ", "count": 1}],
   "kept": [],
   "analysis": {
-    "sam": {"model": "yunet-2023mar+sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO"]},
+    "sam": {"model": "sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"]},
     "ocr": {"ran": true, "engine": "tesseract", "detectors": ["rules", "llm"], "models": {"llm": "muse-spark-1.3"}, "reason": null}
   }
 }
@@ -611,7 +611,7 @@ With `render: "labels"` (the default) the response also carries:
     {"entity_type": "PERSON", "box": [310, 92, 402, 112], "source": "ocr", "detector": "captions", "score": 0.8, "policy": "mask",
      "placeholder": "[[PERSON_a1b2c3]]", "label": "[[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
      "cover_box": [308, 90, 452, 114]},
-    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "local", "detector": "yunet", "score": 0.93, "policy": "mask",
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask",
      "placeholder": "[[PERSON_a1b2c3]]", "label": "PHOTO · [[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
      "cover_box": [70, 114, 190, 264]}
   ],
@@ -676,17 +676,20 @@ With `render: "labels"` (the default) the response also carries:
 - Segmenters (`pii_guard.visual.segment.Segmenter`): anything with
   `segment(image: bytes, entity_types=None) -> list[Region]` that raises `DetectionError` on
   any failure, including a requested type it cannot find. The API and the gateway build theirs
-  from `PII_GUARD_SEGMENTER` (`pii_guard.visual.segmenters.build_segmenter`, LAB-1245):
-  - `hybrid` (default): `LocalSegmenter` (YuNet on the CPU) finds `FACE` and `ID_PHOTO`, SAM 3.1
+  from `PII_GUARD_SEGMENTER` (`pii_guard.visual.segmenters.build_segmenter`, LAB-1245). Only
+  Meta models run by default (ADR 0015, LAB-1795); YuNet and YOLOS-tiny are opt-in:
+  - `sam-api` (the default): SAM 3.1 on the Meta Model API segments every visual type it has a
+    prompt for, one request per prompt: `face`, `signature`, `squiggly line`, `photo of a
+    person`, `stamp` (**5 requests per image**; `keep` stamps are found and reported). The
+    original image goes to the Meta Model API. Without a SAM key every image is
+    `503 detection_failed`; nothing falls back to a non-Meta model.
+  - `hybrid` (opt-in): `LocalSegmenter` (YuNet on the CPU) finds `FACE` and `ID_PHOTO`, SAM 3.1
     on the Meta API finds `SIGNATURE` (and `STAMP` only when its policy is not `keep`): **2 Meta
     API requests per image** (`signature`, `squiggly line`), run alongside YuNet. The image
     still leaves the machine for those two requests. `analysis.sam.model` is
     `yunet-2023mar+sam-3.1`; `analysis.sam.entity_types` lists the visual types asked for
     (`["FACE", "SIGNATURE", "ID_PHOTO"]` with the default policies).
-  - `sam-api` (the default before LAB-1245): SAM segments every visual type it has a prompt for,
-    one request per prompt: `face`, `signature`, `squiggly line`, `photo of a person`, `stamp`
-    (**5 requests per image**; `keep` stamps are found and reported).
-  - `local`: YuNet only, nothing leaves the machine. It cannot find signatures, so while
+  - `local` (opt-in): YuNet only, nothing leaves the machine. It cannot find signatures, so while
     `SIGNATURE` is `mask` or `block` every image is `503 detection_failed`; with
     `PII_GUARD_POLICY_OVERRIDES=SIGNATURE=keep` images are accepted with signatures visible.
   - `off`: every image is `503 detection_failed` (nothing is segmented, nothing is returned).
@@ -696,7 +699,8 @@ With `render: "labels"` (the default) the response also carries:
     falls back to the API.
   - `LocalSegmenter` needs `uv sync --extra local-vision` and the model (`python -m
     pii_guard.visual.segment fetch` into `PII_GUARD_MODEL_DIR`, default
-    `~/.cache/pii-guard/models`; the Docker image ships both). A missing OpenCV, a missing
+    `~/.cache/pii-guard/models`; the Docker images ship OpenCV, and the model only when built
+    with `--build-arg PII_GUARD_ON_DEVICE_VISION=true`). A missing OpenCV, a missing
     model or one whose SHA-256 differs from the pinned value raises.
   - Every mode other than `sam-api` asks only for visual types whose policy is not
     `keep` (a kept region stays visible anyway).
@@ -765,7 +769,7 @@ without its path, query, user or password.
   "rest": {"detectors": ["rules", "ner"]},
   "ner": {"available": true, "model": null, "state": "ready", "error": null},
   "upstream": {"configured": true, "mock": false, "origin": "https://models.example.com:8443"},
-  "images": {"segmenter": "hybrid", "sam": false, "ocr_required": true, "gaps": [],
+  "images": {"segmenter": "sam-api", "sam": true, "ocr_required": true, "gaps": [],
              "available": true},
   "policies": {"PERSON": "mask", "ORGANIZATION": "keep"},
   "auth": {"token_required": false},
@@ -800,9 +804,9 @@ without its path, query, user or password.
 | `upstream.mock` | bool | The gateway answers from the built-in mock upstream. |
 | `upstream.origin` | string \| null | Origin only (`scheme://host[:port]`); `null` when unset, unparseable or mock. |
 | `images.segmenter` | `"hybrid"` \| `"sam-api"` \| `"local"` \| `"off"` | `PII_GUARD_SEGMENTER`. |
-| `images.sam` | bool | A SAM backend is configured (Meta API key or `PII_GUARD_SAM_URL`); the key itself is never returned. |
+| `images.sam` | bool | A SAM backend is configured (`PII_GUARD_SAM_API_KEY`, `META_API_KEY` or `PII_GUARD_SAM_URL`); the key itself is never returned. |
 | `images.ocr_required` | bool | `PII_GUARD_IMAGE_REQUIRE_OCR`. |
-| `images.gaps` | string[] | What image masking still needs: `ocr` (the extra), `tesseract`, `segmenter`. `["unknown"]` if it can't be checked. |
+| `images.gaps` | string[] | What image masking still needs: `ocr` (the extra), `tesseract`, `segmenter`, `sam` (a SAM 3.1 key for the default `sam-api` segmenter). `["unknown"]` if it can't be checked. |
 | `images.available` | bool | `gaps` is empty: `/v1/mask/image` can run. |
 | `policies` | object | Every `EntityType` name → its effective policy (`mask`, `keep` or `block`): defaults plus `PII_GUARD_POLICY_OVERRIDES`. |
 | `auth.token_required` | bool | `PII_GUARD_API_TOKEN` is set. |
@@ -822,7 +826,7 @@ caller's own view (the server's settings locally, the owner's runtime when hoste
 |---|---|---|---|
 | `text` | `true` | `true` | Text masking (`/v1/analyze`, `/v1/mask`, `/v1/unmask`). |
 | `chat` | `true` | `true` | The gateway chat (`/v1/chat/completions`, `/v1/responses`). |
-| `images` | `true` | `PII_GUARD_HOSTED_IMAGES` and no masked visual type the on-device segmenter can't find | Image masking (`/v1/mask/image`); `images.available` says whether it can run locally. Hosted: signed-in owners, local processing only ([ADR 0014](decisions/0014-hosted-local-images.md)). |
+| `images` | `true` | `PII_GUARD_HOSTED_IMAGES` and the replica's segmenter can serve the server's visual policies: SAM 3.1 with its key (the default), or the opt-in on-device engines while no masked type is one they can't find (a stamp) | Image masking (`/v1/mask/image`); `images.available` says whether it can run. Hosted: signed-in owners; images go to the Meta Model API ([ADR 0015](decisions/0015-meta-only-runtime-defaults.md), [ADR 0014](decisions/0014-hosted-local-images.md)). |
 | `logs` | `traffic_log != "off"` | `true` | The traffic log (`/v1/traffic`). |
 | `vault` | `vault_inspect != "off"` | `true` | The vault inspector (`/v1/vault/sessions`). |
 | `server_policy` | `true` | `false` | The server-wide entity policy page (`policies`). Without it, Policy shows the owner's default project policy read-only (from the project API) and points to Projects. |
@@ -1881,22 +1885,31 @@ contain up to 256 policy versions.
 
 `visual_detection` chooses who finds visual regions for a selected project policy's images:
 
-- `local` (default): on the CPU only. YuNet finds faces and ID photos, and the pinned YOLOS-tiny
-  signature detector (`mdefrance/yolos-tiny-signature-detection` at a fixed revision,
-  Apache-2.0, safetensors, every file SHA-256 checked; `python -m pii_guard.visual.segmenters
-  fetch`) finds signatures, on the whole image and 2x2 overlapping tiles. No SAM request is
-  made. Stamps cannot be found locally: a `local` policy that masks `STAMP` refuses images.
-  `analysis.sam.model` is `yunet-2023mar+yolos-tiny-signature` once signatures were asked for.
-- `sam`: the server's segmenter (`PII_GUARD_SEGMENTER`, `hybrid` by default: SAM 3.1 on the Meta
-  API for signatures and stamps, so the original image leaves the machine). A server set to
-  `local` or `off` is stricter and wins. `local-only` deployments and the hosted service accept
-  `local` only (`422 invalid_project_config`).
+- `sam` (default, [ADR 0015](decisions/0015-meta-only-runtime-defaults.md)): the server's
+  segmenter (`PII_GUARD_SEGMENTER`, `sam-api` by default: SAM 3.1 on the Meta Model API for
+  every visual type, so the original image goes to the Meta Model API). A server set to `local`
+  or `off` is stricter and wins.
+- `local`: the optional on-device engines (not Meta models), on the CPU only. YuNet finds faces
+  and ID photos, and the pinned YOLOS-tiny signature detector
+  (`mdefrance/yolos-tiny-signature-detection` at a fixed revision, Apache-2.0, safetensors,
+  every file SHA-256 checked; `python -m pii_guard.visual.segmenters fetch`) finds signatures,
+  on the whole image and 2x2 overlapping tiles. No SAM request is made. They run only on a
+  server that enables them (`PII_GUARD_SEGMENTER=hybrid` or `local`); on a `sam-api` server
+  (the default) a `local` policy's images are refused with `503 detection_failed`, never sent
+  to SAM instead. Stamps cannot be found locally: a `local` policy that masks `STAMP` refuses
+  images. `analysis.sam.model` is `yunet-2023mar+yolos-tiny-signature` once signatures were
+  asked for.
+
+Omitted, `visual_detection` is `sam`, or `local` on a `local-only` deployment, which accepts
+`local` only (`422 invalid_project_config`). Saved versions keep their value. The hosted
+service accepts both values but does not read them: the replica's segmenter (SAM 3.1 by default)
+serves every policy.
 
 Versions saved before LAB-1444 have no visual actions and no `visual_detection`: they read as
-`local` with the server's visual actions. For visual types, an explicit
-`PII_GUARD_POLICY_OVERRIDES` entry wins over the policy when it is stricter (`keep` < `mask` <
-`block`). Requests without a selected project use the server's policies and segmenter, as
-before.
+`sam` (the server's segmenter decides, as it did when they were saved) with the server's visual
+actions. For visual types, an explicit `PII_GUARD_POLICY_OVERRIDES` entry wins over the policy
+when it is stricter (`keep` < `mask` < `block`). Requests without a selected project use the
+server's policies and segmenter, as before.
 
 An endpoint pins one policy version and one provider/upstream/credential tuple, and optionally
 one model (LAB-1451). Providers
