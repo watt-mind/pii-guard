@@ -469,7 +469,7 @@ class HostedService:
                 hosted_segmenter,
                 hosted_visual_policies,
                 local_ocr,
-                require_local_visual_policies,
+                require_servable_visual_policies,
             )
 
             # The owner's policy, text and visual, with the operator's stricter overrides,
@@ -478,7 +478,7 @@ class HostedService:
             request.state.project_policies = hosted_visual_policies(
                 policy, get_policies(request), self.settings, request.app.state.policies
             )
-            require_local_visual_policies(request.state.project_policies, policy)
+            require_servable_visual_policies(request.state.project_policies, self.settings)
             max_pixels, image_timeout = hosted_image_limits(self.settings)
             image_kwargs = {
                 "sam": hosted_segmenter(request.app.state),

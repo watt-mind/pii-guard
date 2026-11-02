@@ -30,7 +30,7 @@ from pii_guard.config import Settings
 from pii_guard.hosted.images import (
     hosted_visual_policies,
     image_body_limit,
-    require_local_visual_policies,
+    require_servable_visual_policies,
 )
 from pii_guard.hosted.quotas import QuotaLedger, QuotaLimits
 from pii_guard.policy import Policy, PolicySet
@@ -365,14 +365,16 @@ def test_owner_visual_policy_and_stricter_operator_overrides() -> None:
     assert legacy.of(EntityType.SIGNATURE) is Policy.MASK
 
 
-def test_sam_detection_policy_is_refused_on_hosted() -> None:
+def test_hosted_policies_use_the_replicas_segmenter_whatever_their_detection() -> None:
     import pii_guard.detection_profile as profile
 
-    # Hosted policies don't choose detection: the operator's segmenter serves them (ADR 0015).
-    with pytest.raises(profile.DetectionProfileError, match="service's image detection"):
-        require_local_visual_policies(PolicySet(), {"visual_detection": "sam"})
-    require_local_visual_policies(PolicySet(), {"visual_detection": "local"})
-    require_local_visual_policies(PolicySet(), {})  # saved before the field: local
+    stamps = PolicySet({EntityType.STAMP: Policy.MASK})
+    on_device, sam = settings(), sam_settings()
+    # The on-device engines can't find stamps: refused before work. SAM 3.1 finds them.
+    with pytest.raises(profile.DetectionProfileError, match="cannot find STAMP"):
+        require_servable_visual_policies(stamps, on_device)
+    require_servable_visual_policies(stamps, sam)
+    require_servable_visual_policies(PolicySet(), on_device)
 
 
 def test_images_capability_follows_the_operator(hosted: tuple[TestClient, Calls]) -> None:
@@ -489,18 +491,18 @@ def test_a_bare_or_missing_local_segmenter_is_paired_with_signatures(
 
     bare = LocalSegmenter(detector=object())
     state = SimpleNamespace(settings=settings(), sam_client=bare)
-    paired = images.local_segmenter(state)
+    paired = images.hosted_segmenter(state)
     assert isinstance(paired, LocalSignatureSegmenter) and paired.local is bare
-    assert images.local_segmenter(state) is paired  # stored, built once
+    assert images.hosted_segmenter(state) is paired  # stored, built once
     monkeypatch.setattr(
         images, "build_segmenter", lambda *a, **k: LocalSegmenter(detector=object())
     )
-    built = images.local_segmenter(SimpleNamespace(settings=settings(), sam_client=None))
+    built = images.hosted_segmenter(SimpleNamespace(settings=settings(), sam_client=None))
     assert isinstance(built, LocalSignatureSegmenter)
     # A pairing around anything but the built-in on-device segmenter is refused.
     impostor = LocalSignatureSegmenter(SamClient(api_key="test-key-not-a-secret"))
     with pytest.raises(Exception, match="on-device segmenter"):
-        images.local_segmenter(SimpleNamespace(settings=settings(), sam_client=impostor))
+        images.hosted_segmenter(SimpleNamespace(settings=settings(), sam_client=impostor))
 
 
 # --- the Meta-only default: SAM 3.1 (ADR 0015, LAB-1795) -----------------------------------
@@ -571,6 +573,8 @@ def test_hosted_defaults_to_sam_for_faces_id_photos_and_signatures(
     sam_pipeline(app, sam, calls)
     with TestClient(app, base_url=ORIGIN) as client:
         assert client.get("/readyz").status_code == 200
+        status = client.get("/v1/status", headers=auth()).json()
+        assert status["capabilities"]["images"] is True  # SAM 3.1 has its key
         response = post_image(client, auth())
         assert response.status_code == 200, response.text
         body = response.json()
@@ -589,7 +593,7 @@ def test_hosted_sam_default_builds_the_built_in_client(no_on_device_models: None
     built = images.hosted_segmenter(state)
     assert type(built) is SamClient and built.configured
     assert images.hosted_segmenter(state) is built  # stored, built once
-    assert images.local_segmenter is images.hosted_segmenter  # the image route's name
+    assert not hasattr(images, "local_segmenter")  # one name for the hosted segmenter
 
 
 def test_hosted_sam_without_a_key_is_not_ready_and_refuses_images(
@@ -602,6 +606,7 @@ def test_hosted_sam_without_a_key_is_not_ready_and_refuses_images(
     app.state.sam_client = SamClient(api_key="", settings=app.state.settings)
     with TestClient(app, base_url=ORIGIN) as client:
         assert client.get("/readyz").status_code == 503
+        assert client.get("/v1/status", headers=auth()).json()["capabilities"]["images"] is False
         response = post_image(client, auth())
         assert response.status_code == 503
         assert response.json()["error"]["code"] == "detection_failed"
@@ -633,3 +638,27 @@ def test_hosted_sam_replica_refuses_an_injected_on_device_segmenter() -> None:
         assert response.json()["error"]["code"] == "detection_profile_denied"
         assert client.get("/readyz").status_code == 503
     assert calls.segment == calls.signature == calls.ocr == 0
+
+
+def test_hosted_sam_serves_a_stamp_masking_policy(no_on_device_models: None) -> None:
+    # SAM 3.1 finds stamps, so a policy that masks them is served, not refused (ADR 0015).
+    app = create_app(sam_settings(policy_overrides="STAMP=mask"))
+    sam, calls = Sam(), Calls()
+    sam_pipeline(app, sam, calls)
+    with TestClient(app, base_url=ORIGIN) as client:
+        assert client.get("/v1/status", headers=auth()).json()["capabilities"]["images"] is True
+        response = post_image(client, auth())
+    assert response.status_code == 200, response.text
+    assert "stamp" in sam.prompts
+
+
+def test_on_device_replica_refuses_a_stamp_masking_policy() -> None:
+    # The opt-in on-device engines can't find stamps: refused before any work.
+    on_device = create_app(settings(policy_overrides="STAMP=mask"))
+    local_calls = Calls()
+    local_pipeline(on_device, local_calls)
+    with TestClient(on_device, base_url=ORIGIN) as client:
+        assert client.get("/v1/status", headers=auth()).json()["capabilities"]["images"] is False
+        refused = post_image(client, auth())
+    assert refused.json()["error"]["code"] == "detection_profile_denied"
+    assert local_calls.segment == local_calls.ocr == 0

@@ -14,11 +14,10 @@ What differs from the self-hosted ``POST /v1/mask/image`` is decided here and no
   ADR 0006): images never fall back to a non-Meta model;
 - the owner's project policy decides text and visual actions (``FACE``, ``ID_PHOTO``,
   ``SIGNATURE``, ``STAMP``, LAB-1444); the operator's ``PII_GUARD_POLICY_OVERRIDES`` win when
-  stricter, and versions saved before visual actions existed take the server's. A policy with
-  ``visual_detection: sam``, or one that masks ``STAMP`` (which the on-device engines cannot
-  find), is refused before any work (fail closed, ADR 0006). Hosted policies cannot choose
-  their detection (``local`` is the only value the hosted API stores): the operator's segmenter
-  serves every policy;
+  stricter, and versions saved before visual actions existed take the server's. Hosted
+  policies do not choose their detection: the replica's segmenter serves every policy, whatever
+  its ``visual_detection``. A policy that masks a type that segmenter cannot find (``STAMP`` on
+  the on-device engines) is refused before any work (fail closed, ADR 0006);
 - one image job per replica at a time: a busy slot is ``429 hosted_capacity``, never a queue;
 - the decoded pixel cap is the lower of ``image_max_pixels`` and ``hosted_image_max_pixels``,
   and the deadline the lower of ``image_timeout`` and ``hosted_image_timeout``.
@@ -44,7 +43,7 @@ from pii_guard.config import Settings
 from pii_guard.detection_profile import DetectionProfileError
 from pii_guard.hosted.runtime import HostedCapacityError
 from pii_guard.policy import Policy, PolicySet
-from pii_guard.projects.visual import effective_policies, visual_detection
+from pii_guard.projects.visual import effective_policies
 from pii_guard.types import DetectionError, EntityType, PiiGuardError
 from pii_guard.visual.masking import OcrUnavailableError, default_ocr_engine
 from pii_guard.visual.ocr import OcrEngine, TesseractOcr
@@ -71,11 +70,11 @@ __all__ = [
     "hosted_segmenter",
     "hosted_visual_policies",
     "image_body_limit",
+    "images_servable",
     "local_ocr",
-    "local_segmenter",
     "require_image_capacity",
     "require_image_pipeline",
-    "require_local_visual_policies",
+    "require_servable_visual_policies",
     "unservable_visual_types",
 ]
 
@@ -201,11 +200,6 @@ def hosted_segmenter(state: Any) -> SamClient | LocalSignatureSegmenter:
     return segmenter
 
 
-#: The name the image route imports (``pii_guard.api.routes.image``); the hosted segmenter
-#: is no longer only the on-device one (ADR 0015).
-local_segmenter = hosted_segmenter
-
-
 def local_ocr(state: Any) -> OcrEngine:
     """The app's OCR engine, which on hosted must be the built-in Tesseract, and present."""
     if not hasattr(state, "ocr_engine"):
@@ -250,11 +244,13 @@ def hosted_visual_policies(
     return effective_policies(policy, project, server, settings.policy_overrides)
 
 
-def unservable_visual_types(policies: PolicySet) -> list[str]:
-    """Visual types ``policies`` masks or blocks that on-device detection cannot find.
+def unservable_visual_types(policies: PolicySet, settings: Settings) -> list[str]:
+    """Visual types ``policies`` masks or blocks that the replica's segmenter cannot find.
 
-    Conservative with SAM 3.1 too (which finds stamps): the callers do not know the
-    operator's segmenter, so a masked ``STAMP`` is refused on every hosted replica."""
+    SAM 3.1 (``sam-api``, the default) finds every visual type; the on-device engines
+    (``local``) find faces, ID photos and signatures, not stamps."""
+    if settings.segmenter == "sam-api":
+        return []
     return [
         t.value
         for t in VISUAL_ENTITY_TYPES
@@ -262,27 +258,35 @@ def unservable_visual_types(policies: PolicySet) -> list[str]:
     ]
 
 
-def require_local_visual_policies(
-    policies: PolicySet, policy: Mapping[str, Any] | None = None
-) -> None:
-    """Refuse, before any work, an image whose policy the hosted pipeline can't serve.
+def images_servable(state: Any) -> bool:
+    """Whether this replica can mask images under the server's own visual policies.
 
-    Hosted policies do not choose their detection: the operator's segmenter serves them
-    (SAM 3.1 by default, ADR 0015), and the hosted API stores ``visual_detection: local``
-    only, so a ``sam`` value can only come from elsewhere and is refused. A ``mask`` or
-    ``block`` stamp is refused too (see :func:`unservable_visual_types`); it would otherwise
-    fail inside the worker after the upload was decoded, so here both fail first and say
-    why."""
-    if visual_detection(policy) != "local":
-        raise DetectionProfileError(
-            "hosted policies use the service's image detection; choose the default "
-            "detection in this policy"
-        )
-    remote = unservable_visual_types(policies)
+    With SAM 3.1 the client must have its key; with the on-device engines no masked type may
+    be one they cannot find. Builds no on-device model (status calls this on every request)."""
+    settings = state.settings
+    if unservable_visual_types(state.policies, settings):
+        return False
+    if settings.segmenter != "sam-api":
+        return settings.segmenter in HOSTED_SEGMENTER_MODES
+    try:
+        segmenter = hosted_segmenter(state)
+    except PiiGuardError:
+        return False
+    return isinstance(segmenter, SamClient) and segmenter.configured
+
+
+def require_servable_visual_policies(policies: PolicySet, settings: Settings) -> None:
+    """Refuse, before any work, an image whose policy the replica's segmenter can't serve.
+
+    Hosted policies do not choose their detection (``visual_detection`` is not read here): the
+    replica's segmenter serves them (SAM 3.1 by default, ADR 0015). A ``mask`` or ``block``
+    type that segmenter cannot find (a stamp on the on-device engines) would otherwise fail
+    inside the worker after the upload was decoded; here it fails first and says why."""
+    remote = unservable_visual_types(policies, settings)
     if remote:
         raise DetectionProfileError(
-            f"hosted images cannot find {', '.join(remote)}, which this policy masks; "
-            "images are refused"
+            f"hosted images on this server cannot find {', '.join(remote)}, which this "
+            "policy masks; images are refused"
         )
 
 

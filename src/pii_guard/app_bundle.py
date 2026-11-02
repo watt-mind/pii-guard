@@ -99,8 +99,13 @@ class Status:
     def images(self) -> str:
         if not self.image_gaps:
             return "on"
-        needs = {"ocr": "OCR", "tesseract": "OCR", "segmenter": "face detection"}
-        missing = ", ".join(dict.fromkeys(needs[g] for g in self.image_gaps))
+        needs = {
+            "ocr": "OCR",
+            "tesseract": "OCR",
+            "segmenter": "face detection",
+            "sam": "SAM 3.1 key",
+        }
+        missing = ", ".join(dict.fromkeys(needs.get(g, g) for g in self.image_gaps))
         return f"refused (no {missing})"
 
 
@@ -376,11 +381,14 @@ def launcher(extras: str = "") -> str:
 
 
 def image_gaps(settings: Settings) -> list[str]:
-    """What image masking still needs: ``ocr`` (the extra), ``tesseract``, ``segmenter``."""
+    """What image masking still needs: ``ocr`` (the extra), ``tesseract``, ``segmenter``, and
+    ``sam``: a SAM 3.1 key for the default ``sam-api`` segmenter (ADR 0015), without which
+    every image is refused."""
     import importlib.util
     import shutil
 
     from pii_guard.types import DetectionError
+    from pii_guard.visual.sam import SamClient
     from pii_guard.visual.segmenters import OffSegmenter, build_segmenter
 
     gaps = []
@@ -390,8 +398,11 @@ def image_gaps(settings: Settings) -> list[str]:
         if shutil.which("tesseract") is None:
             gaps.append("tesseract")
     try:
-        if isinstance(build_segmenter(settings), OffSegmenter):
+        segmenter = build_segmenter(settings)
+        if isinstance(segmenter, OffSegmenter):
             gaps.append("segmenter")  # PII_GUARD_SEGMENTER=off refuses every image
+        elif isinstance(segmenter, SamClient) and not segmenter.configured:
+            gaps.append("sam")  # sam-api without a key refuses every image (fail closed)
     except (DetectionError, ValueError):
         gaps.append("segmenter")
     return gaps
@@ -412,6 +423,11 @@ def _image_hints(gaps: list[str]) -> list[str]:
         hints.append(
             f"faces also need the YuNet model ({launcher()} models fetch yunet) or "
             "META_API_KEY for SAM 3.1 (docs/operations.md)"
+        )
+    if "sam" in gaps:
+        hints.append(
+            "images need a key for SAM 3.1, the default segmenter: set PII_GUARD_SAM_API_KEY "
+            "or META_API_KEY (docs/operations.md)"
         )
     return hints
 

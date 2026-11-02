@@ -277,9 +277,9 @@ def _hosted(request: Request) -> bool:
 def _sam_client(request: Request) -> Segmenter:
     state = request.app.state
     if _hosted(request):
-        from pii_guard.hosted.images import local_segmenter
+        from pii_guard.hosted.images import hosted_segmenter
 
-        return local_segmenter(state)
+        return hosted_segmenter(state)
     sam = getattr(state, "sam_client", None)
     if sam is None:
         with _lock:
@@ -578,7 +578,7 @@ async def mask_image_endpoint(
             hosted_image_limits,
             hosted_visual_policies,
             require_image_capacity,
-            require_local_visual_policies,
+            require_servable_visual_policies,
         )
 
         # The owner's policy, text and visual; the operator's overrides win when stricter.
@@ -586,8 +586,9 @@ async def mask_image_endpoint(
         request.state.project_policies = hosted_visual_policies(
             policy, get_policies(request), settings, request.app.state.policies
         )
-        # Before the image is decoded: a policy only SAM could serve, or a busy replica.
-        require_local_visual_policies(request.state.project_policies, policy)
+        # Before the image is decoded: a policy this replica's segmenter can't serve, or a
+        # busy replica.
+        require_servable_visual_policies(request.state.project_policies, settings)
         require_image_capacity(workers)
         _, timeout = hosted_image_limits(settings)
     elif getattr(request.state, "project_policy", None) is not None:
