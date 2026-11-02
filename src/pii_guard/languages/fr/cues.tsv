@@ -1,0 +1,53 @@
+# Cue words for context-cued numbers (languages/cues.py, LAB-1170); format in hu/cues.tsv.
+# French puts the label before the number, often with "n°" or "numéro de" between them
+# (up to three short words may stand there). Apostrophes and accents are folded.
+téléphone	PHONE
+tél.	PHONE
+portable	PHONE
+mobile	PHONE
+numéro de téléphone	PHONE
+numéro de portable	PHONE
+carte bancaire	BANK_ACCOUNT
+carte de crédit	BANK_ACCOUNT
+numéro de carte	BANK_ACCOUNT
+numéro de compte	BANK_ACCOUNT
+compte bancaire	BANK_ACCOUNT
+RIB	BANK_ACCOUNT
+relevé d'identité bancaire	BANK_ACCOUNT
+sécurité sociale	ID_DOCUMENT
+numéro de sécu	ID_DOCUMENT
+NIR	ID_DOCUMENT
+carte Vitale	ID_DOCUMENT
+numéro fiscal	ID_DOCUMENT
+identifiant fiscal	ID_DOCUMENT
+numéro d'identification fiscale	ID_DOCUMENT
+SPI	ID_DOCUMENT
+passeport*	ID_DOCUMENT
+carte d'identité	ID_DOCUMENT
+carte nationale d'identité	ID_DOCUMENT
+CNI	ID_DOCUMENT
+pièce d'identité	ID_DOCUMENT
+permis de conduire	ID_DOCUMENT
+titre de séjour	ID_DOCUMENT
+numéro de commande	-
+commande*	-
+facture*	-
+numéro de facture	-
+numéro client	-
+numéro de client	-
+référence*	-
+réf.	-
+numéro de suivi	-
+suivi	-
+colis	-
+dossier	-
+devis	-
+ticket	-
+reçu	-
+contrat	-
+SIREN	-
+SIRET	-
+TVA intracommunautaire	-
+code postal	-
+et	-
+ou	-
