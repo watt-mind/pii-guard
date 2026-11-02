@@ -86,6 +86,8 @@ def settings(**overrides: Any) -> Settings:
             "allowed_hosts": ("guard.example",),
             "detectors": ("rules",),
             "ner_fallback": "off",
+            # The opt-in on-device engines (ADR 0015); the SAM 3.1 default has its own tests.
+            "segmenter": "local",
             "upstream_api_key": "synthetic-sponsored-key",
             **overrides,
         },
@@ -366,7 +368,8 @@ def test_owner_visual_policy_and_stricter_operator_overrides() -> None:
 def test_sam_detection_policy_is_refused_on_hosted() -> None:
     import pii_guard.detection_profile as profile
 
-    with pytest.raises(profile.DetectionProfileError, match=r"SAM 3\.1"):
+    # Hosted policies don't choose detection: the operator's segmenter serves them (ADR 0015).
+    with pytest.raises(profile.DetectionProfileError, match="service's image detection"):
         require_local_visual_policies(PolicySet(), {"visual_detection": "sam"})
     require_local_visual_policies(PolicySet(), {"visual_detection": "local"})
     require_local_visual_policies(PolicySet(), {})  # saved before the field: local
@@ -387,16 +390,17 @@ def test_images_capability_follows_the_operator(hosted: tuple[TestClient, Calls]
         assert off.get("/readyz").status_code == 200
 
 
-def test_remote_segmenter_or_ocr_opt_out_refused_at_startup() -> None:
+def test_hybrid_off_or_ocr_opt_out_refused_at_startup() -> None:
+    # hybrid would run a non-Meta face model next to SAM; off refuses every image (ADR 0015).
     for overrides in (
         {"segmenter": "hybrid"},
-        {"segmenter": "sam-api"},
         {"segmenter": "off"},
         {"image_require_ocr": False},
     ):
-        with pytest.raises(ValueError, match="local segmenter"):
+        with pytest.raises(ValueError, match=r"SAM 3\.1"):
             create_app(settings(**overrides))
     create_app(settings(segmenter="local"))
+    create_app(settings(segmenter="sam-api"))
 
 
 def test_injected_remote_or_unknown_components_are_refused(
@@ -497,3 +501,135 @@ def test_a_bare_or_missing_local_segmenter_is_paired_with_signatures(
     impostor = LocalSignatureSegmenter(SamClient(api_key="test-key-not-a-secret"))
     with pytest.raises(Exception, match="on-device segmenter"):
         images.local_segmenter(SimpleNamespace(settings=settings(), sam_client=impostor))
+
+
+# --- the Meta-only default: SAM 3.1 (ADR 0015, LAB-1795) -----------------------------------
+
+
+class Sam:
+    """The Meta Model API, in process: records each SAM prompt, answers with no region."""
+
+    def __init__(self, status: int = 200) -> None:
+        self.prompts: list[str] = []
+        self.status = status
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.prompts.append(json.loads(request.content)["input"][0]["content"][0]["text"])
+        if self.status != 200:
+            return httpx.Response(self.status, json={"error": "synthetic failure"})
+        return httpx.Response(
+            200,
+            json={
+                "status": "completed",
+                "output": [{"type": "message", "content": [{"type": "output_text", "text": ""}]}],
+            },
+        )
+
+
+def sam_settings(**overrides: Any) -> Settings:
+    """The hosted defaults: no segmenter set, so the Meta-only default applies."""
+    base = settings(**overrides)
+    return base.model_copy(update={"segmenter": Settings(_env_file=None).segmenter})
+
+
+def sam_pipeline(app: FastAPI, sam: Sam, calls: Calls) -> None:
+    app.state.sam_client = SamClient(
+        api_key="synthetic-not-a-key",
+        max_retries=0,
+        transport=httpx.MockTransport(sam),
+        settings=app.state.settings,
+    )
+    ocr = TesseractOcr()
+    ocr.read = None  # type: ignore[assignment,method-assign]
+
+    def words(image: Image.Image) -> list[OcrWord]:
+        calls.ocr += 1
+        return list(WORDS)
+
+    ocr.words = words  # type: ignore[method-assign]
+    app.state.ocr_engine = ocr
+
+
+@pytest.fixture
+def no_on_device_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail the test if a non-Meta on-device model is built (YuNet or YOLOS-tiny)."""
+
+    def refused(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("a non-Meta on-device model was built")
+
+    monkeypatch.setattr(LocalSegmenter, "__init__", refused)
+    monkeypatch.setattr(SignatureDetector, "__init__", refused)
+
+
+def test_hosted_defaults_to_sam_for_faces_id_photos_and_signatures(
+    no_on_device_models: None,
+) -> None:
+    config = sam_settings()
+    assert config.segmenter == "sam-api"
+    app = create_app(config)
+    sam, calls = Sam(), Calls()
+    sam_pipeline(app, sam, calls)
+    with TestClient(app, base_url=ORIGIN) as client:
+        assert client.get("/readyz").status_code == 200
+        response = post_image(client, auth())
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["analysis"]["sam"]["model"] == "sam-3.1"
+        assert TAJ_VALUE not in body["transcript"]
+    # One SAM 3.1 request per prompt: faces, ID photos and signatures (and stamps) all go to SAM.
+    assert {"face", "signature", "photo of a person"} <= set(sam.prompts)
+    assert calls.ocr == 1
+
+
+def test_hosted_sam_default_builds_the_built_in_client(no_on_device_models: None) -> None:
+    import pii_guard.hosted.images as images
+
+    state = SimpleNamespace(settings=sam_settings(sam_api_key="synthetic-not-a-key"))
+    state.sam_client = None
+    built = images.hosted_segmenter(state)
+    assert type(built) is SamClient and built.configured
+    assert images.hosted_segmenter(state) is built  # stored, built once
+    assert images.local_segmenter is images.hosted_segmenter  # the image route's name
+
+
+def test_hosted_sam_without_a_key_is_not_ready_and_refuses_images(
+    no_on_device_models: None,
+) -> None:
+    app = create_app(sam_settings())
+    calls = Calls()
+    sam_pipeline(app, Sam(), calls)
+    # No key: an emptied PII_GUARD_SAM_API_KEY, as on the offline CI stacks (LAB-1255).
+    app.state.sam_client = SamClient(api_key="", settings=app.state.settings)
+    with TestClient(app, base_url=ORIGIN) as client:
+        assert client.get("/readyz").status_code == 503
+        response = post_image(client, auth())
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "detection_failed"
+        assert TAJ_VALUE not in response.text
+
+
+def test_hosted_sam_failure_fails_closed_without_a_non_meta_fallback(
+    no_on_device_models: None,
+) -> None:
+    app = create_app(sam_settings())
+    sam, calls = Sam(status=500), Calls()
+    sam_pipeline(app, sam, calls)
+    with TestClient(app, base_url=ORIGIN) as client:
+        response = post_image(client, auth())
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "detection_failed"
+    assert sam.prompts  # SAM was asked; nothing else was tried after it failed
+    assert TAJ_VALUE not in response.text
+
+
+def test_hosted_sam_replica_refuses_an_injected_on_device_segmenter() -> None:
+    app = create_app(sam_settings())
+    calls = Calls()
+    sam_pipeline(app, Sam(), calls)
+    local_pipeline(app, calls)  # replaces the SAM client with the on-device pairing
+    with TestClient(app, base_url=ORIGIN) as client:
+        response = post_image(client, auth())
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "detection_profile_denied"
+        assert client.get("/readyz").status_code == 503
+    assert calls.segment == calls.signature == calls.ocr == 0

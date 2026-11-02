@@ -171,14 +171,15 @@ class HostedService:
                 "a 32-byte tenant key and local fast detectors"
             )
         if settings.hosted_images and (
-            not settings.image_require_ocr
-            or ("segmenter" in settings.model_fields_set and settings.segmenter != "local")
+            not settings.image_require_ocr or settings.segmenter not in {"sam-api", "local"}
         ):
-            # ADR 0014: hosted images are processed on the replica only. A remote segmenter
-            # (hybrid, sam-api) would send the original image out; "off" refuses every image;
-            # SAM-only masking leaves the image's text unchecked.
+            # ADR 0015 (amends ADR 0014): hosted images use SAM 3.1 on the Meta Model API by
+            # default, or the opt-in on-device segmenter. "hybrid" would run a non-Meta face
+            # model next to SAM; "off" refuses every image; masking without OCR leaves the
+            # image's text unchecked.
             raise ValueError(
-                "Hosted images require OCR and the local segmenter (PII_GUARD_SEGMENTER=local)"
+                "Hosted images require OCR and SAM 3.1 (PII_GUARD_SEGMENTER=sam-api, the "
+                "default) or the opt-in local segmenter (PII_GUARD_SEGMENTER=local)"
             )
         self.settings = settings
         self.master_key = key
@@ -465,14 +466,14 @@ class HostedService:
         if images:
             from pii_guard.hosted.images import (
                 hosted_image_limits,
+                hosted_segmenter,
                 hosted_visual_policies,
                 local_ocr,
-                local_segmenter,
                 require_local_visual_policies,
             )
 
             # The owner's policy, text and visual, with the operator's stricter overrides,
-            # exactly as /v1/mask/image; a policy only SAM could serve is refused first.
+            # exactly as /v1/mask/image; a policy the pipeline can't serve is refused first.
             policy = getattr(request.state, "project_policy", None)
             request.state.project_policies = hosted_visual_policies(
                 policy, get_policies(request), self.settings, request.app.state.policies
@@ -480,7 +481,7 @@ class HostedService:
             require_local_visual_policies(request.state.project_policies, policy)
             max_pixels, image_timeout = hosted_image_limits(self.settings)
             image_kwargs = {
-                "sam": local_segmenter(request.app.state),
+                "sam": hosted_segmenter(request.app.state),
                 "ocr": local_ocr(request.app.state),
                 "image_workers": self.image_workers,
             }

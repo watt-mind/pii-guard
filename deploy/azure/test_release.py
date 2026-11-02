@@ -477,7 +477,7 @@ class ReleaseTemplateTests(unittest.TestCase):
             "PII_GUARD_NER_MODEL": "/app/models/ner",
             "PII_GUARD_DETECTORS": "rules,ner",
             "PII_GUARD_HOSTED_IMAGES": "true",
-            "PII_GUARD_SEGMENTER": "local",
+            "PII_GUARD_SEGMENTER": "sam-api",
             "PII_GUARD_HOSTED_MODELS": "muse-spark-1.3",
             "PII_GUARD_TRAFFIC_LOG": "off",
             "PII_GUARD_METRICS": "true",
@@ -487,7 +487,12 @@ class ReleaseTemplateTests(unittest.TestCase):
             env["PII_GUARD_METRICS_TOKEN"],
             {"name": "PII_GUARD_METRICS_TOKEN", "secretRef": "metrics-token"},
         )
-        # Signatures are masked on-device by the owner's policy: no server override (LAB-1444).
+        # Meta-only runtime (ADR 0015): SAM 3.1 finds faces, ID photos and signatures, with the
+        # Key Vault Meta key; signatures follow the owner's policy, no server override.
+        self.assertEqual(
+            env["PII_GUARD_SAM_API_KEY"],
+            {"name": "PII_GUARD_SAM_API_KEY", "secretRef": "meta-key"},
+        )
         self.assertNotIn("PII_GUARD_POLICY_OVERRIDES", env)
         hosts = env["PII_GUARD_ALLOWED_HOSTS"]["value"]
         self.assertIn("publicOrigin", hosts)

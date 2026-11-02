@@ -144,15 +144,19 @@ class Settings(BaseSettings):
     # stop startup (ADR 0006).
     # Unset, fast mode resolves (pii_guard.detect.ner_resolve, docs/models.md): the published
     # pii-guard checkpoint ("repo" or "repo@revision"; the default repo is pinned to v4.2), else
-    # the public fallback (a stop-gap), fetched once into ~/.cache/pii-guard/models
-    # (PII_GUARD_MODELS_DIR).
-    # ner_fallback: "download" fetches it on first use, "cached" only uses it when already
-    # there, "off" never uses it (fast mode is then rules only).
+    # the public fallback (a stop-gap, not a Meta model), fetched once into
+    # ~/.cache/pii-guard/models (PII_GUARD_MODELS_DIR).
+    # ner_fallback: "published" (default, Meta-only runtime, ADR 0015) fetches the published
+    # model on first use and never uses the public fallback, so fast mode is rules only when
+    # the published model can't be had; "download" also fetches the fallback on first use
+    # (opt-in); "cached" fetches nothing and uses either only when already there; "off"
+    # fetches nothing and never uses the fallback (rules only unless the published model is
+    # cached).
     ner_model: str | None = None
     ner_revision: str | None = None
     ner_device: str | None = None
     ner_published_model: str = "watt-mind/pii-guard-ner-xlmr-base"
-    ner_fallback: Literal["download", "cached", "off"] = "download"
+    ner_fallback: Literal["published", "download", "cached", "off"] = "published"
     # Without ner_model, the resolved model loads (and downloads) in the background at startup
     # (LAB-1303); a detecting request that arrives meanwhile waits up to this many seconds,
     # then gets 503 detector_loading.
@@ -185,10 +189,12 @@ class Settings(BaseSettings):
     # session placeholder and returns a masked transcript + summary; "opaque": solid boxes.
     image_render: Literal["labels", "opaque"] = "labels"
     # Who finds faces, ID photos and signatures in images (pii_guard.visual.segmenters,
-    # LAB-1245): "hybrid" = YuNet on the CPU for faces and ID photos, SAM 3.1 (Meta API) for
-    # signatures; "sam-api" = SAM 3.1 for everything (the previous default); "local" = YuNet
-    # only (refuses images while SIGNATURE is masked); "off" = refuse every image.
-    segmenter: Literal["hybrid", "sam-api", "local", "off"] = "hybrid"
+    # LAB-1245): "sam-api" (default, Meta-only runtime, ADR 0015) = SAM 3.1 on the Meta Model
+    # API for everything; the image is sent to Meta, and without a SAM key images are refused
+    # (fail closed). Opt-in, non-Meta on-device engines: "hybrid" = YuNet on the CPU for faces
+    # and ID photos, SAM 3.1 for signatures; "local" = YuNet only (refuses images while
+    # SIGNATURE is masked). "off" = refuse every image.
+    segmenter: Literal["hybrid", "sam-api", "local", "off"] = "sam-api"
     # Fail closed without OCR (ADR 0006): with no OCR engine (Tesseract) an image's text can't
     # be checked, so image parts are refused with 503 ocr_unavailable. False forwards them
     # masked by SAM only, with X-PII-Guard-Image-OCR: off (text in the image unchecked).

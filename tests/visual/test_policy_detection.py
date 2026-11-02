@@ -228,7 +228,10 @@ def test_policy_segmenter_selection() -> None:
     assert pick("sam", hybrid) is hybrid
     assert pick("sam", sam) is sam
     assert pick("local", hybrid) is local
-    assert pick("local", sam) is local
+    # A SAM-only server (the Meta-only default, ADR 0015) runs no on-device engine: a local
+    # policy's images are refused, never sent to SAM instead (fail closed).
+    with pytest.raises(DetectionError, match="on-device image detection"):
+        pick("local", sam)
     # A stricter server wins: a policy never turns egress on.
     assert pick("sam", Faces()) is local  # type: ignore[arg-type]
     assert pick("sam", off) is off and pick("local", off) is off
@@ -264,9 +267,9 @@ def test_effective_policies() -> None:
     assert looser.of(EntityType.FACE) is Policy.MASK  # a looser override never unmasks
 
 
-def test_settings_default_unchanged() -> None:
-    # The server-wide segmenter setting is untouched; policies choose within it.
-    assert Settings().segmenter == "hybrid"
+def test_settings_default_is_sam_only() -> None:
+    # The Meta-only default (ADR 0015); policies choose within the server's setting.
+    assert Settings().segmenter == "sam-api"
 
 
 # --- the self-hosted route picks per selected project policy -------------------------------
@@ -313,8 +316,26 @@ def test_route_builds_on_device_faces_when_the_server_has_none(
 
     faces = LocalSegmenter(detector=object())
     monkeypatch.setattr(route, "build_segmenter", lambda *a, **k: faces)
-    chosen = route._sam_client(_request(Sam().client(), {"visual_detection": "local"}))
+    # A hybrid server whose YuNet was unavailable at build time (faces went to SAM).
+    server = HybridSegmenter(sam=Sam().client(), local=None)
+    chosen = route._sam_client(_request(server, {"visual_detection": "local"}))
     assert isinstance(chosen, LocalSignatureSegmenter) and chosen.local is faces
+
+
+def test_route_local_policy_on_the_sam_only_default_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pii_guard.api.routes.image as route
+
+    def refused(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("a non-Meta on-device model was built on a SAM-only server")
+
+    monkeypatch.setattr(route, "build_segmenter", refused)
+    sam = Sam()
+    with pytest.raises(DetectionError, match="PII_GUARD_SEGMENTER=hybrid or local"):
+        route._sam_client(_request(sam.client(), {"visual_detection": "local"}))
+    assert route._sam_client(_request(sam.client(), {"visual_detection": "sam"})) is not None
+    assert sam.prompts == []
 
 
 def test_selected_project_policy_drives_a_self_hosted_image(tmp_path: Path) -> None:
