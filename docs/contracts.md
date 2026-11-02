@@ -707,12 +707,14 @@ With `render: "labels"` (the default) the response also carries:
 - Region `source`: `sam` (SAM 3.1), `local` (on-device, `detector: "yunet"`, with a score) or
   `ocr`. SAM needs `META_API_KEY` (or `PII_GUARD_SAM_API_KEY`); without one every SAM request
   is `503 detection_failed`.
-- Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
-  binary with `hun`/`eng` data; the Docker image ships both), OCR text goes through the API's
+- Text in the image: the OCR engine (`PII_GUARD_OCR_ENGINE`: `muse`, the default, is Muse Spark
+  Open with its key and receives the unmasked image, ADR 0016; `tesseract` needs `uv sync --extra
+  ocr` and the binary with `hun`/`eng` data) reads it, and the OCR text goes through the API's
   detectors (`PII_GUARD_DETECTORS`, else rules + ner when available; names need `llm` too). Without it the image is refused with
   `503 ocr_unavailable` before SAM runs (fail closed), here and in the gateway. Only with
   `PII_GUARD_IMAGE_REQUIRE_OCR=false` does SAM run alone, and `analysis.ocr` is
-  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`:
+  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "ocr_unavailable"}`
+  (`"tesseract_unavailable"` with `PII_GUARD_OCR_ENGINE=tesseract`):
   text in the image was **not** checked (the gateway says `X-PII-Guard-Image-OCR: off`).
 - Fail closed: any SAM, OCR or detector error is `503 detection_failed`, a masking error
   `500 masking_failed`; an undecodable image or bad base64 is `422 invalid_image`. Error bodies
@@ -769,7 +771,7 @@ without its path, query, user or password.
   "rest": {"detectors": ["rules", "ner"]},
   "ner": {"available": true, "model": null, "state": "ready", "error": null},
   "upstream": {"configured": true, "mock": false, "origin": "https://models.example.com:8443"},
-  "images": {"segmenter": "sam-api", "sam": true, "ocr_required": true, "gaps": [],
+  "images": {"segmenter": "sam-api", "sam": true, "ocr_engine": "muse", "ocr_required": true, "gaps": [],
              "available": true},
   "policies": {"PERSON": "mask", "ORGANIZATION": "keep"},
   "auth": {"token_required": false},
@@ -805,8 +807,9 @@ without its path, query, user or password.
 | `upstream.origin` | string \| null | Origin only (`scheme://host[:port]`); `null` when unset, unparseable or mock. |
 | `images.segmenter` | `"hybrid"` \| `"sam-api"` \| `"local"` \| `"off"` | `PII_GUARD_SEGMENTER`. |
 | `images.sam` | bool | A SAM backend is configured (`PII_GUARD_SAM_API_KEY`, `META_API_KEY` or `PII_GUARD_SAM_URL`); the key itself is never returned. |
+| `images.ocr_engine` | `"muse"` \| `"tesseract"` | `PII_GUARD_OCR_ENGINE`. |
 | `images.ocr_required` | bool | `PII_GUARD_IMAGE_REQUIRE_OCR`. |
-| `images.gaps` | string[] | What image masking still needs: `ocr` (the extra), `tesseract`, `segmenter`, `sam` (a SAM 3.1 key for the default `sam-api` segmenter). `["unknown"]` if it can't be checked. |
+| `images.gaps` | string[] | What image masking still needs: `ocr_key` (a key for Muse Spark Open, the default OCR engine), `ocr` (the extra) and `tesseract` (with `PII_GUARD_OCR_ENGINE=tesseract`), `segmenter`, `sam` (a SAM 3.1 key for the default `sam-api` segmenter). `["unknown"]` if it can't be checked. |
 | `images.available` | bool | `gaps` is empty: `/v1/mask/image` can run. |
 | `policies` | object | Every `EntityType` name → its effective policy (`mask`, `keep` or `block`): defaults plus `PII_GUARD_POLICY_OVERRIDES`. |
 | `auth.token_required` | bool | `PII_GUARD_API_TOKEN` is set. |

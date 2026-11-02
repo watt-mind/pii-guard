@@ -188,7 +188,9 @@ local-only this also sets the gateway fast detector stack; no NER dependency or 
 loaded. Rules alone miss much free-form personal data. This is an explicit coverage choice,
 never an automatic fallback when NER is broken.
 
-Images require local Tesseract with the necessary language packs and `SEGMENTER=local` or
+Images require OCR on your side (`PII_GUARD_OCR_ENGINE=tesseract` with the necessary language
+packs, or Muse Spark Open at a self-hosted `PII_GUARD_OCR_URL`; the default Baseten endpoint is
+refused, ADR 0016) and `SEGMENTER=local` or
 `off` (the default `sam-api` sends images to the Meta Model API and is refused here; YuNet is not
 a Meta model, so this profile is an explicit opt-in out of the Meta-only defaults, ADR 0015). Provision the pinned YuNet weights explicitly with
 `python -m pii_guard.visual.segment fetch` before using `local`; the local loader does not
@@ -250,12 +252,14 @@ What it does:
   `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up` line to reinstall
   (`[ner]` is now a no-op alias, kept so the line works on older releases too).
   `PII_GUARD_GATEWAY_MODE` overrides the mode.
-- **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and a key for SAM 3.1,
-  the default segmenter (`PII_GUARD_SAM_API_KEY` or `META_API_KEY`; see
-  [Segmenter](#segmenter-sam-31-by-default-on-device-engines-optional)). Images go to the Meta
-  Model API. Whatever is missing, image parts are refused (fail closed), the strip says
-  `images: refused (no OCR, SAM 3.1 key)`, and the banner names the missing pieces with the
-  commands to add them. Text works regardless.
+- **Images.** They need a key for Muse Spark Open, the default OCR engine
+  (`PII_GUARD_OCR_API_KEY` or `BASETEN_API_KEY`; with `PII_GUARD_OCR_ENGINE=tesseract`, the `ocr`
+  extra plus the Tesseract binary instead), and a key for SAM 3.1, the default segmenter
+  (`PII_GUARD_SAM_API_KEY` or `META_API_KEY`; see
+  [Segmenter](#segmenter-sam-31-by-default-on-device-engines-optional)). The unmasked image goes
+  to Baseten and to the Meta Model API. Whatever is missing, image parts are refused (fail
+  closed), the strip says `images: refused (no Muse OCR key, SAM 3.1 key)`, and the banner
+  names the missing pieces with the commands to add them. Text works regardless.
 - **Traffic log** `masked` by default (the dashboard needs it); `--traffic-log full` only on a
   loopback bind, as everywhere. A fresh tenant key per run unless `PII_GUARD_TENANT_KEY` is set (in the environment or `.env`).
 - It opens the browser (`--no-browser` to skip) and prints the gateway base URL and the
@@ -412,17 +416,24 @@ service (the demo image, `eval/` and `docs/` mounted read-only) prints it into t
 server binds `0.0.0.0`, so the traffic log can only be `masked` there (see below). Send the demo
 traffic with `uv run python scripts/demo_traffic.py --url http://127.0.0.1:8788`.
 
-**OCR.** The image installs Tesseract with the Hungarian, English and German data
-(`tesseract-ocr-hun`/`-eng`/`-deu`/`-osd`) and the `ocr` extra (`pytesseract`), so the text in
-inline images (a TAJ, a name) is read and masked. That adds about 115 MB (the apt layer; the
-image grew from about 269 MB to 429 MB in `docker image ls` on arm64). Without an OCR engine,
+**OCR.** The text in inline images (a TAJ, a name) is read by Muse Spark Open on Baseten by
+default (`PII_GUARD_OCR_ENGINE=muse`, [ADR 0016](decisions/0016-meta-only-ocr.md),
+[docs/models.md](models.md#ocr-muse-spark-open)): set `PII_GUARD_OCR_API_KEY` or
+`BASETEN_API_KEY` in `.env`. **The unmasked image goes to `PII_GUARD_OCR_URL`** (Baseten unless
+you point it at your own Muse Spark Open). Tesseract, not a Meta model, is opt-in: build with
+`--build-arg PII_GUARD_TESSERACT=true` (Hungarian, English and German data,
+`tesseract-ocr-hun`/`-eng`/`-deu`/`-osd`, about 115 MB) and run with
+`PII_GUARD_OCR_ENGINE=tesseract`; the `ocr` extra (`pytesseract`) is in the image either way.
+Without an OCR engine,
 image parts are refused with `503 ocr_unavailable` (fail closed, ADR 0006): set
 `PII_GUARD_IMAGE_REQUIRE_OCR=false` only if SAM-only masking is acceptable, which leaves text in
 images unchecked (`X-PII-Guard-Image-OCR: off`). pytesseract hands Tesseract the image through
 a temp file, so the read-only `api` and `demo-api` containers mount a `tmpfs` on `/tmp`; a
 read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck reads `/healthz`
-(`"ocr"` plus `"image_require_ocr"`), and prints `ocr on|off` (`docker inspect --format
-'{{json .State.Health}}' <container>`). For `make demo` outside Docker: `brew install
+(`"ocr"`, `"ocr_engine"` and `"image_require_ocr"`) and prints `ocr <engine> on|off`
+(`docker inspect --format '{{json .State.Health}}' <container>`). It fails only when Tesseract
+is the configured engine and missing; a missing Muse key shows in `/v1/status` as the
+`ocr_key` gap instead. For `make demo` outside Docker: `brew install
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
 

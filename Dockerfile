@@ -9,8 +9,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Extras installed into the image. The `ocr` extra (pytesseract) reads the text in images;
-# without it image parts are refused (ADR 0006). The `sam` extra is Meta's official SAM 3.1
+# Extras installed into the image. The `ocr` extra (pytesseract) is the Python side of the
+# opt-in Tesseract OCR engine (PII_GUARD_TESSERACT below); the default OCR, Muse Spark Open
+# (ADR 0016), needs no extra. The `sam` extra is Meta's official SAM 3.1
 # output parser (meta-sam-parser, SAM License, LAB-1665): SAM 3.1 on the Meta Model API is the
 # default segmenter (PII_GUARD_SEGMENTER=sam-api, ADR 0015). The `local-vision` extra (OpenCV
 # headless) runs YuNet, the optional on-device face and ID-photo detector (hybrid / local
@@ -56,16 +57,23 @@ RUN mkdir -p /app/models \
         echo "PII_GUARD_ON_DEVICE_VISION must be true or false" >&2; exit 1; \
     fi
 
-# --- runtime: Python, Tesseract and the virtualenv, as a non-root user -------
+# --- runtime: Python and the virtualenv (Tesseract opt-in), as a non-root user -
 FROM python:3.12-slim-trixie AS runtime
 
-# Tesseract reads the text in images (a TAJ, a name) so it can be masked; the Hungarian,
-# English and German packs match the language packs (docs/languages.md). Adds ~115 MB
-# (the apt layer; docs/operations.md).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-hun tesseract-ocr-deu \
-    && rm -rf /var/lib/apt/lists/*
+# The text in images (a TAJ, a name) is read by Muse Spark Open by default (ADR 0016,
+# PII_GUARD_OCR_ENGINE=muse), which receives the unmasked image. Tesseract is not a Meta model,
+# so it is opt-in: --build-arg PII_GUARD_TESSERACT=true installs it with the Hungarian, English
+# and German packs (the language packs, docs/languages.md; ~115 MB). Run such an image with
+# PII_GUARD_OCR_ENGINE=tesseract to use it.
+ARG PII_GUARD_TESSERACT=false
+RUN if [ "$PII_GUARD_TESSERACT" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-hun tesseract-ocr-deu \
+        && rm -rf /var/lib/apt/lists/*; \
+    elif [ "$PII_GUARD_TESSERACT" != "false" ]; then \
+        echo "PII_GUARD_TESSERACT must be true or false" >&2; exit 1; \
+    fi
 
 RUN groupadd --system --gid 10001 piiguard \
     && useradd --system --uid 10001 --gid piiguard --no-create-home piiguard \
@@ -91,10 +99,12 @@ WORKDIR /app
 USER piiguard
 EXPOSE 8787
 
-# Healthy = /healthz answers and OCR is available (or explicitly not required); prints "ocr on|off".
-# Healthy = /healthz answers and OCR is available (or explicitly not required): the OCR state
-# comes from /healthz itself ("ocr" + "image_require_ocr"), so the check needs no app import.
+# Healthy = /healthz answers, and Tesseract is present when it is the configured OCR engine
+# (or OCR is explicitly not required): the OCR state comes from /healthz itself ("ocr",
+# "ocr_engine", "image_require_ocr"), so the check needs no app import. A missing Muse OCR key
+# is a configuration gap (/v1/status images.gaps "ocr_key", like the SAM key), not an
+# unhealthy container: images are refused, text works. Prints "ocr <engine> on|off".
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["python", "-c", "import json, os, sys, urllib.request; r = json.load(urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['PII_GUARD_PORT']}/healthz\", timeout=2)); print('ocr', r.get('ocr')); sys.exit(0 if r.get('ocr') == 'on' or not r.get('image_require_ocr', True) else 1)"]
+    CMD ["python", "-c", "import json, os, sys, urllib.request; r = json.load(urllib.request.urlopen(f\"http://127.0.0.1:{os.environ['PII_GUARD_PORT']}/healthz\", timeout=2)); print('ocr', r.get('ocr_engine'), r.get('ocr')); sys.exit(0 if r.get('ocr') == 'on' or r.get('ocr_engine') == 'muse' or not r.get('image_require_ocr', True) else 1)"]
 
 CMD ["pii-guard", "serve"]

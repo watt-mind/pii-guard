@@ -20,11 +20,12 @@ The format is sniffed from the bytes (PNG or JPEG only; anything else is ``415``
 response carries the masked image as base64 PNG (``image``), re-encoded from pixels with no
 metadata, plus the regions found, without values. See ``docs/contracts.md``.
 
-Detection: the segmenter (``PII_GUARD_SEGMENTER``, default ``hybrid``: YuNet on the CPU for
-faces and ID photos, SAM 3.1 via ``PII_GUARD_SAM_URL`` / ``META_API_KEY`` for signatures; see
-:mod:`pii_guard.visual.segmenters`) for visual types, and, when
-Tesseract is installed (``uv sync --extra ocr`` + the ``tesseract`` binary), OCR text through
-the API's own text detectors (``PII_GUARD_DETECTORS``). Without Tesseract only SAM runs and
+Detection: the segmenter (``PII_GUARD_SEGMENTER``, default ``sam-api``: SAM 3.1 on the Meta
+Model API, ADR 0015; see :mod:`pii_guard.visual.segmenters`) for visual types, and OCR text
+(``PII_GUARD_OCR_ENGINE``, default ``muse``: Muse Spark Open, which receives the unmasked image,
+ADR 0016; ``tesseract`` on the CPU when installed) through the API's own text detectors
+(``PII_GUARD_DETECTORS``). Without an OCR engine images are refused (``503 ocr_unavailable``)
+unless ``PII_GUARD_IMAGE_REQUIRE_OCR=false``; then only the segmenter runs and
 ``analysis.ocr.ran`` is ``false`` with a ``reason``.
 
 Fail closed (ADR 0006): any SAM, OCR or detector error is ``503 detection_failed``, a
@@ -199,16 +200,19 @@ class OcrInfo(BaseModel):
     """Whether the text in the image was checked, and with what."""
 
     ran: bool = Field(
-        description="`false` only with `PII_GUARD_IMAGE_REQUIRE_OCR=false` and no Tesseract: "
+        description="`false` only with `PII_GUARD_IMAGE_REQUIRE_OCR=false` and no OCR engine: "
         "text in the image was **not** checked."
     )
-    engine: str | None = Field(description="The OCR engine (`tesseract`), or `null`.")
+    engine: str | None = Field(
+        description="The OCR engine (`muse`: Muse Spark Open, or `tesseract`), or `null`."
+    )
     detectors: list[str] = Field(description="The text detectors OCR text went through.")
     models: dict[str, str] = Field(
         description="Each model-backed text detector's model id, by detector name."
     )
     reason: str | None = Field(
-        description="Why OCR did not run (`tesseract_unavailable`), or `null`."
+        description="Why OCR did not run (`ocr_unavailable`: Muse Spark Open has no key; "
+        "`tesseract_unavailable`), or `null`."
     )
 
 
@@ -323,7 +327,7 @@ def _ocr_engine(request: Request) -> OcrEngine | None:
 
         return local_ocr(state)
     if not hasattr(state, "ocr_engine"):
-        state.ocr_engine = default_ocr_engine()
+        state.ocr_engine = default_ocr_engine(state.settings)
     ocr: OcrEngine | None = state.ocr_engine
     require_local_ocr(state.settings, ocr)
     return ocr
@@ -425,8 +429,11 @@ def _counts(counts: dict[Any, int]) -> list[TypeCount]:
     return [TypeCount(entity_type=t.value, count=n) for t, n in counts.items()]
 
 
-def _response(outcome: ImageMaskOutcome, session_id: str | None = None) -> ImageMaskResponse:
+def _response(
+    outcome: ImageMaskOutcome, session_id: str | None = None, *, ocr_engine: str = "tesseract"
+) -> ImageMaskResponse:
     ocr_ran = outcome.ocr_engine is not None
+    reason = "tesseract_unavailable" if ocr_engine == "tesseract" else "ocr_unavailable"
     return ImageMaskResponse(
         image=base64.b64encode(outcome.image).decode("ascii"),
         media_type="image/png",
@@ -442,7 +449,7 @@ def _response(outcome: ImageMaskOutcome, session_id: str | None = None) -> Image
                 engine=outcome.ocr_engine,
                 detectors=outcome.text_detectors,
                 models=outcome.detector_models,
-                reason=None if ocr_ran else "tesseract_unavailable",
+                reason=None if ocr_ran else reason,
             ),
         ),
         render=outcome.render,
@@ -638,4 +645,8 @@ async def mask_image_endpoint(
         ocr=outcome.ocr_engine or "off",
         render=outcome.render,
     )
-    return _response(outcome, session.session_id if session is not None else None)
+    return _response(
+        outcome,
+        session.session_id if session is not None else None,
+        ocr_engine=settings.ocr_engine,
+    )

@@ -7,7 +7,9 @@ missing weights in the local-only profile.
 
 from __future__ import annotations
 
+import ipaddress
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pii_guard.config import Settings
 from pii_guard.types import DetectionError
@@ -62,13 +64,61 @@ def require_segmenter_instance(settings: Settings, segmenter: object) -> None:
         raise DetectionProfileError("local-only images require the built-in local segmenter")
 
 
+#: Host suffixes of names that resolve only inside the operator's own network.
+_PRIVATE_SUFFIXES = (".local", ".internal", ".lan", ".home.arpa", ".svc", ".cluster.local")
+
+
+def is_self_hosted_url(url: str | None) -> bool:
+    """Whether ``url`` names an endpoint on the operator's own network (LAB-1796).
+
+    True for ``localhost``, loopback, private and link-local IP literals, single-label names
+    (a compose or Kubernetes service such as ``http://muse:8000``) and names under
+    :data:`_PRIVATE_SUFFIXES`. Anything else, including every public provider, is remote.
+    """
+    if not url:
+        return False
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return False
+    if not host:
+        return False
+    host = host.rstrip(".").lower()
+    if host == "localhost" or ("." not in host and ":" not in host):
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host.endswith(_PRIVATE_SUFFIXES)
+    return address.is_loopback or address.is_private or address.is_link_local
+
+
+def refuse_remote_ocr(settings: Settings, url: str | None) -> None:
+    """Refuse Muse Spark Open OCR in the local-only profile unless ``url`` is self-hosted
+    (:func:`is_self_hosted_url`): the OCR endpoint sees the unmasked image."""
+    if is_local_only(settings) and not is_self_hosted_url(url):
+        raise DetectionProfileError(
+            "local-only detection profile does not permit remote OCR (Muse Spark Open); set "
+            "PII_GUARD_OCR_URL to a self-hosted endpoint or PII_GUARD_OCR_ENGINE=tesseract"
+        )
+
+
 def require_local_ocr(settings: Settings, ocr: object) -> None:
     if not is_local_only(settings):
         return
     from pii_guard.visual.ocr import TesseractOcr
+    from pii_guard.visual.ocr_muse import MuseOcr
 
-    if not settings.image_require_ocr or type(ocr) is not TesseractOcr:
-        raise DetectionProfileError("local-only images require the built-in local Tesseract OCR")
+    if not settings.image_require_ocr:
+        raise DetectionProfileError("local-only images require OCR")
+    if type(ocr) is TesseractOcr:
+        return
+    if type(ocr) is MuseOcr and is_self_hosted_url(ocr.url):
+        return
+    raise DetectionProfileError(
+        "local-only images require the built-in Tesseract OCR or Muse Spark Open OCR on a "
+        "self-hosted PII_GUARD_OCR_URL"
+    )
 
 
 def require_detector_instance(settings: Settings, detector: object) -> None:

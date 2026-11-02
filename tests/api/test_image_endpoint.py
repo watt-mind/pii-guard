@@ -136,12 +136,14 @@ def make_app(
     ocr: object = "fake",
     policy_overrides: str | None = None,
     require_ocr: bool = True,
+    ocr_engine: str = "muse",
     **state: Any,
 ) -> FastAPI:
     settings = Settings(
         tenant_key=TEST_TENANT_KEY,
         policy_overrides=policy_overrides,
         image_require_ocr=require_ocr,
+        ocr_engine=ocr_engine,
     )
     app = create_app(settings)
     app.state.sam_client = (sam or SamStub()).client()
@@ -296,15 +298,20 @@ def test_require_ocr_is_on_by_default() -> None:
     assert Settings(tenant_key=TEST_TENANT_KEY).image_require_ocr is True
 
 
-def test_without_ocr_and_opted_out_only_sam_runs_and_the_response_says_so() -> None:
-    with TestClient(make_app(ocr=None, require_ocr=False)) as http:
+@pytest.mark.parametrize(
+    ("engine", "reason"), [("muse", "ocr_unavailable"), ("tesseract", "tesseract_unavailable")]
+)
+def test_without_ocr_and_opted_out_only_sam_runs_and_the_response_says_so(
+    engine: str, reason: str
+) -> None:
+    with TestClient(make_app(ocr=None, require_ocr=False, ocr_engine=engine)) as http:
         body = post_png(http).json()
     assert body["analysis"]["ocr"] == {
         "ran": False,
         "engine": None,
         "detectors": [],
         "models": {},
-        "reason": "tesseract_unavailable",
+        "reason": reason,
     }
     assert {r["source"] for r in body["regions"]} == {"sam"}
     assert not is_filled(decode(body), TAJ_BOX)

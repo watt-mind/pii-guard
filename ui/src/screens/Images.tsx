@@ -688,6 +688,7 @@ function Running() {
 /** What the server's image pipeline is missing, phrased for a checkout and for `uvx` alike. */
 function imageNeeds(gaps: readonly string[]): string {
   const parts: string[] = [];
+  if (gaps.includes("ocr_key")) parts.push("a key for Muse Spark Open, the default OCR engine (PII_GUARD_OCR_API_KEY or BASETEN_API_KEY)");
   if (gaps.includes("ocr")) parts.push("PII Guard's OCR add-on (the ocr extra)");
   if (gaps.includes("tesseract")) parts.push("the Tesseract OCR program (brew install tesseract, or apt install tesseract-ocr)");
   if (gaps.includes("segmenter")) parts.push("a face detector (the local-vision extra, or a META_API_KEY for SAM 3.1)");

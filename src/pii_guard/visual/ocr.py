@@ -80,7 +80,9 @@ __all__ = [
     "check_deadline",
     "deadline",
     "estimate_skew",
+    "grow_findings",
     "join_words",
+    "ocr_margin",
     "ocr_text",
     "suppress_background",
     "tesseract_available",
@@ -684,7 +686,42 @@ def text_regions(
     return [finding.region for finding in found.findings]
 
 
+def ocr_margin(ocr: object, width: int) -> int:
+    """Pixels an engine's text regions grow by on every side: its ``region_pad_share`` (a share
+    of the image width; 0 for engines without one, such as Tesseract). Muse Spark Open's line
+    boxes are approximate, so its findings grow by 2 % of the width (LAB-1796); its words stay
+    tight, so captions and MRZ zones are found on the boxes the model returned."""
+    share = getattr(ocr, "region_pad_share", 0.0)
+    if not isinstance(share, int | float) or isinstance(share, bool) or share <= 0:
+        return 0
+    return round(float(share) * width)
+
+
+def grow_findings(
+    findings: Sequence[TextFinding], margin: int, size: tuple[int, int]
+) -> list[TextFinding]:
+    """``findings`` with every region grown by ``margin`` pixels, clamped to ``size`` (w, h)."""
+    if margin <= 0:
+        return list(findings)
+    width, height = size
+    out = []
+    for f in findings:
+        b = f.region.box
+        box = Box(
+            max(0, b.x1 - margin),
+            max(0, b.y1 - margin),
+            min(width - 1, b.x2 + margin),
+            min(height - 1, b.y2 + margin),
+        )
+        out.append(replace(f, region=replace(f.region, box=box)))
+    return out
+
+
 def _read_ocr_page(image: bytes | Image.Image, ocr: OcrEngine) -> OcrPage:
+    return _read_ocr_image(image, ocr)[0]
+
+
+def _read_ocr_image(image: bytes | Image.Image, ocr: OcrEngine) -> tuple[OcrPage, tuple[int, int]]:
     if isinstance(image, Image.Image):
         decoded = image
     else:
@@ -701,7 +738,7 @@ def _read_ocr_page(image: bytes | Image.Image, ocr: OcrEngine) -> OcrPage:
         raise DetectionError(f"OCR failed ({type(exc).__name__})") from exc
     if not isinstance(page, OcrPage):
         raise DetectionError("OCR engine returned an unexpected page")
-    return page
+    return page, decoded.size
 
 
 def _caption_findings(
@@ -764,7 +801,7 @@ def ocr_text(
     """Like :func:`text_regions`, keeping the words and the text of every finding."""
     if not detectors:
         raise DetectionError("no text detector configured for OCR text")
-    page = _read_ocr_page(image, ocr)
+    page, size = _read_ocr_image(image, ocr)
     words = page.words
     if not words:
         return OcrText([], [], [], [])
@@ -779,6 +816,7 @@ def ocr_text(
     caption_hits, fields = _caption_findings(words, captions)
     findings.extend(caption_hits)
     findings.extend(_detector_findings(text, words, offsets, detectors, language))
+    findings = grow_findings(findings, ocr_margin(ocr, size[0]), size)
     logger.debug("ocr: %d word(s), %d text region(s)", len(words), len(findings))
     found = OcrText(words, findings, zones, fields)
     return found if page.frame.identity else _to_source(found, page.frame)

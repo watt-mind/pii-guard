@@ -662,3 +662,31 @@ def test_on_device_replica_refuses_a_stamp_masking_policy() -> None:
         refused = post_image(client, auth())
     assert refused.json()["error"]["code"] == "detection_profile_denied"
     assert local_calls.segment == local_calls.ocr == 0
+
+
+def test_hosted_images_accept_muse_ocr_only_with_its_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The Meta-only OCR default (ADR 0016, LAB-1796): Muse Spark Open with its key serves
+    # hosted images; without one the replica refuses them and readiness says why.
+    from pii_guard.hosted.images import images_servable, local_ocr
+    from pii_guard.visual.masking import OcrUnavailableError
+    from pii_guard.visual.ocr_muse import MuseOcr
+
+    monkeypatch.delenv("PII_GUARD_OCR_API_KEY", raising=False)
+    monkeypatch.delenv("BASETEN_API_KEY", raising=False)
+    keyed = sam_settings(ocr_api_key="synthetic-not-a-key")
+    sam = SamClient(api_key="synthetic-not-a-key", settings=keyed)
+    state = SimpleNamespace(settings=keyed, policies=PolicySet(), sam_client=sam)
+    assert type(local_ocr(state)) is MuseOcr
+    assert images_servable(state) is True
+    keyless = SimpleNamespace(settings=sam_settings(), policies=PolicySet(), sam_client=sam)
+    with pytest.raises(OcrUnavailableError):
+        local_ocr(keyless)
+    assert images_servable(keyless) is False
+    unkeyed = SimpleNamespace(
+        settings=keyed,
+        policies=PolicySet(),
+        sam_client=sam,
+        ocr_engine=MuseOcr(settings=sam_settings()),
+    )
+    with pytest.raises(OcrUnavailableError, match="no API key"):
+        local_ocr(unkeyed)

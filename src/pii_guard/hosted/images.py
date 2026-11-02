@@ -201,16 +201,25 @@ def hosted_segmenter(state: Any) -> SamClient | LocalSignatureSegmenter:
 
 
 def local_ocr(state: Any) -> OcrEngine:
-    """The app's OCR engine, which on hosted must be the built-in Tesseract, and present."""
+    """The app's OCR engine, which on hosted must be a built-in one, and present: Muse Spark
+    Open (the default, ADR 0016) with its key, or the opt-in Tesseract."""
     if not hasattr(state, "ocr_engine"):
-        state.ocr_engine = default_ocr_engine()
+        state.ocr_engine = default_ocr_engine(state.settings)
     ocr = state.ocr_engine
     if ocr is None:
         raise OcrUnavailableError(
             "no OCR engine on this server, so the text in an image can't be checked"
         )
+    from pii_guard.visual.ocr_muse import MuseOcr
+
+    if type(ocr) is MuseOcr:
+        if not ocr.configured:
+            raise OcrUnavailableError("Muse Spark Open OCR has no API key (PII_GUARD_OCR_API_KEY)")
+        return ocr
     if type(ocr) is not TesseractOcr:
-        raise DetectionProfileError("hosted images require the built-in local Tesseract OCR")
+        raise DetectionProfileError(
+            "hosted images require the built-in OCR (Muse Spark Open or Tesseract)"
+        )
     return ocr
 
 
@@ -262,9 +271,14 @@ def images_servable(state: Any) -> bool:
     """Whether this replica can mask images under the server's own visual policies.
 
     With SAM 3.1 the client must have its key; with the on-device engines no masked type may
-    be one they cannot find. Builds no on-device model (status calls this on every request)."""
+    be one they cannot find. Muse Spark Open OCR (the default, ADR 0016) must have its key.
+    Builds no on-device model (status calls this on every request)."""
     settings = state.settings
     if unservable_visual_types(state.policies, settings):
+        return False
+    try:
+        local_ocr(state)  # Muse Spark Open needs its key; builds no model
+    except PiiGuardError:
         return False
     if settings.segmenter != "sam-api":
         return settings.segmenter in HOSTED_SEGMENTER_MODES

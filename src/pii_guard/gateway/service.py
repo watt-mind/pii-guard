@@ -320,7 +320,7 @@ class Gateway:
         if self._sam is None:
             self._sam = build_segmenter(self.settings)
         if self._ocr is _UNSET:
-            self._ocr = default_ocr_engine()
+            self._ocr = default_ocr_engine(self.settings)
         from pii_guard.detection_profile import require_local_ocr, require_segmenter_instance
 
         require_segmenter_instance(self.settings, self._sam)
