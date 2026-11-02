@@ -164,9 +164,10 @@ placeholder:
 | The model sees | Kérem, írjon [[PERSON_968e29]]nak a [[EMAIL_e7038b]] címre.<br><sub>… *to [[PERSON]]* …</sub> |
 | You get back | Megírtam a levelet Próba Zsuzsannának.<br><sub>I wrote *to Zsuzsanna Próba*.</sub> |
 
-**Language packs.** Hungarian, English, German and Polish each ship validated identifier rules,
-cue words and case handling; a new language is one package
-([how to add a language](docs/languages.md)).
+**Language packs.** Hungarian, English, German, Polish, French, Spanish, Italian, Dutch and
+Romanian each ship validated identifier rules (TAJ, Steuer-ID, PESEL, NIR, DNI/NIE, codice
+fiscale, BSN, CNP ...), cue words and, where names inflect, case handling; a new language is
+one package ([how to add a language](docs/languages.md), [what each pack finds](docs/entities.md#per-language)).
 
 **What it detects:** people, addresses, emails, phone numbers, dates of birth, national and
 document IDs (including Hungarian tax and TAJ numbers), bank accounts and payment cards,

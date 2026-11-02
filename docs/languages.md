@@ -1,6 +1,7 @@
 # Adding a language
 
-PII Guard ships Hungarian (`hu`), English (`en`), German (`de`) and Polish (`pl`). Everything a language
+PII Guard ships nine language packs: Hungarian (`hu`), English (`en`), German (`de`), Polish
+(`pl`), French (`fr`), Spanish (`es`), Italian (`it`), Dutch (`nl`) and Romanian (`ro`). Everything a language
 contributes is one **language pack**: a Python package with one `LanguagePack` object
 ([ADR 0010](decisions/0010-language-pack-plugins.md)). The components (rule detector, vault,
 LLM detector, evaluation) ask the pack registry for the text's language and fall back to
@@ -13,7 +14,9 @@ missing; it is also what "done" means (below).
 
 German is the worked example: `src/pii_guard/languages/de/` was written by following this
 guide, and every step below points at it. The Polish pack (`src/pii_guard/languages/pl/`,
-LAB-1400) was built the same way, from the skeleton below.
+LAB-1400) was built the same way, from the skeleton below, and so were the five packs of the
+first EU wave (`fr`, `es`, `it`, `nl`, `ro`, LAB-1774–LAB-1778; [results](#first-eu-wave-smoke-results)).
+`uv run pii-guard lang list` prints the registered packs.
 
 ## What a pack is made of
 
@@ -319,3 +322,23 @@ numbers, IBANs, phones, addresses); the misses are names, dates of birth and org
 fast mode (rules + NER v2.0) the smoke set leaks 0.0 %, and pl-pii-bench (report-only) goes
 from 17.5 to 3.5 % ([results](../eval/results/2026-10-28-lab-1400-pl-pack/README.md)). Adding
 the Polish pack left the `hu`, `en` and `de` scorecards unchanged.
+
+## First EU wave smoke results
+
+Five packs, built in parallel from the Polish template, each measured with the rules detector
+on its own hand-written smoke set (`eval/fixtures/<code>-smoke.jsonl`, 11 or 12 documents,
+2 of them hard negatives) without and with the pack, at the same commit. Rules overlap precision stays
+at 100 % on every set; the remaining leaks are names, dates of birth and organizations, which
+the NER and LLM passes cover. Adding the packs left the `hu`, `en`, `de` and `pl` scorecards
+unchanged.
+
+| Pack | Rules leak, before → after | Validated identifiers | Inflection | Details |
+|---|---|---|---|---|
+| `fr` | `eu/fr-smoke` 81.2 → 50.0 %; `fr-smoke` 43.6 % (fast mode 2.6 %) | NIR, numéro fiscal (SPI) | none | [journey](journey/2026-11-02-lab-1774-fr-pack.md), [results](../eval/results/2026-11-02-lab-1774-fr-pack/README.md) |
+| `es` | four Spanish sets pooled, 82.4 → 51.5 % (fast mode 0.0 %) | DNI / NIF, NIE, CIF | none | [journey](journey/2026-11-02-lab-1775-es-pack.md), [results](../eval/results/2026-11-02-lab-1775-es-pack/README.md) |
+| `it` | `it-smoke` 81.6 → 30.6 % | codice fiscale, partita IVA, CIE | none | [journey](journey/2026-11-02-lab-1776-it-pack.md), [results](../eval/results/2026-11-02-LAB-1776-it-pack/README.md) |
+| `nl` | `nl-smoke` 78.3 → 34.8 % | BSN | genitive `-s` | [journey](journey/2026-11-02-lab-1777-nl-pack.md), [results](../eval/results/2026-11-02-LAB-1777-nl-pack/README.md) |
+| `ro` | `ro-smoke` 81.1 → 39.6 % | CNP, CIF / CUI | `-lui`/`-ului`, `-a` → `-ei` | [journey](journey/2026-11-02-lab-1778-ro-pack.md), [results](../eval/results/2026-11-02-LAB-1778-ro-pack/README.md) |
+
+What each pack's rules find, and where they run, is in
+[entities.md](entities.md#per-language).
