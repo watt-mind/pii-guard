@@ -1,11 +1,14 @@
 {
   "schema_version": 1,
   "meta": {
-    "commit": "ec2828bafe65d303f893ba2a80579c31b644c419",
-    "dirty": false,
-    "dirty_paths": [],
+    "commit": "723660e25f494d82cbd6825a509c92c4d087bff6",
+    "dirty": true,
+    "dirty_paths": [
+      "src/pii_guard/languages/fr/cues.tsv",
+      "src/pii_guard/languages/fr/references.tsv"
+    ],
     "pii_guard_version": "0.1.1",
-    "generated_at": "2026-11-02T11:13:18+00:00",
+    "generated_at": "2026-11-02T11:26:45+00:00",
     "detectors": [
       "rules",
       "ner"
@@ -22,7 +25,7 @@
   "overall": {
     "documents": 11,
     "gold_spans": 41,
-    "predicted_spans": 40,
+    "predicted_spans": 43,
     "unscored_predictions": 0,
     "detection": {
       "exact": {
@@ -74,21 +77,21 @@
           },
           "ID_DOCUMENT": {
             "gold": 8,
-            "pred": 9,
+            "pred": 11,
             "tp_pred": 8,
             "tp_gold": 8,
-            "precision": 0.8888888888888888,
+            "precision": 0.7272727272727273,
             "recall": 1.0,
-            "f1": 0.9411764705882353
+            "f1": 0.8421052631578948
           },
           "BANK_ACCOUNT": {
             "gold": 3,
-            "pred": 2,
+            "pred": 3,
             "tp_pred": 2,
             "tp_gold": 3,
-            "precision": 1.0,
+            "precision": 0.6666666666666666,
             "recall": 1.0,
-            "f1": 1.0
+            "f1": 0.8
           },
           "PAYMENT_CARD": {
             "gold": 0,
@@ -111,17 +114,17 @@
         },
         "micro": {
           "gold": 41,
-          "pred": 40,
+          "pred": 43,
           "tp_pred": 39,
           "tp_gold": 39,
-          "precision": 0.975,
+          "precision": 0.9069767441860465,
           "recall": 0.9512195121951219,
-          "f1": 0.9629629629629629
+          "f1": 0.9285714285714286
         },
         "macro": {
-          "precision": 0.9876543209876544,
+          "precision": 0.9326599326599327,
           "recall": 0.8253968253968255,
-          "f1": 0.841200677801985
+          "f1": 0.8079705436430582
         }
       },
       "overlap": {
@@ -173,21 +176,21 @@
           },
           "ID_DOCUMENT": {
             "gold": 8,
-            "pred": 9,
+            "pred": 11,
             "tp_pred": 8,
             "tp_gold": 8,
-            "precision": 0.8888888888888888,
+            "precision": 0.7272727272727273,
             "recall": 1.0,
-            "f1": 0.9411764705882353
+            "f1": 0.8421052631578948
           },
           "BANK_ACCOUNT": {
             "gold": 3,
-            "pred": 2,
+            "pred": 3,
             "tp_pred": 2,
             "tp_gold": 3,
-            "precision": 1.0,
+            "precision": 0.6666666666666666,
             "recall": 1.0,
-            "f1": 1.0
+            "f1": 0.8
           },
           "PAYMENT_CARD": {
             "gold": 0,
@@ -210,17 +213,17 @@
         },
         "micro": {
           "gold": 41,
-          "pred": 40,
+          "pred": 43,
           "tp_pred": 39,
           "tp_gold": 39,
-          "precision": 0.975,
+          "precision": 0.9069767441860465,
           "recall": 0.9512195121951219,
-          "f1": 0.9629629629629629
+          "f1": 0.9285714285714286
         },
         "macro": {
-          "precision": 0.9876543209876544,
+          "precision": 0.9326599326599327,
           "recall": 0.8253968253968255,
-          "f1": 0.841200677801985
+          "f1": 0.8079705436430582
         }
       }
     },
@@ -283,9 +286,9 @@
       }
     },
     "over_masking": {
-      "masked": 39,
-      "over_masked": 1,
-      "rate": 0.02564102564102564,
+      "masked": 42,
+      "over_masked": 4,
+      "rate": 0.09523809523809523,
       "per_type": {
         "PERSON": {
           "masked": 13,
@@ -313,14 +316,14 @@
           "rate": 0.0
         },
         "ID_DOCUMENT": {
-          "masked": 9,
-          "over_masked": 1,
-          "rate": 0.1111111111111111
+          "masked": 11,
+          "over_masked": 3,
+          "rate": 0.2727272727272727
         },
         "BANK_ACCOUNT": {
-          "masked": 2,
-          "over_masked": 0,
-          "rate": 0.0
+          "masked": 3,
+          "over_masked": 1,
+          "rate": 0.3333333333333333
         },
         "PAYMENT_CARD": {
           "masked": 1,
@@ -402,12 +405,12 @@
     },
     "latency_ms": {
       "detect": {
-        "p50": 43.75125002115965,
-        "p95": 60.55662501603365
+        "p50": 318.49054200574756,
+        "p95": 538.8801461085677
       },
       "mask": {
-        "p50": 0.5797911435365677,
-        "p95": 0.9071039967238903
+        "p50": 1.398958032950759,
+        "p95": 2.2700619883835316
       }
     }
   },
@@ -415,7 +418,7 @@
     "fr": {
       "documents": 11,
       "gold_spans": 41,
-      "predicted_spans": 40,
+      "predicted_spans": 43,
       "unscored_predictions": 0,
       "detection": {
         "exact": {
@@ -467,21 +470,21 @@
             },
             "ID_DOCUMENT": {
               "gold": 8,
-              "pred": 9,
+              "pred": 11,
               "tp_pred": 8,
               "tp_gold": 8,
-              "precision": 0.8888888888888888,
+              "precision": 0.7272727272727273,
               "recall": 1.0,
-              "f1": 0.9411764705882353
+              "f1": 0.8421052631578948
             },
             "BANK_ACCOUNT": {
               "gold": 3,
-              "pred": 2,
+              "pred": 3,
               "tp_pred": 2,
               "tp_gold": 3,
-              "precision": 1.0,
+              "precision": 0.6666666666666666,
               "recall": 1.0,
-              "f1": 1.0
+              "f1": 0.8
             },
             "PAYMENT_CARD": {
               "gold": 0,
@@ -504,17 +507,17 @@
           },
           "micro": {
             "gold": 41,
-            "pred": 40,
+            "pred": 43,
             "tp_pred": 39,
             "tp_gold": 39,
-            "precision": 0.975,
+            "precision": 0.9069767441860465,
             "recall": 0.9512195121951219,
-            "f1": 0.9629629629629629
+            "f1": 0.9285714285714286
           },
           "macro": {
-            "precision": 0.9876543209876544,
+            "precision": 0.9326599326599327,
             "recall": 0.8253968253968255,
-            "f1": 0.841200677801985
+            "f1": 0.8079705436430582
           }
         },
         "overlap": {
@@ -566,21 +569,21 @@
             },
             "ID_DOCUMENT": {
               "gold": 8,
-              "pred": 9,
+              "pred": 11,
               "tp_pred": 8,
               "tp_gold": 8,
-              "precision": 0.8888888888888888,
+              "precision": 0.7272727272727273,
               "recall": 1.0,
-              "f1": 0.9411764705882353
+              "f1": 0.8421052631578948
             },
             "BANK_ACCOUNT": {
               "gold": 3,
-              "pred": 2,
+              "pred": 3,
               "tp_pred": 2,
               "tp_gold": 3,
-              "precision": 1.0,
+              "precision": 0.6666666666666666,
               "recall": 1.0,
-              "f1": 1.0
+              "f1": 0.8
             },
             "PAYMENT_CARD": {
               "gold": 0,
@@ -603,17 +606,17 @@
           },
           "micro": {
             "gold": 41,
-            "pred": 40,
+            "pred": 43,
             "tp_pred": 39,
             "tp_gold": 39,
-            "precision": 0.975,
+            "precision": 0.9069767441860465,
             "recall": 0.9512195121951219,
-            "f1": 0.9629629629629629
+            "f1": 0.9285714285714286
           },
           "macro": {
-            "precision": 0.9876543209876544,
+            "precision": 0.9326599326599327,
             "recall": 0.8253968253968255,
-            "f1": 0.841200677801985
+            "f1": 0.8079705436430582
           }
         }
       },
@@ -676,9 +679,9 @@
         }
       },
       "over_masking": {
-        "masked": 39,
-        "over_masked": 1,
-        "rate": 0.02564102564102564,
+        "masked": 42,
+        "over_masked": 4,
+        "rate": 0.09523809523809523,
         "per_type": {
           "PERSON": {
             "masked": 13,
@@ -706,14 +709,14 @@
             "rate": 0.0
           },
           "ID_DOCUMENT": {
-            "masked": 9,
-            "over_masked": 1,
-            "rate": 0.1111111111111111
+            "masked": 11,
+            "over_masked": 3,
+            "rate": 0.2727272727272727
           },
           "BANK_ACCOUNT": {
-            "masked": 2,
-            "over_masked": 0,
-            "rate": 0.0
+            "masked": 3,
+            "over_masked": 1,
+            "rate": 0.3333333333333333
           },
           "PAYMENT_CARD": {
             "masked": 1,
@@ -795,12 +798,12 @@
       },
       "latency_ms": {
         "detect": {
-          "p50": 43.75125002115965,
-          "p95": 60.55662501603365
+          "p50": 318.49054200574756,
+          "p95": 538.8801461085677
         },
         "mask": {
-          "p50": 0.5797911435365677,
-          "p95": 0.9071039967238903
+          "p50": 1.398958032950759,
+          "p95": 2.2700619883835316
         }
       }
     }

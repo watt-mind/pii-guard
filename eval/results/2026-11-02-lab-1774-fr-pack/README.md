@@ -12,12 +12,18 @@ comparison tool has run on it.
 | Detector | P overlap | R overlap | R exact | Leak | Over-masked | Round trip |
 |---|---:|---:|---:|---:|---:|---:|
 | `rules` | 100.0 | 53.7 | 53.7 | 43.6 % (17/39) | 0 | 100.0 |
-| `rules,ner` (fast) | 97.5 | 95.1 | 95.1 | 2.6 % (1/39) | 1 | 100.0 |
+| `rules,ner` (fast) | 90.7 | 95.1 | 95.1 | 2.6 % (1/39) | 4 | 100.0 |
 
 Every structured identifier is found by the rules (NIRs including a Corsican one, numéros
 fiscaux, passport, CNI and driving-licence numbers, IBANs, phones, addresses: 100 % overlap
 recall on those types). The rules misses are names, dates of birth and organisations, which
-the rules don't cover by design. In fast mode one name leaks.
+the rules don't cover by design. In fast mode one name leaks, and the NER masks four numbers
+in the two hard negatives: an order number, an invoice number, a SIRET and a product code.
+The NER drops a number after an order or invoice word only if the word is in its list.
+New packs can't add French words to that list yet: a test pins the list to hu/en/de/pl
+(LAB-1789). So `facture`, `commande`, `siret` ... are scoped to the rules check in
+`references.tsv`. While they were still read by the NER check, before the test showed the
+conflict, fast mode over-masked 1 span on this set instead of 4.
 
 ## The EU gates (`eval/fixtures/eu/fr-*.jsonl`, rules)
 
