@@ -65,13 +65,13 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: false
       - name: Wheel with the web UI bundled (make wheel, as release.yml)
         run: make wheel
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: judge-wheel
           path: dist/*.whl
@@ -104,7 +104,7 @@ jobs:
           ref: ${{ needs.build.outputs.sha || env.JUDGE_REF }}
           persist-credentials: false
       # Fresh uv cache on purpose: this is the judge's cold path, no caches restored.
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: false
@@ -121,7 +121,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: "1"
           HOMEBREW_NO_INSTALL_CLEANUP: "1"
         run: brew install tesseract tesseract-lang
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: matrix.source == 'wheel'
         with:
           name: ${{ inputs.wheel-artifact || 'judge-wheel' }}
@@ -169,7 +169,7 @@ jobs:
       # The server log holds fictional data only (the smoke sends nothing else).
       - name: Upload the server log on failure
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: judge-path-log-${{ matrix.platform }}-${{ matrix.source }}
           path: ${{ runner.temp }}/pii-guard-up.log
