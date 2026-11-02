@@ -1,0 +1,35 @@
+# Reference words: labels that make a number a business number, not personal data
+# (order, invoice, receipt, shipment ...). One entry per line, `#` comments, blank lines
+# ignored; format in pl/references.tsv. A trailing `*` lets the word take suffixes
+# (`factur*`: `factura`, `facturii`), a trailing `.` matches with or without the dot.
+# The shared check accepts "nr" between the label and the number, not the Romanian
+# "numărul"; the stem-changed forms are listed by stem (`comand*`, `comenz*`).
+# Every entry is scoped to the rules check for now: the NER check's negative words are pinned
+# to the built-in list (tests/detect/test_reference_packs.py, LAB-1788), so a Romanian label
+# does not drop an NER number yet. Not "client" alone: "Client: +40 744 ..." in a chat
+# transcript is a speaker label before a phone number.
+comand*	rules
+comenz*	rules
+factur*	rules
+chitanț*	rules
+bon fiscal	rules
+bonul fiscal	rules
+AWB	rules
+colet*	rules
+expediți*	rules
+rezervar*	rules
+dosar*	rules
+contract nr.	rules
+cod client	rules
+codul clientului	rules
+referinț*	rules
+EAN	rules
+GTIN	rules
+cod de bare	rules
+articol*	rules
+cod produs	rules
+lot	rules
+sumă	weak
+total*	weak
+valoare*	weak
+sold*	weak
