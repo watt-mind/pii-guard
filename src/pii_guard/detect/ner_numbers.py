@@ -107,7 +107,12 @@ _NEGATIVE = (
 )  # fmt: skip
 
 #: Words of a pack cue too generic to count on their own ("account number", "TAJ szám").
-_GENERIC = frozenset({"number", "nummer", "szam", "szama", "numer", "mit", "der", "the", "ending"})
+#: Folded, and already holding the "number" words of fr, es, it, nl and ro (numéro, número,
+#: numero, nummer, număr), so those packs need no edit here (LAB-1773).
+_GENERIC = frozenset(
+    {"number", "nummer", "szam", "szama", "numer", "numero", "numar", "numarul"}
+    | {"mit", "der", "the", "ending"}
+)
 
 #: How far before a value the nearest cue is looked for, on the same line.
 _WINDOW = 60
@@ -118,7 +123,12 @@ _MIN_PIECE = 4
 _WORD_RE = re.compile(r"[^\W\d_]+")
 _WORD_OR_NUMBER_RE = re.compile(r"[^\W\d_]+|\d+")
 #: Words of a label that don't count as words between it and its value ("order number").
-_FILLER = frozenset({"number", "no", "nr", "num", "nummer", "numer", "szam", "szama", "id"})
+#: Folded words as :data:`_WORD_RE` cuts them: ``n°`` and ``n.`` are ``n``, ``nº`` keeps its
+#: ordinal indicator (a letter); the fr/es/it/nl/ro forms are here already (LAB-1773).
+_FILLER = frozenset(
+    {"number", "no", "nr", "num", "nummer", "numer", "szam", "szama", "id"}
+    | {"numero", "numar", "numarul", "n", "nº"}
+)
 #: A negative word counts as a value's label only this close (in words) before it.
 _LABEL_WORDS = 2
 _HEX_RE = re.compile(r"(?:[a-z]+_)?(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{8,}")

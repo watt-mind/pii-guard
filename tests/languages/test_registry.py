@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from importlib import metadata
+from pathlib import Path
 
 import pytest
 
@@ -20,6 +22,20 @@ from pii_guard.languages import (
 )
 from pii_guard.types import EntityType
 
+# The packs every release ships; a new pack only adds its own directory (LAB-1773), so the
+# tests below compare against what is on disk rather than a hard-coded list.
+CORE_PACKS = {"de", "en", "hu", "pl"}
+
+
+def _packs_on_disk() -> set[str]:
+    """Language codes with a subpackage under ``src/pii_guard/languages/``."""
+    root = Path(languages.__file__).parent
+    return {
+        d.name
+        for d in root.iterdir()
+        if (d / "__init__.py").is_file() and re.fullmatch(r"[a-z]{2,3}", d.name)
+    }
+
 
 @pytest.fixture
 def fresh_registry() -> Iterator[None]:
@@ -33,7 +49,8 @@ def test_lookup_is_by_primary_language() -> None:
     assert primary_language("") == "und"
     assert get_pack("hu-HU") is get_pack("hu")
     assert get_pack("fi") is None
-    assert available_languages() == ("de", "en", "hu", "pl")
+    assert available_languages() == tuple(sorted(_packs_on_disk()))
+    assert set(available_languages()) >= CORE_PACKS
 
 
 def test_register_and_unregister_override_a_built_in_pack() -> None:
@@ -73,12 +90,13 @@ def _entry_points(*eps: _EntryPoint):
 
 
 def test_entry_points_add_a_language(monkeypatch: pytest.MonkeyPatch, fresh_registry: None) -> None:
+    assert "cs" not in _packs_on_disk(), "pick a code that is not built in"
     pack = LanguagePack(code="cs", name="Czech")
     monkeypatch.setattr(
         metadata, "entry_points", _entry_points(_EntryPoint("cs", "third_party.cs:pack", pack))
     )
     assert get_pack("cs-CZ") is pack
-    assert set(available_languages()) == {"cs", "de", "en", "hu", "pl"}
+    assert set(available_languages()) == {"cs"} | _packs_on_disk()
 
 
 def test_an_entry_point_may_replace_a_built_in_pack(
@@ -177,7 +195,8 @@ def test_the_hungarian_profile_asks_for_every_type_as_before() -> None:
     from pii_guard.detect.llm import ENTITY_DESCRIPTIONS, language_profile
 
     assert language_profile("hu").entity_types == tuple(ENTITY_DESCRIPTIONS)
-    assert set(packs()) == {"de", "en", "hu", "pl"}
+    assert set(packs()) == _packs_on_disk()
+    assert set(packs()) >= CORE_PACKS
     assert language_profile("en").allow_suffix is False
 
 
