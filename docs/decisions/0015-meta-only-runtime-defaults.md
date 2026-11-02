@@ -92,4 +92,5 @@ without a SAM key, applies only when `hybrid` was configured.
 - **Offline stacks.** A stack without a SAM key refuses images, as the CI smoke stacks do by
   contract (LAB-1255: an emptied `PII_GUARD_SAM_API_KEY` disables SAM). Tests that exercise the
   on-device engines set the segmenter explicitly.
-- **OCR** is not part of this decision. Tesseract is not a Meta model. LAB-1796 covers it.
+- **OCR** is not part of this decision. Tesseract is not a Meta model.
+  [ADR 0016](0016-meta-only-ocr.md) (LAB-1796) makes Muse Spark Open the default OCR engine.

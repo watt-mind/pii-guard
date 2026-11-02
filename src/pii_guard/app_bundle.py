@@ -86,7 +86,8 @@ class Status:
 
     upstream: str  # "mock" or the configured upstream's origin
     detectors: list[str] = field(default_factory=list)
-    #: What images still need (empty: images work): "ocr", "tesseract", "segmenter".
+    #: What images still need (empty: images work): "ocr_key", "ocr", "tesseract",
+    #: "segmenter", "sam".
     image_gaps: list[str] = field(default_factory=list)
     #: Which NER model runs, or why none does (:func:`pii_guard.detect.ner_resolve.describe`).
     ner: str = ""
@@ -100,6 +101,7 @@ class Status:
         if not self.image_gaps:
             return "on"
         needs = {
+            "ocr_key": "Muse OCR key",
             "ocr": "OCR",
             "tesseract": "OCR",
             "segmenter": "face detection",
@@ -381,9 +383,10 @@ def launcher(extras: str = "") -> str:
 
 
 def image_gaps(settings: Settings) -> list[str]:
-    """What image masking still needs: ``ocr`` (the extra), ``tesseract``, ``segmenter``, and
-    ``sam``: a SAM 3.1 key for the default ``sam-api`` segmenter (ADR 0015), without which
-    every image is refused."""
+    """What image masking still needs: ``ocr_key``, a key for Muse Spark Open, the default
+    OCR engine (ADR 0016); with ``PII_GUARD_OCR_ENGINE=tesseract`` ``ocr`` (the extra) and
+    ``tesseract`` (the binary); ``segmenter``; and ``sam``: a SAM 3.1 key for the default
+    ``sam-api`` segmenter (ADR 0015). Without any of them every image is refused."""
     import importlib.util
     import shutil
 
@@ -392,7 +395,12 @@ def image_gaps(settings: Settings) -> list[str]:
     from pii_guard.visual.segmenters import OffSegmenter, build_segmenter
 
     gaps = []
-    if settings.image_require_ocr:
+    if settings.image_require_ocr and settings.ocr_engine == "muse":
+        from pii_guard.visual.ocr_muse import muse_configured
+
+        if not muse_configured(settings):
+            gaps.append("ocr_key")  # no key: no OCR engine, every image is refused
+    elif settings.image_require_ocr:
         if importlib.util.find_spec("pytesseract") is None:
             gaps.append("ocr")
         if shutil.which("tesseract") is None:
@@ -423,6 +431,12 @@ def _image_hints(gaps: list[str]) -> list[str]:
         hints.append(
             f"faces also need the YuNet model ({launcher()} models fetch yunet) or "
             "META_API_KEY for SAM 3.1 (docs/operations.md)"
+        )
+    if "ocr_key" in gaps:
+        hints.append(
+            "images need a key for Muse Spark Open, the default OCR engine: set "
+            "PII_GUARD_OCR_API_KEY or BASETEN_API_KEY, or PII_GUARD_OCR_ENGINE=tesseract "
+            "(docs/operations.md)"
         )
     if "sam" in gaps:
         hints.append(

@@ -147,6 +147,7 @@ def _static_status(request: Request) -> dict[str, Any]:
             "sam": settings.sam_api_key is not None
             or settings.meta_api_key is not None
             or bool(settings.sam_url),
+            "ocr_engine": settings.ocr_engine,
             "ocr_required": settings.image_require_ocr,
             "gaps": gaps,
             "available": not gaps,

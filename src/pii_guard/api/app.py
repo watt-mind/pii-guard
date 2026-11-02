@@ -177,15 +177,22 @@ def _register_healthz(app: FastAPI, settings: Settings, warmup: NerWarmup) -> No
         },
     )
     def healthz() -> dict[str, object]:
-        """``{"status": "ok", "version": ..., "ner": ..., "ocr": ...}`` while the server
-        is up, also while the NER model loads (``ner``: ``loading``). ``ocr`` is ``"on"``
-        when Tesseract is installed and ``"off"`` otherwise; ``image_require_ocr`` says
-        whether image requests are refused without it (503 ``ocr_unavailable``). Needs no
-        token, and touches no detector, vault or upstream."""
+        """``{"status": "ok", "version": ..., "ner": ..., "ocr": ..., "ocr_engine": ...}``
+        while the server is up, also while the NER model loads (``ner``: ``loading``).
+        ``ocr_engine`` is ``PII_GUARD_OCR_ENGINE`` (``muse`` or ``tesseract``); ``ocr`` is
+        ``"on"`` when that engine can run (Muse Spark Open has its key, or Tesseract is
+        installed) and ``"off"`` otherwise; ``image_require_ocr`` says whether image requests
+        are refused without it (503 ``ocr_unavailable``). Needs no token, and touches no
+        detector, vault or upstream."""
         try:
-            from pii_guard.visual.ocr import tesseract_available
+            if settings.ocr_engine == "muse":
+                from pii_guard.visual.ocr_muse import muse_configured
 
-            ocr = "on" if tesseract_available() else "off"
+                ocr = "on" if muse_configured(settings) else "off"
+            else:
+                from pii_guard.visual.ocr import tesseract_available
+
+                ocr = "on" if tesseract_available() else "off"
         except Exception:  # the ocr extra is not installed: OCR is off, not an error
             ocr = "off"
         return {
@@ -193,6 +200,7 @@ def _register_healthz(app: FastAPI, settings: Settings, warmup: NerWarmup) -> No
             "version": __version__,
             "ner": warmup.state,
             "ocr": ocr,
+            "ocr_engine": settings.ocr_engine,
             "image_require_ocr": settings.image_require_ocr,
         }
 

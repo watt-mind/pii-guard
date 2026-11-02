@@ -199,6 +199,21 @@ class Settings(BaseSettings):
     # be checked, so image parts are refused with 503 ocr_unavailable. False forwards them
     # masked by SAM only, with X-PII-Guard-Image-OCR: off (text in the image unchecked).
     image_require_ocr: bool = True
+    # Who reads the text in images (LAB-1796, ADR 0016): "muse" (default, Meta-only runtime) =
+    # Muse Spark Open on Baseten Model APIs (pii_guard.visual.ocr_muse); the unmasked image is
+    # sent to PII_GUARD_OCR_URL. Without a key there is no OCR engine, so images are refused
+    # (503 ocr_unavailable) unless PII_GUARD_IMAGE_REQUIRE_OCR=false. "tesseract" = the
+    # on-device Tesseract binary (not a Meta model; opt-in).
+    ocr_engine: Literal["muse", "tesseract"] = "muse"
+    # Muse Spark Open OCR: the OpenAI-compatible base URL (default Baseten Model APIs; a local-only
+    # profile accepts only a self-hosted one), the model, and the key (PII_GUARD_OCR_API_KEY,
+    # else BASETEN_API_KEY; never logged).
+    ocr_url: str | None = None
+    ocr_model: str | None = None
+    ocr_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("PII_GUARD_OCR_API_KEY", "BASETEN_API_KEY", "ocr_api_key"),
+    )
     # Resource limits for image work (LAB-1207). Images above max_pixels are refused with 413
     # (OCR time and memory grow with pixels); at most image_concurrency images are masked at
     # once per app, each request within image_timeout seconds (POST /v1/mask/image; the

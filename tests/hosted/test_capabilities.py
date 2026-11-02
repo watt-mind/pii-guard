@@ -47,6 +47,8 @@ def settings(**overrides: Any) -> Settings:
             "upstream_api_key": UPSTREAM_KEY,
             # Hosted images use SAM 3.1 (ADR 0015); with its key they are offered.
             "sam_api_key": "synthetic-sam-key-not-a-secret",
+            # Their text is read by Muse Spark Open (ADR 0016); with its key they are offered.
+            "ocr_api_key": "synthetic-ocr-key-not-a-secret",
             **overrides,
         },
     )

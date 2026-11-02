@@ -104,8 +104,10 @@ def test_healthz(client: TestClient) -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
     body = response.json()
-    # OCR availability depends on the host's Tesseract (LAB-1219); the rest is fixed.
+    # OCR availability depends on the engine's key or the host's Tesseract (LAB-1219, LAB-1796);
+    # the rest is fixed.
     assert body.pop("ocr") in {"on", "off"}
+    assert body.pop("ocr_engine") in {"muse", "tesseract"}
     assert isinstance(body.pop("image_require_ocr"), bool)
     assert body == {"status": "ok", "version": __version__, "ner": "off"}
 

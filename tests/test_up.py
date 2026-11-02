@@ -25,6 +25,7 @@ from pii_guard.app_bundle import (
     Status,
     UpOptions,
     _banner,
+    _image_hints,
     active_detectors,
     create_bundle_app,
     image_gaps,
@@ -235,9 +236,23 @@ def test_launcher_names_the_distribution_with_extras() -> None:
 
 def test_image_gaps_lists_what_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("shutil.which", lambda _name: None)
-    gaps = image_gaps(Settings(segmenter="off"))  # "ocr" first too when pytesseract is missing
+    # "ocr" first too when pytesseract is missing
+    gaps = image_gaps(Settings(_env_file=None, segmenter="off", ocr_engine="tesseract"))
     assert gaps[-2:] == ["tesseract", "segmenter"]
     assert image_gaps(Settings(image_require_ocr=False, segmenter="off")) == ["segmenter"]
+
+
+def test_muse_ocr_without_a_key_is_an_image_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The Meta-only OCR default (ADR 0016) refuses images without a key: say so (LAB-1796).
+    monkeypatch.delenv("PII_GUARD_OCR_API_KEY", raising=False)
+    monkeypatch.delenv("BASETEN_API_KEY", raising=False)
+    keyless = Settings(_env_file=None, segmenter="off")
+    assert image_gaps(keyless) == ["ocr_key", "segmenter"]
+    keyed = Settings(_env_file=None, segmenter="off", ocr_api_key="synthetic-not-a-key")
+    assert image_gaps(keyed) == ["segmenter"]
+    hints = " ".join(_image_hints(["ocr_key"]))
+    assert "PII_GUARD_OCR_API_KEY" in hints and "PII_GUARD_OCR_ENGINE=tesseract" in hints
+    assert Status(upstream="mock", image_gaps=["ocr_key"]).images == "refused (no Muse OCR key)"
 
 
 def test_sam_default_without_a_key_is_an_image_gap() -> None:

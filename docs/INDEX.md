@@ -106,3 +106,4 @@ publishing releases.*
 | [0013](decisions/0013-one-console-owner-scoped-api.md) | One console, one API: owner-scoped runtime, hosted projections and server-declared capabilities |
 | [0014](decisions/0014-hosted-local-images.md) | Hosted image masking for signed-in owners, in memory only (on-device detection overridden by 0015) |
 | [0015](decisions/0015-meta-only-runtime-defaults.md) | Meta-only runtime defaults: SAM 3.1 for images (self-hosted and hosted), no public fallback NER; non-Meta engines opt-in |
+| [0016](decisions/0016-meta-only-ocr.md) | Meta-only OCR: Muse Spark Open reads the text in images (the unmasked image goes to the OCR endpoint); Tesseract opt-in |

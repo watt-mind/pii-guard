@@ -12,8 +12,10 @@
 # Images go to SAM 3.1 on the Meta Model API (the default segmenter): set PII_GUARD_SAM_API_KEY or
 # META_API_KEY in .env, or images are refused (fail closed).
 #   The local equivalent without Docker is `make demo` (`make demo MODE=rules`).
-# The image ships Tesseract (hun/eng/deu) for the text in images; without OCR, image parts are
-# refused with 503 ocr_unavailable unless PII_GUARD_IMAGE_REQUIRE_OCR=false.
+# The text in images is read by Muse Spark Open on Baseten (ADR 0016), which receives the
+# unmasked image: set PII_GUARD_OCR_API_KEY or BASETEN_API_KEY in .env, or image parts are
+# refused with 503 ocr_unavailable (unless PII_GUARD_IMAGE_REQUIRE_OCR=false). Tesseract is
+# opt-in: build with PII_GUARD_TESSERACT=true and run with PII_GUARD_OCR_ENGINE=tesseract.
 x-healthcheck: &healthcheck
   interval: 5s
   timeout: 3s
@@ -46,7 +48,8 @@ services:
     read_only: true
     volumes:
       - pii-guard-projects:/var/lib/pii-guard/projects
-    # pytesseract hands Tesseract the image through a temp file: OCR needs a writable /tmp.
+    # pytesseract (the opt-in Tesseract engine) hands Tesseract the image through a temp file:
+    # it needs a writable /tmp.
     tmpfs:
       - /tmp
     restart: unless-stopped
@@ -109,10 +112,10 @@ services:
       <<: *healthcheck
       # The first start downloads the NER model before the server listens: allow for it.
       start_period: 900s
-      # Healthy = /healthz answers and OCR is available (the image ships Tesseract); prints
-      # "ocr on|off" from /healthz itself ("ocr" + "image_require_ocr"). Images are
-      # refused (503 ocr_unavailable) without it (ADR 0006).
-      test: ["CMD", "python", "-c", "import json, urllib.request; r = json.load(urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2)); print('ocr', r.get('ocr')); sys.exit(0 if r.get('ocr') == 'on' or not r.get('image_require_ocr', True) else 1)"]
+      # Healthy = /healthz answers, and Tesseract is present when it is the configured OCR
+      # engine; prints "ocr <engine> on|off" from /healthz itself. A missing Muse OCR key is a
+      # status gap (images refused with 503 ocr_unavailable, ADR 0006), not an unhealthy API.
+      test: ["CMD", "python", "-c", "import json, sys, urllib.request; r = json.load(urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=2)); print('ocr', r.get('ocr_engine'), r.get('ocr')); sys.exit(0 if r.get('ocr') == 'on' or r.get('ocr_engine') == 'muse' or not r.get('image_require_ocr', True) else 1)"]
 
   # The Benchmarks view's index, built once per start from the committed run records (the Node
   # image has no Python): the UI's Vite plugin reads it from the shared volume (LAB-1356).

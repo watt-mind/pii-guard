@@ -11,7 +11,7 @@ service has passed review. Start with internal ingress and zero sponsored budget
 |---|---|---|---|
 | Anonymous walkthrough | Curated server-owned HU/EN synthetic sample; local rules and CPU NER | Masked sample to sponsored Meta, only when budget permits | Public; sample IDs only |
 | Signed-in editable text | Azure hosted service receives original text; local rules and CPU NER | Masked text to configured sponsored Meta or approved BYOK destination | Google identity or owner API key; owner-scoped vault |
-| Signed-in images | Azure hosted service receives the original image in memory and sends it to SAM 3.1 on the Meta Model API for faces, ID photos and signatures; local Tesseract OCR, local rules and CPU NER read its text; never stored | None: the masked image returns to the owner | Google identity only (no API keys, no guests); owner-scoped vault |
+| Signed-in images | Azure hosted service receives the original image in memory and sends it to SAM 3.1 on the Meta Model API for faces, ID photos and signatures and to Muse Spark Open on Baseten, which reads its text (ADR 0016); local rules and CPU NER check that text; never stored | None: the masked image returns to the owner | Google identity only (no API keys, no guests); owner-scoped vault |
 | BYOK | The service receives the provider key and configured endpoint | Masked input, key sent only to that approved public HTTPS destination | Signed-in owner; the endpoint credential is encrypted in project configuration (see [projects](projects.md)) |
 | Self-hosted | Original input stays in the operator's chosen guard/detector infrastructure | Masked input to the operator's provider | The operator controls access and retention |
 
@@ -202,9 +202,10 @@ startup characteristics and is not subject to the self-hosted image's 650 MB OCR
 | `PII_GUARD_HOSTED_PROJECT_CONTAINER` | `project-configuration`; fixed `<environment>.projects.v1.enc` snapshot |
 | `PII_GUARD_HOSTED_PROJECT_ENVIRONMENT` | `dev` or `prod`; separate account, identity and stable tenant key |
 | `PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID` | The environment runtime identity's client ID |
-| `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires Tesseract and the segmenter (SAM 3.1 with its key, or the opt-in on-device engines) |
+| `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires OCR (Muse Spark Open with `PII_GUARD_OCR_API_KEY`, or Tesseract when opted in) and the segmenter (SAM 3.1 with its key, or the opt-in on-device engines) |
 | `PII_GUARD_SEGMENTER` | `sam-api` (the default: SAM 3.1 on the Meta Model API, ADR 0015) or `local` (opt-in on-device engines, which need an image built with `PII_GUARD_ON_DEVICE_VISION=true`); `hybrid`/`off` refuse startup while hosted images are on |
 | `PII_GUARD_SAM_API_KEY` | The SAM 3.1 key; the release sets it from the `meta-key` Key Vault secret |
+| `PII_GUARD_OCR_ENGINE`, `PII_GUARD_OCR_API_KEY` | `muse` (the image's default, ADR 0016) needs a Baseten key; the release does not set one yet, so `/readyz` fails while hosted images are on until it does. `tesseract` needs an image built with `PII_GUARD_TESSERACT=true` |
 | `PII_GUARD_POLICY_OVERRIDES` | Unset: owners' project policies decide visual actions; an override set here wins when stricter |
 | `PII_GUARD_HOSTED_MAX_IMAGE_BYTES`, `PII_GUARD_HOSTED_IMAGE_MAX_PIXELS` | Defaults 4 MiB decoded and 8 MP, checked before OCR |
 | `PII_GUARD_HOSTED_IMAGE_TIMEOUT` | Default 60 s per image; one image job per replica, a busy replica answers `429` |

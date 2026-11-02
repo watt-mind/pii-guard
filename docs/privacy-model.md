@@ -38,7 +38,9 @@ A hosted **detector** endpoint would receive originals and needs separate explic
 terms review. Anonymous hosted traffic uses curated synthetic samples only; editable text and
 session-only BYOK require an authenticated owner. Hosted image masking is for signed-in Google
 owners only. The original image is decoded in the replica's memory and sent to SAM 3.1 on the
-Meta Model API, which finds faces, ID photos and signatures. Local Tesseract reads its text.
+Meta Model API, which finds faces, ID photos and signatures, and to Muse Spark Open on Baseten,
+which reads its text: both receive the unmasked image
+([ADR 0016](decisions/0016-meta-only-ocr.md)).
 The image is never stored or logged, and only the masked image and the owner's session mappings
 remain ([ADR 0015](decisions/0015-meta-only-runtime-defaults.md),
 [ADR 0014](decisions/0014-hosted-local-images.md)). Document uploads are disabled.
@@ -77,7 +79,7 @@ retains configurable remote detection.
 | Stage | Local-only processing and data boundary |
 |---|---|
 | Text detection | Built-in rules and in-process Transformers NER see original text. Local checkpoint loading cannot fetch weights; missing components refuse the request. Explicit rules-only has reduced coverage. |
-| OCR | Built-in local Tesseract sees original image pixels; extracted text uses the same permitted text detectors. Missing OCR/languages refuse processing. |
+| OCR | Built-in local Tesseract (`PII_GUARD_OCR_ENGINE=tesseract`), or Muse Spark Open only at a self-hosted `PII_GUARD_OCR_URL` (the default Baseten endpoint is refused here, ADR 0016), sees original image pixels; extracted text uses the same permitted text detectors. Missing OCR/languages refuse processing. |
 | Image segmentation | Local YuNet sees original pixels (a non-Meta engine, so this profile is an explicit opt-in under [ADR 0015](decisions/0015-meta-only-runtime-defaults.md); set `PII_GUARD_SEGMENTER=local`, since the default `sam-api` is refused here). Remote SAM and hybrid segmentation are refused; unsupported requested visual masks are refused. |
 | Mapping store | The guard's existing local vault holds reversible text mappings under the configured tenant key. The profile does not add persistence or alter retention. |
 | Downstream model | Receives masked text and re-encoded masked images. This separately selected endpoint may be external; missed entities or deliberately kept types can remain visible. |
