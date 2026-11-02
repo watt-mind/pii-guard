@@ -37,10 +37,17 @@ receives masked text, which can still identify someone through missed values or 
 A hosted **detector** endpoint would receive originals and needs separate explicit trust and
 terms review. Anonymous hosted traffic uses curated synthetic samples only; editable text and
 session-only BYOK require an authenticated owner. Hosted image masking is for signed-in Google
-owners only: the original image is decoded in the replica's memory, read by local Tesseract and
-the on-device face detector, never stored or logged, and only the masked image and the owner's
-session mappings remain ([ADR 0014](decisions/0014-hosted-local-images.md)). Document uploads
-are disabled.
+owners only. The original image is decoded in the replica's memory and sent to SAM 3.1 on the
+Meta Model API, which finds faces, ID photos and signatures. Local Tesseract reads its text.
+The image is never stored or logged, and only the masked image and the owner's session mappings
+remain ([ADR 0015](decisions/0015-meta-only-runtime-defaults.md),
+[ADR 0014](decisions/0014-hosted-local-images.md)). Document uploads are disabled.
+
+**Images go to the Meta Model API by default, self-hosted and hosted.** The default segmenter,
+`sam-api`, sends each original image to SAM 3.1 on the Meta Model API (or to your
+`PII_GUARD_SAM_URL`). Without a SAM key, images are refused; nothing falls back to a non-Meta
+model. To keep images on your machine, opt in to the on-device engines (YuNet, YOLOS-tiny;
+not Meta models) with `PII_GUARD_SEGMENTER=local`, or use the `local-only` profile below.
 
 The initial hosted runtime scales from zero to one replicas with one worker and ephemeral
 owner state. Each owner also retains up to 50 masked traffic events in memory, released on
@@ -71,7 +78,7 @@ retains configurable remote detection.
 |---|---|
 | Text detection | Built-in rules and in-process Transformers NER see original text. Local checkpoint loading cannot fetch weights; missing components refuse the request. Explicit rules-only has reduced coverage. |
 | OCR | Built-in local Tesseract sees original image pixels; extracted text uses the same permitted text detectors. Missing OCR/languages refuse processing. |
-| Image segmentation | Local YuNet sees original pixels. Remote SAM and hybrid segmentation are refused; unsupported requested visual masks are refused. |
+| Image segmentation | Local YuNet sees original pixels (a non-Meta engine, so this profile is an explicit opt-in under [ADR 0015](decisions/0015-meta-only-runtime-defaults.md); set `PII_GUARD_SEGMENTER=local`, since the default `sam-api` is refused here). Remote SAM and hybrid segmentation are refused; unsupported requested visual masks are refused. |
 | Mapping store | The guard's existing local vault holds reversible text mappings under the configured tenant key. The profile does not add persistence or alter retention. |
 | Downstream model | Receives masked text and re-encoded masked images. This separately selected endpoint may be external; missed entities or deliberately kept types can remain visible. |
 | Response restoration | The guard restores recognized placeholders using its mapping store before returning the response. |

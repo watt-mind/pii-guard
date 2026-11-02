@@ -45,6 +45,8 @@ def settings(**overrides: Any) -> Settings:
             "ner_fallback": "off",
             "upstream_base_url": UPSTREAM,
             "upstream_api_key": UPSTREAM_KEY,
+            # Hosted images use SAM 3.1 (ADR 0015); with its key they are offered.
+            "sam_api_key": "synthetic-sam-key-not-a-secret",
             **overrides,
         },
     )

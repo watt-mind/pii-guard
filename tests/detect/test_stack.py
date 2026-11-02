@@ -171,7 +171,7 @@ def test_ner_settings_reach_the_detector(monkeypatch: pytest.MonkeyPatch) -> Non
         "name": "ner",
         "model": "./models/fictional-ner",
         "published": "watt-mind/pii-guard-ner-xlmr-base",
-        "fallback": "download",
+        "fallback": "published",  # the Meta-only default (ADR 0015)
     }
 
 

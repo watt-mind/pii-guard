@@ -10,10 +10,11 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 
 # Extras installed into the image. The `ocr` extra (pytesseract) reads the text in images;
-# without it image parts are refused (ADR 0006). The `local-vision` extra (OpenCV headless)
-# runs YuNet, the on-device face and ID-photo detector of the default hybrid segmenter
-# (PII_GUARD_SEGMENTER, LAB-1245). The `sam` extra is Meta's official SAM 3.1 output parser
-# (meta-sam-parser, SAM License, LAB-1665).
+# without it image parts are refused (ADR 0006). The `sam` extra is Meta's official SAM 3.1
+# output parser (meta-sam-parser, SAM License, LAB-1665): SAM 3.1 on the Meta Model API is the
+# default segmenter (PII_GUARD_SEGMENTER=sam-api, ADR 0015). The `local-vision` extra (OpenCV
+# headless) runs YuNet, the optional on-device face and ID-photo detector (hybrid / local
+# segmenters, LAB-1245); its model is fetched only with PII_GUARD_ON_DEVICE_VISION=true below.
 ARG PII_GUARD_EXTRAS="ocr local-vision sam"
 # The NER (torch + transformers) is a core dependency (LAB-1733), but this base image stays
 # rules-only and inside its size budget (LAB-1192): these packages are skipped, so the default
@@ -41,9 +42,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         $(for p in $PII_GUARD_SKIP_PACKAGES; do printf -- '--no-install-package %s ' "$p"; done) \
         --no-editable
 
-# The YuNet model (0.23 MB, MIT, OpenCV model zoo): fetched from its pinned URL and checked
-# against its pinned SHA-256 (pii_guard.visual.segment.YUNET); the build fails on a mismatch.
-RUN PII_GUARD_MODEL_DIR=/app/models /app/.venv/bin/python -m pii_guard.visual.segment fetch
+# Only Meta models run by default (ADR 0015, LAB-1795), so the non-Meta on-device engines are
+# opt-in: --build-arg PII_GUARD_ON_DEVICE_VISION=true fetches the YuNet model (0.23 MB, MIT,
+# OpenCV model zoo) from its pinned URL and checks its pinned SHA-256
+# (pii_guard.visual.segment.YUNET); the build fails on a mismatch. Run such an image with
+# PII_GUARD_SEGMENTER=hybrid or local to use it. (The YOLOS-tiny signature detector needs torch,
+# which this rules-only base image skips; Dockerfile.hosted has the same build argument.)
+ARG PII_GUARD_ON_DEVICE_VISION=false
+RUN mkdir -p /app/models \
+    && if [ "$PII_GUARD_ON_DEVICE_VISION" = "true" ]; then \
+        PII_GUARD_MODEL_DIR=/app/models /app/.venv/bin/python -m pii_guard.visual.segment fetch; \
+    elif [ "$PII_GUARD_ON_DEVICE_VISION" != "false" ]; then \
+        echo "PII_GUARD_ON_DEVICE_VISION must be true or false" >&2; exit 1; \
+    fi
 
 # --- runtime: Python, Tesseract and the virtualenv, as a non-root user -------
 FROM python:3.12-slim-trixie AS runtime

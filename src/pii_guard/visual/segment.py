@@ -16,8 +16,12 @@ What it finds:
 It does **not** find ``SIGNATURE``: no permissively licensed small detector came close to SAM
 3.1 on ID documents (see ``docs/models.md``, *Local segmentation*). Asking for it raises
 :class:`~pii_guard.types.DetectionError` rather than returning a result that silently skips
-signatures (fail closed, ADR 0006). The default ``hybrid`` segmenter
+signatures (fail closed, ADR 0006). The opt-in ``hybrid`` segmenter
 (:mod:`pii_guard.visual.segmenters`, LAB-1245) therefore pairs it with SAM 3.1 for signatures.
+
+YuNet is not a Meta model, so it is optional and off by default (ADR 0015, LAB-1795): it runs
+only with ``PII_GUARD_SEGMENTER=hybrid`` or ``local``, and the Docker images fetch it only with
+``--build-arg PII_GUARD_ON_DEVICE_VISION=true``.
 
 Fail closed: a missing OpenCV, a missing model file or one whose SHA-256 does not match, an
 undecodable image and any inference error raise :class:`DetectionError`. Messages carry

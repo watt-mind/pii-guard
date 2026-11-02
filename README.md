@@ -17,7 +17,7 @@
 - **What it does.** An OpenAI-compatible gateway for AI agents. Change one base URL, and the names, addresses, IDs and faces it detects become reversible placeholders (`[[PERSON_7f3a]]`) before the request leaves. The real values come back in the answer, mid-stream and inside tool calls. Detection is rules plus a small NER that runs on CPU: XLM-RoBERTa base, distilled from Meta's Muse Glimmer 30B.
 - **How well.** On 990 fictional agent-traffic documents (de, en, hu), 0.2% of personal values reached the model and 0.7% of masks hit text that was not personal data. The lowest-leak alternative, PrivAiTe, leaked 2.4% and over-masked 35.2% on the same documents.
 - **How fast.** The NER takes 43 ms per message on a laptop CPU (p50; p95 50 ms, [measurement](eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json)). No LLM call and no API cost in fast mode.
-- **Where your data goes.** In fast mode, the default (rules plus the on-device NER, no LLM call), the original text is processed only on your machine. The hosted demo receives what you type, so use fictional data there. The optional audit and SAM 3.1 endpoints receive the original text or pixels. Anything the detectors miss passes through: pseudonymization, not anonymization or a compliance guarantee.
+- **Where your data goes.** In fast mode, the default (rules plus the on-device NER, no LLM call), the original text is processed only on your machine. The hosted demo receives what you type, so use fictional data there. Images go to SAM 3.1 on the Meta Model API, and the optional audit endpoint receives the original text. Anything the detectors miss passes through: pseudonymization, not anonymization or a compliance guarantee.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/leak-vs-overmasking-dark.svg">
@@ -122,9 +122,12 @@ for a request path at 9.4 s per document (p50). So it labeled the training text 
 **XLM-RoBERTa base** learned from it: 43 ms on CPU, published as
 [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2`.
 
-> In the default fast mode, every model that sees original personal data runs on your machine.
-> Audit mode (Muse Spark Open) and SAM 3.1 are opt-in and receive originals at the endpoint you
-> configure; escalate mode (Muse Spark Open) is opt-in and sends it masked windows only.
+> Only Meta models run by default ([ADR 0015](docs/decisions/0015-meta-only-runtime-defaults.md)).
+> In the default fast mode the rules and the NER, the models that read text, run on your
+> machine. Images go to SAM 3.1 on the Meta Model API: without a SAM key they are refused, never
+> handed to a non-Meta model. Audit mode (Muse Spark Open) is opt-in and receives originals at
+> the endpoint you configure. Escalate mode (Muse Spark Open) is opt-in and sends masked windows
+> only.
 
 | Job | Meta model |
 |---|---|
@@ -133,7 +136,11 @@ for a request path at 9.4 s per document (p50). So it labeled the training text 
 | Benchmark writer; demo model | **Muse Spark** (Meta Model API): [which model does what](docs/models.md#which-model-does-what) |
 | Escalate and audit modes, red team | **Muse Spark Open** (open weights): [escalate runs](eval/results/2026-11-01-lab-1766-escalate/README.md), [audit runs](docs/benchmarks.md#smoke), [red team](eval/results/2026-10-27-redteam/README.md) |
 | Fictional ID specimens | **Muse Image**: painted the portraits, signatures and stamps ([generation record](eval/fixtures/visual/generation.json)) |
-| Signatures in images | **SAM 3.1** (Meta Model API, decoded with Meta's `meta_sam_parser`); faces stay on the device (YuNet): [specimen results](eval/results/visual/specimens.md) |
+| Faces, ID photos and signatures in images | **SAM 3.1** (Meta Model API, decoded with Meta's `meta_sam_parser`), self-hosted and hosted: [specimen results](eval/results/visual/specimens.md) |
+
+Optional, off by default (not Meta models): YuNet faces and the YOLOS-tiny signature detector on
+the device (`PII_GUARD_SEGMENTER=hybrid` or `local`), and the public fallback NER
+(`PII_GUARD_NER_FALLBACK=download`). See [which model does what](docs/models.md#which-model-does-what).
 
 ## Inside the gateway
 

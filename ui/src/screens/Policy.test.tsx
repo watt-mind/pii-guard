@@ -22,17 +22,17 @@ function call(version: PolicyVersion): Requester {
 describe("hosted read-only policy view", () => {
   it("shows image detection and each image type's action", async () => {
     render(<OwnerPolicy call={call(policy)} />);
-    expect(await screen.findByText("On-device (fast)")).toBeInTheDocument();
+    expect(await screen.findByText("On-device (optional, not Meta models)")).toBeInTheDocument();
     const images = screen.getByRole("table", { name: "Images" });
     expect(images).toHaveTextContent(/Signature SIGNATUREKept in place/);
     expect(images).toHaveTextContent(/Face FACEMasked/);
   });
 
-  it("reads a version saved before image settings as on-device", async () => {
+  it("reads a version saved before image settings as SAM 3.1, the server's segmenter", async () => {
     const legacy: PolicyVersion = { ...policy };
     delete legacy.visual_detection;
     render(<OwnerPolicy call={call(legacy)} />);
-    expect(await screen.findByText("On-device (fast)")).toBeInTheDocument();
+    expect(await screen.findByText("SAM 3.1 (the default, sends the image to Meta)")).toBeInTheDocument();
   });
 });
 

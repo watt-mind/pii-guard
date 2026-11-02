@@ -17,8 +17,8 @@ export type VisualDetection = "local" | "sam";
 const HOSTED_BUILD = import.meta.env.VITE_PII_GUARD_HOSTED === "true";
 /** What the Detection choice says, in the editor and the read-only policy view. */
 export const VISUAL_DETECTION_LABEL: Record<VisualDetection, string> = {
-  local: HOSTED_BUILD ? "On the PII Guard server (fast)" : "On-device (fast)",
-  sam: "SAM 3.1 (better signatures, ~2–4 s, sends the image to Meta)",
+  local: HOSTED_BUILD ? "The hosted service's segmenter (SAM 3.1)" : "On-device (optional, not Meta models)",
+  sam: "SAM 3.1 (the default, sends the image to Meta)",
 };
 export interface Endpoint {
   id: string; name: string; project_id: string; policy_id: string;

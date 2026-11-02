@@ -4,9 +4,13 @@
 #   UI http://localhost:5173, demo API + gateway http://127.0.0.1:8788 (traffic log on),
 #   mock upstream (offline). Set PII_GUARD_DEMO_UPSTREAM_URL / _API_KEY for a real upstream.
 #   Fast mode with the NER: the demo image keeps torch + transformers, and the first start downloads
-#   the public fallback NER model (about 1.1 GB, docs/models.md) into the pii-guard-models
-#   volume; demo-api turns healthy once it is loaded. Rules only, offline, no download:
+#   the published pii-guard NER model (a fine-tune of Meta's XLM-RoBERTa, about 1.1 GB,
+#   docs/models.md) into the pii-guard-models volume; demo-api turns healthy once it is loaded.
+#   Only Meta models run by default (ADR 0015): the public fallback NER is off unless
+#   PII_GUARD_DEMO_NER_FALLBACK=download. Rules only, offline, no download:
 #   PII_GUARD_DEMO_NER_FALLBACK=off docker compose --profile demo up --build
+# Images go to SAM 3.1 on the Meta Model API (the default segmenter): set PII_GUARD_SAM_API_KEY or
+# META_API_KEY in .env, or images are refused (fail closed).
 #   The local equivalent without Docker is `make demo` (`make demo MODE=rules`).
 # The image ships Tesseract (hun/eng/deu) for the text in images; without OCR, image parts are
 # refused with 503 ocr_unavailable unless PII_GUARD_IMAGE_REQUIRE_OCR=false.
@@ -79,8 +83,9 @@ services:
       PII_GUARD_UPSTREAM_BASE_URL: ${PII_GUARD_DEMO_UPSTREAM_URL:-http://mock-upstream:8790/v1}
       PII_GUARD_UPSTREAM_API_KEY: ${PII_GUARD_DEMO_UPSTREAM_API_KEY:-}
       # NER model resolution (docs/models.md): PII_GUARD_NER_MODEL from .env if set, else the
-      # public fallback, downloaded on the first start into the volume below. off: rules only.
-      PII_GUARD_NER_FALLBACK: ${PII_GUARD_DEMO_NER_FALLBACK:-download}
+      # published model, downloaded on the first start into the volume below; the public
+      # fallback only with download (ADR 0015). off: rules only.
+      PII_GUARD_NER_FALLBACK: ${PII_GUARD_DEMO_NER_FALLBACK:-published}
       PII_GUARD_MODELS_DIR: /app/cache/models
       HF_HOME: /app/cache/huggingface
     # A fresh tenant key per container unless .env sets one (pseudonyms are per run). The NER

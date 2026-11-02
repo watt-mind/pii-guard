@@ -240,6 +240,15 @@ def test_image_gaps_lists_what_is_missing(monkeypatch: pytest.MonkeyPatch) -> No
     assert image_gaps(Settings(image_require_ocr=False, segmenter="off")) == ["segmenter"]
 
 
+def test_sam_default_without_a_key_is_an_image_gap() -> None:
+    # The Meta-only default (ADR 0015) refuses images without a SAM key: say so (LAB-1795).
+    assert image_gaps(Settings(image_require_ocr=False)) == ["sam"]
+    keyed = Settings(image_require_ocr=False, sam_api_key="synthetic-not-a-key")
+    assert image_gaps(keyed) == []
+    status = Status(upstream="mock", detectors=["rules"], image_gaps=["sam"])
+    assert status.images == "refused (no SAM 3.1 key)"
+
+
 def test_distribution_name_is_the_pypi_one() -> None:
     assert DISTRIBUTION == "wattmind-pii-guard"
     assert __version__ != "0.0.0+unknown"
