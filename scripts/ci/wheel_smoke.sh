@@ -13,7 +13,10 @@
 #                `wattmind-pii-guard==<version>`; without a wheel the file checks are skipped
 #   --python V   the interpreter uv runs it on, as the README does (`uvx --python 3.12`)
 #   --no-ui      expect the no-UI fallback page at / (a source install has no UI bundled)
-#   --image      also send one image (needs the `tesseract` binary: /healthz must say ocr on)
+#   --image      also send one image on the opt-in on-device engines (Tesseract OCR, `hybrid`
+#                segmenter: YuNet and the YOLOS-tiny signature detector without a SAM key),
+#                since the keyless defaults refuse images (ADR 0015/0016, LAB-1807); needs the
+#                `tesseract` binary: /healthz must say ocr on
 #   --torch-backend B  passed to uv (`cpu` on Linux: the CPU build of PyTorch); with `cpu`, no
 #                CUDA package may be downloaded
 #   --expect-ner on|off  fail unless /healthz ends at "ner":"ready" (on) or "ner":"off" (off,
@@ -107,10 +110,14 @@ uv_args="--isolated"
 [ -n "$torch_backend" ] && uv_args="$uv_args --torch-backend $torch_backend"
 echo "source: $source_spec"
 # A clean environment: no developer upstream, key or .env leaks into the run. TMPDIR is kept
-# (pytesseract writes the image there); UV_CACHE_DIR only if the caller set one.
+# (pytesseract writes the image there); UV_CACHE_DIR only if the caller set one. With --image the
+# on-device engines are chosen explicitly (the keyless Meta defaults refuse images).
+engines=""
+$image && engines="PII_GUARD_OCR_ENGINE=tesseract PII_GUARD_SEGMENTER=hybrid"
 workdir="$(mktemp -d)"
 started=$SECONDS
-env -i HOME="$HOME" PATH="$PATH" ${TMPDIR:+TMPDIR="$TMPDIR"} ${UV_CACHE_DIR:+UV_CACHE_DIR="$UV_CACHE_DIR"} \
+# shellcheck disable=SC2086 # engines is a list of assignments: split on purpose
+env -i HOME="$HOME" PATH="$PATH" ${TMPDIR:+TMPDIR="$TMPDIR"} ${UV_CACHE_DIR:+UV_CACHE_DIR="$UV_CACHE_DIR"} $engines \
   bash -c "cd '$workdir' && exec uv tool run $uv_args --from '$source_spec' pii-guard up --no-browser --port $port" \
   >"$log" 2>&1 &
 pid=$!
