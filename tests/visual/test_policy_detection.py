@@ -228,7 +228,10 @@ def test_policy_segmenter_selection() -> None:
     assert pick("sam", hybrid) is hybrid
     assert pick("sam", sam) is sam
     assert pick("local", hybrid) is local
-    assert pick("local", sam) is local
+    # A SAM-only server (the Meta-only default, ADR 0015) runs no on-device engine: a local
+    # policy's images are refused, never sent to SAM instead (fail closed).
+    with pytest.raises(DetectionError, match="on-device image detection"):
+        pick("local", sam)
     # A stricter server wins: a policy never turns egress on.
     assert pick("sam", Faces()) is local  # type: ignore[arg-type]
     assert pick("sam", off) is off and pick("local", off) is off
@@ -239,11 +242,13 @@ def test_policy_segmenter_selection() -> None:
 # --- the policy's visual actions ----------------------------------------------------------
 
 
-def test_visual_detection_defaults_to_local() -> None:
-    assert visual_detection(None) == "local"
-    assert visual_detection({}) == "local"
+def test_visual_detection_defaults_to_the_servers_segmenter() -> None:
+    # Saved before the field: the server's segmenter (SAM 3.1 by default, ADR 0015).
+    assert visual_detection(None) == "sam"
+    assert visual_detection({}) == "sam"
     assert visual_detection({"visual_detection": "sam"}) == "sam"
-    assert visual_detection({"visual_detection": "bogus"}) == "local"
+    assert visual_detection({"visual_detection": "local"}) == "local"
+    assert visual_detection({"visual_detection": "bogus"}) == "local"  # the stricter
 
 
 def test_effective_policies() -> None:
@@ -264,9 +269,9 @@ def test_effective_policies() -> None:
     assert looser.of(EntityType.FACE) is Policy.MASK  # a looser override never unmasks
 
 
-def test_settings_default_unchanged() -> None:
-    # The server-wide segmenter setting is untouched; policies choose within it.
-    assert Settings().segmenter == "hybrid"
+def test_settings_default_is_sam_only() -> None:
+    # The Meta-only default (ADR 0015); policies choose within the server's setting.
+    assert Settings().segmenter == "sam-api"
 
 
 # --- the self-hosted route picks per selected project policy -------------------------------
@@ -299,7 +304,7 @@ def test_route_local_policy_reuses_the_servers_faces_and_never_calls_sam() -> No
     chosen = _sam_client(request)
     assert isinstance(chosen, LocalSignatureSegmenter) and chosen.local is faces
     assert _sam_client(request) is chosen  # built once per app
-    assert _sam_client(_request(hybrid, {})) is not hybrid  # saved before the field: local
+    assert _sam_client(_request(hybrid, {})) is hybrid  # saved before the field: the server's
     sam_policy = _sam_client(_request(hybrid, {"visual_detection": "sam"}))
     assert sam_policy is hybrid
     assert sam.prompts == []
@@ -313,8 +318,26 @@ def test_route_builds_on_device_faces_when_the_server_has_none(
 
     faces = LocalSegmenter(detector=object())
     monkeypatch.setattr(route, "build_segmenter", lambda *a, **k: faces)
-    chosen = route._sam_client(_request(Sam().client(), {"visual_detection": "local"}))
+    # A hybrid server whose YuNet was unavailable at build time (faces went to SAM).
+    server = HybridSegmenter(sam=Sam().client(), local=None)
+    chosen = route._sam_client(_request(server, {"visual_detection": "local"}))
     assert isinstance(chosen, LocalSignatureSegmenter) and chosen.local is faces
+
+
+def test_route_local_policy_on_the_sam_only_default_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import pii_guard.api.routes.image as route
+
+    def refused(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("a non-Meta on-device model was built on a SAM-only server")
+
+    monkeypatch.setattr(route, "build_segmenter", refused)
+    sam = Sam()
+    with pytest.raises(DetectionError, match="PII_GUARD_SEGMENTER=hybrid or local"):
+        route._sam_client(_request(sam.client(), {"visual_detection": "local"}))
+    assert route._sam_client(_request(sam.client(), {"visual_detection": "sam"})) is not None
+    assert sam.prompts == []
 
 
 def test_selected_project_policy_drives_a_self_hosted_image(tmp_path: Path) -> None:
@@ -345,6 +368,19 @@ def test_selected_project_policy_drives_a_self_hosted_image(tmp_path: Path) -> N
         projects = client.get("/v1/projects", headers=headers).json()
         project = projects["default_project_id"]
         selected = {**headers, "x-pii-guard-project": project, "content-type": "image/png"}
+        # The default policy uses the server's segmenter (sam, ADR 0015): signatures to SAM.
+        default = client.post("/v1/mask/image", content=_png(), headers=selected)
+        assert default.status_code == 200, default.text
+        assert sam.prompts and "FACE" in {r["entity_type"] for r in default.json()["regions"]}
+        sam.prompts.clear()
+        # An explicit local version: on-device on this hybrid server, no SAM request.
+        family = projects["projects"][0]["default_policy_id"]
+        saved = client.put(
+            f"/v1/projects/{project}/policies/{family}",
+            json={"name": "Local images", "visual_detection": "local"},
+            headers=headers,
+        )
+        assert saved.status_code == 201, saved.text
         response = client.post("/v1/mask/image", content=_png(), headers=selected)
         assert response.status_code == 200, response.text
         types = {r["entity_type"] for r in response.json()["regions"]}

@@ -29,8 +29,8 @@ def test_fast_is_the_code_default() -> None:
     assert GatewayConfig(_env_file=None).mode is Mode.FAST  # type: ignore[call-arg]
 
 
-def test_mode_values_are_fast_and_audit() -> None:
-    assert [m.value for m in Mode] == ["fast", "audit"]
+def test_mode_values_are_fast_escalate_and_audit() -> None:
+    assert [m.value for m in Mode] == ["fast", "escalate", "audit"]
 
 
 @pytest.mark.parametrize("raw", ["strict", "STRICT", " Strict "])
@@ -86,7 +86,7 @@ def test_unknown_header_mode_lists_the_current_names() -> None:
             headers={"X-PII-Guard-Mode": "paranoid"},
         )
     assert r.status_code == 400
-    assert "fast, audit" in r.text
+    assert "fast, escalate, audit" in r.text
 
 
 def test_cli_mode_maps_strict_with_a_stderr_warning(capsys: pytest.CaptureFixture[str]) -> None:

@@ -1,26 +1,34 @@
 """Which segmenter finds faces, ID photos and signatures (``PII_GUARD_SEGMENTER``, LAB-1245).
 
+Only Meta models run by default (ADR 0015, LAB-1795): the default is ``sam-api``, SAM 3.1 on
+the Meta Model API. The on-device engines, YuNet (OpenCV model zoo) for faces and ID photos and
+the YOLOS-tiny signature detector, are not Meta models: they stay available, off by default,
+and run only when configured (``hybrid`` or ``local``, or a project policy's ``local`` on such
+a server).
+
 Modes (:data:`SEGMENTER_MODES`):
 
-- ``hybrid`` (default): :class:`HybridSegmenter`. ``FACE`` and ``ID_PHOTO`` on the CPU with
-  YuNet (:class:`~pii_guard.visual.segment.LocalSegmenter`), everything else (``SIGNATURE``,
-  and ``STAMP`` when its policy is not ``keep``) with SAM 3.1 on the Meta API (or the on-device
-  YOLOS-tiny :class:`SignatureDetector` for ``SIGNATURE`` when ``META_API_KEY`` is not set).
-  Two SAM calls per image with the default policies (``signature``, ``squiggly line``) instead
-  of five. The image still leaves the machine for the signature prompts when SAM is configured:
-  a latency and cost win, not a privacy one.
-- ``sam-api``: :class:`~pii_guard.visual.sam.SamClient` for every type (the previous default):
-  one call per prompt, ``face``, ``signature``, ``squiggly line``, ``photo of a person``,
-  ``stamp``.
-- ``local``: :class:`~pii_guard.visual.segment.LocalSegmenter` only; nothing leaves the
-  machine. It cannot find signatures, so with the default policies (``SIGNATURE`` is ``mask``)
-  every image is refused (``detection_failed``); set ``SIGNATURE`` to ``keep`` to accept
-  images with visible signatures.
+- ``sam-api`` (default): :class:`~pii_guard.visual.sam.SamClient` for every type: one call per
+  prompt, ``face``, ``signature``, ``squiggly line``, ``photo of a person``, ``stamp``. The
+  image is sent to the Meta Model API. Without a SAM key (``PII_GUARD_SAM_API_KEY``, else
+  ``META_API_KEY``) every image is refused (fail closed); nothing falls back to a non-Meta
+  model.
+- ``hybrid`` (opt-in, non-Meta faces): :class:`HybridSegmenter`. ``FACE`` and ``ID_PHOTO`` on
+  the CPU with YuNet (:class:`~pii_guard.visual.segment.LocalSegmenter`), everything else
+  (``SIGNATURE``, and ``STAMP`` when its policy is not ``keep``) with SAM 3.1 (or the on-device
+  YOLOS-tiny :class:`SignatureDetector` for ``SIGNATURE`` when no SAM key is set). Two SAM
+  calls per image with the default policies (``signature``, ``squiggly line``) instead of
+  five: a latency and cost win, not a privacy one.
+- ``local`` (opt-in, non-Meta): :class:`~pii_guard.visual.segment.LocalSegmenter` only;
+  nothing leaves the machine. It cannot find signatures, so with the default policies
+  (``SIGNATURE`` is ``mask``) every image is refused (``detection_failed``); set ``SIGNATURE``
+  to ``keep`` to accept images with visible signatures.
 - ``off``: :class:`OffSegmenter`, no segmentation; every image is refused, so nothing is
   returned with an unchecked face.
 
 Fail closed (ADR 0006), decided once when the segmenter is built (:func:`build_segmenter`):
 
+- ``sam-api`` without a key builds, and refuses every image when asked to segment.
 - ``hybrid`` without OpenCV or the YuNet model falls back to SAM for faces too, with a
   warning (still masked, so not a leak). With no SAM API key either, it raises.
 - ``local`` without OpenCV or the model raises; it never falls back to the API.
@@ -29,13 +37,14 @@ Fail closed (ADR 0006), decided once when the segmenter is built (:func:`build_s
 Per-policy detection (LAB-1444): a project policy's ``visual_detection`` picks the segmenter
 for its images (:func:`policy_segmenter`, :data:`VISUAL_DETECTIONS`):
 
-- ``local`` (the default): :class:`LocalSignatureSegmenter`, YuNet for faces and ID photos and
-  the pinned YOLOS-tiny signature detector (:class:`SignatureDetector`) for signatures, both on
-  the CPU; nothing leaves the machine. Stamps cannot be found locally, so a policy that masks
-  ``STAMP`` is refused.
-- ``sam``: the server's segmenter (``hybrid`` by default: local faces, SAM 3.1 for signatures
-  and stamps). A server that is stricter (``local`` or ``off``) wins: the policy never turns
-  egress on.
+- ``local``: :class:`LocalSignatureSegmenter`, YuNet for faces and ID photos and the pinned
+  YOLOS-tiny signature detector (:class:`SignatureDetector`) for signatures, both on the CPU;
+  nothing leaves the machine. Stamps cannot be found locally, so a policy that masks
+  ``STAMP`` is refused. These are the optional non-Meta engines, so a ``sam-api`` server (the
+  default) refuses a ``local`` policy's images instead of running them (ADR 0015); a
+  ``hybrid`` or ``local`` server has opted in and serves them.
+- ``sam``: the server's segmenter (``sam-api`` by default). A server that is stricter
+  (``local`` or ``off``) wins: the policy never turns egress on.
 
 Get the signature detector once (pinned Hugging Face revision, SHA-256 checked)::
 
@@ -262,9 +271,15 @@ def _yolos(  # pragma: no cover - needs torch, transformers and the pinned files
         from transformers import AutoImageProcessor, AutoModelForObjectDetection
         from transformers.utils import logging as hf_logging
     except ImportError as exc:
+        from pii_guard.detect.stack import no_torch_build
+
+        where = (
+            "PyTorch has no Intel macOS build; run the Docker demo for images"
+            if no_torch_build()
+            else "part of the default install; the rules-only base Docker image skips them"
+        )
         raise DetectionError(
-            "the signature detector needs torch and transformers (part of the default install; "
-            "the rules-only base Docker image skips them)"
+            f"the signature detector needs torch and transformers ({where})"
         ) from exc
     with contextlib.suppress(Exception):
         hf_logging.disable_progress_bar()
@@ -446,12 +461,23 @@ def policy_segmenter(
 
     ``server`` is the deployment's segmenter (``PII_GUARD_SEGMENTER``); ``local`` returns the
     shared :class:`LocalSignatureSegmenter`. The stricter of the two wins: a ``local`` / ``off``
-    server is used even when the policy says ``sam``, and ``local`` never calls SAM.
+    server is used even when the policy says ``sam``, and ``local`` never calls SAM. A
+    ``local`` policy on a SAM-only server raises :class:`DetectionError` (ADR 0015).
     """
     if detection not in VISUAL_DETECTIONS:
         raise ValueError(f"visual_detection must be one of: {', '.join(VISUAL_DETECTIONS)}")
     if isinstance(server, OffSegmenter):
         return server
+    if detection == "local" and isinstance(server, SamClient):
+        # The Meta-only default (ADR 0015): the on-device engines are not Meta models and run
+        # only where the operator enabled them. Refused, never sent to SAM instead: the policy
+        # asked for no egress (fail closed, ADR 0006).
+        raise DetectionError(
+            "this project policy asks for on-device image detection, which this server does "
+            "not run (PII_GUARD_SEGMENTER=sam-api, SAM 3.1 only); choose SAM 3.1 detection "
+            "in the policy, or enable the optional on-device engines with "
+            "PII_GUARD_SEGMENTER=hybrid or local"
+        )
     if detection == "local" or not isinstance(server, (HybridSegmenter, SamClient)):
         return local()
     return server

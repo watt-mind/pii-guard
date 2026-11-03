@@ -1,0 +1,39 @@
+# Reference words: labels that make a number a business number, not personal data
+# (order, invoice, payment reference ...). One entry per line, `#` comments, blank lines
+# ignored; format in pl/references.tsv. A trailing `*` lets the word take suffixes
+# (`factuur*`: `factuurnummer`, `factuurdatum`), a trailing `.` matches with or without the
+# dot (`klantnr`/`klantnr.`). The shared check accepts "nummer" and "nr" between the label
+# and the number, so `factuur nr. 123` needs no entry of its own.
+# Every entry is scoped to the rules check for now: the NER check's negative words are pinned
+# to the built-in list (tests/detect/test_reference_packs.py, LAB-1788), so a Dutch label
+# does not drop an NER number yet.
+bestelnummer*	rules
+bestelling*	rules
+ordernummer*	rules
+factuur*	rules
+facturen	rules
+creditnota*	rules
+klantnummer*	rules
+klantnr.	rules
+kenmerk*	rules
+betalingskenmerk*	rules
+referentie*	rules
+dossiernummer*	rules
+dossier	rules
+zaaknummer*	rules
+artikelnummer*	rules
+zendingnummer*	rules
+pakket*	rules
+reservering*	rules
+offerte*	rules
+bonnummer*	rules
+kassabon*	rules
+polisnummer*	rules
+kvk*	rules
+kvk-nummer*	rules
+handelsregister*	rules
+btw-nummer*	rules
+btwnummer*	rules
+btw-id	rules
+bedrag*	weak
+totaal	weak

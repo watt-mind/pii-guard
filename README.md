@@ -6,8 +6,8 @@
 </picture>
 
 [![Try it live](https://img.shields.io/badge/try%20it%20live-guard.watt--mind.com-b6f36b)](https://guard.watt-mind.com)
-[![Demo Video](https://img.shields.io/badge/demo%20video-3--min%20walkthrough-blue)](https://youtu.be/Lsr74ddhxRo)
-[![CI](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml)
+[![Demo Video](https://img.shields.io/badge/demo%20video-3--min%20walkthrough-blue)](https://youtu.be/VrY8x3h26ws)
+[![CI](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/watt-mind/pii-guard/actions/workflows/ci.yml)
 [![Model on Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20model-pii--guard--ner--xlmr--base-yellow)](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
@@ -17,7 +17,7 @@
 - **What it does.** An OpenAI-compatible gateway for AI agents. Change one base URL, and the names, addresses, IDs and faces it detects become reversible placeholders (`[[PERSON_7f3a]]`) before the request leaves. The real values come back in the answer, mid-stream and inside tool calls. Detection is rules plus a small NER that runs on CPU: XLM-RoBERTa base, distilled from Meta's Muse Glimmer 30B.
 - **How well.** On 990 fictional agent-traffic documents (de, en, hu), 0.2% of personal values reached the model and 0.7% of masks hit text that was not personal data. The lowest-leak alternative, PrivAiTe, leaked 2.4% and over-masked 35.2% on the same documents.
 - **How fast.** The NER takes 43 ms per message on a laptop CPU (p50; p95 50 ms, [measurement](eval/results/2026-10-30-lab-1625-ner-v42/latency-cpu-local.json)). No LLM call and no API cost in fast mode.
-- **Where your data goes.** In fast mode, the default (rules plus the on-device NER, no LLM call), the original text is processed only on your machine. The hosted demo receives what you type, so use fictional data there. The optional audit and SAM 3.1 endpoints receive the original text or pixels. Anything the detectors miss passes through: pseudonymization, not anonymization or a compliance guarantee.
+- **Where your data goes.** In fast mode, the default (rules plus the on-device NER, no LLM call), the original text is processed only on your machine. The hosted demo receives what you type, so use fictional data there. Images go unmasked to SAM 3.1 on the Meta Model API and to Muse Spark Open on Baseten, which reads their text; the optional audit endpoint receives the original text. Anything the detectors miss passes through: pseudonymization, not anonymization or a compliance guarantee.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/leak-vs-overmasking-dark.svg">
@@ -27,35 +27,43 @@
 <p align="center"><sub>990 fictional documents (de, en, hu), drawn by <code>pii-guard eval report</code> from the <a href="eval/results/runs/">run records</a>. <a href="#results">All sets</a> · <a href="docs/benchmarks/README.md">Shareable PNGs</a></sub></p>
 <!-- intro:end -->
 
-<p align="center"><sub>Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026) · <a href="https://youtu.be/Lsr74ddhxRo">3-minute video walkthrough</a>. Version 0.1.0, installed from git; no tagged release yet. <a href="docs/why-pii-guard.md#what-is-not-here-yet">Known gaps</a>.</sub></p>
+<p align="center"><sub>Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026) · <a href="https://youtu.be/VrY8x3h26ws">3-minute video walkthrough</a>. Released on PyPI as <code>wattmind-pii-guard</code>. <a href="docs/why-pii-guard.md#what-is-not-here-yet">Known gaps</a>.</sub></p>
 
 ## Quickstart
 
-**Walkthrough:** [watch the 3-minute demo video on YouTube](https://youtu.be/Lsr74ddhxRo).
+**Walkthrough:** [watch the 3-minute demo video on YouTube](https://youtu.be/VrY8x3h26ws).
 
 **No install:** the [live demo](https://guard.watt-mind.com) runs as a guest with no sign-up
 (fictional data only; capped sponsored allowance).
 
-**On your machine** (needs [uv](https://docs.astral.sh/uv/)): the API and the gateway on
-http://127.0.0.1:8787, with a mock model that echoes what it receives:
+**On your machine** (needs [uv](https://docs.astral.sh/uv/)): the web console, the API and the
+gateway on http://127.0.0.1:8787, with a mock model that echoes what it receives:
 
 ```bash
-uvx --python 3.12 \
-  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
-  pii-guard up
+uvx --python 3.12 --from wattmind-pii-guard pii-guard up
 ```
 
 **Launch a coding agent directly** ([OpenCode](docs/integrations/opencode.md), [Codex](docs/integrations/codex.md), [Claude Code](docs/integrations/claude-code.md), [pi](docs/integrations/pi.md), [Muse Code](docs/integrations/muse-code.md)) behind an in-process local gateway with Meta's `muse-spark-1.3`:
 
 ```bash
 export META_API_KEY=<your-key>
-uvx --python 3.12 \
-  --from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard' \
-  pii-guard run opencode --upstream meta --model muse-spark-1.3
+uvx --python 3.12 --from wattmind-pii-guard \
+  pii-guard run opencode --upstream meta --model muse-spark-1.3 --dashboard local
 ```
 
+`--dashboard local` also serves the web console on the gateway port: open the
+`local dashboard http://127.0.0.1:<port>/#traffic` URL that `run` prints at startup.
+
+- **The package is `wattmind-pii-guard`**: `pii-guard` on PyPI is an unrelated project. The
+  latest `develop` builds from git (`--from 'wattmind-pii-guard @ git+https://github.com/watt-mind/pii-guard@develop'`)
+  without the web console; everything else is the same.
 - **First run:** downloads PyTorch and the NER once (the NER is 1.1 GB); `/healthz` reports
   `"ner": "ready"` when detection is live.
+- **Platforms:** macOS 14+ on Apple silicon and Linux (x86_64, arm64); on Windows use WSL2
+  (it is Linux) or Docker, native Windows is not tested yet. On Linux and WSL2 add
+  `--torch-backend cpu` after `uvx` to skip the multi-GB CUDA build of PyTorch. Intel Macs and
+  macOS 13 have no PyTorch build: Intel Macs install text masking with rules only and refuse images
+  (the banner says so); the [Docker demo](docs/operations.md#docker) runs everything on either.
 - **A real model:** `--upstream meta` with `META_API_KEY`; `openai`, `fireworks`, `openrouter`
   or any `--upstream-url` work the same way ([`pii-guard up` options](docs/operations.md#one-command-pii-guard-up), [coding agent integrations](docs/integrations/README.md)).
 - **No auth by default**, bound to 127.0.0.1: set `PII_GUARD_API_TOKEN` before exposing it
@@ -114,18 +122,28 @@ for a request path at 9.4 s per document (p50). So it labeled the training text 
 **XLM-RoBERTa base** learned from it: 43 ms on CPU, published as
 [`watt-mind/pii-guard-ner-xlmr-base`](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base) `v4.2`.
 
-> In the default fast mode, every model that sees original personal data runs on your machine.
-> Audit mode (Muse Spark Open) and SAM 3.1 are opt-in and receive originals at the endpoint you
-> configure.
+> Only Meta models run by default ([ADR 0015](docs/decisions/0015-meta-only-runtime-defaults.md)).
+> In the default fast mode the rules and the NER, the models that read text, run on your
+> machine. Images go, unmasked, to SAM 3.1 on the Meta Model API and to Muse Spark Open on
+> Baseten, which reads their text ([ADR 0016](docs/decisions/0016-meta-only-ocr.md)): without
+> their keys they are refused, never handed to a non-Meta model. Audit mode (Muse Spark Open) is opt-in and receives originals at
+> the endpoint you configure. Escalate mode (Muse Spark Open) is opt-in and sends masked windows
+> only.
 
 | Job | Meta model |
 |---|---|
 | Fast-mode NER (CPU) | **XLM-RoBERTa base** (FacebookAI, MIT), fine-tuned: [model card](training/ner/model-card.md), [training](docs/models.md#ner-v4-v41-and-v42-v42-is-published) |
 | Teacher: labels training text | **Muse Glimmer 30B** (open weights, Apache-2.0): [distillation](docs/models.md#distilled-from-muse-glimmer) |
 | Benchmark writer; demo model | **Muse Spark** (Meta Model API): [which model does what](docs/models.md#which-model-does-what) |
-| Audit mode, red team | **Muse Spark Open** (open weights): [audit runs](docs/benchmarks.md#smoke), [red team](eval/results/2026-10-27-redteam/README.md) |
+| Escalate and audit modes, red team | **Muse Spark Open** (open weights): [escalate runs](eval/results/2026-11-01-lab-1766-escalate/README.md), [audit runs](docs/benchmarks.md#smoke), [red team](eval/results/2026-10-27-redteam/README.md) |
 | Fictional ID specimens | **Muse Image**: painted the portraits, signatures and stamps ([generation record](eval/fixtures/visual/generation.json)) |
-| Signatures in images | **SAM 3.1** (Meta Model API, decoded with Meta's `meta_sam_parser`); faces stay on the device (YuNet): [specimen results](eval/results/visual/specimens.md) |
+| Faces, ID photos and signatures in images | **SAM 3.1** (Meta Model API, decoded with Meta's `meta_sam_parser`), self-hosted and hosted: [specimen results](eval/results/visual/specimens.md) |
+| Text in images (OCR) | **Muse Spark Open** (Baseten Model APIs, or your own endpoint), self-hosted and hosted: [Muse vs Tesseract](eval/results/visual/fictional-ocr-muse.md) |
+
+Optional, off by default (not Meta models): YuNet faces and the YOLOS-tiny signature detector on
+the device (`PII_GUARD_SEGMENTER=hybrid` or `local`), Tesseract OCR on the device
+(`PII_GUARD_OCR_ENGINE=tesseract`), and the public fallback NER
+(`PII_GUARD_NER_FALLBACK=download`). See [which model does what](docs/models.md#which-model-does-what).
 
 ## Inside the gateway
 
@@ -144,6 +162,7 @@ original exactly.
 |---|---|---|
 | `fast` (default): everyday traffic | Rules + on-device NER; no LLM call | Only the masked request, to your LLM provider |
 | `fast` with `PII_GUARD_DETECTORS=rules`: offline runs, CI, structured data | Rules only; free-text names only as [known values](docs/api.md#sessions-and-restore) your app registers | Only the masked request |
+| `escalate` (opt-in, `X-PII-Guard-Mode: escalate`): an LLM second look only where fast mode is unsure | Fast, then Muse Spark Open on the uncertain spans only; the LLM can add or retype spans, never unmask; a failed call masks the uncertain words | Nothing when nothing is uncertain; else small windows of the original text (about 200 characters around each uncertain word, every value already found replaced by a placeholder), to the LLM endpoint you configure ([measured](docs/architecture-gateway.md#escalate-mode)) |
 | `audit` (opt-in, `X-PII-Guard-Mode: audit`): measuring the upper bound, training labels | Rules + NER + an LLM detector; fails closed if that call fails | The original text, to the audit endpoint you configure |
 
 **Grammar-aware.** In Hungarian a name changes with every case; the ending stays outside the
@@ -155,9 +174,10 @@ placeholder:
 | The model sees | Kérem, írjon [[PERSON_968e29]]nak a [[EMAIL_e7038b]] címre.<br><sub>… *to [[PERSON]]* …</sub> |
 | You get back | Megírtam a levelet Próba Zsuzsannának.<br><sub>I wrote *to Zsuzsanna Próba*.</sub> |
 
-**Language packs.** Hungarian, English, German and Polish each ship validated identifier rules,
-cue words and case handling; a new language is one package
-([how to add a language](docs/languages.md)).
+**Language packs.** Hungarian, English, German, Polish, French, Spanish, Italian, Dutch and
+Romanian each ship validated identifier rules (TAJ, Steuer-ID, PESEL, NIR, DNI/NIE, codice
+fiscale, BSN, CNP ...), cue words and, where names inflect, case handling; a new language is
+one package ([how to add a language](docs/languages.md), [what each pack finds](docs/entities.md#per-language)).
 
 **What it detects:** people, addresses, emails, phone numbers, dates of birth, national and
 document IDs (including Hungarian tax and TAJ numbers), bank accounts and payment cards,
@@ -234,7 +254,7 @@ the last gateway request as sent upstream, with placeholders (`pii-guard up` kee
 </p>
 
 <p align="center"><sub>Console tour, recorded in fast mode (rules + NER) with fictional data.
-<a href="ui/README.md#screens">More screens</a> · <a href="https://youtu.be/Lsr74ddhxRo">Video walkthrough</a>.</sub></p>
+<a href="ui/README.md#screens">More screens</a> · <a href="https://youtu.be/VrY8x3h26ws">Video walkthrough</a>.</sub></p>
 
 Run the console locally: [`make demo` from a checkout](docs/operations.md#the-demo-stack).
 

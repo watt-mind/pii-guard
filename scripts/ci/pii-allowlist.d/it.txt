@@ -1,0 +1,5 @@
+# The Italian pack's fictional identifiers in code and docs (LAB-1776); format in ../README.md.
+# The CIE number layout ("CA" + 00000 + "AA") written as a placeholder, not a document's number.
+CA00000AA
+# The Italian passport layout (two letters, seven digits) as an ascending run; issued to nobody.
+YA1234567

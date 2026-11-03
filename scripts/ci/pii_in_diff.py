@@ -12,7 +12,8 @@ flags, on the lines the PR adds,
 
 * identifiers a validated rule found (checksum or format-checked: tax and TAJ numbers, IBANs
   and cards, ID documents, company numbers), unless the value is on the allow-list of known
-  fictional values (``scripts/ci/pii-allowlist.txt``);
+  fictional values (``scripts/ci/pii-allowlist.txt``, plus one ``pii-allowlist.d/<code>.txt``
+  per language pack in the same format, so a new pack doesn't edit the shared file);
 * e-mail addresses outside the reserved example domains (RFC 2606/6761: ``example.*``,
   ``*.example``, ``*.test``, ``*.invalid``, ``*.localhost``).
 
@@ -40,6 +41,8 @@ from pii_guard.types import EntityType
 
 ROOT = Path(__file__).resolve().parents[2]
 ALLOWLIST = ROOT / "scripts" / "ci" / "pii-allowlist.txt"
+#: More allow-lists in the same format, one per language pack (LAB-1773).
+ALLOWLIST_DIR = ROOT / "scripts" / "ci" / "pii-allowlist.d"
 
 LANGUAGES = ("hu", "en-GB", "de")
 ID_TYPES = {
@@ -58,6 +61,7 @@ SKIP_PREFIXES = (
     "ui/e2e/",
     ".github/",
     "scripts/ci/pii-allowlist.txt",
+    "scripts/ci/pii-allowlist.d/",
 )
 SKIP_PATTERNS = (re.compile(r"\.(test|spec)\.[cm]?[jt]sx?$"), re.compile(r"(^|/)__snapshots__/"))
 TEXT_SUFFIXES = {
@@ -86,11 +90,16 @@ def normalize(value: str) -> str:
     return re.sub(r"[\s.\-/]", "", folded)
 
 
-def load_allowlist() -> set[str]:
-    if not ALLOWLIST.exists():
-        return set()
-    lines = ALLOWLIST.read_text(encoding="utf-8").splitlines()
+def _read_allowlist(path: Path) -> set[str]:
+    lines = path.read_text(encoding="utf-8").splitlines()
     return {normalize(x.split("#", 1)[0]) for x in lines if x.split("#", 1)[0].strip()}
+
+
+def load_allowlist() -> set[str]:
+    """The values of :data:`ALLOWLIST` and of every ``*.txt`` in :data:`ALLOWLIST_DIR`."""
+    paths = [ALLOWLIST] if ALLOWLIST.exists() else []
+    paths += sorted(ALLOWLIST_DIR.glob("*.txt"))
+    return set().union(*(_read_allowlist(p) for p in paths))
 
 
 def scanned(path: str) -> bool:
@@ -178,7 +187,8 @@ def report(findings: Iterable[Finding], allow: set[str]) -> int:
         print(
             f"pii-in-diff: {len(bad)} finding(s). Use fictional values: example.* e-mail domains, "
             "and for identifiers either an invalid checksum or a value added to "
-            "scripts/ci/pii-allowlist.txt with a note saying it is fictional.",
+            "scripts/ci/pii-allowlist.txt (or a language pack's pii-allowlist.d/<code>.txt) "
+            "with a note saying it is fictional.",
             file=sys.stderr,
         )
         return 1

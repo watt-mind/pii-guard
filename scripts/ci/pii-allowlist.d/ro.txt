@@ -1,0 +1,5 @@
+# The Romanian pack's fictional identifiers in code and docs (LAB-1778); format in README.md.
+# The identity card layout (series "RX" + an ascending six-digit run) in the rules docstring and
+# the prompt notes; issued to nobody.
+RX nr. 123456
+RX 123456

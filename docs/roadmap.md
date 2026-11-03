@@ -48,9 +48,10 @@ design:
 - [x] **SAM 3.1 weights, license & hybrid visual pipeline verified:** Integrated **Meta SAM
       3.1** with `meta-sam-parser` (SAM License) for signature segmentation alongside local
       CPU **YuNet** face detection and **Tesseract OCR** ([eval/results/visual/specimens.md](../eval/results/visual/specimens.md)).
-- [x] **Language pack architecture & conformance suite shipped:** Shipped 4 built-in packs
-      (`hu`, `en`, `de`, `pl`) with inflection matchers, checksum rules, and `pii-guard lang
-      check` conformance gates ([languages.md](languages.md)).
+- [x] **Language pack architecture & conformance suite shipped:** Shipped 9 built-in packs
+      (`hu`, `en`, `de`, `pl`, then the first EU wave `fr`, `es`, `it`, `nl`, `ro`) with
+      checksum rules, inflection matchers where names inflect (`hu`, `en`, `de`, `pl`, `nl`,
+      `ro`), and `pii-guard lang check` conformance gates ([languages.md](languages.md)).
 - [x] **Open-source compliance & synthetic-only guarantee enforced:** Apache-2.0 repository
       license ([ADR 0004](decisions/0004-apache-2-license.md)), strict synthetic-data-only
       policy ([ADR 0005](decisions/0005-synthetic-data-only.md)), and automated dataset
@@ -59,9 +60,12 @@ design:
 ## Post-Hackathon Roadmap
 
 - **Full EU-24 Language Pack Rollout:** Expand deterministic rule, national-ID checksum, and
-  morphological inflection packs beyond `hu`, `en`, `de`, and `pl` to all 24 official EU
-  languages, building on the completed EU-24 data and identifier audit
+  morphological inflection packs to all 24 official EU languages, building on the completed
+  EU-24 data and identifier audit
   ([data-sources-eu24.md](data-sources-eu24.md), [training-data-eu-phase1.md](training-data-eu-phase1.md)).
+  Shipped: `hu`, `en`, `de`, `pl` and the first EU wave, `fr`, `es`, `it`, `nl`, `ro`
+  (2026-11-02; [results](languages.md#first-eu-wave-smoke-results)). Remaining: the other
+  fifteen official languages (bg, cs, da, el, et, fi, ga, hr, lt, lv, mt, pt, sk, sl, sv).
 - **Enterprise Encrypted Distributed Vault:** Add an optional Redis / PostgreSQL AEAD-encrypted
   session mapping store with per-tenant envelope keys and automatic TTL eviction so horizontal
   multi-instance gateway deployments can share session state without sticky routing.

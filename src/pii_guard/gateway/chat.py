@@ -25,6 +25,12 @@ from pii_guard.gateway.config import Mode
 from pii_guard.gateway.detection import ModeDetector
 from pii_guard.gateway.meter import client_chunk, record_payload, record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
+from pii_guard.gateway.opaque_reasoning import (
+    OPAQUE_STRIPPED_HEADER,
+    OpaqueStream,
+    observe,
+    strip_unverified,
+)
 from pii_guard.gateway.outbound import OUTBOUND_CHECK_HEADER, OutboundCheck
 from pii_guard.gateway.placeholder_note import NOTE_HEADER, add_chat_note
 from pii_guard.gateway.request import CollectedTexts, TextSlot, collect_texts
@@ -92,6 +98,9 @@ logger = logging.getLogger("pii_guard.gateway")
 
 REQUEST_ID_HEADER = "X-PII-Guard-Request-Id"
 MODE_HEADER = "X-PII-Guard-Mode"
+#: Escalate mode: texts sent to the LLM as masked windows in this request (LAB-1766).
+ESCALATIONS_HEADER = "X-PII-Guard-Escalations"
+ESCALATION_FAILURES_HEADER = "X-PII-Guard-Escalation-Failures"
 LANGUAGE_HEADER = "X-PII-Guard-Language"
 # Opt-in: "masked" echoes back what the upstream saw (the masked messages) and said (its
 # masked answer), for UIs that show the boundary. Masked text only, never the values.
@@ -157,6 +166,12 @@ class RequestStats:
     note: bool = False
     #: The outbound re-check of the masked request (LAB-1500); ``None``: not reached.
     outbound: OutboundCheck | None = None
+    #: Reasoning items/blocks removed for an opaque blob not issued in this session.
+    opaque_stripped: int = 0
+    #: Escalate mode (LAB-1766): texts sent to the LLM as masked windows, and the calls of
+    #: those that failed closed. Always 0 in fast and audit mode.
+    audit_escalations: int = 0
+    escalation_failures: int = 0
 
     def headers(self, session_id: str) -> dict[str, str]:
         out = {
@@ -170,6 +185,8 @@ class RequestStats:
             out[SESSION_SOURCE_HEADER] = self.session_source.value
         if self.note:
             out[NOTE_HEADER] = "added"
+        if self.opaque_stripped:
+            out[OPAQUE_STRIPPED_HEADER] = str(self.opaque_stripped)
         if self.outbound is not None:
             out[OUTBOUND_CHECK_HEADER] = self.outbound.result
         if self.mode_alias:
@@ -178,6 +195,10 @@ class RequestStats:
                 f'299 pii-guard "{MODE_HEADER}: {self.mode_alias} is deprecated, '
                 f'use {self.mode.value}"'
             )
+        if self.mode is Mode.ESCALATE:
+            out[ESCALATIONS_HEADER] = str(self.audit_escalations)
+            if self.escalation_failures:
+                out[ESCALATION_FAILURES_HEADER] = str(self.escalation_failures)
         if self.images:
             out["X-PII-Guard-Images"] = str(self.images)
             out["X-PII-Guard-Image-Regions-Masked"] = str(sum(self.image_masked.values()))
@@ -196,6 +217,11 @@ class RequestStats:
         }
         if self.outbound is not None:
             fields["outbound_check"] = self.outbound.result
+        if self.opaque_stripped:
+            fields["opaque_reasoning_stripped"] = self.opaque_stripped
+        if self.mode is Mode.ESCALATE:
+            fields["audit_escalations"] = self.audit_escalations
+            fields["escalation_failures"] = self.escalation_failures
         if self.images:
             fields["images"] = self.images
             fields["image_masked"] = _counts(self.image_masked)
@@ -360,6 +386,11 @@ async def mask_chat_request(
     timer.add("parse", time.perf_counter() - timer.started)
     kept: list[list[Span]] = []
     try:
+        stats.opaque_stripped = strip_unverified(
+            session, "chat", collected, lambda: collect_texts(body)
+        )
+        stats.texts = len(collected.slots)
+        stats.images = len(collected.images)
         with timer.span("detect"):
             spans = await gateway.detect_all(
                 collected.slots, detector, session, language, stats, kept
@@ -472,9 +503,9 @@ async def complete_chat_json(
         raise UpstreamError("upstream returned a body that is not a JSON object")
     masked_answer = _masked_answer(answer) if echo_data is not None else None
     gateway.issued_ids.add(session.session_id, upstream_ids(answer))
+    observe(session, "chat", answer)
     report = restore_completion(session, answer)
     stats.unresolved = len(report.unresolved)
-    gateway.seed_cache(session, language, detector, report.restored_spans, stats)
     out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
     if echo_data is not None:
         answer["pii_guard"] = {**echo_data, "masked_answer": masked_answer}
@@ -505,6 +536,7 @@ def complete_chat_stream(
 ) -> tuple[Response, RequestStats]:
     restorer = SseRestorer(
         session,
+        opaque=OpaqueStream(session, "chat"),
         on_ids=lambda ids: gateway.issued_ids.add(session.session_id, ids),
         keep_restored_tools=trace.full,
     )
@@ -519,9 +551,6 @@ def complete_chat_stream(
         stats=stats,
         restorer=restorer,
         session=session,
-        seed_cache=lambda restored: gateway.seed_cache(
-            session, language, detector, restored, stats
-        ),
         on_error=_chat_stream_error,
     )
     out_headers["Cache-Control"] = "no-cache"

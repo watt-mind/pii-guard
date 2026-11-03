@@ -85,9 +85,9 @@ def test_factory_explicit_remote_mode_refused_before_local_or_sam_build(mode: st
         )
 
 
-def test_unused_hybrid_default_does_not_prevent_text_app_startup() -> None:
+def test_unused_sam_default_does_not_prevent_text_app_startup() -> None:
     configured = settings()
-    assert configured.segmenter == "hybrid"
+    assert configured.segmenter == "sam-api"  # the Meta-only default (ADR 0015)
     app = create_app(configured)
     with TestClient(app) as client:
         response = client.post("/v1/analyze", json={"text": "synthetic@example.com"})

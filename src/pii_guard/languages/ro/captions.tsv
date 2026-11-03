@@ -1,0 +1,50 @@
+# Field captions on Romanian identity documents and forms (visual/captions.py): the carte de
+# identitate (captions in Romanian, French and English), the passport and the permis de
+# conducere. caption <TAB> entity type of the value printed next to it, or "-" when that value
+# is not personal data (the caption is still recognised, so it bounds its neighbours).
+# Captions with ș/ț are listed in both spellings, comma below (current cards) and cedilla
+# (older cards and fonts), as printed.
+Nume	PERSON
+Nume/Nom/Last name	PERSON
+Prenume	PERSON
+Prenume/Prenom/First name	PERSON
+Nume și prenume	PERSON
+Nume şi prenume	PERSON
+Data nașterii	DATE_OF_BIRTH
+Data naşterii	DATE_OF_BIRTH
+Locul nașterii	ADDRESS
+Locul naşterii	ADDRESS
+Loc naștere	ADDRESS
+Loc naştere	ADDRESS
+Loc naștere/Lieu de naissance/Place of birth	ADDRESS
+Loc naştere/Lieu de naissance/Place of birth	ADDRESS
+Domiciliu	ADDRESS
+Domiciliu/Adresse/Address	ADDRESS
+Adresa	ADDRESS
+CNP	ID_DOCUMENT
+Cod numeric personal	ID_DOCUMENT
+Cod personal	ID_DOCUMENT
+Seria	ID_DOCUMENT
+Nr. pașaport	ID_DOCUMENT
+Nr. paşaport	ID_DOCUMENT
+Număr pașaport	ID_DOCUMENT
+Număr paşaport	ID_DOCUMENT
+Telefon	PHONE
+E-mail	EMAIL
+Sex	-
+Sex/Sexe/Sex	-
+Cetățenie	-
+Cetăţenie	-
+Cetățenie/Nationalité/Nationality	-
+Cetăţenie/Nationalité/Nationality	-
+Emisă de	-
+Emisă de/Délivrée par/Issued by	-
+Autoritatea	-
+Valabilitate	-
+Valabilitate/Validité/Validity	-
+Data eliberării	-
+Data expirării	-
+Tip	-
+Codul țării	-
+Codul ţării	-
+Semnătura titularului	-

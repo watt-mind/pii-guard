@@ -1,0 +1,30 @@
+# French company and brand names (detect/ner_orgs.py; the shared list is ../brands.tsv).
+# One name per line; matching ignores case. Leave out names that are also surnames or given
+# names (Renault, Peugeot, Michelin, Dassault, Leclerc, Darty, Hermès ...).
+BNP Paribas
+Société Générale
+Crédit Agricole
+Crédit Mutuel
+La Banque Postale
+La Poste
+SNCF
+RATP
+Orange
+SFR
+Bouygues Telecom
+Free Mobile
+TotalEnergies
+EDF
+Engie
+Carrefour
+Auchan
+Intermarché
+Monoprix
+Fnac
+Decathlon
+L'Oréal
+Airbus
+Air France
+Doctolib
+Pôle emploi
+France Travail

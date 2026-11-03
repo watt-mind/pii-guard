@@ -38,7 +38,7 @@ from starlette.types import Scope
 
 from pii_guard.api.app import create_app
 from pii_guard.config import Settings, get_settings
-from pii_guard.detect import ner_resolve
+from pii_guard.detect import ner_resolve, stack
 from pii_guard.security_headers import SecurityHeadersMiddleware
 
 __all__ = [
@@ -86,7 +86,8 @@ class Status:
 
     upstream: str  # "mock" or the configured upstream's origin
     detectors: list[str] = field(default_factory=list)
-    #: What images still need (empty: images work): "ocr", "tesseract", "segmenter".
+    #: What images still need (empty: images work): "ocr_key", "ocr", "tesseract",
+    #: "segmenter", "sam".
     image_gaps: list[str] = field(default_factory=list)
     #: Which NER model runs, or why none does (:func:`pii_guard.detect.ner_resolve.describe`).
     ner: str = ""
@@ -99,8 +100,14 @@ class Status:
     def images(self) -> str:
         if not self.image_gaps:
             return "on"
-        needs = {"ocr": "OCR", "tesseract": "OCR", "segmenter": "face detection"}
-        missing = ", ".join(dict.fromkeys(needs[g] for g in self.image_gaps))
+        needs = {
+            "ocr_key": "Muse OCR key",
+            "ocr": "OCR",
+            "tesseract": "OCR",
+            "segmenter": "face detection",
+            "sam": "SAM 3.1 key",
+        }
+        missing = ", ".join(dict.fromkeys(needs.get(g, g) for g in self.image_gaps))
         return f"refused (no {missing})"
 
 
@@ -226,7 +233,8 @@ padding:0 16px}}</style></head>
 <p>The API and the OpenAI-compatible gateway are up, but this install has no web UI bundled
 (it was built from source, not from a release wheel).</p>
 <ul>
-<li>Release wheel with the UI: see the README, "Try it".</li>
+<li>With the UI, from PyPI:
+<code>uvx --python 3.12 --from wattmind-pii-guard pii-guard up</code></li>
 <li>From a checkout: <code>make wheel</code>, or <code>make demo</code> (UI with Node).</li>
 </ul>
 <p>Everything else works: <a href="/healthz">/healthz</a>, <a href="/docs">/docs</a>,
@@ -375,22 +383,34 @@ def launcher(extras: str = "") -> str:
 
 
 def image_gaps(settings: Settings) -> list[str]:
-    """What image masking still needs: ``ocr`` (the extra), ``tesseract``, ``segmenter``."""
+    """What image masking still needs: ``ocr_key``, a key for Muse Spark Open, the default
+    OCR engine (ADR 0016); with ``PII_GUARD_OCR_ENGINE=tesseract`` ``ocr`` (the extra) and
+    ``tesseract`` (the binary); ``segmenter``; and ``sam``: a SAM 3.1 key for the default
+    ``sam-api`` segmenter (ADR 0015). Without any of them every image is refused."""
     import importlib.util
     import shutil
 
     from pii_guard.types import DetectionError
+    from pii_guard.visual.sam import SamClient
     from pii_guard.visual.segmenters import OffSegmenter, build_segmenter
 
     gaps = []
-    if settings.image_require_ocr:
+    if settings.image_require_ocr and settings.ocr_engine == "muse":
+        from pii_guard.visual.ocr_muse import muse_configured
+
+        if not muse_configured(settings):
+            gaps.append("ocr_key")  # no key: no OCR engine, every image is refused
+    elif settings.image_require_ocr:
         if importlib.util.find_spec("pytesseract") is None:
             gaps.append("ocr")
         if shutil.which("tesseract") is None:
             gaps.append("tesseract")
     try:
-        if isinstance(build_segmenter(settings), OffSegmenter):
+        segmenter = build_segmenter(settings)
+        if isinstance(segmenter, OffSegmenter):
             gaps.append("segmenter")  # PII_GUARD_SEGMENTER=off refuses every image
+        elif isinstance(segmenter, SamClient) and not segmenter.configured:
+            gaps.append("sam")  # sam-api without a key refuses every image (fail closed)
     except (DetectionError, ValueError):
         gaps.append("segmenter")
     return gaps
@@ -411,6 +431,17 @@ def _image_hints(gaps: list[str]) -> list[str]:
         hints.append(
             f"faces also need the YuNet model ({launcher()} models fetch yunet) or "
             "META_API_KEY for SAM 3.1 (docs/operations.md)"
+        )
+    if "ocr_key" in gaps:
+        hints.append(
+            "images need a key for Muse Spark Open, the default OCR engine: set "
+            "PII_GUARD_OCR_API_KEY or BASETEN_API_KEY, or PII_GUARD_OCR_ENGINE=tesseract "
+            "(docs/operations.md)"
+        )
+    if "sam" in gaps:
+        hints.append(
+            "images need a key for SAM 3.1, the default segmenter: set PII_GUARD_SAM_API_KEY "
+            "or META_API_KEY (docs/operations.md)"
         )
     return hints
 
@@ -452,6 +483,9 @@ def _banner(opts: UpOptions, status: Status, traffic_log: str, *, ui: bool) -> s
             # The extra is there, but no model resolved (fallback off, or not cached).
             lines.append(f"{pad}{status.ner}")
             lines.append(f"{pad}PII_GUARD_NER_FALLBACK=download downloads the NER model once")
+        elif stack.no_torch_build():
+            lines.append(f"{pad}free-text names need NER, and PyTorch has no Intel macOS build:")
+            lines.append(f"{pad}for rules + NER run the Docker demo (docs/operations.md#docker)")
         else:
             # torch/transformers are core dependencies (LAB-1733) but missing here (the
             # rules-only Docker image, or an install that skipped them): a fresh install has
@@ -654,7 +688,12 @@ def run_up(opts: UpOptions) -> int:
         # The UI holds the live traffic stream open: without a graceful-shutdown timeout,
         # Ctrl-C would wait for the browser tab to close.
         config = uvicorn.Config(
-            app, host=opts.host, port=opts.port, log_level="warning", timeout_graceful_shutdown=1
+            app,
+            host=opts.host,
+            port=opts.port,
+            log_level="warning",
+            access_log=False,
+            timeout_graceful_shutdown=1,
         )
         server = uvicorn.Server(config)
         quiet = _QuietShutdown(server)

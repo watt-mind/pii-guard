@@ -1,0 +1,7 @@
+# Spanish pack (LAB-1775): fictional or published example identifiers in the pack's
+# docstrings and prompt notes (src/pii_guard/languages/es/). Issued to nobody we know of;
+# they are the worked examples of the check-letter algorithms.
+12345678Z  # DNI, the algorithm's textbook example (also written 12.345.678-Z)
+X1234567L  # NIE, the algorithm's textbook example (also written X-1234567-L)
+J99216582  # CIF, a published example of the control digit
+B12345674  # CIF, ascending payload with its computed control digit (prompt notes)

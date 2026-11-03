@@ -161,6 +161,8 @@ class VaultSession:
         #: :func:`pii_guard.gateway.sessions.check_and_bind`; ``None``: not presented yet.
         #: On the session itself, so the binding lives exactly as long as the session.
         self.owner: str | None = None
+        # Bounded digests of upstream-issued opaque reasoning, scoped to this incarnation.
+        self.opaque_reasoning: OrderedDict[bytes, None] = OrderedDict()
         #: Random per session object (LAB-1580): a dropped/expired/rotated id re-created as a
         #: new session gets a new one, so per-session state keyed by it (the gateway's
         #: detection cache) starts clean in every runtime that shares that state.

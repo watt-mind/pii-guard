@@ -1,0 +1,8 @@
+pad 0.00: regions 110, box covered 29 (26%), text read 62/69 tesseract-readable, box+text 27 (25%), mean line-box area 18% of image, no-JSON 1/24
+pad 0.01: regions 110, box covered 80 (73%), text read 62/69 tesseract-readable, box+text 76 (69%), mean line-box area 28% of image, no-JSON 1/24
+pad 0.02: regions 110, box covered 96 (87%), text read 62/69 tesseract-readable, box+text 92 (84%), mean line-box area 40% of image, no-JSON 1/24
+pad 0.03: regions 110, box covered 101 (92%), text read 62/69 tesseract-readable, box+text 97 (88%), mean line-box area 53% of image, no-JSON 1/24
+-- span boxes interpolated by character offset inside the line (what masking would cover)
+pad x0.01 y0.01: span-covered 35/69 (51%), mask/region area x2.5
+pad x0.02 y0.015: span-covered 42/69 (61%), mask/region area x3.5
+pad x0.03 y0.02: span-covered 43/69 (62%), mask/region area x4.8

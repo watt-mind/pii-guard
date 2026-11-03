@@ -40,6 +40,7 @@ from starlette.responses import Response
 
 from pii_guard.gateway.meter import record_usage, scan_usage
 from pii_guard.gateway.opaque_ids import upstream_ids, without_opaque_ids
+from pii_guard.gateway.opaque_reasoning import OpaqueStream, observe, strip_unverified
 from pii_guard.gateway.placeholder_note import add_responses_note
 from pii_guard.gateway.request import CollectedTexts, InvalidChatRequestError
 from pii_guard.gateway.responses_request import collect_response_texts
@@ -232,6 +233,11 @@ class ResponsesGateway:
         stats.images = len(collected.images)
         timer.add("parse", time.perf_counter() - timer.started)
         try:
+            stats.opaque_stripped = strip_unverified(
+                session, "responses", collected, lambda: collect_response_texts(body)
+            )
+            stats.texts = len(collected.slots)
+            stats.images = len(collected.images)
             with timer.span("detect"):
                 spans = await gw.detect_all(collected.slots, detector, session, language, stats)
                 names = tool_names(body)
@@ -431,10 +437,10 @@ class ResponsesGateway:
         if not isinstance(answer, dict):
             raise UpstreamError("upstream returned a body that is not a JSON object")
         masked_output = _masked_output(answer) if echo else None
+        observe(session, "responses", answer)
         self.gateway.issued_ids.add(session.session_id, upstream_ids(answer))
         report = restore_response(session, answer)
         stats.unresolved = len(report.unresolved)
-        self.gateway.seed_cache(session, language, detector, report.restored_spans, stats)
         out_headers["X-PII-Guard-Unresolved"] = str(stats.unresolved)
         if echo:
             answer["pii_guard"] = {"masked_input": masked_input, "masked_output": masked_output}
@@ -462,7 +468,9 @@ class ResponsesGateway:
     ) -> tuple[Response, RequestStats]:
         issued = self.gateway.issued_ids
         restorer = ResponsesSseRestorer(
-            session, on_ids=lambda ids: issued.add(session.session_id, ids)
+            session,
+            on_ids=lambda ids: issued.add(session.session_id, ids),
+            opaque=OpaqueStream(session, "responses"),
         )
         trace.streaming = True
         timeout = self.gateway.config.upstream_stream_timeout
@@ -488,9 +496,6 @@ class ResponsesGateway:
             stats=stats,
             restorer=restorer,
             session=session,
-            seed_cache=lambda restored: self.gateway.seed_cache(
-                session, language, detector, restored, stats
-            ),
             on_error=_responses_stream_error,
         )
         out_headers["Cache-Control"] = "no-cache"

@@ -1,0 +1,24 @@
+# Reference words: labels that make a number a business number, not personal data
+# (order, invoice, tracking ...). Format in pl/references.tsv. French puts "n°" between the
+# word and the number ("Facture n° 4400"); the shared pattern does not know that sign, so
+# the French rules add it themselves (rules.py, ``_reference_before``, LAB-1785).
+# Only words already in the NER check's list (detect/ner_numbers.py ``_NEGATIVE``) are read
+# by the NER check; the others are scoped to the rules check until that list takes new
+# pack words (LAB-1789).
+factur*	rules
+commande*	rules
+colis	rules
+suivi	rules
+devis	rules
+ticket*
+réservation*	rules
+transaction*
+dossier*	rules
+siren	rules
+siret	rules
+référence*	weak
+réf.	weak
+montant*	weak
+total	weak
+solde	weak
+prix	weak

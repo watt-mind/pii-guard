@@ -116,6 +116,17 @@ def _static_status(request: Request) -> dict[str, Any]:
                     "available": fast_error is None,
                     "reason": fast_error,
                 },
+                "escalate": {
+                    "detectors": [*fast, "llm"],
+                    "available": fast_error is None and audit_reason is None,
+                    "reason": fast_error
+                    or (
+                        audit_reason.replace("audit mode", "escalate mode", 1)
+                        if audit_reason
+                        else None
+                    ),
+                    "model": model,
+                },
                 "audit": {
                     "detectors": [*fast, "llm"],
                     "available": fast_error is None and audit_reason is None,
@@ -133,7 +144,10 @@ def _static_status(request: Request) -> dict[str, Any]:
         },
         "images": {
             "segmenter": settings.segmenter,
-            "sam": settings.meta_api_key is not None or bool(settings.sam_url),
+            "sam": settings.sam_api_key is not None
+            or settings.meta_api_key is not None
+            or bool(settings.sam_url),
+            "ocr_engine": settings.ocr_engine,
             "ocr_required": settings.image_require_ocr,
             "gaps": gaps,
             "available": not gaps,
@@ -193,11 +207,12 @@ def hosted_projection(status: dict[str, Any], public_origin: str) -> dict[str, A
 
 
 def _hosted_images_servable(state: Any) -> bool:
-    """Hosted images run on the on-device segmenter only: offered only while the server's
-    visual policies ask for nothing it cannot find (a masked signature refuses every image)."""
-    from pii_guard.hosted.images import unservable_visual_types
+    """Hosted images are offered while the replica's segmenter can serve the server's visual
+    policies: SAM 3.1 with its key (the default, ADR 0015), or the on-device engines while
+    nothing masked is a type they cannot find (a stamp)."""
+    from pii_guard.hosted.images import images_servable
 
-    return not unservable_visual_types(state.policies)
+    return images_servable(state)
 
 
 def server_status(request: Request) -> dict[str, Any]:

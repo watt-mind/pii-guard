@@ -1,0 +1,43 @@
+# Field captions on Dutch identity documents and forms (visual/captions.py): the identiteitskaart,
+# the paspoort (captions printed in Dutch, English and French; the English ones are in
+# en/captions.tsv), the rijbewijs and common forms.
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours).
+Naam	PERSON
+Achternaam	PERSON
+Voornamen	PERSON
+Voornaam	PERSON
+Voorletters	PERSON
+Echtgenoot van	PERSON
+Echtgenote van	PERSON
+Naam echtgenoot	PERSON
+Geboortedatum	DATE_OF_BIRTH
+Geboortedatum en -plaats	DATE_OF_BIRTH
+Geboorteplaats	ADDRESS
+Adres	ADDRESS
+Woonadres	ADDRESS
+Straat en huisnummer	ADDRESS
+Postcode en woonplaats	ADDRESS
+Woonplaats	ADDRESS
+Persoonsnummer	ID_DOCUMENT
+Burgerservicenummer	ID_DOCUMENT
+BSN	ID_DOCUMENT
+Documentnummer	ID_DOCUMENT
+Rijbewijsnummer	ID_DOCUMENT
+Telefoonnummer	PHONE
+E-mailadres	EMAIL
+IBAN	BANK_ACCOUNT
+Geslacht	-
+Lengte	-
+Nationaliteit	-
+Datum van afgifte	-
+Datum afgifte	-
+Geldig tot	-
+Vervaldatum	-
+Afgegeven door	-
+Autoriteit	-
+Handtekening houder	-
+Handtekening	-
+Soort document	-
+Code staat van afgifte	-
+Categorieën	-

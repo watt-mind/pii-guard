@@ -19,6 +19,7 @@ import hmac
 import json
 import re
 
+from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from pii_guard.config import Settings
@@ -29,6 +30,7 @@ __all__ = [
     "ENDPOINT_KEY_PREFIX",
     "TOKEN_HEADER",
     "BearerTokenMiddleware",
+    "BrowserRequestSecurityMiddleware",
     "LoopbackOnlyMiddleware",
     "allowed_hosts",
     "looks_like_endpoint_key",
@@ -75,6 +77,10 @@ _PUBLIC_PATHS = frozenset({"/healthz"})
 #: Authenticated by the route itself, never by the API token: the one-time CLI login code
 #: exchange and the telemetry key's own logout (LAB-1708).
 _SELF_AUTHENTICATING_PATHS = frozenset({"/v1/cli/token"})
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+_GATEWAY_PATH = re.compile(
+    r"^(?:/(?:s|e)/[^/]+)?/v1/(?:chat/completions|responses|messages(?:/count_tokens)?)$"
+)
 
 
 def _bypasses_api_token(scope: Scope) -> bool:
@@ -146,6 +152,49 @@ class LoopbackOnlyMiddleware:
             "PII_GUARD_TRAFFIC_LOG=full only serves loopback connections; this server is "
             "reachable from other machines. Bind to 127.0.0.1 or use 'masked'",
         )
+
+
+class BrowserRequestSecurityMiddleware:
+    """Refuse cross-origin browser mutations before local admission or processing.
+
+    A loopback socket identifies the browser's machine, not the website controlling it.
+    Browser forms can post valid JSON as text/plain without a CORS preflight (LAB-1757).
+    Non-browser SDKs may omit Origin, Fetch Metadata and Content-Type; their authentication
+    remains the token/endpoint middleware's responsibility. Hosted mode has its own guard.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") in _SAFE_METHODS:
+            await self.app(scope, receive, send)
+            return
+        headers = Headers(scope=scope)
+        origin = headers.get("origin")
+        expected = f"{scope.get('scheme', 'http')}://{headers.get('host', '')}"
+        if (
+            len(headers.getlist("origin")) > 1
+            or len(headers.getlist("sec-fetch-site")) > 1
+            or (origin is not None and origin != expected)
+            or headers.get("sec-fetch-site") in {"cross-site", "same-site"}
+        ):
+            await _send_error(
+                send, 403, "cross_origin_request_denied", "A same-origin request is required"
+            )
+            return
+        if scope.get("method") == "POST" and _GATEWAY_PATH.fullmatch(scope.get("path", "")):
+            media = headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            if len(headers.getlist("content-type")) > 1 or (
+                media
+                and media != "application/json"
+                and not (media.startswith("application/") and media.endswith("+json"))
+            ):
+                await _send_error(
+                    send, 415, "unsupported_media_type", "Gateway requests must use JSON"
+                )
+                return
+        await self.app(scope, receive, send)
 
 
 class BearerTokenMiddleware:

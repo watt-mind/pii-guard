@@ -4,9 +4,11 @@ Only configuration is durable. Request texts, vault mappings and activity are ne
 here. Policy versions are append-only and each endpoint pins one exact version.
 
 A policy version holds text and visual entity actions (``FACE``, ``ID_PHOTO``, ``SIGNATURE``,
-``STAMP``: ``mask`` or ``keep`` only) and ``visual_detection`` (``local`` by default, or ``sam``;
-``local-only`` deployments accept ``local`` only), LAB-1444. Versions saved before then hold
-text types only and no ``visual_detection``; they read as ``local`` with the server's visual
+``STAMP``: ``mask`` or ``keep`` only) and ``visual_detection`` (LAB-1444): ``sam`` by default
+(SAM 3.1, the server's Meta segmenter, ADR 0015) or ``local`` (the optional on-device engines);
+``local-only`` deployments accept ``local`` only and default to it. Saved values are kept as
+they are. Versions saved before LAB-1444 hold text types only and no ``visual_detection``; they
+read as ``sam`` (the server's segmenter, as they were served then) with the server's visual
 actions (:mod:`pii_guard.projects.visual`).
 """
 
@@ -41,8 +43,11 @@ T = TypeVar("T")
 
 #: The actions a project policy may give a visual type (``block`` is text-only here).
 VISUAL_POLICY_ACTIONS = frozenset({Policy.MASK, Policy.KEEP})
-#: ``visual_detection`` values; the first is the default.
+#: ``visual_detection`` values.
 VISUAL_DETECTIONS = ("local", "sam")
+#: The default for a new version, and how a version saved before the field reads: the
+#: server's Meta segmenter (ADR 0015). A ``local-only`` deployment defaults to ``local``.
+DEFAULT_VISUAL_DETECTION = "sam"
 
 #: The schema every store had before LAB-1708; frozen, so a snapshot of it is recognised and
 #: upgraded by :data:`_SCHEMA_UPGRADE` (purely additive tables, no existing table changes).
@@ -447,14 +452,17 @@ class ProjectStore:
             raise InvalidProjectConfigError() from None
         language = data.get("language", "hu")
         mode = data.get("mode", "fast")
-        detection = data.get("visual_detection", VISUAL_DETECTIONS[0])
+        detection = data.get(
+            "visual_detection",
+            "local" if self._profile == "local-only" else DEFAULT_VISUAL_DETECTION,
+        )
         if (
             detection not in VISUAL_DETECTIONS
             or (self._profile == "local-only" and detection != "local")
             or not isinstance(language, str)
             or not 2 <= len(language) <= 16
             or not all(char.isascii() and (char.isalpha() or char == "-") for char in language)
-            or mode not in {"fast", "audit"}
+            or mode not in {"fast", "escalate", "audit"}
             or data.get("detection_profile", self._profile) != self._profile
             or (self._profile == "local-only" and mode != "fast")
         ):

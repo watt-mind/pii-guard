@@ -83,15 +83,17 @@ class PolicyRequest(NameRequest):
         description="Entity actions: mask, keep or block for text types; mask or keep for "
         "visual types (FACE, ID_PHOTO, SIGNATURE, STAMP).",
     )
-    visual_detection: Literal["local", "sam"] = Field(
-        default="local",
-        description="Image detection: local (on-device faces, ID photos and signatures) or "
-        "sam (SAM 3.1 on the Meta API for signatures and stamps; sends the image to Meta).",
+    visual_detection: Literal["local", "sam"] | None = Field(
+        default=None,
+        description="Image detection: sam (the default; SAM 3.1 on the Meta Model API, sends "
+        "the image to Meta) or local (the optional on-device engines; refused unless the "
+        "server enables them). Unset: sam, or local on a local-only deployment. Hosted "
+        "replicas use their own segmenter for every policy.",
     )
     language: str = Field(
         default="hu", min_length=2, max_length=16, description="Detection language tag."
     )
-    mode: Literal["fast", "audit"] = Field(
+    mode: Literal["fast", "escalate", "audit"] = Field(
         default="fast", description="Detection mode; hosted policies require fast."
     )
     detection_profile: Literal["standard", "local-only"] | None = Field(
@@ -165,8 +167,9 @@ def _context(request: Request) -> tuple[ProjectStore, str]:
 
 def _policy_data(body: PolicyRequest, request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
-    # Hosted images are on-device only until SAM has its own spend reservation (LAB-1444).
-    if settings.hosted and (body.mode != "fast" or body.visual_detection != "local"):
+    # Hosted policies are fast mode only; their images use the replica's segmenter whatever
+    # visual_detection says (ADR 0015).
+    if settings.hosted and body.mode != "fast":
         raise InvalidProjectConfigError()
     return body.model_dump(exclude_none=True)
 

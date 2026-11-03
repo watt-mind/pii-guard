@@ -1,0 +1,36 @@
+# Dutch company and brand names (detect/ner_orgs.py; the shared list is ../brands.tsv).
+# One name per line; matching ignores case. Leave out names that are also surnames or given
+# names (Philips, Heineken, Blokker, Etos ...) and common words (Action, Jumbo, Hema).
+ING
+ABN AMRO
+Rabobank
+SNS Bank
+ASN Bank
+Triodos
+bunq
+KPN
+Ziggo
+Odido
+Albert Heijn
+Bol.com
+Coolblue
+Marktplaats
+Thuisbezorgd
+Booking.com
+KLM
+Transavia
+NS
+PostNL
+Ahold Delhaize
+ASML
+Unilever
+Randstad
+Achmea
+Aegon
+NN Group
+Eneco
+Essent
+Vattenfall
+Belastingdienst
+DigiD
+UWV

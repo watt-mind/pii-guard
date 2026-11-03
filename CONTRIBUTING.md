@@ -114,7 +114,7 @@ delivery jobs sit outside `ci-ok`: `hosted-image-push` (develop pushes only, OID
 registry) and `hosted-deployment` (called after `ci-ok`, off unless explicitly enabled).
 
 Pull requests, the merge queue and pushes to `develop` run a **fast** suite; pushes to `main`,
-the nightly run (of `develop`) and manual runs run **everything**. The fast test step itself recently took
+the nightly run and manual runs run **everything**. The fast test step itself recently took
 roughly 1.5-2.5 minutes, while a complete PR that also selects the hosted image took about
 4-5 minutes end to end (measured 2026-10-29; runner load moves this by tens of percent):
 
@@ -133,6 +133,28 @@ Superseded pull-request and `develop` push runs are cancelled so the latest comm
 feedback first. Nightly and manual runs use separate concurrency groups, so a stream of merges
 cannot cancel the scheduled full-suite check. Pushes to `main` and merge-queue runs retain
 their full checks without cancelling a running check.
+
+### Judge path (outside `ci-ok`)
+
+[`.github/workflows/judge-path.yml`](.github/workflows/judge-path.yml) installs and runs
+pii-guard the way the README tells someone on a clean machine to: `uvx --python 3.12 --from
+<source> pii-guard up` with a fresh uv cache (no caches restored) on `ubuntu-latest` and
+`macos-14` (arm64). `scripts/ci/wheel_smoke.sh` then waits for `"ner":"ready"` (10 minute
+cap, time-to-ready in the job summary), checks the UI at `/`, masks and restores one chat call
+on the mock upstream (checked in `/v1/traffic`), sends one image and stops it with Ctrl-C. It
+is slow (PyTorch and the 1.1 GB NER download every time), so it never runs on `develop` pull
+requests or pushes:
+
+| Trigger | Sources tested | Blocks |
+|---|---|---|
+| Manual (`workflow_dispatch`, input `ref`, default `develop`) | a wheel built from `ref` (UI bundled) and `git+https://...@<sha>` (no UI: the page must say so) | nothing |
+| Pull request to `main` (a release PR) | the same two | the release PR (red is visible on it) |
+| `release.yml`, before publishing | the exact wheel the release built | the GitHub release and PyPI |
+| `release.yml`, after the PyPI upload | `wattmind-pii-guard==<version>` from PyPI | nothing; a red run files a GitHub issue |
+
+Windows is not covered (the smoke stops the server with SIGINT). Locally, against any wheel:
+`PII_GUARD_SMOKE_PORT=18790 scripts/ci/wheel_smoke.sh --python 3.12 --image dist/*.whl`
+(`--image` needs the `tesseract` binary with Hungarian and English data).
 
 Report behavior tests use a small, fixed set of synthetic benchmark records; separate tests
 still validate the complete committed report and recompute every stored dataset summary.
@@ -211,9 +233,6 @@ When a gate fails:
 
 ## Commits and pull requests
 
-- **Open pull requests against `develop`**, not the default branch. `main` is the last release:
-  it only takes the `develop` → `main` release pull request, and GitHub proposes it as the base,
-  so change the base when you open the PR (`gh pr create --base develop`).
 - Conventional commit messages: `feat(detect): add IBAN checksum rule`,
   `fix(gateway): split placeholders across stream chunks`.
 - Keep pull requests focused on one change. Describe what changed, why, and how you verified

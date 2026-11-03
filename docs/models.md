@@ -11,9 +11,8 @@
 | Structured identifiers | Rules (no model) | PII Guard container | yes (inside the boundary) |
 | Names, organizations, addresses, dates of birth and (NER v2) contact and ID numbers the rules can't validate | Multilingual NER encoder (XLM-RoBERTa-base, open; GLiNER as an alternative backend) | PII Guard container (CPU / MPS / CUDA) | yes |
 | Second-pass detection and adjudication (audit mode, opt-in; fast mode, rules + NER, is the production default) | **Muse Spark Open** (open weights), optionally fine-tuned; **Muse Glimmer** as a smaller local candidate | Baseten (`meta-models/muse-spark-open-1026`), or your own hardware | yes |
-| Faces, ID photos | **YuNet** (OpenCV model zoo, 0.23 MB, MIT; the default `hybrid` segmenter, see [Local segmentation](#local-segmentation)) | PII Guard container (CPU) | yes |
-| Signatures (and faces with `PII_GUARD_SEGMENTER=sam-api`) | **SAM 3.1** | Meta Model API, or a GPU endpoint (`PII_GUARD_SAM_URL`) | yes |
-| OCR | Open OCR engine | PII Guard container or GPU endpoint | yes |
+| Faces, ID photos, signatures (and stamps) in images | **SAM 3.1** (the default `sam-api` segmenter, self-hosted and hosted, [ADR 0015](decisions/0015-meta-only-runtime-defaults.md)) | Meta Model API, or a GPU endpoint (`PII_GUARD_SAM_URL`) | yes |
+| Text in images (OCR) | **Muse Spark Open** (the default `muse` OCR engine, self-hosted and hosted, [ADR 0016](decisions/0016-meta-only-ocr.md); [below](#ocr-muse-spark-open)) | Baseten Model APIs, or your own endpoint (`PII_GUARD_OCR_URL`) | yes: the unmasked image |
 | Synthetic corpus generation | **Muse** (Wonder for documents, Spark for variations) | Meta Model API | **no**: fictional data only |
 | The downstream model in the demo | **Muse Spark** | Meta Model API | **no**: only masked data |
 
@@ -22,8 +21,83 @@ the optional `sam` extra: `uv sync --extra sam`; the Docker images include it). 
 Meta's SAM License (`licenses/meta-sam-parser-SAM-LICENSE.txt`). Without the extra, pii-guard's
 own decoder reads the output, with the same size limits and fail-closed checks.
 
-The rule behind this table: **anything that sees real personal data is an open-weights model
-you can host yourself.** Hosted Meta models only ever see fictional data or masked data.
+The rule behind this table: **only Meta models run by default** (the hackathon's runtime rule,
+[ADR 0015](decisions/0015-meta-only-runtime-defaults.md)). The rules and the NER encoder (a
+fine-tune of Meta's XLM-RoBERTa) run in the PII Guard container. SAM 3.1 is the exception
+that sees original images outside it: `sam-api` sends each image to the Meta Model API (or to
+your `PII_GUARD_SAM_URL`), and Muse Spark Open, which reads the text in each image, receives
+the same unmasked image on Baseten (or at your `PII_GUARD_OCR_URL`). Without a SAM key or an
+OCR key, images are refused (fail closed, ADR 0006). Nothing falls back to a non-Meta model. Otherwise, hosted Meta models see only fictional or
+masked data.
+
+**Optional, off by default (not Meta models).** These still work when you configure them,
+and nothing runs them unless you do:
+
+| Job | Model | Turn it on |
+|---|---|---|
+| Faces, ID photos on the device | **YuNet** (OpenCV model zoo, 0.23 MB, MIT; [Local segmentation](#local-segmentation)) | `PII_GUARD_SEGMENTER=hybrid` (YuNet + SAM 3.1 for signatures) or `local`; Docker: `--build-arg PII_GUARD_ON_DEVICE_VISION=true` |
+| Signatures on the device | **YOLOS-tiny** signature detector (`mdefrance/yolos-tiny-signature-detection`, 26 MB, Apache-2.0) | `PII_GUARD_SEGMENTER=local` on hosted, a project policy's `visual_detection: local` on a `hybrid` / `local` server, or `hybrid` without a SAM key |
+| Text in images on the device | **Tesseract** (Apache-2.0; `hun+eng`, word boxes) | `PII_GUARD_OCR_ENGINE=tesseract`; Docker: `--build-arg PII_GUARD_TESSERACT=true` |
+| Fast-mode NER when the published model is unavailable | **Public fallback** (`bardsai/eu-pii-anonimization-multilang`, Apache-2.0; [below](#which-ner-model-fast-mode-runs)) | `PII_GUARD_NER_FALLBACK=download` (or `cached`) |
+
+## OCR: Muse Spark Open
+
+`pii_guard.visual.ocr_muse.MuseOcr` (LAB-1796, [ADR 0016](decisions/0016-meta-only-ocr.md)) is
+the default OCR engine of the image path (`PII_GUARD_OCR_ENGINE=muse`). It sends the image, as
+a PNG re-encoded from its pixels, to an OpenAI-compatible Chat Completions endpoint, by default
+Muse Spark Open on Baseten Model APIs, with `reasoning_effort: "low"`.
+
+**The unmasked image goes to the OCR endpoint.** That is the original screenshot or scan, with
+every name and number on it readable. On Baseten that is Baseten's Model APIs; point
+`PII_GUARD_OCR_URL` at your own Muse Spark Open (open weights) to keep it on your network. The
+`local-only` detection profile refuses Muse OCR unless that URL is self-hosted: `localhost`,
+a loopback, private or link-local address, a single-label name such as a compose service
+(`http://muse:8000/v1`), or a name under `.local`, `.internal`, `.lan`, `.home.arpa` or `.svc`.
+
+| Setting | Env var | Default |
+|---|---|---|
+| Engine | `PII_GUARD_OCR_ENGINE` | `muse`; `tesseract` runs Tesseract on the device (opt-in, not a Meta model) |
+| Endpoint | `PII_GUARD_OCR_URL` | `https://inference.baseten.co/v1` (`/chat/completions` is appended) |
+| Model | `PII_GUARD_OCR_MODEL` | `meta-models/muse-spark-open-1026` |
+| Key | `PII_GUARD_OCR_API_KEY`, else `BASETEN_API_KEY` | unset: no OCR engine, images are refused (`503 ocr_unavailable`); a self-hosted URL may go keyless; an emptied `PII_GUARD_OCR_API_KEY` disables it even when `BASETEN_API_KEY` is set. The key is never logged. |
+
+How it works:
+
+- **Prompt.** The one the spike measured
+  ([LAB-1794](../eval/results/2026-11-02-meta-ocr-spike/README.md)): the system prompt frames
+  the task as document layout for an accessibility tool, and the user prompt asks for
+  `{"lines":[{"text","box"}]}`, boxes normalized to 0-1000. Prompts that mention personal data
+  or redaction are refused far more often.
+- **Lines, not words.** Each returned line is one OCR unit, so a detected span masks its whole
+  line. Masks are coarser on letter pages; on ID cards each value sits on its own line.
+- **Padding.** The model's boxes are approximate. Every text region found on them grows by 2 %
+  of the image width on every side, clamped to the image. The lines themselves keep the model's
+  box, so caption values ("Surname" over "JANE") and MRZ zones are found on the layout it
+  returned. Padding the lines first broke the caption geometry (43.6 % text recall instead of
+  84.5 %).
+- **Refusals fail closed.** A reply without valid JSON (the model declined, or the reply was cut
+  off) is retried once with the same prompt. A second one raises `DetectionError`, so the image
+  is refused, never forwarded unchecked (ADR 0006). Timeouts, HTTP errors and the image
+  deadline (`PII_GUARD_IMAGE_TIMEOUT`) fail closed the same way.
+
+**Results** on the 24 fictional specimen-style documents (`eval/fixtures/visual/`), SAM
+stubbed out so only OCR differs, text detector `rules` + captions
+([Muse](../eval/results/visual/fictional-ocr-muse.md),
+[Tesseract](../eval/results/visual/fictional-ocr-tesseract.md)):
+
+| OCR engine | Text regions fully covered (cov ≥ 0.9) | Mean coverage | MRZ | Over-masking | Per image |
+|---|---:|---:|---:|---:|---:|
+| Tesseract `hun+eng` (on the device) | 85.5 % | 87.2 % | 6/6 | 0.5 % | p50 1.1 s (this Mac) |
+| Muse Spark Open, lines + 2 % | 84.5 % | 87.8 % | 5/6 | 6.7 % | p50 8.2 s, p95 16.8 s (live, Baseten) |
+
+Recall@IoU ≥ 0.5 is near zero for Muse by construction: a line box is much larger than the
+value it holds. Over-masking is higher for the same reason. No image failed closed in the live run (a refusal is retried once); the
+spike saw 1 in 24 with the same prompt. The words are recorded in
+`eval/fixtures/visual/ocr/muse.json`, so the run repeats offline:
+`pii-guard eval visual --specimens eval/fixtures/visual/images --manifest eval/fixtures/visual/manifest.json --labels eval/fixtures/visual/labels.json --ocr-engine muse --ocr-replay eval/fixtures/visual/ocr/muse.json`
+(`--ocr-record` re-records them live; fictional images only). The older
+[fictional.md](../eval/results/visual/fictional.md) record (34.5 % text recall) predates the
+caption and MRZ detectors; the Tesseract row above is the same code as the Muse row.
 
 ## NER detector
 
@@ -40,10 +114,10 @@ loaded and any inference error raise `DetectionError` (fail closed).
 
 | Setting | Env var | Default |
 |---|---|---|
-| Model (hub id or directory) | `PII_GUARD_NER_MODEL` | unset: the published checkpoint, else the public fallback ([below](#which-ner-model-fast-mode-runs)) |
+| Model (hub id or directory) | `PII_GUARD_NER_MODEL` | unset: the published checkpoint ([below](#which-ner-model-fast-mode-runs)) |
 | Revision | `PII_GUARD_NER_REVISION` | pinned for the published and fallback models |
 | Published checkpoint | `PII_GUARD_NER_PUBLISHED_MODEL` | `watt-mind/pii-guard-ner-xlmr-base`, pinned to release `v4.2` (LAB-1625; rollback to `v2.0` [below](#which-ner-model-fast-mode-runs)); `repo` or `repo@revision` |
-| Fallback | `PII_GUARD_NER_FALLBACK` | `download`: fetch it on first use; `cached`: only if already downloaded; `off`: never |
+| Fallback | `PII_GUARD_NER_FALLBACK` | `published`: fetch the published checkpoint on first use, never use the public fallback (Meta-only, ADR 0015); `download`: the public fallback is fetched on first use too (opt-in); `cached`: fetch nothing, use either only if already downloaded; `off`: fetch nothing, never the fallback |
 | Model cache | `PII_GUARD_MODELS_DIR` | `~/.cache/pii-guard/models` |
 | Device | `PII_GUARD_NER_DEVICE` | `auto`: CUDA, then Apple MPS, then CPU |
 | Backend | `PII_GUARD_NER_BACKEND` | `transformers`; `gliner` runs a GLiNER model instead (needs the `gliner` package, which is not in the lock since LAB-1733; reproduce from commit `13e2aaf`) |
@@ -85,11 +159,15 @@ would run, without downloading).
    (`hdkiller--pii-guard-ner-xlmr-base-<revision>/`) is reused (offline and under `cached`
    too), and `PII_GUARD_NER_PUBLISHED_MODEL` set to the old `hdkiller` id still names the
    same checkpoint.
-3. **The public fallback**, a **stop-gap** used only when step 2 is turned off or replaced by
-   an unpinned repo:
+3. **The public fallback**, a **stop-gap** that is **off by default** (not a Meta model,
+   [ADR 0015](decisions/0015-meta-only-runtime-defaults.md)). With
+   `PII_GUARD_NER_FALLBACK=download` (or `cached`) it is used when step 2 is turned off or
+   replaced by an unpinned repo:
    [`bardsai/eu-pii-anonimization-multilang`](https://huggingface.co/bardsai/eu-pii-anonimization-multilang)
    at revision `62ca5712368705bac11b8fea19e42e65cce088dd`. It leaks little but **over-masks:
-   about 23 % on en-smoke** (below).
+   about 23 % on en-smoke** (below). With the default (`published`), fast mode is rules only
+   when there is no published model, and the startup line says so (`rules only (no published
+   pii-guard model pinned and the public fallback is off ...)`).
 
 `make demo`, `make smoke-fast`, `docker compose --profile demo up` and the banners print the
 line `rules + NER: <model>@<revision> (public fallback, Apache-2.0)`, or why it is rules only.
@@ -651,18 +729,24 @@ Configure it with `PII_GUARD_SAM_URL` (default `https://api.meta.ai/v1`), `PII_G
 
 LAB-1229 asked whether faces, ID photos and signatures can be found **on the device** instead of
 with SAM 3.1 on the Meta API (four API calls and 5-6 s per image, and the image leaves the
-machine). **Answer: faces and ID photos yes, signatures no.** So since LAB-1245 the default
-segmenter is **`hybrid`** (`PII_GUARD_SEGMENTER`, see
-[operations.md](operations.md#segmenter-faces-on-the-device-signatures-on-sam-31)): YuNet
+machine). **Answer: faces and ID photos yes, signatures no.** So from LAB-1245 to LAB-1795 the
+default segmenter was **`hybrid`** (`PII_GUARD_SEGMENTER`, see
+[operations.md](operations.md#segmenter-sam-31-by-default-on-device-engines-optional)): YuNet
 (`pii_guard.visual.segment.LocalSegmenter`) finds faces and ID photos on the CPU, and SAM 3.1
 only the signatures.
+
+**Since LAB-1795 the default is `sam-api` again** (only Meta models at runtime,
+[ADR 0015](decisions/0015-meta-only-runtime-defaults.md)); `hybrid` and `local` stay available,
+off by default. The table below is the trade-off of that choice: on the specimens SAM 3.1 alone
+leaks 47.7 % of portraits against `hybrid`'s 10.8 %, with 5 SAM calls per image instead of 2
+and about twice the latency. Signatures are unchanged.
 
 ### Hybrid vs SAM-only (LAB-1245)
 
 | Set | Segmenter | Portrait recall | Portrait leak | Signature recall | Signature leak | SAM calls / image | `/v1/mask/image` p50 / p95 |
 |---|---|---:|---:|---:|---:|---:|---:|
-| specimens (65) | `sam-api` (SAM 3.1 for everything, the previous default) | 90.8 % | 47.7 % | 83.8 % | 51.4 % | 5 | 7.9 s / 11.6 s |
-| | **`hybrid`** (YuNet + SAM 3.1 for signatures, the default) | 92.3 % | **10.8 %** | 83.8 % | 48.6 % | **2** | **4.1 s / 6.1 s** |
+| specimens (65) | `sam-api` (SAM 3.1 for everything, the default again since LAB-1795) | 90.8 % | 47.7 % | 83.8 % | 51.4 % | 5 | 7.9 s / 11.6 s |
+| | **`hybrid`** (YuNet + SAM 3.1 for signatures, opt-in since LAB-1795) | 92.3 % | **10.8 %** | 83.8 % | 48.6 % | **2** | **4.1 s / 6.1 s** |
 | fictional (24) | `sam-api` | 100.0 % | 0.0 % | 100.0 % | 6.7 % | 5 | 7.2 s / 8.1 s |
 | | **`hybrid`** | 100.0 % | 0.0 % | 100.0 % | 6.7 % | **2** | **3.8 s / 5.0 s** |
 
