@@ -66,7 +66,7 @@ RUN --mount=type=bind,from=ner-model,source=/app/models/ner,target=/tmp/ner-pinn
     && test "$(ls -A /app/models | tr '\n' ' ')" = "ner " \
     && diff -r --no-dereference /tmp/ner-pinned /app/models/ner
 
-FROM node:24-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a AS ui-build
+FROM node:26-trixie-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS ui-build
 WORKDIR /ui
 RUN npm install --global pnpm@12.10.1
 COPY ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
