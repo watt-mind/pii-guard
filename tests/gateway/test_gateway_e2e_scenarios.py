@@ -972,7 +972,7 @@ def test_e2e_messages_api_streaming_parallel_tool_use_and_cache_hit(
        placeholders split across chunks.
     2. All blocks flush before their ``content_block_stop`` events and restore cleanly.
     3. Turn 2 sends the restored assistant turn + ``tool_result`` blocks; ``DetectionCache``
-       avoids re-running the LLM detector on Turn 1's user prompt and assistant text block.
+       reuses Turn 1's detected user prompt and fully detects the unchecked assistant text.
     """
     recorded: list[httpx.Request] = []
     ph_map: dict[str, str] = {}
@@ -1264,9 +1264,9 @@ def test_e2e_messages_api_streaming_parallel_tool_use_and_cache_hit(
     assert leaked_values(recorded[1].content) == []
     assert not PLACEHOLDER_RE.search(r2.text)
 
-    # Turn 1 user message, model id, and restored assistant text block all hit DetectionCache;
-    # only the 6 tool_use input keys/values + 2 tool_use names + 2 tool_result strings run FakeLlm.
-    assert e2e_harness.llm.calls == 10
+    # Turn 1's user message and model id hit DetectionCache; the unchecked assistant text,
+    # 6 tool_use input keys/values, 2 tool names and 2 tool_result strings need detection.
+    assert e2e_harness.llm.calls == 11
     evs2 = [d for _, d in _parse_named_sse(r2.text)]
     final_reply = "".join(
         e["delta"]["text"]

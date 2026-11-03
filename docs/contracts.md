@@ -236,7 +236,7 @@ unset. Secrets are `SecretStr`.
 | `PII_GUARD_SAM_URL` | `sam_url` | `str \| None` | unset |
 | `PII_GUARD_SAM_API_KEY` | `sam_api_key` | `SecretStr \| None` | unset (falls back to `META_API_KEY`) |
 | `PII_GUARD_SAM_MODEL` | `sam_model` | `str \| None` | unset (SamClient default `sam-3.1`) |
-| `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `hybrid` |
+| `PII_GUARD_SEGMENTER` | `segmenter` | `hybrid \| sam-api \| local \| off` | `sam-api` (Meta-only default, ADR 0015) |
 | `META_API_KEY` | `meta_api_key` | `SecretStr \| None` | unset |
 
 One factory, `pii_guard.detect.stack`, picks the detectors for both the REST API and the
@@ -244,7 +244,8 @@ gateway (LAB-1270). Without `PII_GUARD_DETECTORS` the REST API runs the gateway 
 `rules`, plus `ner` when torch and transformers import (the default install; the rules-only
 base Docker image skips them). An explicit `PII_GUARD_DETECTORS`
 (`rules,llm`, say) wins for the REST API only; the gateway keeps its per-mode set: `fast`, the
-default, or `audit`, which adds the LLM detector, chosen by `PII_GUARD_GATEWAY_MODE` or the
+default, `escalate`, which sends only fast mode's uncertain spans to the LLM detector as masked
+windows, or `audit`, which adds the LLM detector, chosen by `PII_GUARD_GATEWAY_MODE` or the
 `X-PII-Guard-Mode` header (old mode names: [operations.md](operations.md#modes)). NER fails
 closed (ADR 0006): with `PII_GUARD_NER_MODEL` set but torch/transformers missing, startup raises
 `DetectionError` ("ner configured but torch and transformers are not installed") in both; with neither,
@@ -275,7 +276,7 @@ Gateway `audit` (including its `strict` alias) is refused before any processing 
 request. Images require `PII_GUARD_SEGMENTER=local|off` and built-in Tesseract OCR; missing
 models/dependencies and unsupported visual `mask`/`block` policies still fail closed. Cached
 remote segmenters and custom OCR engines are refused. Unused endpoint settings and the default
-`hybrid` segmenter do not prevent text-only startup; selecting them for an image does refuse.
+`sam-api` segmenter do not prevent text-only startup; selecting them for an image does refuse.
 Profile refusals use `503 detection_profile_denied`; existing component-specific missing-model
 and unsupported-capability errors remain valid.
 
@@ -376,6 +377,7 @@ Every non-2xx response, including validation errors and unknown routes, has this
 | 400 | `unsupported_api` | `POST /v1/messages` (and `/v1/messages/count_tokens`): the upstream has no Anthropic Messages API (it answered 404 or 405 on `.../messages`). The message points to an Anthropic-compatible upstream, the OpenAI-compatible routes (`/v1/chat/completions`) and the console's Connect page; the response has `x-should-retry: false`. Only the masked request reached that upstream; the call is one `refused` traffic event. |
 | 400 | `invalid_code` | `POST /v1/cli/token`: the one-time CLI login code is unknown, already used or expired (it is deleted on first use either way). Run `pii-guard login` again. |
 | 401 | `unauthorized` | `PII_GUARD_API_TOKEN` is set and the request has no valid token (every route but `/healthz`). |
+| 403 | `cross_origin_request_denied` | Self-hosted browser mutations have a foreign, null or ambiguous Origin, or cross-site/same-site Fetch Metadata. No request processing or forwarding occurs. |
 | 403 | `traffic_log_not_local` | `PII_GUARD_TRAFFIC_LOG=full` and the connection is not loopback on both ends. |
 | 403 | `project_access_denied` | Hosted project management lacks an authenticated Google owner, or the request tries to use an endpoint key outside its permitted route/scope. |
 | 403 | `vault_inspect_not_local` | `PII_GUARD_VAULT_INSPECT=full` and a `/v1/vault/*` connection is not loopback on both ends. |
@@ -552,6 +554,11 @@ there is the per-owner vault.
 Cover faces, signatures, ID photos and text personal data in a PNG or JPEG image
 (`pii_guard.api.routes.image`, shared pipeline in `pii_guard.visual.masking`).
 
+Local Tesseract OCR receives an in-memory PNG on stdin and returns text/TSV on stdout,
+including orientation detection. It creates no image or recognized-text temporary files.
+Subprocess failures and timeouts expose fixed error descriptions, never OCR output or
+diagnostics. The existing image deadline also bounds each OCR subprocess.
+
 Request, either form:
 
 - **raw upload**: the image bytes as the body with `Content-Type: image/png` or `image/jpeg`;
@@ -581,14 +588,14 @@ uploads are not accepted (they would need an extra dependency).
   "media_type": "image/png",
   "width": 720, "height": 450,
   "regions": [
-    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "local", "detector": "yunet", "score": 0.93, "policy": "mask"},
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask"},
     {"entity_type": "SIGNATURE", "box": [402, 380, 560, 430], "source": "sam", "detector": "sam", "score": null, "policy": "mask"},
     {"entity_type": "NATIONAL_ID_HU_TAJ", "box": [310, 184, 437, 206], "source": "ocr", "detector": "rules", "score": 1.0, "policy": "mask"}
   ],
   "masked": [{"entity_type": "FACE", "count": 1}, {"entity_type": "SIGNATURE", "count": 1}, {"entity_type": "NATIONAL_ID_HU_TAJ", "count": 1}],
   "kept": [],
   "analysis": {
-    "sam": {"model": "yunet-2023mar+sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO"]},
+    "sam": {"model": "sam-3.1", "entity_types": ["FACE", "SIGNATURE", "ID_PHOTO", "STAMP"]},
     "ocr": {"ran": true, "engine": "tesseract", "detectors": ["rules", "llm"], "models": {"llm": "muse-spark-1.3"}, "reason": null}
   }
 }
@@ -604,7 +611,7 @@ With `render: "labels"` (the default) the response also carries:
     {"entity_type": "PERSON", "box": [310, 92, 402, 112], "source": "ocr", "detector": "captions", "score": 0.8, "policy": "mask",
      "placeholder": "[[PERSON_a1b2c3]]", "label": "[[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
      "cover_box": [308, 90, 452, 114]},
-    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "local", "detector": "yunet", "score": 0.93, "policy": "mask",
+    {"entity_type": "FACE", "box": [72, 116, 188, 262], "source": "sam", "detector": "sam", "score": null, "policy": "mask",
      "placeholder": "[[PERSON_a1b2c3]]", "label": "PHOTO · [[PERSON_a1b2c3]]", "match": "fuzzy", "match_confidence": 0.93,
      "cover_box": [70, 114, 190, 264]}
   ],
@@ -669,17 +676,20 @@ With `render: "labels"` (the default) the response also carries:
 - Segmenters (`pii_guard.visual.segment.Segmenter`): anything with
   `segment(image: bytes, entity_types=None) -> list[Region]` that raises `DetectionError` on
   any failure, including a requested type it cannot find. The API and the gateway build theirs
-  from `PII_GUARD_SEGMENTER` (`pii_guard.visual.segmenters.build_segmenter`, LAB-1245):
-  - `hybrid` (default): `LocalSegmenter` (YuNet on the CPU) finds `FACE` and `ID_PHOTO`, SAM 3.1
+  from `PII_GUARD_SEGMENTER` (`pii_guard.visual.segmenters.build_segmenter`, LAB-1245). Only
+  Meta models run by default (ADR 0015, LAB-1795); YuNet and YOLOS-tiny are opt-in:
+  - `sam-api` (the default): SAM 3.1 on the Meta Model API segments every visual type it has a
+    prompt for, one request per prompt: `face`, `signature`, `squiggly line`, `photo of a
+    person`, `stamp` (**5 requests per image**; `keep` stamps are found and reported). The
+    original image goes to the Meta Model API. Without a SAM key every image is
+    `503 detection_failed`; nothing falls back to a non-Meta model.
+  - `hybrid` (opt-in): `LocalSegmenter` (YuNet on the CPU) finds `FACE` and `ID_PHOTO`, SAM 3.1
     on the Meta API finds `SIGNATURE` (and `STAMP` only when its policy is not `keep`): **2 Meta
     API requests per image** (`signature`, `squiggly line`), run alongside YuNet. The image
     still leaves the machine for those two requests. `analysis.sam.model` is
     `yunet-2023mar+sam-3.1`; `analysis.sam.entity_types` lists the visual types asked for
     (`["FACE", "SIGNATURE", "ID_PHOTO"]` with the default policies).
-  - `sam-api` (the default before LAB-1245): SAM segments every visual type it has a prompt for,
-    one request per prompt: `face`, `signature`, `squiggly line`, `photo of a person`, `stamp`
-    (**5 requests per image**; `keep` stamps are found and reported).
-  - `local`: YuNet only, nothing leaves the machine. It cannot find signatures, so while
+  - `local` (opt-in): YuNet only, nothing leaves the machine. It cannot find signatures, so while
     `SIGNATURE` is `mask` or `block` every image is `503 detection_failed`; with
     `PII_GUARD_POLICY_OVERRIDES=SIGNATURE=keep` images are accepted with signatures visible.
   - `off`: every image is `503 detection_failed` (nothing is segmented, nothing is returned).
@@ -689,19 +699,22 @@ With `render: "labels"` (the default) the response also carries:
     falls back to the API.
   - `LocalSegmenter` needs `uv sync --extra local-vision` and the model (`python -m
     pii_guard.visual.segment fetch` into `PII_GUARD_MODEL_DIR`, default
-    `~/.cache/pii-guard/models`; the Docker image ships both). A missing OpenCV, a missing
+    `~/.cache/pii-guard/models`; the Docker images ship OpenCV, and the model only when built
+    with `--build-arg PII_GUARD_ON_DEVICE_VISION=true`). A missing OpenCV, a missing
     model or one whose SHA-256 differs from the pinned value raises.
   - Every mode other than `sam-api` asks only for visual types whose policy is not
     `keep` (a kept region stays visible anyway).
 - Region `source`: `sam` (SAM 3.1), `local` (on-device, `detector: "yunet"`, with a score) or
   `ocr`. SAM needs `META_API_KEY` (or `PII_GUARD_SAM_API_KEY`); without one every SAM request
   is `503 detection_failed`.
-- Text in the image: when Tesseract is installed (`uv sync --extra ocr` and the `tesseract`
-  binary with `hun`/`eng` data; the Docker image ships both), OCR text goes through the API's
+- Text in the image: the OCR engine (`PII_GUARD_OCR_ENGINE`: `muse`, the default, is Muse Spark
+  Open with its key and receives the unmasked image, ADR 0016; `tesseract` needs `uv sync --extra
+  ocr` and the binary with `hun`/`eng` data) reads it, and the OCR text goes through the API's
   detectors (`PII_GUARD_DETECTORS`, else rules + ner when available; names need `llm` too). Without it the image is refused with
   `503 ocr_unavailable` before SAM runs (fail closed), here and in the gateway. Only with
   `PII_GUARD_IMAGE_REQUIRE_OCR=false` does SAM run alone, and `analysis.ocr` is
-  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "tesseract_unavailable"}`:
+  `{"ran": false, "engine": null, "detectors": [], "models": {}, "reason": "ocr_unavailable"}`
+  (`"tesseract_unavailable"` with `PII_GUARD_OCR_ENGINE=tesseract`):
   text in the image was **not** checked (the gateway says `X-PII-Guard-Image-OCR: off`).
 - Fail closed: any SAM, OCR or detector error is `503 detection_failed`, a masking error
   `500 masking_failed`; an undecodable image or bad base64 is `422 invalid_image`. Error bodies
@@ -758,7 +771,7 @@ without its path, query, user or password.
   "rest": {"detectors": ["rules", "ner"]},
   "ner": {"available": true, "model": null, "state": "ready", "error": null},
   "upstream": {"configured": true, "mock": false, "origin": "https://models.example.com:8443"},
-  "images": {"segmenter": "hybrid", "sam": false, "ocr_required": true, "gaps": [],
+  "images": {"segmenter": "sam-api", "sam": true, "ocr_engine": "muse", "ocr_required": true, "gaps": [],
              "available": true},
   "policies": {"PERSON": "mask", "ORGANIZATION": "keep"},
   "auth": {"token_required": false},
@@ -793,9 +806,10 @@ without its path, query, user or password.
 | `upstream.mock` | bool | The gateway answers from the built-in mock upstream. |
 | `upstream.origin` | string \| null | Origin only (`scheme://host[:port]`); `null` when unset, unparseable or mock. |
 | `images.segmenter` | `"hybrid"` \| `"sam-api"` \| `"local"` \| `"off"` | `PII_GUARD_SEGMENTER`. |
-| `images.sam` | bool | A SAM backend is configured (Meta API key or `PII_GUARD_SAM_URL`); the key itself is never returned. |
+| `images.sam` | bool | A SAM backend is configured (`PII_GUARD_SAM_API_KEY`, `META_API_KEY` or `PII_GUARD_SAM_URL`); the key itself is never returned. |
+| `images.ocr_engine` | `"muse"` \| `"tesseract"` | `PII_GUARD_OCR_ENGINE`. |
 | `images.ocr_required` | bool | `PII_GUARD_IMAGE_REQUIRE_OCR`. |
-| `images.gaps` | string[] | What image masking still needs: `ocr` (the extra), `tesseract`, `segmenter`. `["unknown"]` if it can't be checked. |
+| `images.gaps` | string[] | What image masking still needs: `ocr_key` (a key for Muse Spark Open, the default OCR engine), `ocr` (the extra) and `tesseract` (with `PII_GUARD_OCR_ENGINE=tesseract`), `segmenter`, `sam` (a SAM 3.1 key for the default `sam-api` segmenter). `["unknown"]` if it can't be checked. |
 | `images.available` | bool | `gaps` is empty: `/v1/mask/image` can run. |
 | `policies` | object | Every `EntityType` name → its effective policy (`mask`, `keep` or `block`): defaults plus `PII_GUARD_POLICY_OVERRIDES`. |
 | `auth.token_required` | bool | `PII_GUARD_API_TOKEN` is set. |
@@ -815,7 +829,7 @@ caller's own view (the server's settings locally, the owner's runtime when hoste
 |---|---|---|---|
 | `text` | `true` | `true` | Text masking (`/v1/analyze`, `/v1/mask`, `/v1/unmask`). |
 | `chat` | `true` | `true` | The gateway chat (`/v1/chat/completions`, `/v1/responses`). |
-| `images` | `true` | `PII_GUARD_HOSTED_IMAGES` and no masked visual type the on-device segmenter can't find | Image masking (`/v1/mask/image`); `images.available` says whether it can run locally. Hosted: signed-in owners, local processing only ([ADR 0014](decisions/0014-hosted-local-images.md)). |
+| `images` | `true` | `PII_GUARD_HOSTED_IMAGES` and the replica's segmenter can serve the server's visual policies: SAM 3.1 with its key (the default), or the opt-in on-device engines while no masked type is one they can't find (a stamp) | Image masking (`/v1/mask/image`); `images.available` says whether it can run. Hosted: signed-in owners; images go to the Meta Model API ([ADR 0015](decisions/0015-meta-only-runtime-defaults.md), [ADR 0014](decisions/0014-hosted-local-images.md)). |
 | `logs` | `traffic_log != "off"` | `true` | The traffic log (`/v1/traffic`). |
 | `vault` | `vault_inspect != "off"` | `true` | The vault inspector (`/v1/vault/sessions`). |
 | `server_policy` | `true` | `false` | The server-wide entity policy page (`policies`). Without it, Policy shows the owner's default project policy read-only (from the project API) and points to Projects. |
@@ -1027,7 +1041,8 @@ a request refused by the re-check gets `422 outbound_check_failed` with
 `X-PII-Guard-Outbound-Check: blocked` (policy and short-value rules:
 [architecture-gateway.md](architecture-gateway.md#outbound-re-check)). Besides re-reading the
 walker's texts, the re-check scans the serialized masked body as one text, so a field no
-walker slot covers can't carry a session value out either (LAB-1563).
+walker slot covers can't carry a session value out either (LAB-1563). Texts are also searched
+with their JSON escapes decoded, so an escaped value cannot pass the re-check (LAB-1755).
 
 ## Gateway chat streaming (implemented)
 
@@ -1040,6 +1055,16 @@ call as failed with this code and retains the upstream status, without the rejec
 
 ## Gateway request fields (implemented)
 
+Self-hosted gateway POSTs reject an explicit non-JSON or repeated `Content-Type` with
+`415 unsupported_media_type`. `application/json` and `application/*+json` are accepted;
+SDKs without browser headers may omit the header. Browser mutations must be same-origin,
+including requests through session and endpoint URLs. Hosted mode retains its own checks.
+
+Before collecting text, every gateway request has a cumulative 1,000,000-node JSON budget
+and a maximum container depth of 64. Keys count as nodes; decoded argument and tool-output
+JSON share the same budget. Over-budget or over-deep requests fail with `400 invalid_request`
+before detection or forwarding. Finalizers run in linear-time postorder.
+
 `POST /v1/chat/completions` walks the whole body against an allow-list
 (`pii_guard.gateway.request`) and fails closed (ADR 0006): every key below is masked, checked
 or passed through as stated, and **any other key is rejected** with
@@ -1051,6 +1076,19 @@ itself could be a value), never the value.
 
 Treatments:
 
+- **structured tool output**: complete JSON objects, arrays and quoted strings in tool-result
+  text are decoded before detection, so JSON Unicode escapes cannot hide known values. So are
+  JSON Lines (every non-empty line an object or array), one fenced ```` ```json ```` block and
+  JSON after a byte-order mark; the text around the values is kept exactly.
+  Decoded keys, text and long numbers receive the same masking/block policies as other JSON.
+  Nested JSON string layers are limited to four (excess fails closed with
+  `400 invalid_request`). A tool JSON text over 1,048,576 characters, 50,000 nodes, depth 64
+  or the request's remaining budget is not decoded: it is detected as one plain text, as any
+  non-JSON tool output, so large tool results never break a session. Masked structures are
+  serialized back to the original text field. Non-JSON text keeps its normal text/gutter
+  handling (the outbound re-check still sees through JSON escapes in it). This applies
+  to Chat `tool`/`function` output, Responses function/custom tool output, and Messages
+  `tool_result`, including their text parts/blocks and token-count requests.
 - **mask**: free text. Detected values are replaced by placeholders and restored in the
   answer.
 - **mask JSON**: every string in the value, object keys included, is masked as its own text.
@@ -1102,7 +1140,20 @@ is exempt: a value found by format or checksum (a tax ID, an IBAN, ...) is maske
 appears, and a tool named after one is `400 unsupported_content` (LAB-1348). Values the operator
 pre-loaded (`known`) are never exempt.
 - **pass**: numbers, booleans and null only (strings are `400 invalid_request`), or an opaque
-  provider-issued blob forwarded untouched.
+  provider-issued blob forwarded untouched. Opaque reasoning is forwarded only when its
+  exact value was observed in an upstream response in the **same live vault session**
+  (LAB-1753). Any other blob is **stripped**, never forwarded: the whole reasoning item
+  (Responses), `thinking`/`redacted_thinking` block (Messages, including the block's
+  readable `thinking` text) or reasoning detail (Chat) is removed before detection, and the
+  response carries `X-PII-Guard-Opaque-Reasoning-Stripped: <count>`. Imported histories,
+  gateway restarts, expired/recreated sessions and evicted provenance entries therefore keep
+  working without the old reasoning (an upstream that requires a tool loop's thinking block
+  may reject that turn: an upstream error, not a leak). Authorization retains bounded
+  SHA-256 digests (1024 per session; blobs over 1,048,576 characters are not authorized),
+  never the blobs themselves. Streamed signatures and Chat reasoning fragments have a
+  4,194,304-character cap and authorize when their block/choice finishes or the stream
+  ends; Chat details without an `index` are keyed by their `id` (else `type`), and each
+  such fragment also authorizes on its own.
 
 | Where | Key | Treatment |
 | --- | --- | --- |
@@ -1121,7 +1172,7 @@ pre-loaded (`known`) are never exempt.
 | message | `role` | one of `system`, `developer`, `user`, `assistant`, `tool`, `function` |
 | message | `content` | string mask (line-number gutters hidden during detection, restored when forwarding); array of content parts, below; applies to every role, including tool/function output |
 | message | `refusal`, `reasoning_content`, `reasoning` | mask (strings use the same gutter treatment; a non-string value: mask JSON) |
-| message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass (opaque, provider-signed) |
+| message | `reasoning_details`, `thinking_blocks` | per block: `text`, `summary`, `thinking` mask JSON; `type`, `format`, `id`, `index` check; `data`, `signature`, `encrypted_content` pass only with same-session upstream provenance, else the block is stripped (opaque, provider-signed) |
 | message | `audio` | `transcript` mask; `id` check; `expires_at` pass |
 | message | `annotations` | mask JSON |
 | message | `name` | detected personal data removes the field; for `role: function` it is checked instead (it must match the call) |
@@ -1169,7 +1220,7 @@ with the treatments of the table above. Any other key, item type or part type is
 | `custom_tool_call` item | `name` check; `input` | mask |
 | `custom_tool_call_output` item | `output` | as `function_call_output` |
 | `reasoning` item | `summary[]` (`summary_text`), `content[]` (`reasoning_text`) | `text` mask |
-| `reasoning` item | `encrypted_content` | pass (opaque, provider-encrypted) |
+| `reasoning` item | `encrypted_content` | pass only with same-session upstream provenance, else the item is stripped (opaque, provider-encrypted) |
 | other items (`item_reference`, `web_search_call`, ...) | | `400` |
 
 A **line-number gutter** at the start of a line of message text or tool output (`12|`, as Muse
@@ -1293,8 +1344,8 @@ the treatments of the chat table. Any other key, block type or tool type is
 | `image` block | `source` | inline `base64` PNG/JPEG: the masked image (and, with placeholder labels, its transcript as a `text` block after it); `url`/`file` sources `400` |
 | `tool_use` block | `id`, `name` check; `input` | mask JSON (every string, keys included, and long numbers), as chat tool-call arguments |
 | `tool_result` block | `tool_use_id` check; `is_error` pass; `content` | string mask, or `text` and `image` blocks as above |
-| `thinking` block | `thinking` mask; `signature` | pass (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
-| `redacted_thinking` block | `data` | pass (opaque) |
+| `thinking` block | `thinking` mask; `signature` | pass only with same-session upstream provenance, else the whole block is stripped (opaque, provider-signed; the masked text is what the model wrote, so it still matches) |
+| `redacted_thinking` block | `data` | pass only with same-session upstream provenance, else the block is stripped (opaque) |
 | other blocks (`document`, `search_result`, `server_tool_use`, ...) | | `400` |
 
 **Placeholder note.** When the masked body holds a placeholder, the note goes in front of
@@ -1837,22 +1888,31 @@ contain up to 256 policy versions.
 
 `visual_detection` chooses who finds visual regions for a selected project policy's images:
 
-- `local` (default): on the CPU only. YuNet finds faces and ID photos, and the pinned YOLOS-tiny
-  signature detector (`mdefrance/yolos-tiny-signature-detection` at a fixed revision,
-  Apache-2.0, safetensors, every file SHA-256 checked; `python -m pii_guard.visual.segmenters
-  fetch`) finds signatures, on the whole image and 2x2 overlapping tiles. No SAM request is
-  made. Stamps cannot be found locally: a `local` policy that masks `STAMP` refuses images.
-  `analysis.sam.model` is `yunet-2023mar+yolos-tiny-signature` once signatures were asked for.
-- `sam`: the server's segmenter (`PII_GUARD_SEGMENTER`, `hybrid` by default: SAM 3.1 on the Meta
-  API for signatures and stamps, so the original image leaves the machine). A server set to
-  `local` or `off` is stricter and wins. `local-only` deployments and the hosted service accept
-  `local` only (`422 invalid_project_config`).
+- `sam` (default, [ADR 0015](decisions/0015-meta-only-runtime-defaults.md)): the server's
+  segmenter (`PII_GUARD_SEGMENTER`, `sam-api` by default: SAM 3.1 on the Meta Model API for
+  every visual type, so the original image goes to the Meta Model API). A server set to `local`
+  or `off` is stricter and wins.
+- `local`: the optional on-device engines (not Meta models), on the CPU only. YuNet finds faces
+  and ID photos, and the pinned YOLOS-tiny signature detector
+  (`mdefrance/yolos-tiny-signature-detection` at a fixed revision, Apache-2.0, safetensors,
+  every file SHA-256 checked; `python -m pii_guard.visual.segmenters fetch`) finds signatures,
+  on the whole image and 2x2 overlapping tiles. No SAM request is made. They run only on a
+  server that enables them (`PII_GUARD_SEGMENTER=hybrid` or `local`); on a `sam-api` server
+  (the default) a `local` policy's images are refused with `503 detection_failed`, never sent
+  to SAM instead. Stamps cannot be found locally: a `local` policy that masks `STAMP` refuses
+  images. `analysis.sam.model` is `yunet-2023mar+yolos-tiny-signature` once signatures were
+  asked for.
+
+Omitted, `visual_detection` is `sam`, or `local` on a `local-only` deployment, which accepts
+`local` only (`422 invalid_project_config`). Saved versions keep their value. The hosted
+service accepts both values but does not read them: the replica's segmenter (SAM 3.1 by default)
+serves every policy.
 
 Versions saved before LAB-1444 have no visual actions and no `visual_detection`: they read as
-`local` with the server's visual actions. For visual types, an explicit
-`PII_GUARD_POLICY_OVERRIDES` entry wins over the policy when it is stricter (`keep` < `mask` <
-`block`). Requests without a selected project use the server's policies and segmenter, as
-before.
+`sam` (the server's segmenter decides, as it did when they were saved) with the server's visual
+actions. For visual types, an explicit `PII_GUARD_POLICY_OVERRIDES` entry wins over the policy
+when it is stricter (`keep` < `mask` < `block`). Requests without a selected project use the
+server's policies and segmenter, as before.
 
 An endpoint pins one policy version and one provider/upstream/credential tuple, and optionally
 one model (LAB-1451). Providers

@@ -121,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         type=lambda v: cli_mode(v, "pii-guard connect"),
-        choices=("fast", "audit"),
+        choices=("fast", "escalate", "audit"),
         default="fast",
         help="X-PII-Guard-Mode the client sends (default: fast, rules + NER); not written "
         "for a project endpoint URL, whose policy sets the mode",

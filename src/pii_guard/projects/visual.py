@@ -1,7 +1,8 @@
 """A project policy's image settings: visual actions and ``visual_detection`` (LAB-1444).
 
-- :func:`visual_detection`: the policy's ``visual_detection``; ``local`` for versions saved
-  before it existed.
+- :func:`visual_detection`: the policy's ``visual_detection``; ``sam`` (the server's
+  segmenter, :data:`~pii_guard.projects.store.DEFAULT_VISUAL_DETECTION`, ADR 0015) for
+  versions saved before it existed, ``local`` for a value it does not know (the stricter).
 - :func:`effective_policies`: the policy's actions with the server's visual ones folded in. A
   visual type the version does not hold (saved before LAB-1444) takes the server's action, as
   it did then; a type the operator sets in ``PII_GUARD_POLICY_OVERRIDES`` takes the stricter of
@@ -15,7 +16,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from pii_guard.policy import Policy, PolicySet
-from pii_guard.projects.store import VISUAL_DETECTIONS
+from pii_guard.projects.store import DEFAULT_VISUAL_DETECTION, VISUAL_DETECTIONS
 from pii_guard.types import VISUAL_ENTITY_TYPES, EntityType
 
 __all__ = ["effective_policies", "stricter", "visual_detection"]
@@ -29,9 +30,10 @@ def stricter(a: Policy, b: Policy) -> Policy:
 
 
 def visual_detection(policy: Mapping[str, Any] | None) -> str:
-    """``local`` or ``sam``; ``local`` when the version predates the field."""
-    value = (policy or {}).get("visual_detection", VISUAL_DETECTIONS[0])
-    return value if value in VISUAL_DETECTIONS else VISUAL_DETECTIONS[0]
+    """``local`` or ``sam``; ``sam`` when the version predates the field (the server's
+    segmenter decides, as it did then), ``local`` for an unknown value."""
+    value = (policy or {}).get("visual_detection", DEFAULT_VISUAL_DETECTION)
+    return value if value in VISUAL_DETECTIONS else "local"
 
 
 def effective_policies(

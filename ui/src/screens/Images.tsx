@@ -192,9 +192,11 @@ export function Images({ client, engineState, loadImage = fetchImage, replayReco
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-pretty text-muted">
           {hosted && !demo
-            ? "Detectors on the PII Guard server find faces, ID photos and signatures; OCR plus the text detectors find identifiers printed in the image."
+            ? "SAM 3.1 on the Meta Model API finds faces, ID photos and signatures (the original image is sent to Meta); OCR plus the text detectors on the PII Guard server find identifiers printed in the image."
             : serverImages && !demo
-            ? serverImages.sam
+            ? serverImages.segmenter === "sam-api"
+              ? "SAM 3.1 on the Meta Model API finds faces, ID photos, signatures and stamps (the original image is sent to Meta); OCR plus the text detectors find identifiers printed in the image."
+              : serverImages.sam
               ? "SAM 3.1 segments signatures and stamps (the original image is sent to Meta's API for that), an on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image."
               : "An on-device detector finds faces and ID photos; OCR plus the text detectors find identifiers printed in the image. Signatures and stamps need SAM 3.1 (META_API_KEY on the server)."
             : "Faces, ID photos, signatures and stamps are segmented on the PII Guard server; OCR plus the text detectors find identifiers printed in the image."}{" "}
@@ -686,9 +688,11 @@ function Running() {
 /** What the server's image pipeline is missing, phrased for a checkout and for `uvx` alike. */
 function imageNeeds(gaps: readonly string[]): string {
   const parts: string[] = [];
+  if (gaps.includes("ocr_key")) parts.push("a key for Muse Spark Open, the default OCR engine (PII_GUARD_OCR_API_KEY or BASETEN_API_KEY)");
   if (gaps.includes("ocr")) parts.push("PII Guard's OCR add-on (the ocr extra)");
   if (gaps.includes("tesseract")) parts.push("the Tesseract OCR program (brew install tesseract, or apt install tesseract-ocr)");
   if (gaps.includes("segmenter")) parts.push("a face detector (the local-vision extra, or a META_API_KEY for SAM 3.1)");
+  if (gaps.includes("sam")) parts.push("a key for SAM 3.1, the default segmenter (PII_GUARD_SAM_API_KEY or META_API_KEY)");
   if (!parts.length) return "";
   return `To read images, the server needs ${parts.join(", ")}. Install what is missing and restart PII Guard: when it starts, pii-guard up prints the exact install command.`;
 }

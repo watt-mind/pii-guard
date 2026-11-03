@@ -203,7 +203,7 @@ function OwnerPolicyDetails({ project, policy }: { project: Project; policy: Pol
               ),
             },
             { label: "Detection mode", value: <span className="capitalize">{policy.mode}</span> },
-            { label: "Image detection", value: VISUAL_DETECTION_LABEL[policy.visual_detection ?? "local"] },
+            { label: "Image detection", value: VISUAL_DETECTION_LABEL[policy.visual_detection ?? "sam"] },
             { label: "Language", value: LANGUAGE_NAME[policy.language] ?? mono(policy.language) },
           ]}
         />
@@ -279,7 +279,7 @@ export function OwnerPolicy({ call = request, projectId }: OwnerPolicyProps) {
 }
 
 function imageGaps(server: FullServerStatus): string {
-  const needs: Record<string, string> = { ocr: "no OCR (the ocr extra)", tesseract: "no Tesseract", segmenter: "no face detector (the local-vision extra, or SAM 3.1 with a Meta API key)" };
+  const needs: Record<string, string> = { ocr: "no OCR (the ocr extra)", tesseract: "no Tesseract", segmenter: "no face detector (the local-vision extra, or SAM 3.1 with a Meta API key)", sam: "no SAM 3.1 key (PII_GUARD_SAM_API_KEY or META_API_KEY)" };
   return server.images.gaps.map((g) => needs[g] ?? g).join(", ");
 }
 

@@ -3609,6 +3609,606 @@ after is this branch (run records `eval/results/runs/2026-10-30-lab-1199-post-va
 Rules-mode Ai4Privacy leak falls from 63.0 to 62.3 % (hu 65.4 → 63.6 %) with no new
 over-masking. Fast mode is unchanged: NER v2.0 already masks these values.
 
+<!-- journey:source docs/journey/2026-10-30-lab-1222-ai4privacy-ignore-regions.md -->
+### 106. Ai4Privacy no longer charges a masked title or bare town as over-masking (2026-10-30)
+
+LAB-1222, the follow-up of LAB-1213. LAB-1213 taught the Ai4Privacy converter to keep the labels
+PII Guard's policy doesn't mask (dates, ages, gender, sex, titles, a town on its own) as *ignore
+regions*, so a prediction on one is neither credited nor charged; the committed sample predated
+that, so the scorer only skipped `DATE_OF_BIRTH` on it. **Change:** the sample was rebuilt from the
+pinned split (`fetch --source-file`, the 920 MB file checked against its SHA-256): the same 600
+rows and gold spans, plus 1,452 ignore regions (de 452, en 504, hu 496); the
+[manifest](../eval/fixtures/public/ai4privacy-openpii-1m.json) is unchanged and `fetch --check`
+passes.
+
+Both runs on `develop` `323d859`, local CPU, `pii-guard eval --detectors …` on
+`eval/fixtures/public/{de,en,hu}-ai4privacy.jsonl`; before is the earlier sample, after the
+refreshed one ([rules](../eval/results/runs/2026-10-30-lab-1222-ai4privacy-rules.json),
+[fast](../eval/results/runs/2026-10-29-lab-1222-ai4privacy-fast.json)):
+
+| system | precision (overlap) | over-masking | unscored predictions | recall / leak |
+| -- | -- | -- | -- | -- |
+| rules | 98.5 % → 98.5 % | 0.1 % → 0.1 % | 0 → 0 | 36.5 % / 62.9 %, unchanged (62.3 % once re-recorded on later `develop` rules, LAB-1199 cues) |
+| fast (rules + NER v2.0) | 98.1 % → **98.9 %** | 1.2 % → **0.3 %** (26 → 7 spans) | 250 → 269 | 96.9 % / 2.4 %, unchanged |
+
+A change of method, not of the model: recall and leak can't move with ignore regions. The
+comparison models and baselines are still on the earlier sample and show under the
+earlier-fixture table in [benchmarks.md](benchmarks.md#ai4privacy) until they are re-run.
+
+Found on the way: fast mode's leak on this set is 2.4 %, not the 0.4 % of the LAB-1512 record
+(`d2e710a`). The difference is all `ADDRESS` (4 → 49 of 379 leaked) and appears on the earlier
+sample too, so it is not this change; the only detection commit in between is LAB-1477's
+bare-number `ADDRESS` guard. Tracked in LAB-1599. Cost: $0.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1302-fictional-smoke-phones.md -->
+### 107. Smoke phones from the fictional ranges, headline rows re-recorded (2026-10-30)
+
+LAB-1302, split out of LAB-1214. The Hungarian and German smoke fixtures had phone numbers
+that weren't from ranges set aside for fiction. They now follow
+[ADR 0005](decisions/0005-synthetic-data-only.md): the German ones are Bundesnetzagentur
+drama numbers, and the Hungarian ones use a real area code with an ascending-run or
+`555 01xx` subscriber number ([`build_smoke.py`](../eval/fixtures/build_smoke.py), 3 hu and
+5 de values). That changes the fixtures' sha256, so every older hu/de smoke result is stale.
+The rows behind the report and the landing are re-recorded from a clean commit, `18edc24`, all
+in one pull request:
+
+- rules only, fast mode (published NER v2.0) and Presidio, LLM Guard and PrivAiTe;
+- the open-model comparison (`scripts/bench_ner_encoders.py`): five public encoders and the
+  bardsai v1 fallback, alone and with the rules, plus pii-guard NER v2.0 alone;
+- **audit mode as it ships now**: rules + NER v2.0 + Muse Spark Open on Baseten. The
+  2026-10-27 audit row used the unpublished distilled NER checkpoint, which is gone, so this is
+  a new row and the old one is kept for reference with `†`.
+
+Leaked values on `smoke` (173 values, 51 documents), before (the latest earlier record) → after:
+
+| system | leak | F1 | over-masking |
+| -- | --: | --: | --: |
+| fast (rules + NER v2.0) | 0 → 0 | 94.6 → 94.6 % | 1.1 → 1.1 % |
+| rules only | 71 → 71 | 70.0 → 70.0 % | 0.0 → 0.0 % |
+| audit (rules + NER + Muse Spark Open) | 1 → 0 | 98.2 → 96.2 % | 1.1 → 1.1 % |
+| Presidio | 42 → 46 | 64.9 → 70.3 % | 27.5 → 19.0 % |
+| LLM Guard | 78 → 78 | 53.2 → 53.2 % | 36.7 → 36.7 % |
+| PrivAiTe | 22 → 22 | 55.2 → 54.7 % | 25.8 → 25.8 % |
+| rules + Wismut/nym-pii-multilingual | 7 → 6 | 90.6 → 90.1 % | 6.0 → 6.0 % |
+| pii-guard NER v2.0 alone | 6 → 8 | 89.3 → 89.8 % | 1.1 → 1.1 % |
+
+Fast mode and rules only score exactly the same on the new numbers, as LAB-1214 predicted.
+Presidio moved mostly because its run now loads the German spaCy model `de_core_news_lg`,
+which the `baselines` extra pins but the 2026-10-30 LAB-1496 environment didn't have (German
+over-masking 44 → 16 %, German leaks 4 → 8). The encoder rows moved by at most two leaked
+values or a few tenths of F1. The audit row isn't comparable one to one with the old one: it uses a
+different NER.
+
+Left stale with `†` (en-only snapshot): historical NER candidates and ablations (v2 base and
+large variants, v2.1 epochs, v3 to v4 candidates, GLiNER, the distilled checkpoints) and the
+earlier LLM rows (Muse Glimmer, Muse Spark 1.3, rules + Muse Spark Open). They were
+model-selection steps and none of them ships. Records
+`eval/results/runs/2026-10-30-lab-1302-*.json` (18). Cost: $0.27 Baseten, two audit runs of
+51 requests each (the first at `3449736`, redone after LAB-1199's cue rules merged; same
+counts), about 59k prompt tokens (32k cached) and 24k completion per run, at $1.25 / $0.15 /
+$4.25 per million; everything else on local CPU.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1589-polish-in-the-headline-set.md -->
+### 108. Polish joins the headline hand-written set (2026-10-30)
+
+LAB-1589, split out of LAB-1583. The Polish pack (LAB-1400) shipped with its own 11-document
+`pl-smoke` set, but it stayed out of the run log: a record there adds Polish to the headline
+`smoke` set, and no comparison tool had run on it. Now every row behind the report and the
+landing has a Polish run, recorded from one clean commit (`252b680`) on local CPU:
+
+- rules only, fast mode (rules + the published NER v2.0), Presidio, LLM Guard and PrivAiTe;
+- the open-model comparison (`scripts/bench_ner_encoders.py`, whose `smoke` set now includes
+  `pl-smoke`): five public encoders and the bardsai v1 fallback, alone and with the rules, plus
+  pii-guard NER v2.0 alone.
+
+Before recording, three of the set's four phone numbers moved into a documented block: Poland
+reserves no range for fiction, so [ADR 0005](decisions/0005-synthetic-data-only.md) now has a
+Polish rule like the Hungarian one (a real area code with a `555 01 xx` subscriber number, or a
+mobile prefix and an ascending digit run). The rules score the same on the new numbers.
+
+`smoke` is now 62 documents (de 10, en 10, hu 31, pl 11). Leak, F1 and over-masking pooled over
+the set, before (de + en + hu, 51 documents) → after (with pl):
+
+| system | leak | F1 | over-masking |
+| -- | --: | --: | --: |
+| fast (rules + NER v2.0) | 0.0 → 0.0 % | 94.6 → 95.4 % | 1.1 → 0.9 % |
+| rules only | 41.0 → 40.7 % | 70.0 → 70.2 % | 0.0 → 0.0 % |
+| PrivAiTe | 12.7 → 13.0 % | 54.7 → 55.4 % | 25.8 → 25.7 % |
+| Presidio | 26.6 → 25.5 % | 70.3 → 62.9 % | 19.0 → 26.1 % |
+| LLM Guard | 45.1 → 46.3 % | 53.2 → 54.0 % | 36.7 → 33.7 % |
+| rules + bardsai v1 (fallback) | 1.2 → 0.9 % | 93.2 → 94.1 % | 10.3 → 8.8 % |
+| rules + Wismut/nym-pii-multilingual | 3.5 → 2.8 % | 90.1 → 91.8 % | 6.0 → 4.9 % |
+
+On Polish alone fast mode leaks 0 of 43 values (F1 98.9 %), as in the LAB-1400 tuning run;
+rules alone leak 39.5 % (names, dates of birth and organisations need the NER). Presidio has no
+Polish spaCy pipeline, so it analyses Polish text with its English one (pl F1 38.3 %). The
+headline sentence, the landing and the README table still compare fast mode with the best
+open-source tool on the same documents; only the audit row (one remote Muse Spark Open call per
+document) has no Polish run and is now marked `†`. A `pl-smoke` suite joins the rules-only
+regression gate (`eval/gates.json`).
+
+Records: `eval/results/runs/2026-10-30-lab-1589-pl-smoke*.json` (17). Cost: $0, local CPU only.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1597-hu-neutral-i-harmony.md -->
+### 109. Hungarian names like Judit and Katalin get back-vowel case endings (2026-10-30)
+
+LAB-1597, found in LAB-1152. The synthetic agent-traffic generator picked a Hungarian case
+ending from the last vowel of the name and counted `i`/`í` as front. In Hungarian they are
+neutral, so the vowel before them decides: `Juditnak`, `Katalinnal`, `Bálinttól`,
+`Jázminról`. The generator wrote `Juditnek`, `Katalinnel`, `Bálinttől` and `Jázminről`
+instead. `HungarianSuffixMatcher.restore` also kept the written suffix for these names
+rather than re-harmonizing it. It now re-harmonizes them too (`Zsófi` + `nek` →
+`Zsófinak`, `Dávid` + `vel` → `Dáviddal`). This is the same rule as `_hu_harmony_class`.
+
+The regenerated files change 3 of the 330 Hungarian test documents and 1 of the 100 dev
+documents (`python -m pii_guard.eval.datasets check agent-traffic agent-traffic-dev` matches).
+The gold spans and their counts are unchanged.
+
+Fast mode (rules + NER v2.0) on agent-traffic. The 10-28 record is before; the 10-30 rerun on
+the regenerated files is after:
+
+| set | leak | partial leak | over-masking | F1 overlap |
+| -- | --: | --: | --: | --: |
+| agent-traffic (990) | 12 → 16 of 5,155 (0.23 → 0.31 %) | 2 → 0 | 1.97 → 1.40 % | 95.5 → 97.0 % |
+| agent-traffic, hu (330) | 0 → 0 of 1,728 | 2 → 0 | | |
+| agent-traffic-dev (300) | 2 → 2 of 1,555 | 1 → 0 | 2.16 → 1.66 % | 96.1 → 97.4 % |
+
+- **None of this movement comes from the data fix.** The same code on the old and the new
+  Hungarian file gives identical totals (leak 0.003104, F1 0.970042, over-masking 0.014049).
+  The change since 10-28 comes from the detector work merged in between (the 10-28 records
+  were made from a dirty tree). The four extra leaks are in en/de, not hu.
+- Rules only on agent-traffic: leak 45.3 → 38.8 %, which is also code drift since 10-27.
+- Presidio, LLM Guard and PrivAiTe were not rerun (no baselines environment here). Their
+  agent-traffic rows still read the 10-27 records on the old files, which differ in 3 of
+  990 documents.
+- Cost: $0, all local.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1606-lexicon-surname-given-name.md -->
+### 110. A lexicon surname and given name are masked without a model span (2026-10-30)
+
+LAB-1606, found on LAB-1359. **Before:** fast mode sent three of the 220 `probe-real` names
+upstream whole, all a surname that is also an everyday word with an inflected given name
+(`Fekete Piroskáról`, `Fekete Bélát`). The NER model emitted no span at all, so LAB-1359's
+join, which extends an existing `PERSON` span, had nothing to extend.
+
+- **Fix.** `detect/ner_words.py`: a capitalised word from the pack's `surnames` lexicon, one
+  space, then a capitalised word the pack reads as a lexicon given name, bare or with a case
+  ending, is a `PERSON` span even when the model tagged nothing there. A second given name
+  and a hyphenated double surname join. It stays out when a street type follows
+  (`Kossuth Lajos utca`), when a model span of the text types already overlaps it, or for a
+  pack without these lexicons (English, German). The suffix trim then ends the span at the
+  stem, as for any whole name.
+- **Not fixed here: 1 of 220 left.** `Fekete Eleknek` stays a whole miss: `Elek` is not in
+  the hand-curated given-name lexicon, so the rule does not fire, on purpose (only the
+  lexicon decides). The model-side fix, hard positives with common-word surnames and
+  inflected given names, goes into the next NER data round (LAB-1625). No model was trained.
+
+Fast mode (rules + NER v2.0), `develop` `890a6f6` against this branch. Counts are in
+[before.json](../eval/results/2026-10-30-lab-1606-surname-given/before.json),
+[after.json](../eval/results/2026-10-30-lab-1606-surname-given/after.json) and
+[other-hu-sets.json](../eval/results/2026-10-30-lab-1606-surname-given/other-hu-sets.json).
+
+| set (split) | leak (whole) | over-masking | precision | recall |
+| -- | -- | -- | -- | -- |
+| probe-real (dev) | 3 -> 1 (1.36 -> 0.45 %) | 0.0 -> 0.0 % | 100.0 -> 100.0 % | 98.64 -> 99.55 % |
+| probe, fictional (dev) | 10 -> 10 | 0.0 -> 0.0 % | 100.0 -> 100.0 % | 95.45 -> 95.45 % |
+| hu-inflection (dev) | 1 -> 1 | 0.0 -> 0.0 % | 100.0 -> 100.0 % | 93.44 -> 93.44 % |
+| hu-smoke (dev) | 0 -> 0 | 0.88 -> 0.88 % | 94.17 -> 94.17 % | 93.33 -> 93.33 % |
+| agent-traffic-dev (dev) | 2 -> 2 | 1.66 -> 1.66 % | 96.35 -> 96.35 % | 98.52 -> 98.52 % |
+| cee-pii (test) | 2 -> 2 | 12.44 -> 12.44 % | 85.49 -> 85.49 % | 97.22 -> 97.22 % |
+| ai4privacy (test) | 8 -> 8 | 0.37 -> 0.37 % | 98.9 -> 98.9 % | 98.95 -> 98.95 % |
+
+The other Hungarian fixtures (company names, agent text, brand names, uncued numbers,
+injection, synth sample) did not change. No headline set moved, so the run records and the
+hosted proof numbers stay as they are.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1625-ner-v42-published.md -->
+### 111. NER v4.2 published and pinned: what changes against v2.0 (2026-10-30)
+
+LAB-1625. The owner published B3 as `watt-mind/pii-guard-ner-xlmr-base` tag `v4.2` (revision
+`33ef18fe`, weights SHA-256 `40e8406c…`) after seeing the regressions below, and fast mode now
+pins it. v2.0 (`95f612a9`) stays pinned as `ner_resolve.PREVIOUS_PUBLISHED`, so a rollback is
+one setting and still checks the weights' hash.
+
+**v2.0 → v4.2**, same commit, CPU, rules + model (fast mode), leak / over-masking %:
+
+- **Better:**
+  - agent traffic (990): 0.31 / 1.40 → 0.21 / 0.74, with no leaks left on valid- or
+    invalid-checksum identifiers;
+  - agent-traffic-dev: over-masking 1.66 → 0.66 at the same 0.13 leak;
+  - Nemotron-PII: leak 0.72 → 0.57;
+  - CEE-PII: over-masking 12.4 → 7.3;
+  - Hungarian inflection: leak 2.0 → 0.0;
+  - EU gate sets: leak 0.95 → 0.32;
+  - MAPA (report-only): over-masking 55.5 → 44.7;
+  - Polish with the model alone (pl-pii-bench): leak 22.7 → 13.3.
+- **Same:** hand-written smoke (62, with Polish), 0.0 leak; Ai4Privacy 0.37; Gretel 19.1 (2.4
+  with corrected labels). CPU latency is equal within noise: 42.8 / 49.6 ms against
+  42.3 / 48.8 ms per message (p50 / p95, alternating run).
+- **Worse:**
+  - CEE-PII leak 0.40 → 0.79 (0.8 % of values);
+  - the model alone on CEE-PII: 1.59 → 10.52, the largest regression;
+  - pl-pii-bench: 3.52 → 4.24;
+  - TAB: 4.03 → 5.13 (two of 40 documents' values);
+  - MAPA: 8.24 → 8.51;
+  - smoke over-masking: 0.87 → 1.32;
+  - Gretel over-masking: 21.8 → 24.4.
+  None of these sets is a release gate. Every gate passed.
+
+Dev images pull the model when they are built (`Dockerfile.hosted`), so a deployment picks up
+v4.2 only after a rebuild.
+
+Evidence: [results README](../eval/results/2026-10-30-lab-1625-ner-v42/README.md) (section
+"B3 on every published set"), [model card](../training/ner/model-card.md).
+
+<!-- journey:source docs/journey/2026-10-30-lab-1625-ner-v42.md -->
+### 112. NER v4.2: the first candidate since v2.0 to pass every gate (2026-10-30)
+
+LAB-1625, after LAB-1547. **Before:** v4.1-A1 passed the eu gate but failed the hu/en/de smoke
+gate (leak 0.58 %, over-masking 2.16 % against v2.0's 0.00 / 1.08). It also over-masked
+agent-traffic-dev, 3.21 % against 1.66 %, mostly with `DATE_OF_BIRTH` false alarms. The
+LAB-1417 smoke-style split showed 0 % leak for every model, so it could not have caught this.
+
+- **Selection repaired first.** `training/ner/selection_v42.py` is a synthetic hu/en/de split of
+  685 documents. It has one slice per v4.1 failure mode: German genitive names, Hungarian
+  common-word surnames with an inflected given name, birth dates next to other dates, and
+  reference numbers next to IBANs. It uses frames and names disjoint from the training data,
+  and no gate text. On the three known models it gives v2.0 0.00 / 6.63, A1 0.21 / 9.61 and
+  A2 0.16 / 10.08, the same order as the smoke gate.
+- **Birth-date labels fixed at the source.** kiji, nym and E3 label contract dates, deadlines
+  and even towns as birth dates. 656 implausible uncued spans are taught as `O`. Hard
+  positives and hard negatives were added (6,300 template documents, no model call).
+- **After** (candidate B3, the v4.1-A1 mix with these changes and the targeted data twice; v2.0
+  re-scored on the same commit):
+  - smoke 0.00 / 1.09 (v2.0 0.00 / 1.08);
+  - hu-inflection leak 2.0 → 0.0;
+  - agent-traffic-dev over-masking 1.66 → 0.66, at the same 0.13 leak;
+  - eu total leak 0.95 → 0.32, with Maltese over-masking 12.9 → 0;
+  - CPU p95 0.94× v2.0.
+  - MAPA (report-only): leak 8.24 → 8.51, over-masking 55.5 → 44.7.
+- **Cost:** Modal $1.57 for three A10G runs and one latency run. Fireworks and Meta $0.
+- **Decision:** B3 goes to the owner. It is not published and the production pin is unchanged.
+  Dev-calibrated thresholds on B3 (a post-hoc check) cut over-masking but fail the smoke and
+  agent-traffic leak gates, so they are not used.
+
+Evidence: [README](../eval/results/2026-10-30-lab-1625-ner-v42/README.md),
+[gates.json](../eval/results/2026-10-30-lab-1625-ner-v42/gates.json).
+
+<!-- journey:source docs/journey/2026-10-30-lab-1648-ids-before-reference-cells.md -->
+### 113. IDs before an order-number cell are masked again (2026-10-30)
+
+LAB-1648, found while LAB-1597 re-recorded agent-traffic. Fast-mode leak on agent-traffic
+(test) rose from 12 to 16 of 5,155 values (0.23 → 0.31 %) between the 10-28 record and
+`develop`. All of the rise was in en/de. Local CPU only. A sweep of the 41 detector merges since
+the 10-28 record (`13666bf`) found which spans changed:
+
+| merge | spans that start leaking | spans that stop |
+| -- | -- | -- |
+| LAB-1433 (#205): a bare TAJ only in Hungarian text | en-0091 `ids.national` | |
+| LAB-1258 (#313): NER sees CSV cells | en-0174, en-0264, en-0273, en-0291, de-0237 | en-0210 (one) |
+| LAB-1476 batch (#303) | | en-0003 |
+
+**Cause.** LAB-1258 turns a `,` or `;` that comes straight before a capital letter into a space
+in the text the model reads, so `2,Teszt Elek` reaches the model as two cells. The test
+covered names. It did not cover the reference cells in the agent-traffic CSVs, which also
+start with a capital: `…,610456508,ORD-2026-481850,…` and `…,14500209637,SO9016764,…`. The
+model then saw `686276120 ORD-2024-544367` as one order-number phrase and dropped the national
+ID. All five new leaks are the `national_id` cell right before an `ORD-` or `SO` cell.
+
+**Fix** ([`detect/ner.py`](../src/pii_guard/detect/ner.py), `model_view`). A delimiter
+counts as a cell boundary only when a capitalized word follows it. That means a capital
+followed by a lower-case letter (`Teszt`, `Ádám`), an apostrophe (`O'Brien`) or an initial's
+period (`J. Smith`). An all-caps reference cell stays glued, as it was before LAB-1258.
+
+Fast mode (rules + NER v2.0). Before is `develop` `f7f9d90` (the LAB-1597 records); after is
+this branch, re-recorded as
+[`2026-10-30-datasets-agent-traffic-fast`](../eval/results/runs/2026-10-30-datasets-agent-traffic-fast.json)
+and [`-dev-fast`](../eval/results/runs/2026-10-30-datasets-agent-traffic-dev-fast.json):
+
+| set | leak | over-masking | recall (overlap, spans) | F1 overlap |
+| -- | --: | --: | --: | --: |
+| agent-traffic (990) | 16 → 13 of 5,155 (0.31 → 0.25 %) | 78 → 74 (1.40 → 1.33 %) | 5,469 → 5,476 of 5,587 | 97.0 → 97.1 % |
+| agent-traffic-dev (300) | 2 → 2 of 1,555 | 28 → 26 (1.66 → 1.55 %) | 1,662 → 1,661 of 1,687 | 97.4 → 97.4 % |
+| agent-text (hu/en/de) | 0/126 → 0/126 | 0/132 → 0/132 | 132/132 → 132/132 | |
+| smoke (hu/en/de/pl) | 0/216 → 0/216 | 2/229 → 2/229 | 228/241 → 228/241 | |
+| hu-inflection, synth-sample, negative | unchanged | unchanged | unchanged | |
+
+The LAB-1258 names (`Teszt Elek`, `Max Mustermann` in `customers.csv`) are still found
+whole: agent-text doesn't move.
+
+**Not fixed: en-0091, 13 vs 12 on 10-28.** `"ids": {"national": "<nine digits>"}` was masked on
+10-28 only because the Hungarian bare-TAJ rule fired in English text and the number happened to
+pass its mod-10 check (one nine-digit number in ten does). LAB-1433 limited that rule to
+Hungarian on purpose, for precision. The NER doesn't propose the value, and no English cue
+matches a bare `national` key. A JSON-key cue for nested `ids.*` objects is a separate change:
+LAB-1649.
+
+Cost: $0, all local.
+
+<!-- journey:source docs/journey/2026-10-30-lab-1656-public-numbers-from-records.md -->
+### 114. One source for every public number, and a like-for-like agent-traffic comparison (2026-10-30)
+
+LAB-1656. The README, the landing page and `docs/benchmarks.md` used to disagree: the README's
+table read the per-dataset records, the landing read the fixture-set run records, and some
+landing figures were typed by hand. Now every public number comes from the run records in
+`eval/results/runs/`:
+
+- the README results block is generated (`pii-guard eval report`), with an over-masking table,
+  leak per language and one sourced latency line, and `--check` fails when it is stale;
+- the landing's numbers live in `ui/src/hosted/proof.ts` and `proof.source.test.ts` checks
+  each one against the generated report, so a new run that moves a figure fails the UI tests;
+- placeholders in public copy fail `tests/test_public_copy_placeholders.py` until filled.
+
+**The comparison was not like-for-like.** PrivAiTe, Presidio and LLM Guard had last run on an
+earlier version of the agent-traffic files. They were re-run on the current 990 documents
+(de/en/hu) and the current Ai4Privacy sample, on one commit, on CPU, with the same scorer
+(`2026-10-30-lab-1656-*`, about 11 minutes, $0). The fresh PrivAiTe leak is 2.4 %, not the
+0.5 % of its older run.
+
+**Agent traffic, fast mode with NER v4.2 against the tools,** over-masking / leak %:
+
+| | Over-masking | Leak |
+|---|--:|--:|
+| PII Guard fast (v4.2) | 0.7 | 0.2 |
+| PrivAiTe | 35.2 | 2.4 |
+| Presidio | 33.4 | 16.6 |
+| LLM Guard | 16.9 | 20.2 |
+
+The landing now leads with this table, then zero leaks per language on the hand-written set,
+the open-model comparison, number validity on CEE-PII, Hungarian inflection, the NER's CPU time
+(43 ms p50 per ~400-character message, the model alone) and Polish through its language pack.
+MAPA EUR-Lex stays report-only and is off the landing and the README headline. Where v4.2 is
+behind v2.0 (CEE-PII 0.8 % against 0.4 %, Polish 4.2 % against 3.5 %), the README and the
+landing say so.
+
+Evidence: [README results](../README.md#results), [benchmarks.md](benchmarks.md#agent-traffic).
+
+<!-- journey:source docs/journey/2026-11-01-lab-1766-escalate-mode.md -->
+### 115. Escalate mode: Muse Spark Open looks only where fast mode is unsure (2026-11-01)
+
+LAB-1766. A third gateway mode between `fast` and `audit`. Fast mode runs as before; a
+selector picks the places it is unsure of (low-score NER spans, capitalised words after a form
+of address or next to a name, long numbers no rule matched, unvalidated rules-vs-NER type
+conflicts), and only windows of about ±200 characters around them go to Muse Spark Open, with
+every value already found replaced by a placeholder. The model can add spans or settle a type,
+never unmask one; a failed call masks the uncertain words. Text with nothing uncertain makes
+no call. Design and settings: [architecture-gateway.md](architecture-gateway.md#escalate-mode).
+
+**Fast against escalate,** same documents and code
+([results](../eval/results/2026-11-01-lab-1766-escalate/README.md)):
+
+| | Hand-written (106 docs) fast / escalate | Ai4Privacy (600 docs) fast / escalate |
+|---|--:|--:|
+| Leak | 0.51 % / 0.34 % (3 → 2 of 583) | 0.37 % / 0.37 % (8 of 2,185) |
+| Over-masking | 0.41 % / 0.54 % (3 → 4) | 0.28 % / 0.28 % |
+| Documents escalated | 46 % | 30 % |
+| Added latency, escalated docs, p50 / p95 | 1.5 / 2.9 s | 1.4 / 2.8 s |
+| Cost per 1,000 messages | $0.89 | $0.57 |
+
+The leak change is one vehicle plate on the hand-written set and nothing on Ai4Privacy: within
+noise. Escalate is about a quarter to a third of audit's cost and sends far less text, but on
+these sets it does not cut leaks measurably, so it stays opt-in and the hosted default stays
+fast mode. Cost of the evaluation: $0.56 of Baseten credit (fictional and public synthetic
+documents only; no court text left the machine).
+
+<!-- journey:source docs/journey/2026-11-02-lab-1774-fr-pack.md -->
+### 116. A French language pack: fr-smoke leak 43.6 % with rules, 2.6 % in fast mode (2026-11-02)
+
+LAB-1774, part of the first EU wave (fr/es/it/nl/ro). French text got only the recall floor:
+language-independent rules, the other packs' `EVERYWHERE` rules and exact matching in the
+vault. So we built a `fr` pack by following [languages.md](languages.md), with the Polish
+pack as the template. It adds validators for the NIR (numéro de sécurité sociale: the key
+97 − n mod 97, Corsica's 2A/2B counted as 19/18, the INSEE's field codes) and the numéro fiscal
+(SPI: the last three digits are the first ten mod 511, checked against the DGFiP's worked
+example). It also adds national phone numbers, addresses (`12 rue des Lilas, 69003 Lyon`, a
+postcode where an address line starts), cue and reference words, CNI and passport captions,
+brand names, prompt notes and stopwords.
+
+| rules on | before | after |
+| -- | --: | --: |
+| `eu/fr-smoke` (5 documents) | 81.2 % leak | **50.0 %** |
+| new `fr-smoke` (11 documents) | — | **43.6 %** (fast mode **2.6 %**) |
+
+- **What runs everywhere.** A NIR next to its label, and an unlabelled one when its sex digit
+  is 1 or 2 and its month a calendar month: 15 characters with a valid key in the card's
+  layout are hard to mistake for anything else. Over 4 156 non-French documents in `eval/` it
+  fired once, on a value the dataset labels as an identifier. The numéro fiscal runs
+  everywhere too, but only next to its label: a bare 13-digit number is often a barcode, and
+  one in 511 passes the check.
+- **What stays French.** Phones (`06 39 98 12 34`, dotted, hyphenated, compact), addresses and
+  postcodes. `Client :` is a chat speaker label as often as a customer-number label, so it is
+  no reference word.
+- **No inflection matcher.** French names don't inflect. The elided `d'` and `l'` stay outside
+  the placeholder (`l'avis d'[[PERSON_x]]`), so exact matching with `allow_suffix=False` is
+  enough, and the round trip on `eu/fr-inflection` is 100 %.
+- **`n°` is a gap in the shared code.** The cue window and the reference check stop at `°`,
+  so `passeport n° 19FA45821` and `Facture n° 4400…` were missed. The pack covers both for now
+  (a rule for documents after `n°`, and a French check before a validated number), and the
+  shared fix is LAB-1785. In the same vein, the NER check's list of order and invoice
+  words is pinned to hu/en/de/pl by a test, so `facture` and `commande` only reach the rules
+  for now (LAB-1789), and fast mode masks four business numbers in the hard negatives.
+- **Nothing else moved.** The hu/en/de/pl smoke, synth-sample, injection, ai4privacy and
+  negative sets give the same counts before and after
+  ([results](../eval/results/2026-11-02-lab-1774-fr-pack/README.md)).
+- **Fictional phones.** The smoke set uses `01 99 00 xx xx` and `06 39 98 xx xx`, the blocks
+  that secondary sources list as reserved for fiction in France. We did not find ARCEP's own
+  decision, so the ADR 0005 entry for France is left to the roll-up (LAB-1779).
+- **Cost:** $0. Everything ran on a local CPU.
+
+<!-- journey:source docs/journey/2026-11-02-lab-1775-es-pack.md -->
+### 117. A Spanish language pack: es rules leak 82.4 → 51.5 % (2026-11-02)
+
+LAB-1775, part of the first EU wave (fr/es/it/nl/ro). Spanish text had only the recall
+floor: DNI and NIE appeared only as unvalidated cue words. So we built an `es` pack by
+following [languages.md](languages.md), with the Polish pack as the template. It adds
+validators for the DNI / NIF and the NIE (the mod-23 check letter, NIE prefix `X`/`Y`/`Z`
+mapped to 0/1/2) and the company CIF (control digit or letter). The DNI and NIE run for every
+language, because eight digits and a valid check letter are distinctive; the CIF runs only
+next to its label. National phone numbers (nine digits from 6-9), street addresses
+(`Calle del Olmo 14, 3.º B, 28012 Madrid`) and postcodes where an address line starts run for
+Spanish text only. It also adds cue words (a labelled number is masked even when its check
+letter fails, and a passport, social security or driving-licence number after its label),
+reference words (`pedido`, `factura`, `cliente`, `referencia`, with `n.º`), prompt notes,
+DNI and passport captions and brand names. No inflection matcher: names don't decline.
+
+Rules and fast mode (rules + the published NER) on the four Spanish sets (`es-smoke`, the
+phase-1 gates `eu/es-smoke` and `eu/es-inflection`, `negative/es-uncued-numbers`: 32 documents,
+74 labels), same commit, without and with the pack
+([details](../eval/results/2026-11-02-lab-1775-es-pack/README.md)):
+
+| | leak | F1 exact | over-masking |
+| -- | --: | --: | --: |
+| rules, before | 82.4 % | 27.9 % | 0.0 % |
+| **rules, after** | **51.5 %** | **61.7 %** | 0.0 % |
+| fast, before | 0.0 % | 85.7 % | 4.0 % |
+| **fast, after** | 0.0 % | **90.8 %** | 4.1 % |
+
+- **Tuned on hand-written sets only.** There is no Spanish benchmark in the repository yet.
+  The new `es-smoke` set has 11 documents, 2 of them hard negatives: rules overlap precision
+  100 %, every structured identifier found; the misses are names, dates and organisations.
+- **What is left.** Three NER over-masks on the negative set (a postcode, a receipt number
+  after `n.º`, a booking locator). The Spanish reference words reach only the rules check for
+  now: the NER number check's pinned fallback list rejects a new pack's words and does not
+  read `n.º` (LAB-1787). With `both` scope over-masking was 2.8 %.
+- **Nothing else moved.** The hu/en/de/pl rules scorecards on `eval/fixtures` and on the
+  negative sets give the same counts before and after, and so do the other eleven phase-1
+  gate languages.
+- **Cost:** $0. Everything ran on a local CPU.
+
+<!-- journey:source docs/journey/2026-11-02-lab-1776-it-pack.md -->
+### 118. An Italian language pack: it-smoke leak 81.6 → 30.6 % with rules (2026-11-02)
+
+LAB-1776, the Italian member of the first EU wave (fr/es/it/nl/ro). Before it, no rule knew the
+codice fiscale, so the rules masked none of the Italian identifiers. We built an `it` pack by
+following [languages.md](languages.md), with the Polish pack as the template. It adds a
+codice fiscale validator (letter and digit positions, month letter, day with the +40 for women,
+the odd/even check table mod 26, and omocodia letters in place of digits), the partita IVA
+(Luhn and the provincial office code), the CIE number (`CA00000AA`), mobile and landline phone
+numbers, addresses (`Via dei Mille 27, 40121 Bologna (BO)`) and a CAP at the start of an address
+line. It also adds cue words (a labeled number is masked even when its check character fails,
+and a passport, driving-licence or tessera sanitaria number after its label), reference words
+for orders, invoices, receipts, shipments and protocol numbers, prompt notes, CIE and passport
+captions, brand names and eval stopwords. Names don't inflect, so there is no matcher
+(`allow_suffix=False`).
+
+Rules only, same commit, without and with the pack
+([per set](../eval/results/2026-11-02-LAB-1776-it-pack/README.md)):
+
+| rules | leak | overlap recall | overlap precision | over-masked |
+| -- | --: | --: | --: | --: |
+| `it-smoke` before | 81.6 % | 17.0 % | 100.0 % | 0 |
+| **`it-smoke` after** | **30.6 %** | **64.2 %** | 100.0 % | 0 |
+| `it-smoke` + `eu/it-*` after | 44.0 % | 51.2 % | 100.0 % | 0 |
+
+- **Where each rule runs.** The codice fiscale runs for every language: 16 characters in its
+  letter/digit pattern with a valid check letter are an Italian tax code in any text. So do an
+  `IT` + partita IVA VAT number and a CIE number next to its label. A labeled partita IVA runs
+  for Italian text only, and a bare one never: eleven digits with a Luhn digit are as often a
+  Hungarian personal ID or a German Steuer-ID. In other languages its label is a cue. Phones,
+  addresses and an unlabeled CIE number are Italian-only too.
+- **What is left.** Every structured value in the smoke files is found. The leaks are names and
+  dates of birth, which the NER and LLM passes cover.
+- **Two cue words we didn't add.** Cue matching ignores accents, so `e` (and) would also match
+  `è` (is), which often stands between a cue and its value (`il mio cellulare è 333 …`). And
+  the shared reference check doesn't accept the Italian `n.` between a label and its number, so
+  the pack lists `fattura n.`, `ordine n.` and the like as entries of their own. The reference words
+  reach the rules check only for now: a shared test pins the NER check's words to the built-in
+  list (LAB-1788).
+- **Nothing else moved.** The hu/en/de/pl smoke, synth-sample, inflection, injection,
+  agent-text, negative, ai4privacy and secrets sets give the same scorecards before and after.
+- **Cost:** $0. Everything ran on a local CPU.
+
+<!-- journey:source docs/journey/2026-11-02-lab-1777-nl-pack.md -->
+### 119. A Dutch language pack: nl-smoke leak 78.3 → 34.8 % with rules (2026-11-02)
+
+LAB-1777, the Dutch member of the first EU wave (fr/es/it/nl/ro). Before it, the BSN appeared
+only as an unvalidated cue word in the NER number check, and no rule knew Dutch phone numbers,
+postcodes or addresses. We built an `nl` pack by following [languages.md](languages.md),
+with the Polish and German packs as templates. It adds a BSN validator (the elfproef, the
+weighted 1-in-11 check of the burgerservicenummer and the older sofinummer), mobile and
+landline phone numbers (`06-12345678`, `020-555 0123`), postcodes (`3521 AB`, without the
+pairs SA, SD and SS that PostNL never issues) and addresses (`Van Goghstraat 7-II, 1071 AB
+Amsterdam`). It also adds a genitive matcher (`Pieters fiets`, `Anna's`, `Joris'`), cue words
+(a labelled BSN is masked even when its elfproef fails, and a passport, ID-card or
+driving-licence number after its label), reference words and `-` cues for orders, invoices,
+customer numbers, payment references, KvK and btw numbers, prompt notes (surname prefixes such
+as `van der` are part of the name), ID-card and passport captions, brand names and eval
+stopwords.
+
+Rules only, same commit, without and with the pack
+([per set](../eval/results/2026-11-02-LAB-1777-nl-pack/README.md)):
+
+| rules | leak | overlap recall | overlap precision | over-masking |
+| -- | --: | --: | --: | --: |
+| `nl-smoke` before | 78.3 % | 20.4 % | 100.0 % | 0 |
+| **`nl-smoke` after** | **34.8 %** | **61.2 %** | 100.0 % | 0 |
+| `nl-smoke` + `eu/nl-*` after | 46.5 % | 49.4 % | 100.0 % | 0 |
+
+- **Where the BSN runs.** One nine-digit number in eleven passes the elfproef, so an unlabelled
+  BSN is matched in Dutch text only: elsewhere a Polish mobile number or a Hungarian TAJ can
+  pass it too, the lesson of the unlabelled TAJ (LAB-1433). Next to its label (`BSN`,
+  `burgerservicenummer`, `sofinummer`) it runs for every language. Phones, postcodes and
+  addresses are Dutch-only.
+- **What is left.** Every structured value in the smoke files is found. The leaks are names and
+  dates of birth, which the NER and LLM passes cover.
+- **Cue words we didn't add.** Every pack's cues run for every text, and `en` (and) and `of`
+  (or) are other words in French, Spanish and English (`téléphone en cas d'urgence`, `phone of
+  the office`), where a `-` cue would end the window before the number. A bare `btw` is
+  English chat for "by the way", so the cues name `btw-nummer` and `btw-id` instead. The
+  reference words reach the rules check only for now: a shared test pins the NER check's
+  words to the built-in list (LAB-1788).
+- **Nothing else moved.** The hu/en/de/pl smoke, synth-sample, inflection, injection,
+  agent-text, negative, ai4privacy and secrets sets give the same scorecards before and after.
+- **Cost:** $0. Everything ran on a local CPU.
+
+<!-- journey:source docs/journey/2026-11-02-lab-1778-ro-pack.md -->
+### 120. A Romanian language pack: ro-smoke leak 81.1 → 39.6 % with rules (2026-11-02)
+
+LAB-1778, the Romanian member of the first EU wave (fr/es/it/nl/ro). Before it, the CNP was only
+an unvalidated cue word in the NER number check, no rule knew a Romanian identifier, and a
+declined name (`Mariei`, `Popescului`) matched its nominative only exactly. We built an `ro` pack
+by following [languages.md](languages.md), with the Polish pack as the template. It adds a
+CNP validator (sex/century digit, date of birth, county code 01–52, weighted mod-11 check with
+10 → 1), the CIF/CUI (weighted check, next to its label, with or without the `RO` prefix), the
+identity card series and number (`CI seria RX nr. 123456`), mobile and landline phone numbers,
+addresses (`Strada Teilor nr. 15, ap. 7, 400123 Cluj-Napoca`, `Bd.`, `Calea`, `Șoseaua`,
+`sector 3`) and a six-digit postcode at the start of an address line. It also adds cue words
+(a labeled number is masked even when its check digit fails, and a passport or driving-licence
+number after its label), reference words for orders, invoices, receipts, AWBs and case files,
+prompt notes, identity card and passport captions in both spellings of ș/ț, brand names and
+eval stopwords.
+
+Rules only, same commit, without and with the pack
+([per set](../eval/results/2026-11-02-LAB-1778-ro-pack/README.md)):
+
+| rules | leak | overlap recall | overlap precision | over-masked |
+| -- | --: | --: | --: | --: |
+| `ro-smoke` before | 81.1 % | 17.9 % | 100.0 % | 0 |
+| **`ro-smoke` after** | **39.6 %** | **57.1 %** | 100.0 % | 0 |
+| `ro-smoke` + `eu/ro-*` after | 47.4 % | 48.2 % | 100.0 % | 0 |
+
+- **Where each rule runs.** The CNP runs for every language: thirteen digits with a possible
+  date, county and check digit are a Romanian personal number in any text; an unlabeled one
+  right after an invoice or EAN label is left alone. The CIF runs for Romanian text only and
+  only next to its label: a one-in-eleven check on two to ten digits is no evidence on its own.
+  Phones, addresses and the identity card number are Romanian-only too.
+- **Case endings.** A `RomanianCaseMatcher` keeps `-lui`/`-ului`/`-ul` and the vocative
+  `-le`/`-ule` outside the placeholder (`[[PERSON_x]]lui` for `Popescului`) and handles the
+  stem change of feminine names in `-a`: `Maria` → `Mariei`, `Monica` → `Monicăi`, `Andreea` →
+  `Andreei`. A confirmed `Maria` masks `Mariei` under its own placeholder and unmasks back to
+  `Mariei`; a `[[PERSON_x]]ei` the model writes itself unmasks as `Mariei`, not `Mariaei`.
+- **What it can't do yet.** A full name declines on its given name, inside the value
+  (`Maria Popescu` → `Mariei Popescu`). The vault models a form as a changed stem plus a
+  suffix at the end, so that change can't share the nominative's placeholder without losing
+  the round trip. A detected `Mariei Popescu` is masked as a value of its own, so nothing leaks;
+  surname-first `Popescu Mariei` does map onto `Popescu Maria`.
+- **Diacritics.** Romanian text writes ș/ț with a comma or a cedilla, or leaves them out. The
+  rules accept both spellings, cue and caption matching folds accents, and the captions list
+  both forms as printed.
+- **Nothing else moved.** The hu/en/de/pl smoke, synth-sample, inflection, injection,
+  agent-text, negative, ai4privacy and secrets sets give the same scorecards before and after.
+- **Cost:** $0. Everything ran on a local CPU.
+
 <!-- journey:end -->
 
 Milestones merged since the last time this page was rendered are in [journey/](journey/), one file each, oldest first.
@@ -3747,5 +4347,11 @@ As of 2026-10-28, `develop` at `5581013`.
   chance 20 %; LAB-1152, triage).
 - **Polish.** Fast mode leaks 17.5 % on the public pl-pii-bench set, nearly all national ID
   numbers; a `pl` language pack with checksum validators is in progress (LAB-1400).
+- **More EU languages.** The first EU wave shipped five packs on 2026-11-02, French,
+  Spanish, Italian, Dutch and Romanian (milestones 116–120; notes:
+  [fr](journey/2026-11-02-lab-1774-fr-pack.md), [es](journey/2026-11-02-lab-1775-es-pack.md),
+  [it](journey/2026-11-02-lab-1776-it-pack.md), [nl](journey/2026-11-02-lab-1777-nl-pack.md),
+  [ro](journey/2026-11-02-lab-1778-ro-pack.md); [smoke results](languages.md#first-eu-wave-smoke-results)).
+  Fifteen official EU languages still have no pack ([roadmap](roadmap.md#post-hackathon-roadmap)).
 - **Confirm Baseten's data terms** (LAB-1139, triage) before recommending the hosted endpoint
   for real data.

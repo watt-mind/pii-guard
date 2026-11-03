@@ -53,7 +53,7 @@ import time
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from PIL import Image
 
@@ -77,6 +77,8 @@ from pii_guard.visual.ocr import (
     TesseractOcr,
     check_deadline,
     deadline,
+    grow_findings,
+    ocr_margin,
     tesseract_available,
 )
 from pii_guard.visual.pipeline import ImageAnalysis, analyze_image_text
@@ -86,6 +88,9 @@ from pii_guard.visual.segment import Segmenter
 from pii_guard.visual.segmenters import default_entity_types
 from pii_guard.visual.summary import ExpiryPolicy
 from pii_guard.workers import BoundedWorkers
+
+if TYPE_CHECKING:
+    from pii_guard.config import Settings
 
 __all__ = [
     "DEFAULT_IMAGE_MAX_PIXELS",
@@ -266,9 +271,21 @@ class AnalyzerDetector:
         return self.analyzer.analyze(text, language)
 
 
-def default_ocr_engine() -> OcrEngine | None:
-    """Tesseract (``hun+eng``) if ``pytesseract`` and the binary are installed, else ``None``."""
-    return TesseractOcr() if tesseract_available() else None
+def default_ocr_engine(settings: Settings | None = None) -> OcrEngine | None:
+    """The configured OCR engine (``PII_GUARD_OCR_ENGINE``, LAB-1796), or ``None`` when it
+    can't run: ``muse`` (the default) without a key (:func:`~pii_guard.visual.ocr_muse.
+    muse_configured`), ``tesseract`` without ``pytesseract`` and the binary (``hun+eng``).
+
+    Raises :class:`~pii_guard.detection_profile.DetectionProfileError` for ``muse`` on a
+    local-only profile whose OCR URL is not self-hosted."""
+    from pii_guard.config import get_settings
+
+    settings = settings or get_settings()
+    if settings.ocr_engine == "tesseract":
+        return TesseractOcr() if tesseract_available() else None
+    from pii_guard.visual.ocr_muse import MuseOcr, muse_configured
+
+    return MuseOcr(settings=settings) if muse_configured(settings) else None
 
 
 def require_ocr(ocr: OcrEngine | None, *, required: bool) -> None:
@@ -279,9 +296,10 @@ def require_ocr(ocr: OcrEngine | None, *, required: bool) -> None:
     (``PII_GUARD_IMAGE_REQUIRE_OCR=false``) accepts SAM-only masking."""
     if required and ocr is None:
         raise OcrUnavailableError(
-            "OCR is unavailable (Tesseract is not installed), so text in the image can't be "
-            "checked; install it (docs/operations.md) or set PII_GUARD_IMAGE_REQUIRE_OCR=false "
-            "to mask images with SAM only"
+            "OCR is unavailable, so text in the image can't be checked: Muse Spark Open OCR "
+            "(the default) needs PII_GUARD_OCR_API_KEY or BASETEN_API_KEY, and "
+            "PII_GUARD_OCR_ENGINE=tesseract needs Tesseract installed (docs/operations.md); "
+            "or set PII_GUARD_IMAGE_REQUIRE_OCR=false to mask images with SAM only"
         )
 
 
@@ -393,6 +411,7 @@ class ImageMasker:
         if render == "labels" and matcher is not None and analysis.ocr is not None:
             # Values the conversation already named, printed where no detector found them.
             found = matcher.find(analysis.ocr, masked_types)
+            found = grow_findings(found, ocr_margin(self.ocr, width), (width, height))
             if found:
                 ocr_text = analysis.ocr
                 analysis = ImageAnalysis(

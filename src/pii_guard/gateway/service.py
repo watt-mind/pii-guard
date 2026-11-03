@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import logging
 import re
 import threading
@@ -79,6 +78,7 @@ from pii_guard.gateway.request import (
     ImageSlot,
     InvalidChatRequestError,
     TextSlot,
+    dumps_utf8,
 )
 from pii_guard.gateway.sessions import (
     SESSION_HEADER,
@@ -320,7 +320,7 @@ class Gateway:
         if self._sam is None:
             self._sam = build_segmenter(self.settings)
         if self._ocr is _UNSET:
-            self._ocr = default_ocr_engine()
+            self._ocr = default_ocr_engine(self.settings)
         from pii_guard.detection_profile import require_local_ocr, require_segmenter_instance
 
         require_segmenter_instance(self.settings, self._sam)
@@ -347,7 +347,7 @@ class Gateway:
         if mode is not Mode.FAST:
             from pii_guard.detection_profile import refuse_remote
 
-            refuse_remote(self.settings, "audit detection")
+            refuse_remote(self.settings, f"{mode.value} detection")
         return mode
 
     _mode = mode
@@ -511,11 +511,11 @@ class Gateway:
         add_note: Callable[[dict[str, Any]], None],
     ) -> bytes:
         """The masked body as sent upstream, with the placeholder note if it needs one."""
-        text = json.dumps(body, ensure_ascii=False)
+        text = dumps_utf8(body)
         if self.config.placeholder_note and needs_note(text, session):
             add_note(body)
             stats.note = True
-            text = json.dumps(body, ensure_ascii=False)
+            text = dumps_utf8(body)
         return text.encode("utf-8")
 
     _forwarded = forwarded
@@ -712,12 +712,37 @@ class Gateway:
         detector.require_available()
         results, pending = self._partition_cached_slots(slots, detector, session, language, stats)
         if pending:
-            await self._run_pending_detections(pending, results, detector, language, stats)
+            if detector.mode is Mode.ESCALATE:
+                await self._run_escalated_detections(
+                    pending, results, detector, session, language, stats
+                )
+            else:
+                await self._run_pending_detections(pending, results, detector, language, stats)
         return self._apply_policies_and_known(
             slots, results, detector, session, language, stats, kept
         )
 
     _detect_all = detect_all
+
+    async def _run_escalated_detections(
+        self,
+        pending: dict[bytes, tuple[str, list[int], Any]],
+        results: list[list[Span] | None],
+        detector: ModeDetector,
+        session: VaultSession,
+        language: str,
+        stats: RequestStats,
+    ) -> None:
+        """Escalate mode's detections, scoped to this request (LAB-1766): the LLM decision
+        cache is per vault session, the escalations per request are capped, and their count
+        goes to the response header and the traffic event."""
+        from pii_guard.detect.escalate import escalation_request
+
+        scope = f"{session.session_id}:{session.incarnation}"
+        with escalation_request(scope, max_texts=self.config.escalate_max_texts) as request:
+            await self._run_pending_detections(pending, results, detector, language, stats)
+        stats.audit_escalations += request.escalations
+        stats.escalation_failures += request.failures
 
     @staticmethod
     def _with_known(
@@ -798,25 +823,6 @@ class Gateway:
             raise OutboundCheckFailedError(stats.outbound.hits)
 
     _recheck = recheck
-
-    def seed_cache(
-        self,
-        session: VaultSession,
-        language: str,
-        detector: ModeDetector,
-        restored: Mapping[int, tuple[str, list[Span]]],
-        stats: RequestStats,
-    ) -> None:
-        """The client sends the restored answer back as history: pre-detect it."""
-        for text, spans in restored.values():
-            if text and any(ch.isalnum() for ch in text):
-                key = self.cache.key(
-                    session.session_id, language, detector.config_id, text, session.incarnation
-                )
-                self.cache.put(key, spans)
-                stats.seeded += 1
-
-    _seed_cache = seed_cache
 
     async def mask_images(
         self,

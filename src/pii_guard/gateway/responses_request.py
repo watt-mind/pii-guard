@@ -27,6 +27,7 @@ What is masked:
 
 ``reasoning.encrypted_content`` is forwarded untouched: it is the provider's own encrypted
 reasoning from an earlier turn, produced from masked input, and nothing here can read it.
+The gateway accepts it only after observing the exact blob upstream in the same vault session.
 
 Rejected: remote and ``file_id`` images (never fetched), file and audio parts, hosted tools
 (``web_search``, ``file_search``, ``mcp``, ...: they act upstream on data the gateway never
@@ -42,6 +43,7 @@ from typing import Any
 from pii_guard.gateway.request import (
     CollectedTexts,
     InvalidChatRequestError,
+    OpaqueBlob,
     TextSlot,
     UnsupportedContentError,
     _check_json,
@@ -51,11 +53,13 @@ from pii_guard.gateway.request import (
     _collect_image,
     _collect_json,
     _collect_metadata,
+    _collect_tool_output,
     _field,
     _reject_unknown,
     _require_scalars,
     _setter,
     _text_slot,
+    remove_item,
 )
 
 __all__ = ["collect_response_texts"]
@@ -164,8 +168,9 @@ def _collect_response_metadata_fields(body: dict[str, Any], out: CollectedTexts)
 
 def collect_response_texts(body: object) -> CollectedTexts:
     """Every text of a Responses request, as :class:`TextSlot` objects (fail closed)."""
-    checked = _validate_response_body(body)
     out = CollectedTexts([], [])
+    out.check_structure(body)
+    checked = _validate_response_body(body)
     _collect_input(checked, out)
     _collect_top_response_fields(checked, out)
     _collect_tools(checked, out)
@@ -194,9 +199,8 @@ def _collect_input(body: dict[str, Any], out: CollectedTexts) -> None:
         item_type = item.get("type", "message" if "role" in item else None)
         allowed = _ITEM_KEYS.get(item_type) if isinstance(item_type, str) else None
         if allowed is None or not isinstance(item_type, str):
-            shown = item_type if isinstance(item_type, str) and len(item_type) <= 32 else "unknown"
             raise UnsupportedContentError(
-                f"{where}: input items of type {shown!r} are not supported; the gateway forwards "
+                f"{where}: unsupported input item type; the gateway forwards "
                 "messages, function calls and their outputs, and reasoning items only"
             )
         _reject_unknown(item, allowed, where, f"{item_type} item")
@@ -205,10 +209,16 @@ def _collect_input(body: dict[str, Any], out: CollectedTexts) -> None:
         for key in _ITEM_CHECKED:
             if item.get(key) is not None:
                 _check_json(item, key, f"{where}.{key}", out)
-        _collect_item(item, item_type, where, out)
+        _collect_item(item, item_type, where, out, items)
 
 
-def _collect_item(item: dict[str, Any], item_type: str, where: str, out: CollectedTexts) -> None:
+def _collect_item(
+    item: dict[str, Any],
+    item_type: str,
+    where: str,
+    out: CollectedTexts,
+    items: list[Any],
+) -> None:
     if item_type == "message":
         _collect_message(item, where, out)
     elif item_type in ("function_call", "custom_tool_call"):
@@ -223,7 +233,7 @@ def _collect_item(item: dict[str, Any], item_type: str, where: str, out: Collect
     elif item_type in ("function_call_output", "custom_tool_call_output"):
         _collect_output(item, where, out)
     else:
-        _collect_reasoning(item, where, out)
+        _collect_reasoning(item, where, out, items)
 
 
 def _collect_message(item: dict[str, Any], where: str, out: CollectedTexts) -> None:
@@ -239,7 +249,9 @@ def _collect_message(item: dict[str, Any], where: str, out: CollectedTexts) -> N
         raise InvalidChatRequestError(f"{where}.content must be a string or an array")
 
 
-def _collect_part(part: object, where: str, out: CollectedTexts, parts: list[Any]) -> None:
+def _collect_part(
+    part: object, where: str, out: CollectedTexts, parts: list[Any], *, tool_output: bool = False
+) -> None:
     if not isinstance(part, dict):
         raise InvalidChatRequestError(f"{where} must be an object")
     part_type = part.get("type")
@@ -253,9 +265,8 @@ def _collect_part(part: object, where: str, out: CollectedTexts, parts: list[Any
         )
     allowed = _PART_KEYS.get(part_type) if isinstance(part_type, str) else None
     if allowed is None or not isinstance(part_type, str):
-        shown = part_type if isinstance(part_type, str) and len(part_type) <= 32 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: content parts of type {shown!r} are not supported; the gateway masks "
+            f"{where}: unsupported content part type; the gateway masks "
             "text parts only and does not forward what it cannot mask"
         )
     _reject_unknown(part, allowed, where, "content part")
@@ -263,7 +274,10 @@ def _collect_part(part: object, where: str, out: CollectedTexts, parts: list[Any
     value = part.get(key)
     if not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
-    out.slots.append(_text_slot(part, key, "content"))
+    if tool_output:
+        _collect_tool_output(part, key, out)
+    else:
+        out.slots.append(_text_slot(part, key, "content"))
     for name in ("annotations", "logprobs"):
         if part.get(name) is not None:
             _collect_json(part, name, out, name)
@@ -291,15 +305,17 @@ def _collect_output(item: dict[str, Any], where: str, out: CollectedTexts) -> No
     """A tool result: a string, or text parts (``input_text`` / ``output_text``)."""
     output = item.get("output")
     if isinstance(output, str):
-        out.slots.append(_text_slot(item, "output", "tool"))
+        _collect_tool_output(item, "output", out)
     elif isinstance(output, list):
         for i, part in enumerate(output):
-            _collect_part(part, f"{where}.output.{i}", out, output)
+            _collect_part(part, f"{where}.output.{i}", out, output, tool_output=True)
     else:
         raise InvalidChatRequestError(f"{where}.output must be a string or an array")
 
 
-def _collect_reasoning(item: dict[str, Any], where: str, out: CollectedTexts) -> None:
+def _collect_reasoning(
+    item: dict[str, Any], where: str, out: CollectedTexts, items: list[Any]
+) -> None:
     for key, part_type in _REASONING_PARTS.items():
         parts = item.get(key)
         if parts is None:
@@ -319,6 +335,8 @@ def _collect_reasoning(item: dict[str, Any], where: str, out: CollectedTexts) ->
     blob = item.get("encrypted_content")
     if blob is not None and not isinstance(blob, str):  # opaque, forwarded untouched
         raise InvalidChatRequestError(f"{where}.encrypted_content must be a string or null")
+    if isinstance(blob, str):
+        out.opaque.append(OpaqueBlob("encrypted_content", blob, remove_item(items, item)))
 
 
 def _collect_string(
@@ -349,9 +367,8 @@ def _collect_tool(tool: object, where: str, out: CollectedTexts, *, nested: bool
         raise InvalidChatRequestError(f"{where} must be an object")
     tool_type = tool.get("type")
     if tool_type not in _TOOL_TYPES or (nested and tool_type == "namespace"):
-        shown = tool_type if isinstance(tool_type, str) and len(tool_type) <= 32 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: tools of type {shown!r} are not supported; hosted tools act upstream "
+            f"{where}: unsupported tool type; hosted tools act upstream "
             "on data the gateway never sees (function, custom and namespace tools are)"
         )
     if tool_type != "namespace":

@@ -90,19 +90,27 @@ class CachedOcr:
     """An OCR engine that returns recorded words, keyed by the image's pixels."""
 
     name = "tesseract-cached"
+    region_pad_share = 0.0
 
     def __init__(self, words: dict[str, list[OcrWord]] | None = None) -> None:
         self._words = dict(words or {})
 
     @classmethod
-    def load(cls, path: Path = OCR_CACHE) -> CachedOcr:
+    def load(cls, path: Path = OCR_CACHE, *, name: str | None = None) -> CachedOcr:
+        """The recorded words in ``path``; ``name`` (``muse``) replaces the engine name the
+        report shows, as ``<name>-cached``."""
         data = json.loads(path.read_text(encoding="utf-8"))
-        return cls(
+        engine = cls(
             {
                 key: [_word_from_json(w) for w in entry["words"]]
                 for key, entry in data["images"].items()
             }
         )
+        if name is not None:
+            engine.name = f"{name}-cached"
+        # Muse's text regions grow by a share of the image width (LAB-1796); words stay tight.
+        engine.region_pad_share = float(data.get("region_pad_share", 0.0))
+        return engine
 
     def add(self, image: Image.Image, words: list[OcrWord]) -> None:
         self._words[pixel_key(image)] = list(words)
@@ -112,6 +120,43 @@ class CachedOcr:
         if key not in self._words:
             raise KeyError("no recorded OCR words for this image (run --record-ocr)")
         return list(self._words[key])
+
+
+class RecordingOcr:
+    """Wraps an OCR engine and keeps the words it returned per image (``--ocr-record``)."""
+
+    def __init__(self, inner: Any) -> None:
+        self.inner = inner
+        self.name = inner.name
+        self.region_pad_share = getattr(inner, "region_pad_share", 0.0)
+        self.images: dict[str, list[OcrWord]] = {}
+
+    def words(self, image: Image.Image) -> list[OcrWord]:
+        words = self.inner.words(image)
+        self.images[pixel_key(image)] = list(words)
+        return words
+
+    def write(self, path: Path, specimens: Sequence[Any], *, engine: str) -> None:
+        """Write the recorded words in :data:`OCR_CACHE`'s format. ``specimens`` (with ``id``
+        and ``path``) name each image; all must be fictional."""
+        ids: dict[str, str] = {}
+        for spec in specimens:
+            ids[pixel_key(load_image(Path(spec.path).read_bytes()))] = spec.id
+        detail = getattr(self.inner, "model", None)
+        payload = {
+            "version": 1,
+            "description": f"{engine} OCR words of the fictional documents in manifest.json, "
+            "recorded by pii-guard eval visual --ocr-record. All fictional. Key: SHA-256 of "
+            "the decoded image size and RGB pixels.",
+            "engine": engine + (f" {detail}" if detail else ""),
+            "region_pad_share": self.region_pad_share,
+            "images": {
+                key: {"id": ids.get(key, "unknown"), "words": [_word_to_json(w) for w in words]}
+                for key, words in sorted(self.images.items(), key=lambda kv: ids.get(kv[0], ""))
+            },
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
 def record_ocr(root: Path = FIXTURES, path: Path = OCR_CACHE) -> int:  # pragma: no cover

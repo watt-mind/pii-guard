@@ -279,7 +279,8 @@ synthetic data carries every language.
 ## 4. National identifiers for rules
 
 Abbreviations: **Check** says whether the identifier has a check digit. **In repo** says
-whether `src/pii_guard` has a validating rule today. ✓ means a checksum rule exists. *cue*
+whether `src/pii_guard` has a validating rule today. ✓ means a checksum rule exists; *label*
+means a rule matches the format next to its label, with no check digit to validate. *cue*
 means the word only appears in the generic number-label list of
 [`detect/ner_numbers.py`](../src/pii_guard/detect/ner_numbers.py), with no validation.
 
@@ -311,26 +312,31 @@ means the word only appears in the generic number-label list of
 | DE | Sozialversicherungsnummer | 12 characters: area + DDMMYY + letter + serial + check | yes | [de.wikipedia](https://de.wikipedia.org/wiki/Versicherungsnummer) | ✓ (`languages/de`) |
 | DK | CPR | DDMMYY-SSSS | mod 11 **dropped in 2007**: never reject on it | [dk.cpr](https://arthurdejong.org/python-stdnum/doc/stdnum.dk.cpr.html) | – |
 | EE | Isikukood | 11 digits, GYYMMDDSSSC | yes, two-pass mod 11 | [ee.ik](https://arthurdejong.org/python-stdnum/doc/stdnum.ee.ik.html) | – |
-| ES | DNI / NIF | 8 digits + letter | yes, mod 23 letter | [es.dni](https://arthurdejong.org/python-stdnum/doc/stdnum.es.dni.html), [es.nif](https://arthurdejong.org/python-stdnum/doc/stdnum.es.nif.html) | cue |
-| ES | NIE | X/Y/Z + 7 digits + letter | yes, mod 23 letter | [es.nie](https://arthurdejong.org/python-stdnum/doc/stdnum.es.nie.html) | cue |
+| ES | DNI / NIF | 8 digits + letter | yes, mod 23 letter | [es.dni](https://arthurdejong.org/python-stdnum/doc/stdnum.es.dni.html), [es.nif](https://arthurdejong.org/python-stdnum/doc/stdnum.es.nif.html) | ✓ (`languages/es`) |
+| ES | NIE | X/Y/Z + 7 digits + letter | yes, mod 23 letter | [es.nie](https://arthurdejong.org/python-stdnum/doc/stdnum.es.nie.html) | ✓ (`languages/es`) |
+| ES | CIF (company tax ID; next to its label) | letter + 7 digits + control digit or letter | yes, Luhn-style control | [es.cif](https://arthurdejong.org/python-stdnum/doc/stdnum.es.cif.html) | ✓ (`languages/es`) |
 | FI | Henkilötunnus | DDMMYY + century sign + ZZZ + check character (new century signs since 2023) | yes, mod 31 | [fi.hetu](https://arthurdejong.org/python-stdnum/doc/stdnum.fi.hetu.html) | – |
-| FR | NIR (INSEE) | 13 digits + 2-digit key; 2A/2B for Corsica | yes, 97 − (n mod 97) | [fr.nir](https://arthurdejong.org/python-stdnum/doc/stdnum.fr.nir.html) | – |
-| FR | Numéro fiscal (SPI) | 13 digits | yes, mod 511 | [fr.nif](https://arthurdejong.org/python-stdnum/doc/stdnum.fr.nif.html) | – |
+| FR | NIR (INSEE) | 13 digits + 2-digit key; 2A/2B for Corsica | yes, 97 − (n mod 97) | [fr.nir](https://arthurdejong.org/python-stdnum/doc/stdnum.fr.nir.html) | ✓ (`languages/fr`) |
+| FR | Numéro fiscal (SPI) | 13 digits | yes, mod 511 | [fr.nif](https://arthurdejong.org/python-stdnum/doc/stdnum.fr.nif.html) | ✓ (`languages/fr`) |
 | GR | AMKA | 11 digits, DDMMYY + 5 | yes, Luhn | [gr.amka](https://arthurdejong.org/python-stdnum/doc/stdnum.gr.amka.html) | – |
 | GR | AFM (tax) | 9 digits | yes, mod 11 | [gr.vat](https://arthurdejong.org/python-stdnum/doc/stdnum.gr.vat.html) | – |
 | HR | OIB | 11 digits | yes, ISO 7064 MOD 11,10 | [hr.oib](https://arthurdejong.org/python-stdnum/doc/stdnum.hr.oib.html) | cue |
 | HU | Személyi azonosító, adóazonosító jel, TAJ | 11, 10 and 9 digits | yes, all three | repo `detect/checksums.py` (stdnum has none) | ✓ (`detect/checksums.py`) |
 | IE | PPSN | 7 digits + check letter (+ A/B/H) | yes, weighted mod 23 | [ie.pps](https://arthurdejong.org/python-stdnum/doc/stdnum.ie.pps.html) | – |
-| IT | Codice fiscale | 16 alphanumeric characters | yes, odd/even table, mod 26 | [it.codicefiscale](https://arthurdejong.org/python-stdnum/doc/stdnum.it.codicefiscale.html) | – |
+| IT | Codice fiscale | 16 alphanumeric characters | yes, odd/even table, mod 26 | [it.codicefiscale](https://arthurdejong.org/python-stdnum/doc/stdnum.it.codicefiscale.html) | ✓ (`languages/it`) |
+| IT | Partita IVA (VAT; next to its label, or `IT` + number) | 11 digits, office code 001–100 (and 120, 121, 888, 999) | yes, Luhn | [it.iva](https://arthurdejong.org/python-stdnum/doc/stdnum.it.iva.html) | ✓ (`languages/it`) |
+| IT | Carta d'identità elettronica (CIE) | `C` + letter + 5 digits + 2 letters | no | – | label (`languages/it`) |
 | LT | Asmens kodas | 11 digits (same scheme as Estonia) | yes, two-pass mod 11 | [lt.asmens](https://arthurdejong.org/python-stdnum/doc/stdnum.lt.asmens.html) | – |
 | LU | Matricule national | 13 digits, YYYYMMDD + NNN + 2 check digits | unclear: Luhn + Verhoeff per secondary sources only; not in the official TIN sheet | EU TIN sheet (LU) | – |
 | LV | Personas kods | old DDMMYY-CNNNN; since 2017 `32` + 9 digits | old: yes (mod 11); new: **unclear** (stdnum says its algorithm "has not been confirmed by an independent source"). Match the shape; use the check only to raise confidence | [lv.pvn](https://arthurdejong.org/python-stdnum/doc/stdnum.lv.pvn.html) | – |
 | MT | ID card number (also the TIN) | 7 digits + letter (M, G, A, P, L, H, B, Z) | **no** | [Microsoft Purview](https://learn.microsoft.com/en-us/purview/sit-defn-malta-identity-card-number) | – |
-| NL | BSN | 9 digits | yes, "11-proef" | [nl.bsn](https://arthurdejong.org/python-stdnum/doc/stdnum.nl.bsn.html) | cue |
+| NL | BSN | 9 digits | yes, "11-proef" | [nl.bsn](https://arthurdejong.org/python-stdnum/doc/stdnum.nl.bsn.html) | ✓ (`languages/nl`) |
 | PL | PESEL, NIP, REGON, ID card, passport | 11 / 10 / 9 or 14 / 3 letters + 6 digits / 2 letters + 7 digits | yes, all | [pl.pesel](https://arthurdejong.org/python-stdnum/doc/stdnum.pl.pesel.html) | ✓ (`languages/pl`) |
 | PT | NIF | 9 digits | yes, mod 11 | [pt.nif](https://arthurdejong.org/python-stdnum/doc/stdnum.pt.nif.html) | cue |
 | PT | Cartão de Cidadão | 12 characters (NIC + check + 2 letters + check) | yes | [pt.cc](https://arthurdejong.org/python-stdnum/doc/stdnum.pt.cc.html) | – |
-| RO | CNP | 13 digits, SYYMMDDJJNNNC | yes, weighted mod 11 | [ro.cnp](https://arthurdejong.org/python-stdnum/doc/stdnum.ro.cnp.html) | cue |
+| RO | CNP | 13 digits, SYYMMDDJJNNNC | yes, weighted mod 11 | [ro.cnp](https://arthurdejong.org/python-stdnum/doc/stdnum.ro.cnp.html) | ✓ (`languages/ro`) |
+| RO | CIF / CUI (company tax code; next to its label) | 2–10 digits, optional `RO` prefix | yes, weighted mod 11 | [ro.cui](https://arthurdejong.org/python-stdnum/doc/stdnum.ro.cui.html) | ✓ (`languages/ro`) |
+| RO | Identity card (carte de identitate) series and number | 2 letters + 6 digits | no | – | label (`languages/ro`) |
 | SE | Personnummer / samordningsnummer | YYMMDD-NNNC (`+` from age 100; day +60 for samordningsnummer) | yes, Luhn | [se.personnummer](https://arthurdejong.org/python-stdnum/doc/stdnum.se.personnummer.html) | – |
 | SI | EMŠO | 13 digits, DDMMYYYRRBBBK | yes, weighted mod 11 | [si.emso](https://arthurdejong.org/python-stdnum/doc/stdnum.si.emso.html) | cue |
 | SI | Davčna številka | 8 digits | yes, mod 11 | [si.ddv](https://arthurdejong.org/python-stdnum/doc/stdnum.si.ddv.html) | – |

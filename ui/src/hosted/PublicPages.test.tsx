@@ -110,7 +110,7 @@ describe("focused public pages", () => {
     open("#trust");
     render(<HostedApp call={call()} />);
     expect(screen.getByText(/Self-hosting puts the guard/)).toHaveTextContent(/masked requests still go to your chosen model provider/);
-    expect(screen.getByText(/Faces, ID photos and signatures are detected locally/)).toHaveTextContent(/project policy decides mask or keep.*stamp masking refuses/);
+    expect(screen.getByText(/original image is sent to SAM 3\.1 on the Meta Model API/)).toHaveTextContent(/project policy decides mask or keep/);
     expect(screen.getByRole("heading", { name: "Processing and access" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Images, retention and provider" })).toBeInTheDocument();
   });

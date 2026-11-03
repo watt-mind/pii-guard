@@ -6,14 +6,18 @@ python -m pii_guard.eval.baselines.suite --system fast --fixtures eval/fixtures/
 ```
 
 ``pii-guard eval`` scores detectors; this wraps the same scorer for a named *system*
-(:data:`SYSTEMS`: ``rules``, ``fast`` = rules + NER, ``audit`` = rules + NER + LLM, as the
-gateway's modes are built) and adds a ``run`` block to the scorecard:
+(:data:`SYSTEMS`: ``rules``, ``fast`` = rules + NER, ``escalate`` = fast + the LLM on uncertain
+spans only, ``audit`` = rules + NER + LLM, as the gateway's modes are built) and adds a ``run``
+block to the scorecard:
 
 - one warm-up call before timing (as the baselines get), so a model load isn't a p95 outlier;
 - the NER checkpoint's identity (``PII_GUARD_NER_MODEL`` and the SHA-256 of its
   ``model.safetensors``) and the LLM endpoint, model and reasoning effort (never the key);
 - the LLM detector's token usage, the cost at :data:`BASETEN_PRICE_USD_PER_1M` and the cost
   per 1,000 messages (one fixture document = one message);
+- for ``escalate``: the escalation rate (documents sent to the LLM), windows and characters
+  sent, fail-closed calls, and the latency escalation adds per document (p50/p95, all documents
+  and escalated ones only), with the gateway's default ``escalate_*`` settings;
 - wall time and the host's load average at start and end, since latency depends on it;
 - documents a detector failed on (the pipeline fails closed, so the gateway would have
   refused that request): counted in ``run.blocked``, left out of the scores.
@@ -30,7 +34,7 @@ import sys
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pii_guard.eval.baselines.base import host_info
 from pii_guard.eval.fixtures import FixtureError, load_fixtures
@@ -41,11 +45,19 @@ from pii_guard.eval.stats import sha256_file
 from pii_guard.gateway.config import cli_mode
 from pii_guard.types import PiiGuardError
 
-__all__ = ["BASETEN_PRICE_USD_PER_1M", "SYSTEMS", "cost_usd", "main", "ner_identity"]
+__all__ = [
+    "BASETEN_PRICE_USD_PER_1M",
+    "SYSTEMS",
+    "EscalateAnalyzer",
+    "cost_usd",
+    "main",
+    "ner_identity",
+]
 
 SYSTEMS: dict[str, list[str]] = {
     "rules": ["rules"],
     "fast": ["rules", "ner"],
+    "escalate": ["rules", "ner", "llm"],
     "audit": ["rules", "ner", "llm"],
 }
 
@@ -85,6 +97,103 @@ def ner_identity() -> dict[str, Any]:
     return out
 
 
+class EscalateAnalyzer:
+    """Escalate mode as the gateway builds it (LAB-1766), behind :class:`DetectorAnalyzer`'s
+    interface: the fast pipeline with raw-span recording, an
+    :class:`~pii_guard.detect.escalate.EscalatingDetector` with the default ``escalate_*``
+    settings and an :class:`~pii_guard.detect.llm.LlmDetector` from the environment.
+
+    ``added_ms`` holds the time escalation added to each analysed text (0 when nothing was
+    uncertain), for the added-latency percentiles.
+    """
+
+    def __init__(self, names: Sequence[str] = ("rules", "ner"), llm: Any = None) -> None:
+        from pii_guard.config import get_settings
+        from pii_guard.detect.escalate import EscalatingDetector, RawRecorder
+        from pii_guard.detect.pipeline import DetectionPipeline
+        from pii_guard.gateway.config import GatewayConfig
+        from pii_guard.policy import PolicySet
+
+        self.policies = PolicySet()
+        base = DetectorAnalyzer([n for n in names if n != "llm"], policies=self.policies)
+        self.skipped = list(base.skipped)
+        self.loaded = [*base.loaded, "llm"]
+        config = GatewayConfig()
+        if llm is None:
+            from pii_guard.detect.llm import LlmDetector
+
+            llm = LlmDetector(
+                settings=get_settings(),
+                reasoning_effort=config.llm_reasoning_effort,
+                timeout=config.escalate_timeout,
+                challenge_empty=False,
+            )
+            reason = llm.unavailable_reason
+            if reason:
+                self.skipped.append(("llm", reason))
+        self.llm = llm
+        self.config = config
+        self._last_ms = 0.0
+        self.added_ms: list[float] = []
+        fast = DetectionPipeline(
+            [RawRecorder(d) for d in base.detectors], keep_types=self.policies.keep_types
+        )
+        self.escalate = EscalatingDetector(
+            fast,
+            llm,
+            radius=config.escalate_window,
+            max_windows=config.escalate_max_windows,
+            low_score=config.escalate_low_score,
+            timeout=config.escalate_timeout,
+            on_failure=config.escalate_on_failure,
+            on_llm_ms=self._record,
+        )
+        self.detectors = [*base.detectors, llm]
+
+    def _record(self, ms: float) -> None:
+        self._last_ms += ms
+
+    def analyze(self, text: str, language: str) -> list[Any]:
+        self._last_ms = 0.0
+        spans = self.escalate.detect(text, language)
+        self.added_ms.append(self._last_ms)
+        return spans
+
+
+def _percentile(values: Sequence[float], q: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = q * (len(ordered) - 1)
+    low = int(rank)
+    high = min(low + 1, len(ordered) - 1)
+    return round(ordered[low] + (ordered[high] - ordered[low]) * (rank - low), 1)
+
+
+def _escalation_block(analyzer: EscalateAnalyzer, documents: int) -> dict[str, Any]:
+    usage = dict(analyzer.escalate.usage)
+    added = analyzer.added_ms[1:]  # without the warm-up call
+    escalated = [ms for ms in added if ms > 0]
+    config = analyzer.config
+    return {
+        "settings": {
+            "window": config.escalate_window,
+            "max_windows": config.escalate_max_windows,
+            "low_score": config.escalate_low_score,
+            "timeout_s": config.escalate_timeout,
+            "on_failure": config.escalate_on_failure,
+        },
+        "usage": usage,
+        "escalation_rate": round(usage.get("escalated_texts", 0) / max(documents, 1), 4),
+        "added_ms": {
+            "p50": _percentile(added, 0.5),
+            "p95": _percentile(added, 0.95),
+            "escalated_p50": _percentile(escalated, 0.5),
+            "escalated_p95": _percentile(escalated, 0.95),
+        },
+    }
+
+
 def _load() -> list[float] | None:
     try:
         return [round(x, 2) for x in os.getloadavg()]
@@ -102,7 +211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=lambda v: cli_mode(v, "suite"),
         choices=sorted(SYSTEMS),
         required=True,
-        help="rules, fast or audit (strict: deprecated alias of audit)",
+        help="rules, fast, escalate or audit (strict: deprecated alias of audit)",
     )
     parser.add_argument("--fixtures", type=Path, action="append", required=True)
     parser.add_argument("--json", type=Path, required=True, metavar="OUT")
@@ -115,7 +224,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"suite: {exc}", file=sys.stderr)
         return 2
     names = SYSTEMS[args.system]
-    analyzer = DetectorAnalyzer(names)
+    analyzer: DetectorAnalyzer | EscalateAnalyzer = (
+        EscalateAnalyzer(names) if args.system == "escalate" else DetectorAnalyzer(names)
+    )
     if analyzer.skipped:  # a comparison row must be the configuration it claims to be
         for name, reason in analyzer.skipped:
             print(f"suite: detector {name!r} unavailable: {reason}", file=sys.stderr)
@@ -168,6 +279,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "invalid_output_rate": doc_usage.get("invalid_outputs", 0)
             / max(doc_usage.get("requests", 0), 1),
         }
+    if args.system == "escalate":
+        run["escalation"] = _escalation_block(cast(EscalateAnalyzer, analyzer), len(documents))
     scorecard["run"] = run
     markdown = render_markdown(scorecard)
     args.json.parent.mkdir(parents=True, exist_ok=True)

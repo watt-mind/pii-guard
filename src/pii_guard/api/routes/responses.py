@@ -92,7 +92,9 @@ def get_responses_gateway(request: Request) -> ResponsesGateway:
 @router.post(
     "/v1/responses",
     tags=["gateway"],
-    responses=error_responses("detection_profile_denied", "outbound_check_failed"),
+    responses=error_responses(
+        "detection_profile_denied", "outbound_check_failed", "unsupported_media_type"
+    ),
 )
 async def responses(request: Request) -> Response:
     await ensure_connected(request)
@@ -101,7 +103,7 @@ async def responses(request: Request) -> Response:
     received_at = time.perf_counter()
     try:
         body = json.loads(raw)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         raise InvalidChatRequestError("request body is not valid JSON") from None
     # The traffic event id, assigned before detection (LAB-1179): even a refused call
     # carries it, so the client can join the error to its traffic event.

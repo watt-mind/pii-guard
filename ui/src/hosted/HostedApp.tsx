@@ -305,10 +305,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <MetaModel stage="Runtime detection" name="XLM-RoBERTa" where="Inside PII Guard, CPU" role={<>The NER component used for hosted fast text detection, alongside validated rules. Rules-only configurations are also available. <a className={link} href={NER_MODEL}>Published ↗</a></>} />
           <MetaModel stage="Training only" name="Muse Glimmer 30B" where="Open weights, served on Modal" role="The teacher: it labeled 4,964 fictional documents, and our NER was distilled from its labels." />
           <MetaModel stage="Optional remote audit" name="Muse Spark Open" where="Open weights, on Baseten" role="The opt-in audit detector receives originals. It also supports red-team evaluation that tries to re-identify masked text." />
-          <MetaModel stage="Image processing" name="SAM 3.1" where="Self-hosted installs" role="Finds signatures on scans, so they’re masked along with faces and ID photos." />
+          <MetaModel stage="Image processing" name="SAM 3.1" where="Meta Model API" role="Finds faces, ID photos and signatures on scans so they’re masked. It receives the original image." />
           <MetaModel stage="Downstream generation" name={modelOr("Muse Spark")} where="Meta Model API" role="Answers in this demo after masking. Detection can miss values; inspect the masked request before relying on it." />
         </ul>
-        <p className="text-sm text-muted">The hosted preview uses local image detectors rather than SAM. <a className={link} href="#trust">Check the hosted trust boundary</a> before choosing remote detection.</p>
+        <p className="text-sm text-muted">Only Meta models run by default. Images go to SAM 3.1 on the Meta Model API. <a className={link} href="#trust">Check the hosted trust boundary</a> before uploading one.</p>
       </section>
     ),
     europe: (
@@ -336,7 +336,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
         <RecordedImageExample />
-        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model, with faces, ID photos and signatures found on the server itself. The recorded specimens keep signatures and stamps visible; current project policies can choose to mask detected signatures. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a downstream model. SAM 3.1 on the Meta Model API finds faces, ID photos and signatures, so the original image is sent to Meta for that. The recorded specimens keep signatures and stamps visible; current project policies can choose to mask detected signatures. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
         <div aria-labelledby="images-proof-heading" role="group" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 border-y border-line py-5 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="min-w-0">
             <h3 id="images-proof-heading" className="text-sm font-medium text-ink">Measured on images</h3>
@@ -388,7 +388,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
               { label: "Signed in", value: `Google receives your sign-in (name, email, profile). PII Guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
             ]} /></div>
             <div><h3 className="mb-3 text-sm font-medium text-ink">Images, retention and provider</h3><KeyValues items={[
-              { label: "Images", value: "Signed in only. Faces, ID photos and signatures are detected locally; your project policy decides mask or keep. Stamps cannot be detected, so a policy requiring stamp masking refuses the image. Images are processed in memory, returned to you, and never stored or sent to a model." },
+              { label: "Images", value: "Signed in only. The original image is sent to SAM 3.1 on the Meta Model API, which finds faces, ID photos, signatures and stamps; your project policy decides mask or keep. Images are processed in memory, returned to you, and never stored or sent to a downstream model." },
               { label: "How long", value: "Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable; it doesn’t prove the memory is erased." },
               { label: "What Meta receives", value: <>The request after masking; missed values can remain. The <a className={link} href={META_TERMS}>Meta Model API terms ↗</a> exclude training on it (section 5.1) but allow retention as needed (section 4.4), and processing there isn’t guaranteed to stay in the EU.</> },
             ]} /></div>

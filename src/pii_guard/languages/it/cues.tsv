@@ -1,0 +1,76 @@
+# Cue words for context-cued numbers (languages/cues.py; docs/languages.md); format in
+# hu/cues.tsv. Italian nouns do not decline: a trailing "*" covers the plural and the compounds
+# that keep the stem (telefono, telefonico). Elided forms are listed with their apostrophe
+# ("carta d'identità"); matching ignores case and accents.
+telefono	PHONE
+telefonic*	PHONE
+tel.	PHONE
+cellulare	PHONE
+cell.	PHONE
+cel.	PHONE
+recapito telefonico	PHONE
+numero di telefono	PHONE
+fax	PHONE
+carta di credito	BANK_ACCOUNT
+carte di credito	BANK_ACCOUNT
+carta di debito	BANK_ACCOUNT
+numero carta	BANK_ACCOUNT
+numero della carta	BANK_ACCOUNT
+conto corrente	BANK_ACCOUNT
+numero di conto	BANK_ACCOUNT
+c/c	BANK_ACCOUNT
+codice fiscale	ID_DOCUMENT
+cod. fisc.	ID_DOCUMENT
+cod. fiscale	ID_DOCUMENT
+C.F.	ID_DOCUMENT
+partita IVA	ID_DOCUMENT
+P.IVA	ID_DOCUMENT
+P. IVA	ID_DOCUMENT
+part. IVA	ID_DOCUMENT
+carta d'identità	ID_DOCUMENT
+carta di identità	ID_DOCUMENT
+carta d'identità elettronica	ID_DOCUMENT
+CIE	ID_DOCUMENT
+documento d'identità	ID_DOCUMENT
+documento di identità	ID_DOCUMENT
+numero documento	ID_DOCUMENT
+numero del documento	ID_DOCUMENT
+passaporto	ID_DOCUMENT
+passaporti	ID_DOCUMENT
+patente	ID_DOCUMENT
+patente di guida	ID_DOCUMENT
+tessera sanitaria	ID_DOCUMENT
+permesso di soggiorno	ID_DOCUMENT
+numero d'ordine	-
+numero ordine	-
+n. ordine	-
+ordine	-
+ordini	-
+ordinazione	-
+fattur*	-
+numero fattura	-
+ricevut*	-
+scontrin*	-
+cliente	-
+codice cliente	-
+numero cliente	-
+riferimento	-
+rif.	-
+protocollo	-
+prot.	-
+pratica	-
+numero pratica	-
+codice articolo	-
+articolo	-
+codice prodotto	-
+spedizion*	-
+prenotazion*	-
+preventiv*	-
+CAP	-
+importo	-
+totale	-
+saldo	-
+# Not "e" (and): matching ignores accents, so it would also be "è" (is), which often
+# stands between a cue and its value ("il mio cellulare è 333 ...").
+o	-
+oppure	-
