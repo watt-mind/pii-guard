@@ -1,4 +1,4 @@
-"""The boundary probe's forged-demo check asserts anonymous guest semantics (LAB-1521)."""
+"""The boundary probe asserts anonymous guest semantics for demo and guest work (LAB-1813)."""
 
 from __future__ import annotations
 
@@ -24,6 +24,8 @@ class StubServer:
         self.forged_account_authenticated = False
         self.reflect_identity = False
         self.issue_cookie = True
+        self.serve_guest_work = False
+        self.echo_secret = False
         self.calls: list[tuple[str, str, list[tuple[str, str]]]] = []
 
     def __call__(
@@ -61,13 +63,27 @@ class StubServer:
                 demo["principal"] = "synthetic-forged@example.com"
             cookies = [f"{GUEST}; Path=/; Secure; HttpOnly"] if self.issue_cookie else []
             return Reply(200, cookies, "", json.dumps(demo).encode())
+        origins = [value for key, value in headers if key.lower() == "origin"]
+        if (
+            path in {"/v1/mask", "/v1/chat/completions"}
+            and self.serve_guest_work
+            and origins == ["https://guard-dev.example"]
+        ):
+            text = "jane.placeholder@example.com" if self.echo_secret else "[[EMAIL_1a2b3c]]"
+            answer: dict[str, Any] = {"masked_text": text, "session_id": "s_1"}
+            if self.reflect_identity:
+                answer["principal"] = "synthetic-forged@example.com"
+            cookies = [f"{GUEST}; Path=/; Secure; HttpOnly"] if self.issue_cookie else []
+            return Reply(200, cookies, "", json.dumps(answer).encode())
         return Reply(401, [], "", b'{"error": {"code": "unauthorized"}}')
 
 
-def run(server: StubServer, capsys: pytest.CaptureFixture[str]) -> tuple[int, dict[str, Any]]:
+def run(
+    server: StubServer, capsys: pytest.CaptureFixture[str], check: str = "forged-demo"
+) -> tuple[int, dict[str, Any]]:
     code = main(["https://guard-dev.example"], send=server)
     lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    return code, next(line for line in lines if line.get("check") == "forged-demo")
+    return code, next(line for line in lines if line.get("check") == check)
 
 
 def test_sponsored_guest_demo_passes_with_anonymous_follow_ups(
@@ -135,3 +151,51 @@ def test_guest_demo_without_guest_cookie_fails(capsys: pytest.CaptureFixture[str
     assert code == 1
     assert line["guest_cookie"] is False
     assert line["account_anonymous"] == []
+
+
+@pytest.mark.parametrize("check", ["forged-mask", "forged-chat"])
+def test_guest_playground_work_passes_refused_or_as_anonymous_guest(
+    check: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    refused = StubServer()
+    code, line = run(refused, capsys, check)
+    assert (code, line["path"], line["ok"]) == (0, "refused", True)
+    served = StubServer()
+    served.serve_guest_work = True
+    code, line = run(served, capsys, check)
+    assert code == 0
+    assert line["path"] == "guest"
+    assert line["account_anonymous"] == [True, True]
+    assert line["ok"] is True
+    assert "synthetic-guest-0001" not in json.dumps(line)
+
+
+@pytest.mark.parametrize(
+    ("flaw", "field", "value"),
+    [
+        ("forged_account_authenticated", "account_anonymous", [True, False]),
+        ("reflect_identity", "reflected", True),
+        ("echo_secret", "echoed_secret", True),
+    ],
+)
+def test_guest_playground_work_leaks_fail(
+    flaw: str, field: str, value: object, capsys: pytest.CaptureFixture[str]
+) -> None:
+    server = StubServer()
+    server.serve_guest_work = True
+    setattr(server, flaw, True)
+    code, line = run(server, capsys, "forged-mask")
+    assert code == 1
+    assert line["ok"] is False
+    assert line[field] == value
+
+
+def test_guest_playground_work_without_guest_cookie_fails(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    server = StubServer()
+    server.serve_guest_work = True
+    server.issue_cookie = False
+    code, line = run(server, capsys, "forged-mask")
+    assert code == 1
+    assert line["guest_cookie"] is False
