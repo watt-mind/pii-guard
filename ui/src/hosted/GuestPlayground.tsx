@@ -121,7 +121,7 @@ export default function GuestPlayground({ session }: { session: HostedSession })
     // Playground and Chat word their hosted copy from this context; a guest is the hosted guard too.
     <HostedSessionContext.Provider value={session}>
       <div className="public-teal-theme flex min-h-dvh flex-col bg-canvas text-ink">
-        <PublicHeader accountHref={login} />
+        <PublicHeader current="playground/text" accountHref={login} />
         <main id="main" tabIndex={-1} aria-label="Playground" className="mx-auto w-full max-w-[1280px] flex-1 space-y-6 px-4 py-6 focus:outline-none sm:px-6 sm:py-8">
           <PlaygroundSection
             tab={tab}
