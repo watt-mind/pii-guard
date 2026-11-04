@@ -130,6 +130,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const canRun = guestLive || (signedIn && !needsKey);
   // A guest can mask their own text in the Playground, and chat there when free runs are on (LAB-1812).
   const guestOwnText = guestPlayground && Boolean(account) && !signedIn;
+  const guestPerDay = account?.limits.requests_per_day;
   // The model's name comes from the server (`included_model`), never from this page (LAB-1466).
   const model = account?.included_model ? modelName(account.included_model) : null;
   const modelOr = (fallback: string) => model ?? fallback;
@@ -226,7 +227,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={<><span className="sm:hidden">{p.short}</span><span className="max-sm:hidden">{p.label}</span></>} value={p.value} hint={p.hint} />)}</dl>
             <p className="text-xs text-muted">{MEASURED} · compared with the open-source tools Presidio, PrivAiTe and LLM Guard · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
           </div>
-          <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
+          {guestOwnText ? (
+            // A guest's first step is their own text (LAB-1814); the fixed demo stays one press away.
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#playground/text">Try it with your own text</ButtonLink><ButtonLink href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><a className={[link, "text-sm"].join(" ")} href={SELF_HOST}>Self-host it ↗</a></div>
+              <p className="text-xs text-muted">No sign-in{typeof guestPerDay === "number" ? <> · <span className="tabular-nums">{guestPerDay}</span> free requests a day</> : null} · text{sponsoredOff ? "" : " and chat"}</p>
+            </div>
+          ) : <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>}
           <ul aria-label="Proof" className="flex max-w-2xl flex-wrap gap-x-4 gap-y-0.5 border-t border-line pt-4 text-xs text-muted">
             <ProofItem href={HARNESS_REPORT}>Tested with {HARNESS.agents.length} real coding agents</ProofItem>
             <ProofItem href={`${DOCS}/benchmarks.md#run-log`}>{RUNS.label} committed benchmark runs</ProofItem>
@@ -267,7 +274,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <div className="basis-full sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
           </div>
-          {guestOwnText && <p className="mt-3 text-xs text-muted">Your own text, no account needed: <a className={link} href="#playground/text">open the Playground as a guest</a> to mask a document{sponsoredOff ? "" : ` or chat with ${modelOr("the included model")}`}.</p>}
+          {guestOwnText && <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4"><ButtonLink href="#playground/text">Now try your own text →</ButtonLink><p className="text-xs text-muted">No account needed: mask a document{sponsoredOff ? "" : ` or chat with ${modelOr("the included model")}`} in the Playground.</p></div>}
           <div className="mt-4 space-y-3 empty:hidden">
             {account && !signedIn && sponsoredOff && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={loginUrl}>Sign in to run your own text</ButtonLink>}>The recorded run below shows the same flow, answered by a real model.</Notice>}
             {needsKey && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={hasConsole ? "#connect" : "#account"}>Add a model key</ButtonLink>}>Add your own model key to run it, or follow the recorded run below.</Notice>}
