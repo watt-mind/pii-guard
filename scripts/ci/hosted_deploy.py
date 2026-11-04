@@ -128,6 +128,7 @@ def assert_config(config: dict, target: str) -> None:
         "TENANT_KEY_SECRET_URI",
         "GOOGLE_SECRET_URI",
         "METRICS_TOKEN_SECRET_URI",
+        "OCR_KEY_SECRET_URI",
     ):
         if not re.fullmatch(
             r"https://[a-z0-9-]+\.vault\.azure\.net/secrets/[a-zA-Z0-9-]+/[a-f0-9]{32}",

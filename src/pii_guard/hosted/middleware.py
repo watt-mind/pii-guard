@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hmac
 import json
 import secrets
@@ -254,9 +255,17 @@ class HostedMiddleware:
                 headers,
                 principal_id=principal.id,
                 authenticated=principal.authenticated,
-                anonymous_sponsored=plan.canonical == "/v1/demo" and method == "POST",
+                # Guest work (the demo and the Playground) is charged to its network.
+                anonymous_sponsored=not principal.authenticated and plan.work,
                 read=plan.read_or_first_run,
             )
+        # Read before the body: the forwarding headers never reach the application.
+        if plan.work:
+            ctx.state["quota_key"] = self.service.quota_key(principal, headers)
+        elif plan.account:
+            # The account shows a guest its network's usage, but never fails for it.
+            with contextlib.suppress(PiiGuardError):
+                ctx.state["quota_key"] = self.service.quota_key(principal, headers)
         headers, raw, chat_images, text_limit = await self._enter_and_read_body(
             ctx, principal, plan, endpoint_snapshot
         )
@@ -700,7 +709,7 @@ class HostedMiddleware:
             self.service.check_kill_switch()
         images = 1 if plan.image else (image_charge.images if image_charge else 0)
         ctx.reservation = self.service.quotas.admit(
-            principal.id,
+            ctx.state.get("quota_key", principal.id),
             authenticated=principal.authenticated,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -768,7 +777,11 @@ class HostedMiddleware:
         namespace = project_id if project_id != default else None
         if selected_endpoint is not None:
             namespace = str(project_id) + ":" + selected_endpoint.id
-        ctx.runtime = self.service.acquire(principal, namespace=namespace)
+        ctx.runtime = self.service.acquire(
+            principal,
+            namespace=namespace,
+            playground=not principal.authenticated and plan.canonical != "/v1/demo",
+        )
         ctx.state["hosted_runtime"] = ctx.runtime
         if selected_endpoint is not None:
             # Each stored event names the endpoint it went through, so the project's
