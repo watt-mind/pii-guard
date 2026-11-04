@@ -62,8 +62,13 @@ class Settings(BaseSettings):
     # Enable only after verifying direct ACA ingress and access-log privacy.
     hosted_client_ip_source: Literal["off", "aca_xff_rightmost"] = "off"
     hosted_max_principals: int = Field(default=256, ge=1, le=10000)
-    # Anonymous demo runtimes are a separate pool, so guests never take a signed-in slot.
-    hosted_max_guest_runtimes: int = Field(default=8, ge=1, le=1000)
+    # Guest runtimes (the demo and the Playground) are a separate pool, so guests never take
+    # a signed-in slot; a full pool frees its least recently used idle guest (LAB-1812).
+    hosted_max_guest_runtimes: int = Field(default=64, ge=1, le=1000)
+    # A guest's daily allowance: per client network with an address source on, else per
+    # guest cookie (LAB-1812).
+    hosted_guest_requests_per_day: int = Field(default=100, ge=1, le=10000)
+    hosted_guest_tokens_per_day: int = Field(default=1_000_000, ge=1000, le=10_000_000)
     hosted_runtime_ttl: int = Field(default=3600, ge=300, le=86400)
     hosted_max_sessions: int = Field(default=20, ge=1, le=100)
     hosted_max_body_bytes: int = Field(default=32768, ge=1024, le=262144)
