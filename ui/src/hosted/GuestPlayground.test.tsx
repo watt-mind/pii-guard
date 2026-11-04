@@ -182,7 +182,16 @@ describe("the guest Playground (LAB-1812)", () => {
   it("points guests from the landing demo to the Playground", async () => {
     open("#demo");
     render(<HostedApp call={account()} console={consoleStub} guest={renderGuest} />);
-    expect(await screen.findByRole("link", { name: "open the Playground as a guest" })).toHaveAttribute("href", "#playground/text");
+    expect(await screen.findByRole("link", { name: "Now try your own text →" })).toHaveAttribute("href", "#playground/text");
+  });
+
+  it("leads guests to the Playground from the hero and the menu (LAB-1814)", async () => {
+    open("");
+    render(<HostedApp call={account()} console={consoleStub} guest={renderGuest} />);
+    expect(await screen.findByRole("link", { name: "Try it with your own text" })).toHaveAttribute("href", "#playground/text");
+    expect(screen.getByText(/No sign-in · /)).toHaveTextContent("No sign-in · 100 free requests a day · text and chat");
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    expect(within(nav).getAllByRole("link", { name: "Playground" })[0]).toHaveAttribute("href", "#playground/text");
   });
 });
 
