@@ -80,6 +80,7 @@ def config(target: str = "dev") -> dict:
         "GOOGLE_SECRET_URI": "https://syntheticvault.vault.azure.net/secrets/google/" + "c" * 32,
         "METRICS_TOKEN_SECRET_URI": "https://syntheticvault.vault.azure.net/secrets/metrics/"
         + "d" * 32,
+        "OCR_KEY_SECRET_URI": "https://syntheticvault.vault.azure.net/secrets/ocr-key/" + "e" * 32,
         "GOOGLE_CLIENT_ID": "synthetic-client-id",
     }
 

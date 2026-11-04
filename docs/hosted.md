@@ -205,7 +205,7 @@ startup characteristics and is not subject to the self-hosted image's 650 MB OCR
 | `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires OCR (Muse Spark Open with `PII_GUARD_OCR_API_KEY`, or Tesseract when opted in) and the segmenter (SAM 3.1 with its key, or the opt-in on-device engines) |
 | `PII_GUARD_SEGMENTER` | `sam-api` (the default: SAM 3.1 on the Meta Model API, ADR 0015) or `local` (opt-in on-device engines, which need an image built with `PII_GUARD_ON_DEVICE_VISION=true`); `hybrid`/`off` refuse startup while hosted images are on |
 | `PII_GUARD_SAM_API_KEY` | The SAM 3.1 key; the release sets it from the `meta-key` Key Vault secret |
-| `PII_GUARD_OCR_ENGINE`, `PII_GUARD_OCR_API_KEY` | `muse` (the image's default, ADR 0016) needs a Baseten key; the release does not set one yet, so `/readyz` fails while hosted images are on until it does. `tesseract` needs an image built with `PII_GUARD_TESSERACT=true` |
+| `PII_GUARD_OCR_ENGINE`, `PII_GUARD_OCR_API_KEY` | `muse` (the image's default, ADR 0016) needs a Baseten key; the release sets it from the `ocr-key` Key Vault secret (LAB-1802). `tesseract` needs an image built with `PII_GUARD_TESSERACT=true` |
 | `PII_GUARD_POLICY_OVERRIDES` | Unset: owners' project policies decide visual actions; an override set here wins when stricter |
 | `PII_GUARD_HOSTED_MAX_IMAGE_BYTES`, `PII_GUARD_HOSTED_IMAGE_MAX_PIXELS` | Defaults 4 MiB decoded and 8 MP, checked before OCR |
 | `PII_GUARD_HOSTED_IMAGE_TIMEOUT` | Default 60 s per image; one image job per replica, a busy replica answers `429` |
@@ -279,7 +279,8 @@ the selected subscription first if not already registered.
    on this vault; the runtime retains Secrets User access. Revoke temporary provisioning
    access when operational policy requires it.
 4. Set `HOSTED_IMAGE`, `HOSTED_PUBLIC_ORIGIN`, `GOOGLE_CLIENT_ID`, `META_KEY_SECRET_URI`,
-   `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`, `METRICS_TOKEN_SECRET_URI`. URI variables must refer to **versioned**
+   `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`, `METRICS_TOKEN_SECRET_URI`, `OCR_KEY_SECRET_URI`
+   (Baseten, for Muse Spark Open OCR). URI variables must refer to **versioned**
    secrets in the dedicated vault. No secret values enter the script. Run
    `deploy/azure/deploy.sh stage`; it validates and deploys internal ingress, Google Easy Auth,
    one replica in prod or zero to one in dev (LAB-1711), with one worker per replica, and waits boundedly for the latest revision to be admitted as ready. Verify application

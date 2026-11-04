@@ -188,6 +188,7 @@ class DeploymentAdmissionTests(unittest.TestCase):
                 "TENANT_KEY_SECRET_URI": VAULT + "secrets/tenant/" + "c" * 32,
                 "GOOGLE_SECRET_URI": VAULT + "secrets/google/" + "d" * 32,
                 "METRICS_TOKEN_SECRET_URI": VAULT + "secrets/metrics/" + "e" * 32,
+                "OCR_KEY_SECRET_URI": VAULT + "secrets/ocr-key/" + "f" * 32,
                 **overrides,
             }
             result = subprocess.run(  # noqa: S603 - repository script and controlled env

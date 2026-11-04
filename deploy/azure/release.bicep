@@ -47,6 +47,9 @@ param metaKeySecretUri string
 param tenantKeySecretUri string
 @minLength(1)
 param googleSecretUri string
+@description('Versioned Key Vault reference to the Baseten key Muse Spark Open OCR reads image text with (ADR 0016, LAB-1802).')
+@minLength(1)
+param ocrKeySecretUri string
 @description('Versioned Key Vault reference to the Prometheus scrape token for GET /metrics (LAB-1732).')
 @minLength(1)
 param metricsTokenSecretUri string
@@ -103,6 +106,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
         { name: 'tenant-key', keyVaultUrl: tenantKeySecretUri, identity: identity.id }
         { name: 'google-client-secret', keyVaultUrl: googleSecretUri, identity: identity.id }
         { name: 'metrics-token', keyVaultUrl: metricsTokenSecretUri, identity: identity.id }
+        { name: 'ocr-key', keyVaultUrl: ocrKeySecretUri, identity: identity.id }
       ]
     }
     template: {
@@ -126,6 +130,8 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = if (appDeploymentEnabled
           { name: 'PII_GUARD_HOSTED_IMAGES', value: 'true' }
           { name: 'PII_GUARD_SEGMENTER', value: 'sam-api' }
           { name: 'PII_GUARD_SAM_API_KEY', secretRef: 'meta-key' }
+          // Muse Spark Open on Baseten reads image text (ADR 0016); without it /readyz fails.
+          { name: 'PII_GUARD_OCR_API_KEY', secretRef: 'ocr-key' }
           { name: 'PII_GUARD_HOSTED_MODELS', value: 'muse-spark-1.3' }
           { name: 'PII_GUARD_HOSTED_SPONSORED_MICRODOLLARS', value: string(admittedSponsoredMicrodollars) }
           { name: 'PII_GUARD_HOSTED_SPONSORED_ALLOCATION_ID', value: allocationId }

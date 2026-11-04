@@ -493,6 +493,11 @@ class ReleaseTemplateTests(unittest.TestCase):
             env["PII_GUARD_SAM_API_KEY"],
             {"name": "PII_GUARD_SAM_API_KEY", "secretRef": "meta-key"},
         )
+        # Muse Spark Open on Baseten reads image text (ADR 0016, LAB-1802).
+        self.assertEqual(
+            env["PII_GUARD_OCR_API_KEY"],
+            {"name": "PII_GUARD_OCR_API_KEY", "secretRef": "ocr-key"},
+        )
         self.assertNotIn("PII_GUARD_POLICY_OVERRIDES", env)
         hosts = env["PII_GUARD_ALLOWED_HOSTS"]["value"]
         self.assertIn("publicOrigin", hosts)
@@ -630,13 +635,14 @@ class ReleaseTemplateTests(unittest.TestCase):
             "tenantKeySecretUri",
             "googleSecretUri",
             "metricsTokenSecretUri",
+            "ocrKeySecretUri",
         ):
             self.assertEqual(params[name]["minLength"], 1)
             self.assertNotIn("defaultValue", params[name])
         secrets = self.resource("Microsoft.App/containerApps")["properties"]["configuration"][
             "secrets"
         ]
-        self.assertEqual(len(secrets), 4)
+        self.assertEqual(len(secrets), 5)
         for secret in secrets:
             self.assertEqual(set(secret), {"name", "keyVaultUrl", "identity"})
             self.assertIn("parameters(", secret["keyVaultUrl"])
@@ -763,6 +769,7 @@ class ReleaseDriverIngressTests(unittest.TestCase):
             "TENANT_KEY_SECRET_URI": secret.format("tenant-key"),
             "GOOGLE_SECRET_URI": secret.format("google-client-secret"),
             "METRICS_TOKEN_SECRET_URI": secret.format("metrics-token"),
+            "OCR_KEY_SECRET_URI": secret.format("ocr-key"),
             **extra,
         }
         result = subprocess.run(  # noqa: S603 - local driver against a fake az, no cloud
