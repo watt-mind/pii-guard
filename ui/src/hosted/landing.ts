@@ -31,6 +31,19 @@ export function runsLeft(account: Account) {
   return `${Math.max(0, perDay - account.usage.requests_today)} of ${perDay} ${account.authenticated ? "runs" : "free runs"} left today`;
 }
 
+/** "97 of 100 free requests left today", for the guest Playground (LAB-1812), or null without a daily limit. */
+export function requestsLeft(account: Account) {
+  const perDay = account.limits.requests_per_day;
+  if (typeof perDay !== "number") return null;
+  return `${Math.max(0, perDay - account.usage.requests_today)} of ${perDay} free requests left today`;
+}
+
+/** Whether a guest's daily allowance is spent, as `/v1/account` last reported it. */
+export function allowanceSpent(account: Account) {
+  const perDay = account.limits.requests_per_day;
+  return typeof perDay === "number" && account.usage.requests_today >= perDay;
+}
+
 /** "0 of 5 free runs today · resets in 6 h", from the account's usage and limit. */
 export function usageLine(account: Account, now = Date.now()) {
   const perDay = account.limits.requests_per_day;

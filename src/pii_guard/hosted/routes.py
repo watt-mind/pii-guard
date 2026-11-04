@@ -145,7 +145,8 @@ def account(request: Request) -> dict[str, Any]:
             "images_per_day": limits.user_images if images else 0,
             "max_image_bytes": hosted.settings.hosted_max_image_bytes if images else 0,
         },
-        "usage": hosted.quotas.usage(principal.id),
+        # A guest's allowance is its network's when an address source is on (LAB-1812).
+        "usage": hosted.quotas.usage(getattr(request.state, "quota_key", principal.id)),
         "state": {"persistence": "ephemeral", "restart_loses_sessions": True},
         "connections": hosted.connections.list(principal.id) if authenticated else [],
     }

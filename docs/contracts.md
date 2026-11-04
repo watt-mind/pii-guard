@@ -1736,7 +1736,10 @@ Google's stable subject claim, never email, establishes ownership. Account linki
 implemented. Invalid identity headers or invalid guard keys fail closed; they do not become
 guests. Guard authorization and platform identity headers are removed before downstream calls.
 
-Only `/v1/account` and the curated `/v1/demo` are anonymous API routes. Landing/static assets
+Only `/v1/account`, the curated `/v1/demo` and the guest Playground (LAB-1812: direct
+`POST /v1/analyze`, `/v1/mask`, `/v1/unmask`, `/v1/sessions` and the sponsored
+`/v1/chat/completions`, under the shared default policy, never through an endpoint path and
+without `X-Pii-Guard-Connection`, `-Project`, `-Endpoint` or `-Mode`) are anonymous API routes. Landing/static assets
 and health probes remain public. Other data routes require Google identity or an owned guard
 API key. Hosted mode serves `/v1/status` and `/v1/connect/snippets` only to signed-in Google
 principals, as owner projections (ADR 0013, [`GET /v1/status`](#hosted-projection)), and
@@ -1759,7 +1762,7 @@ random process-only key; mapped IPv4 uses the same bucket as IPv4. Its bounded i
 tables hold digests and counters/timestamps only. Each table holds at most 4096 entries,
 with one-hour idle and 24-hour absolute expiry; a full table evicts its least recently used
 bucket once it has been idle for five minutes (a fully refilled burst), and otherwise
-refuses new entries without evicting live allowances. Anonymous sponsored demo requests
+refuses new entries without evicting live allowances. Anonymous demo and Playground requests
 share a 30-request network burst, refilling 30/minute, and 120 requests per fixed hour
 starting at bucket creation. Each request also charges its aggregate (IPv4 /24, IPv6 /48):
 a 120-request burst refilling 60/minute and 480 requests per fixed hour, tracking at most
@@ -1788,9 +1791,11 @@ stream completion/cancellation; inactive runtimes expire after one hour. A 30-se
 loop forgets expired state. Session capacity refuses new sessions rather than evicting active
 ones. Runtimes are taken only by routes that use one: no `/v1/account` method, no `OPTIONS`
 request and no key or connection management route takes one, and a guest takes one only for
-`POST /v1/demo`. Guests draw on a separate pool (`HOSTED_MAX_GUEST_RUNTIMES`, default 8),
-so anonymous traffic never occupies a signed-in owner's runtime, and a guest's runtime is
-dropped as soon as its demo finishes. Defaults: 256 signed-in runtimes, 20 sessions per
+guest work (`POST /v1/demo` and the Playground routes). Guests draw on a separate pool
+(`HOSTED_MAX_GUEST_RUNTIMES`, default 64; a full pool frees its least recently used idle guest),
+so anonymous traffic never occupies a signed-in owner's runtime, and a demo-only guest runtime is
+dropped as soon as its demo finishes; a Playground guest's runtime keeps its sessions until it
+expires. Defaults: 256 signed-in runtimes, 20 sessions per
 owner, 256 cached detections, 50 masked traffic events; the owner's traffic log scrubs the
 provider key a request may send (sponsored or the selected connection's). Full vault reveal is never available. All state is ephemeral; restart loses mappings,
 connections and guard API keys. Durable multi-replica state is deferred to LAB-1376.
@@ -1969,11 +1974,13 @@ failure or an empty model answer. The static UI walkthrough remains available wi
 ### Admission, cost and egress
 
 Every signed-in mutation and data request (any method but `GET`, `HEAD` and `OPTIONS`) and a
-guest's `POST /v1/demo` require atomic admission before detector/provider work. Reads (`GET`,
+guest's demo and Playground requests require atomic admission before detector/provider work. Reads (`GET`,
 `HEAD`, including the console's polling of `/v1/traffic` and `/v1/status`) spend no daily
 request or token budget and hold no inference concurrency; the per-owner read bucket above
-bounds them. `/v1/account` is never admitted. Defaults are five guest or 100 standard
-requests per UTC day, 100,000 guest or 1,000,000 standard reserved tokens, two active requests
+bounds them. `/v1/account` is never admitted. Defaults are 100 guest or 100 standard
+requests per UTC day, 1,000,000 reserved tokens for either (`HOSTED_GUEST_REQUESTS_PER_DAY`,
+`HOSTED_GUEST_TOKENS_PER_DAY`); with an address source on, a guest's allowance belongs to its
+network (IPv4 address, IPv6 /64), so a new guest cookie does not reset it (LAB-1812), two active requests
 per owner, eight globally, 10,000 requests and 10,000,000 tokens globally per day. Ingress
 slots cover slow clients before parsed admission. A request takes one only after identity,
 path, origin and abuse checks have passed, so a request refused by any of them never holds

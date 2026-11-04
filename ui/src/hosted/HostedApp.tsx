@@ -73,8 +73,11 @@ const SECTIONS = ["image-preview", "how", "results", "account"] as const;
 
 const link = "inline-flex min-h-6 items-center underline underline-offset-4 hover:text-ink";
 
-/** Anonymous visitors get the public page; a signed-in owner gets the console (`console`). */
-export function HostedApp({ call = request, console: renderConsole }: { call?: Requester; console?: (session: HostedSession) => ReactNode }) {
+/**
+ * Anonymous visitors get the public page; a signed-in owner gets the console (`console`). A guest
+ * who opens the Playground gets the guest Playground (`guest`, LAB-1812).
+ */
+export function HostedApp({ call = request, console: renderConsole, guest }: { call?: Requester; console?: (session: HostedSession) => ReactNode; guest?: (session: HostedSession) => ReactNode }) {
   const { account, error, refresh } = useAccount(call);
   const hash = useHash();
   // Signed in earlier on this page, so an anonymous account now means the session ended.
@@ -89,13 +92,16 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
   // Evaluation shows only the published benchmarks bundled with the page, so it needs no sign-in
   // (LAB-1533), and it still opens when the account can't be read.
   if (renderConsole && !account?.authenticated && (account || error) && consoleSectionOf(hash) === "evaluation") return <PublicEvaluation loginUrl={account?.login_url || LOGIN} hash="#evaluation" />;
+  // Text and Chat run for guests on the shared default policy; its Images tab asks to sign in (LAB-1812).
+  // A session that ended on this page still says so.
+  if (guest && section === "playground" && account && !wasSignedIn) return guest({ account, error, refresh, call });
   if (section && account) return <SignedOutConsole section={section} hash={hash} loginUrl={account.login_url || LOGIN} expired={wasSignedIn} />;
   // Back from sign-in: wait for the account rather than flash the public page.
   if (renderConsole && !account && !error && hash !== "" && !SITE_HASHES.has(hash) && hash !== "#account") return <p role="status" className="p-6 text-sm text-muted">Opening your console…</p>;
-  return <HostedContent call={call} account={error ? null : account} accountError={error} refresh={refresh} console={Boolean(renderConsole)} />;
+  return <HostedContent call={call} account={error ? null : account} accountError={error} refresh={refresh} console={Boolean(renderConsole)} guestPlayground={Boolean(guest && renderConsole)} />;
 }
 
-function HostedContent({ call, account, accountError, refresh, console: hasConsole }: { call: Requester; account: Account | null; accountError: string; refresh: () => Promise<void>; console: boolean }) {
+function HostedContent({ call, account, accountError, refresh, console: hasConsole, guestPlayground }: { call: Requester; account: Account | null; accountError: string; refresh: () => Promise<void>; console: boolean; guestPlayground: boolean }) {
   const [language, setLanguage] = useState<Language>("en");
   const [result, setResult] = useState<DemoResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -122,6 +128,8 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const ownConnection = signedIn && sponsoredOff ? account?.connections[0] : undefined;
   const needsKey = signedIn && sponsoredOff && !ownConnection;
   const canRun = guestLive || (signedIn && !needsKey);
+  // A guest can mask their own text in the Playground, and chat there when free runs are on (LAB-1812).
+  const guestOwnText = guestPlayground && Boolean(account) && !signedIn;
   // The model's name comes from the server (`included_model`), never from this page (LAB-1466).
   const model = account?.included_model ? modelName(account.included_model) : null;
   const modelOr = (fallback: string) => model ?? fallback;
@@ -259,6 +267,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <div className="basis-full sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
           </div>
+          {guestOwnText && <p className="mt-3 text-xs text-muted">Your own text, no account needed: <a className={link} href="#playground/text">open the Playground as a guest</a> to mask a document{sponsoredOff ? "" : ` or chat with ${modelOr("the included model")}`}.</p>}
           <div className="mt-4 space-y-3 empty:hidden">
             {account && !signedIn && sponsoredOff && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={loginUrl}>Sign in to run your own text</ButtonLink>}>The recorded run below shows the same flow, answered by a real model.</Notice>}
             {needsKey && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={hasConsole ? "#connect" : "#account"}>Add a model key</ButtonLink>}>Add your own model key to run it, or follow the recorded run below.</Notice>}
@@ -384,7 +393,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-2 lg:grid-cols-2">
             <div><h3 className="mb-3 text-sm font-medium text-ink">Processing and access</h3><KeyValues items={[
               { label: "Where", value: "Microsoft Azure, Sweden Central (EU). Processed in memory. No content archive, and no backup of the mappings. Azure operators can access process memory." },
-              { label: "As a guest", value: `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
+              { label: "As a guest", value: guestPlayground ? `On this page a fixed, fictional sample is masked. In the Playground you can type your own text: PII Guard receives it in full and masks it with the shared default policy; in Chat only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` : `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
               { label: "Signed in", value: `Google receives your sign-in (name, email, profile). PII Guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
             ]} /></div>
             <div><h3 className="mb-3 text-sm font-medium text-ink">Images, retention and provider</h3><KeyValues items={[
@@ -420,9 +429,9 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     ),
     account: (
       <section id="account" aria-labelledby="account-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={!account && accountError ? "The live service isn’t reachable right now. You can still self-host it, or come back to run the live demo." : signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live demo. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
+        <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={!account && accountError ? "The live service isn’t reachable right now. You can still self-host it, or come back to run the live demo." : signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : `No sign-in needed for the live demo${guestPlayground ? " or the Playground" : ""}. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address.`} />
         <div className="flex flex-wrap items-center gap-3">
-          {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
+          {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink>{guestOwnText && <ButtonLink href="#playground/text">Open the Playground</ButtonLink>}<ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Card title="Hosted console" subtitle="Try your own text and connect your app." headingLevel={3}><p className="text-muted">Manage projects, model connections and gateway endpoints in one place.</p><p className="mt-4 text-xs text-muted"><a className={link} href="#trust">Hosted processing and retention details</a></p></Card>

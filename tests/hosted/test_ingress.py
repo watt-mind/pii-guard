@@ -189,7 +189,7 @@ def test_requests_refused_before_identity_or_admission_take_no_slot(monkeypatch:
         # a route hosted mode does not serve, and a signed-in user over abuse admission.
         (raw_scope("/v1/mask", headers=[(b"authorization", b"Bearer pg_synthetic_bad")]), 401),
         (raw_scope("/v1/mask", headers=[(b"authorization", b"Basic synthetic")]), 401),
-        (raw_scope("/v1/mask"), 401),
+        (raw_scope("/v1/traffic"), 401),
         (raw_scope("/v1/demo", headers=[(b"origin", b"https://elsewhere.example")]), 403),
         (raw_scope("/v1/projects/../admin", headers=signed_in("synthetic-a")), 403),
     ]

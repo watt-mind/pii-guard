@@ -241,6 +241,17 @@ _CREDENTIAL_ROUTES = frozenset(
     }
 )
 _PAID_ROUTES = frozenset({"/v1/chat/completions", "/v1/responses", "/v1/demo"})
+# The guest Playground (LAB-1812): text masking and the sponsored chat, through the shared
+# default policy. Guests POST these directly, never through an endpoint path.
+_GUEST_ROUTES = frozenset(
+    {"/v1/analyze", "/v1/mask", "/v1/unmask", "/v1/sessions", "/v1/chat/completions"}
+)
+# A guest has no connections, projects or endpoints, and runs only the default mode.
+_GUEST_FORBIDDEN_HEADERS = (
+    "x-pii-guard-connection",
+    "x-pii-guard-project",
+    "x-pii-guard-endpoint",
+)
 _CHAT_ROUTES = frozenset({"/v1/chat/completions", "/v1/responses"})
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _READ_METHODS = frozenset({"GET", "HEAD"})
@@ -417,17 +428,26 @@ def _check_owner_only_routes(
         raise HostedUnauthorizedError("Key and connection management requires a signed-in session")
 
 
+def _is_guest_work(canonical: str, routed: tuple[str, str] | None, method: str | None) -> bool:
+    return canonical in _GUEST_ROUTES and routed is None and method == "POST"
+
+
 def _check_access_and_origin(
     path: str,
     canonical: str,
     headers: Headers,
     principal: Principal,
     *,
+    routed: tuple[str, str] | None,
     method: str | None,
     expected_origin: str,
 ) -> None:
-    if canonical not in {"/v1/account", "/v1/demo"} and not principal.authenticated:
-        raise HostedUnauthorizedError("Sign in with Google to use this endpoint")
+    if not principal.authenticated and canonical not in {"/v1/account", "/v1/demo"}:
+        if not _is_guest_work(canonical, routed, method):
+            raise HostedUnauthorizedError("Sign in with Google to use this endpoint")
+        mode = headers.get("x-pii-guard-mode")
+        if any(headers.get(h) for h in _GUEST_FORBIDDEN_HEADERS) or mode not in {None, "fast"}:
+            raise HostedUnauthorizedError("Sign in with Google to choose a connection or project")
     if canonical == "/v1/demo" and (
         path != canonical or any(headers.get(h) for h in _DEMO_FORBIDDEN_HEADERS)
     ):
@@ -490,6 +510,7 @@ def _classify_route(
         canonical,
         headers,
         principal,
+        routed=routed,
         method=method,
         expected_origin=expected_origin,
     )
@@ -505,8 +526,10 @@ def _classify_route(
     # takes a runtime, so cookieless calls cannot exhaust capacity (LAB-1412).
     account = canonical == "/v1/account"
     if not principal.authenticated:
-        # A guest's only work is the curated demo itself.
-        needs_runtime = work = canonical == "/v1/demo" and method == "POST"
+        # A guest's only work is the curated demo and the Playground (LAB-1812).
+        needs_runtime = work = (canonical == "/v1/demo" and method == "POST") or _is_guest_work(
+            canonical, routed, method
+        )
     else:
         # Key and connection management uses the account stores, never a runtime.
         needs_runtime = not (account or preflight or credentials)

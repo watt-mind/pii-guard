@@ -177,6 +177,24 @@ def test_guest_runtimes_are_a_separate_pool_released_after_the_demo(make_client:
     assert list(service._runtimes) == ["u_synthetic-owner"]
 
 
+def test_guest_playground_runtime_persists_and_yields_its_slot_when_idle(
+    make_client: Any,
+) -> None:
+    service: HostedService = make_client(hosted_max_guest_runtimes=1).app.state.hosted
+    one = service.acquire(Principal("g_synthetic-guest-one", False, "guest"), playground=True)
+    service.release(one)
+    # The Playground keeps an idle guest's sessions between requests (LAB-1812)...
+    assert list(service._runtimes) == ["g_synthetic-guest-one"]
+    two = service.acquire(Principal("g_synthetic-guest-two", False, "guest"), playground=True)
+    # ...until a new guest needs the full pool: the least recently used idle one goes.
+    assert list(service._runtimes) == ["g_synthetic-guest-two"]
+    assert one.vault._tenant_key == b""
+    # A busy guest is never evicted.
+    with pytest.raises(HostedCapacityError):
+        service.acquire(Principal("g_synthetic-guest-three", False, "guest"), playground=True)
+    service.release(two)
+
+
 def test_guest_non_demo_methods_take_no_runtime_or_budget(make_client: Any) -> None:
     client = make_client()
     service = client.app.state.hosted

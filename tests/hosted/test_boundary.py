@@ -106,7 +106,9 @@ def boundary(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, list
     # An injected one-time durable allocator stands in for the deployment mount. The real
     # ledger still admits every request and retains reservations after failure.
     app.state.hosted.quotas = QuotaLedger(
-        QuotaLimits(global_daily_microdollars=1_000_000_000),
+        QuotaLimits(
+            guest_requests=100, guest_tokens=10_000_000, global_daily_microdollars=1_000_000_000
+        ),
         sponsored_allocation_microdollars=1_000_000_000,
         allocation_expires_at=time.time() + 3600,
         claim_allocation=lambda: True,
@@ -202,27 +204,30 @@ def test_real_demo_cookie_rotation_hits_network_burst_then_allows_sign_in(
     )
 
 
-def test_real_demo_keeps_five_request_guest_cap_and_shared_network_allowance(
+def test_real_demo_guest_cap_is_shared_by_the_network(
     boundary: tuple[TestClient, list[httpx.Request]],
 ) -> None:
     client, seen = boundary
     service = client.app.state.hosted
     service.abuse = AbuseAdmission("aca_xff_rightmost", clock=lambda: 100.0)
     service.quotas = QuotaLedger(
-        QuotaLimits(guest_tokens=1_000_000, global_daily_microdollars=1_000_000_000),
+        QuotaLimits(
+            guest_requests=5, guest_tokens=1_000_000, global_daily_microdollars=1_000_000_000
+        ),
         sponsored_allocation_microdollars=1_000_000_000,
         allocation_expires_at=time.time() + 3600,
         claim_allocation=lambda: True,
     )
+    for _ in range(5):
+        response = client.post(
+            "/v1/demo",
+            json={"sample_id": "en-support"},
+            headers={"origin": ORIGIN, "x-forwarded-for": "192.0.2.1"},
+        )
+        assert response.status_code == 200, response.text
+    # A new guest cookie does not reset the network's daily allowance (LAB-1812).
     for _ in range(2):
         client.cookies.clear()
-        for _ in range(5):
-            response = client.post(
-                "/v1/demo",
-                json={"sample_id": "en-support"},
-                headers={"origin": ORIGIN, "x-forwarded-for": "192.0.2.1"},
-            )
-            assert response.status_code == 200, response.text
         denied = client.post(
             "/v1/demo",
             json={"sample_id": "en-support"},
@@ -230,7 +235,7 @@ def test_real_demo_keeps_five_request_guest_cap_and_shared_network_allowance(
         )
         assert denied.status_code == 429
         assert denied.json()["error"]["code"] == "quota_exceeded"
-    assert len(seen) == 10
+    assert len(seen) == 5
     assert len(service.abuse._networks) == 1
 
 
@@ -280,23 +285,96 @@ def test_vault_traffic_and_deletion_cannot_cross_owners(
 
 
 @pytest.mark.parametrize(
-    "path",
+    ("method", "path"),
     [
-        "/v1/analyze",
-        "/v1/mask",
-        "/v1/unmask",
-        "/v1/sessions",
-        "/v1/chat/completions",
-        "/v1/responses",
+        ("POST", "/v1/responses"),
+        ("GET", "/v1/status"),
+        ("GET", "/v1/traffic"),
+        ("GET", "/v1/vault/sessions"),
+        ("GET", "/v1/models"),
+        ("GET", "/v1/projects"),
+        ("POST", "/v1/projects"),
+        ("GET", "/v1/account/api-keys"),
+        ("POST", "/v1/account/connections"),
     ],
 )
-def test_anonymous_data_routes_refused(
-    boundary: tuple[TestClient, list[httpx.Request]], path: str
+def test_guest_refused_outside_the_playground(
+    boundary: tuple[TestClient, list[httpx.Request]], method: str, path: str
 ) -> None:
     client, seen = boundary
-    response = client.post(path, json={"text": EMAIL}, headers={"origin": ORIGIN})
+    response = client.request(method, path, json={"text": EMAIL}, headers={"origin": ORIGIN})
     assert response.status_code == 401
     assert not seen
+
+
+@pytest.mark.parametrize(
+    ("header", "value"),
+    [
+        ("x-pii-guard-connection", "synthetic"),
+        ("x-pii-guard-project", "synthetic"),
+        ("x-pii-guard-endpoint", "synthetic"),
+        ("x-pii-guard-mode", "audit"),
+    ],
+)
+def test_guest_playground_refuses_owner_selectors(
+    boundary: tuple[TestClient, list[httpx.Request]], header: str, value: str
+) -> None:
+    client, seen = boundary
+    response = client.post(
+        "/v1/chat/completions",
+        json={"model": "muse-spark-1.3", "messages": [{"role": "user", "content": EMAIL}]},
+        headers={"origin": ORIGIN, header: value},
+    )
+    assert response.status_code == 401
+    assert not seen
+
+
+def test_guest_playground_masks_chats_and_restores_in_one_session(
+    boundary: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, seen = boundary
+    headers = {"origin": ORIGIN}
+    masked = client.post("/v1/mask", json={"text": EMAIL}, headers=headers)
+    assert masked.status_code == 200, masked.text
+    assert EMAIL not in masked.json()["masked_text"]
+    answer = chat(
+        client, {**headers, "x-pii-guard-mode": "fast"}, "/s/guest-synthetic/v1/chat/completions"
+    )
+    assert answer.status_code == 200, answer.text
+    sent = json.loads(seen[0].content)["messages"][-1]["content"]
+    assert EMAIL not in sent
+    # The guest's runtime outlives the request, so the session restores what it masked.
+    body = {"session_id": "guest-synthetic", "text": sent}
+    restored = client.post("/v1/unmask", json=body, headers=headers)
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["text"] == EMAIL
+    # Another guest (a new cookie) cannot read it.
+    client.cookies.clear()
+    stranger = client.post("/v1/unmask", json=body, headers=headers)
+    assert stranger.status_code == 404
+
+
+def test_guest_playground_allowance_follows_the_network_not_the_cookie(
+    boundary: tuple[TestClient, list[httpx.Request]],
+) -> None:
+    client, _ = boundary
+    service = client.app.state.hosted
+    service.abuse = AbuseAdmission("aca_xff_rightmost", clock=lambda: 100.0)
+    service.quotas = QuotaLedger(QuotaLimits(guest_requests=3))
+    headers = {"origin": ORIGIN, "x-forwarded-for": "198.51.100.7"}
+    for _ in range(3):
+        client.cookies.clear()
+        assert client.post("/v1/mask", json={"text": EMAIL}, headers=headers).status_code == 200
+    client.cookies.clear()
+    spent = client.post("/v1/mask", json={"text": EMAIL}, headers=headers)
+    assert spent.status_code == 429
+    assert spent.json()["error"]["code"] == "quota_exceeded"
+    account = client.get("/v1/account", headers=headers).json()
+    assert account["usage"]["requests_today"] == 3
+    other = {"origin": ORIGIN, "x-forwarded-for": "198.51.100.8"}
+    assert client.post("/v1/mask", json={"text": EMAIL}, headers=other).status_code == 200
+    # A signed-in owner on the same network keeps their own allowance.
+    assert client.post("/v1/mask", json={"text": EMAIL}, headers=auth(**headers)).status_code == 200
 
 
 # Hosted images (LAB-1390) are admitted for signed-in owners: see test_images.py.

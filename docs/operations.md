@@ -85,7 +85,8 @@ the ingress topology or logging configuration changes.
 With the source enabled, anonymous demo requests share a 30-request burst refilling
 30/minute and 120 requests per fixed hour starting at bucket creation. Signed-in users
 have independent 10-request bursts refilling 30/minute even on a shared judge network.
-The existing five guest requests/day and other token/cost quotas still apply. New guest
+Guest demo and Playground requests share their network's daily allowance (100 by default,
+`PII_GUARD_HOSTED_GUEST_REQUESTS_PER_DAY`), and other token/cost quotas still apply. New guest
 cookies do not reset a network allowance, and sign-in cannot replenish global sponsorship.
 429 responses include `Retry-After`; hourly anonymous exhaustion asks for Google sign-in
 or the free walkthrough. Missing/untrusted address signals return sanitized 503 errors.
