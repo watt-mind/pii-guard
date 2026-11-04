@@ -1103,5 +1103,23 @@ class ProjectConfigurationFoundationTests(unittest.TestCase):
         )
 
 
+class DevSecretReaderTests(unittest.TestCase):
+    """Dev grants Key Vault read per secret: each secret the release mounts needs one (LAB-1802)."""
+
+    def test_every_release_secret_is_readable_by_the_dev_identity(self) -> None:
+        release = TEMPLATE.read_text()
+        mounted = set(re.findall(r"\{ name: '([a-z0-9-]+)', keyVaultUrl:", release))
+        self.assertIn("ocr-key", mounted)
+        main = TEMPLATE.with_name("main.bicep").read_text()
+        listed = re.search(r"var devAppSecretNames = \[([^\]]*)\]", main)
+        self.assertIsNotNone(listed)
+        assert listed is not None  # noqa: S101 - narrows the type for mypy
+        granted = set(re.findall(r"'([a-z0-9-]+)'", listed.group(1)))
+        # Container and vault secret names differ (meta-key vs meta-api-key): match the count
+        # and the one secret named the same in both.
+        self.assertEqual(len(granted), len(mounted))
+        self.assertIn("ocr-key", granted)
+
+
 if __name__ == "__main__":
     unittest.main()
