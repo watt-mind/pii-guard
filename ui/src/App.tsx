@@ -26,16 +26,17 @@ import { Sidebar } from "./components/Sidebar";
 import { PageHeader, SegmentedControl } from "./components/ui";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { ProjectSwitcher } from "./projects/ProjectSwitcher";
-import { DEFAULT_SAMPLE, SAMPLES, sampleBehind, type Sample } from "./content/samples";
+import { sampleBehind } from "./content/samples";
 import type { BenchmarkLoader } from "./api/benchmarks";
 import { useEngine, type EngineHandle } from "./hooks/useEngine";
 import { useServerStatus, type StatusLoader } from "./hooks/useServerStatus";
+import { usePlaygroundRunner } from "./hooks/usePlaygroundRunner";
 import { useTheme } from "./hooks/useTheme";
 import { useTraffic, type TrafficHandle } from "./hooks/useTraffic";
-import { initialAnswer, knownSignatureOf, runGuard, toRunError, type KnownSession, type RunError, type RunResult } from "./lib/run";
+import { knownSignatureOf, type RunResult } from "./lib/run";
 import { DEFAULT_ROUTE, PLAYGROUND_TABS, SECTIONS, hashOf, parseHash, routeFromLocation, sameRoute, type EvaluationParams, type PlaygroundTab, type Route, type Section } from "./lib/routes";
 import type { VaultClient } from "./api/vault";
-import { newKnownRow, type KnownRow } from "./lib/knownRows";
+import { newKnownRow } from "./lib/knownRows";
 import { Overview } from "./screens/Overview";
 import { Logs } from "./screens/Traffic";
 // Keep Evaluation and its charts out of the console entry: first-visit mounting alone
@@ -50,6 +51,7 @@ const Policy = lazy(() => import("./screens/Policy").then((module) => ({ default
 const RoundTrip = lazy(() => import("./screens/RoundTrip").then((module) => ({ default: module.RoundTrip })));
 const Chat = lazy(() => import("./screens/Chat").then((module) => ({ default: module.Chat })));
 const Vault = lazy(() => import("./screens/Vault").then((module) => ({ default: module.Vault })));
+const GuestPlayground = lazy(() => import("./hosted/GuestPlayground"));
 
 export interface AppProps {
   api?: HttpGuardClient;
@@ -72,7 +74,14 @@ export interface AppProps {
 /** Hosted deployment is an explicit build choice; the local console remains the default. */
 export function App(props: AppProps) {
   return import.meta.env.VITE_PII_GUARD_HOSTED === "true" ? (
-    <HostedApp console={(session) => <SignedInConsole session={session} {...props} />} />
+    <HostedApp
+      console={(session) => <SignedInConsole session={session} {...props} />}
+      guest={(session) => (
+        <Suspense fallback={<p role="status" className="p-6 text-sm text-muted">Opening the playground…</p>}>
+          <GuestPlayground session={session} />
+        </Suspense>
+      )}
+    />
   ) : (
     <LocalConsole {...props} />
   );
@@ -205,62 +214,6 @@ function useConsoleNavigation(caps: Capabilities, hosted: HostedSession | null, 
   }, [capsKnown, route, requestedRoute]);
 
   return { route, opened, sectionOpened, apiOpen, navigate, openSection, openTab, reportEvaluation };
-}
-
-function usePlaygroundRunner(engine: EngineHandle) {
-  const [sampleId, setSampleId] = useState<string | null>(DEFAULT_SAMPLE.id);
-  const [text, setText] = useState(DEFAULT_SAMPLE.text);
-  const [language, setLanguage] = useState<"hu" | "en">(DEFAULT_SAMPLE.language);
-  const [known, setKnown] = useState<KnownRow[]>([]);
-  const knownSession = useRef<KnownSession | null>(null);
-  const [result, setResult] = useState<RunResult | null>(null);
-  const [answer, setAnswer] = useState("");
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<RunError | null>(null);
-  const runId = useRef(0);
-
-  const run = useCallback(async () => {
-    const id = ++runId.current;
-    setRunning(true);
-    setError(null);
-    try {
-      const values = known.filter((k) => k.value.trim() !== "").map((k) => ({ value: k.value, entity_type: k.entity_type }));
-      if (knownSession.current && knownSession.current.engine !== engine.engine) knownSession.current = null;
-      const r = await runGuard(engine.client, text, sampleId, {
-        language,
-        known: values,
-        knownSession: knownSession.current,
-        onKnownSession: (s) => (knownSession.current = s),
-      });
-      if (id !== runId.current) return;
-      setResult(r);
-      setAnswer(initialAnswer(r, SAMPLES.find((s) => s.id === r.sampleId)));
-    } catch (err) {
-      if (id !== runId.current) return;
-      // Fail closed: drop any previous masked output so nothing stale is shown as current.
-      setResult(null);
-      const e = toRunError(err);
-      if (e.code === "not_found") knownSession.current = null;
-      setError(e);
-    } finally {
-      if (id === runId.current) setRunning(false);
-    }
-  }, [engine.client, engine.engine, text, sampleId, language, known]);
-
-  const pickSample = (s: Sample) => {
-    setSampleId(s.id);
-    setText(s.text);
-    setLanguage(s.language);
-    setError(null);
-  };
-
-  const editText = (t: string) => {
-    setText(t);
-    const match = SAMPLES.find((s) => s.text === t);
-    setSampleId(match?.id ?? null);
-  };
-
-  return { sampleId, text, language, setLanguage, known, setKnown, result, answer, setAnswer, running, error, run, pickSample, editText };
 }
 
 /** First paint waits (briefly) until the engine and the traffic log have settled (CLS, LAB-1448). */
@@ -461,13 +414,29 @@ interface PlaygroundSectionProps {
   setChatDraft: (draft: ChatDraft | null) => void;
   loadImage?: (src: string) => Promise<Blob>;
   server: ServerStatus | null;
+  /** Shown between the page header and the tabs (the hosted guest notice, LAB-1812). */
+  intro?: ReactNode;
+  /** Replaces a tab's screen: a hosted guest gets a sign-in prompt for Images (LAB-1812). */
+  panels?: Partial<Record<"chat" | "images", ReactNode>>;
 }
 
-function PlaygroundSection({ tab, openTab, caps, opened, playground, engine, mockClient, chatClient, chatDraft, setChatDraft, loadImage, server }: PlaygroundSectionProps) {
-  const showImages = caps.images && opened("playground/images");
+function PlaygroundChatTab({ override, opened, chatClient, engine, chatDraft, server, caps }: { override: ReactNode; opened: boolean; chatClient: ChatClient; engine: EngineHandle; chatDraft: ChatDraft | null; server: ServerStatus | null; caps: Capabilities }) {
+  if (override) return override;
+  if (!opened) return null;
+  return <Chat client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={Boolean(server?.upstream?.mock)} modes={chatModesOf(server, caps)} />;
+}
+
+function PlaygroundImagesTab({ override, opened, engine, mockClient, loadImage, server }: { override: ReactNode; opened: boolean; engine: EngineHandle; mockClient: GuardClient; loadImage?: (src: string) => Promise<Blob>; server: ServerStatus | null }) {
+  if (override) return override;
+  if (!opened) return null;
+  return <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />;
+}
+
+export function PlaygroundSection({ tab, openTab, caps, opened, playground, engine, mockClient, chatClient, chatDraft, setChatDraft, loadImage, server, intro, panels = {} }: PlaygroundSectionProps) {
   return (
     <>
       <PageHeader title="Playground" lead={playgroundLeadText(caps.accounts)} />
+      {intro}
       <PlaygroundTabs tab={tab} onTab={openTab} caps={caps} />
       <PlaygroundTextPanel
         hidden={tab !== "text"}
@@ -484,16 +453,14 @@ function PlaygroundSection({ tab, openTab, caps, opened, playground, engine, moc
       <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden={tab !== "chat"}>
         <PageLoadBoundary>
           <Suspense fallback={<p role="status">Loading chat…</p>}>
-            {opened("playground/chat") && (
-              <Chat client={chatClient} live={engine.state.status.state === "online"} draft={chatDraft} ner={server ? server.ner.available : null} mockUpstream={Boolean(server?.upstream?.mock)} modes={chatModesOf(server, caps)} />
-            )}
+            <PlaygroundChatTab override={panels.chat} opened={opened("playground/chat")} chatClient={chatClient} engine={engine} chatDraft={chatDraft} server={server} caps={caps} />
           </Suspense>
         </PageLoadBoundary>
       </div>
       <div id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden={tab !== "images"}>
         <PageLoadBoundary>
           <Suspense fallback={<p role="status">Loading images…</p>}>
-            {showImages && <Images client={engine.client} engineState={engine.state} loadImage={loadImage} replayRecorded={mockClient.maskImage?.bind(mockClient)} serverImages={server?.images ?? null} />}
+            <PlaygroundImagesTab override={panels.images} opened={caps.images && opened("playground/images")} engine={engine} mockClient={mockClient} loadImage={loadImage} server={server} />
           </Suspense>
         </PageLoadBoundary>
       </div>

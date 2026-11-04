@@ -171,6 +171,16 @@ class AbuseAdmission:
     def _network_digest(self, headers: Headers) -> bytes:
         return self._network_keys(headers)[0]
 
+    def network_id(self, headers: Headers) -> str | None:
+        """An opaque, process-only key for this client network, or None with source off.
+
+        Guest daily quotas are keyed by it (LAB-1812), so a new guest cookie does not
+        reset them. Missing or invalid signals refuse, as for anonymous admission.
+        """
+        if self.source == "off":
+            return None
+        return "net_" + self._network_digest(headers).hex()[:32]
+
     @staticmethod
     def _purge(table: dict[bytes, _Bucket], now: float) -> None:
         for key, bucket in list(table.items()):
