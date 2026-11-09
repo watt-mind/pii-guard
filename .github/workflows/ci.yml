@@ -23,6 +23,9 @@ env:
   UV_LOCKED: "1"
   # Keep in step with the uv image pinned in Dockerfile/Dockerfile.hosted.
   UV_VERSION: "0.13.6"
+  # The spaCy models are direct-URL wheels on GitHub releases, which return transient 5xx; the
+  # default 3 retries (~10 s) let one 504 fail every uv job on a cold-cache nightly run (LAB-2349).
+  UV_HTTP_RETRIES: "8"
   FORCE_COLOR: "1"
 
 jobs:
