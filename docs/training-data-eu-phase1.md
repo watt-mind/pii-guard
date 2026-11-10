@@ -166,7 +166,7 @@ Hugging Face dataset, so removing a worktree no longer loses them.
   says `"synthetic": true`. `eu_corpus.py --corpus <name>` and `modal_eu_label.py`
   (`EU_CORPUS=<corpus>/<dir>`) write there; an explicit `--out eval/generated/...` (or a
   repo-relative `EU_CORPUS`) still works as before and is not pushed.
-- **Backup.** [`watt-mind/pii-guard-ner-train`](https://huggingface.co/datasets/watt-mind/pii-guard-ner-train)
+- **Backup.** `watt-mind/pii-guard-ner-train` on Hugging Face
   (private). Both generators push the corpus at the end of a successful run (one commit; the
   revision is printed); `--no-push` skips it. A push is refused unless the manifest says
   synthetic and every path passes the LAB-1527 real-text allowlist (`modal_upload.check_payload`):
