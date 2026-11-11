@@ -11,14 +11,7 @@
 [![Model on Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20model-pii--guard--ner--xlmr--base-yellow)](https://huggingface.co/watt-mind/pii-guard-ner-xlmr-base)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-## Meta Global AI Developer Hackathon 2026: submission overview
-
-| | |
-|---|---|
-| **Track · problem statement** | Startup · Push the Frontier |
-| **Built** | From scratch during the hackathon window, Oct 26 – Nov 4, 2026 |
-| **Demo** | [3-minute video](https://youtu.be/VrY8x3h26ws) · [try it as a guest](https://guard.watt-mind.com), no install or account · `uvx --python 3.12 --from wattmind-pii-guard pii-guard up` runs keyless with a mock model |
-| **Bonus prizes in scope** | Best Build on Meta Open Weight Models · Best Agentic Use-Case |
+**Demo:** [3-minute video](https://youtu.be/VrY8x3h26ws) · [try it as a guest](https://guard.watt-mind.com), no install or account · `uvx --python 3.12 --from wattmind-pii-guard pii-guard up` runs keyless with a mock model
 
 **Meta models, what each does and where it runs** ([details](#which-meta-models-do-what)):
 
