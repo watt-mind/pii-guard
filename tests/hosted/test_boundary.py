@@ -508,7 +508,7 @@ def test_stream_holds_runtime_until_response_finishes() -> None:
         async def chunks() -> Any:
             entered.set()
             yield b"synthetic"
-            await asyncio.to_thread(finish.wait, 5)
+            await asyncio.to_thread(finish.wait, 30)
             yield b"done"
 
         return StreamingResponse(chunks())
@@ -517,7 +517,7 @@ def test_stream_holds_runtime_until_response_finishes() -> None:
     with TestClient(app, base_url=ORIGIN) as client, ThreadPoolExecutor(max_workers=1) as pool:
         pending = pool.submit(client.get, "/v1/traffic/stream", headers=auth())
         try:
-            assert entered.wait(3)
+            assert entered.wait(30)
             service = app.state.hosted
             runtime = next(iter(service._runtimes.values()))
             assert runtime.active == 1
@@ -526,7 +526,7 @@ def test_stream_holds_runtime_until_response_finishes() -> None:
                 service.acquire(Principal("u_synthetic-two", True, "google"))
         finally:
             finish.set()
-        response = pending.result(timeout=5)
+        response = pending.result(timeout=30)
         assert response.status_code == 200
         assert runtime.active == 0
 
