@@ -9,9 +9,10 @@ Muse speaks the **OpenAI Responses API**, not Chat Completions. The gateway serv
 (`POST /v1/responses` and the `GET /muse-code/models` catalog). Nothing is translated, and
 there is no proxy or MITM.
 
-Tested with Muse Code **1.4.14** (`1.4.14-R7309.1`): end to end against a scripted mock model
-(`tests/integrations/test_muse_e2e.py`), and locally against the Meta Model API
-(`muse-spark-1.3`, fictional data only). 1.4.13 (`1.4.13-R6996.1`) sends the same requests (see
+Tested with Muse Code **1.4.15** (`1.4.15-R8339.1`): end to end against a scripted mock model
+(`tests/integrations/test_muse_e2e.py`). 1.4.14 (`1.4.14-R7309.1`) sends the same requests (see
+[1.4.14 to 1.4.15](#1414-to-1415)) and was also run locally against the Meta Model API
+(`muse-spark-1.3`, fictional data only); 1.4.13 (`1.4.13-R6996.1`) too (see
 [1.4.13 to 1.4.14](#1413-to-1414)).
 
 ## Setup (copy-paste)
@@ -118,7 +119,7 @@ Muse's `meta` provider makes two kinds of requests to the base URL:
    upstream's own `/responses`, and restores the `response.*` event stream
    (docs/contracts.md, "Responses API").
 
-The fields Muse 1.4.13 and 1.4.14 send (`request_keys` in the run records):
+The fields Muse 1.4.13, 1.4.14 and 1.4.15 send (`request_keys` in the run records):
 
 | Where | Fields |
 |---|---|
@@ -201,7 +202,7 @@ Muse Code was installed with the official installer into a throwaway `HOME`, so 
 export HOME=$(mktemp -d) XDG_CONFIG_HOME=$HOME/.config MUSE_NO_MODIFY_PATH=1
 curl -fsSL https://dev.meta.ai/install.sh -o install.sh   # read it first
 bash install.sh
-$HOME/.local/bin/muse --version        # Muse Code 1.4.14 (1.4.14-R7309.1)
+$HOME/.local/bin/muse --version        # Muse Code 1.4.15 (1.4.15-R8339.1)
 ```
 
 The installer only installs the current release. An older one, for a comparison, comes from its
@@ -212,6 +213,25 @@ release manifest, the file the launcher reads (check the `sha256` it lists):
 aren't printed). The table above comes from a traced run against the Meta Model API and from
 the recorder in the e2e harness. `--provider local` runs Muse's embedded llama.cpp with
 downloaded Glimmer weights and ignores the base URL. It is not covered here.
+
+### 1.4.14 to 1.4.15
+
+LAB-2367, 2026-11-11. 1.4.15 (`1.4.15-R8339.1`, from the installer) and 1.4.14 (from its
+release manifest, `sha256` checked) each ran the scripted e2e task four times with
+`MUSE_TRANSPORT_TRACE=1`; the request bodies the upstream received were compared field by field
+(names and types, not values):
+
+- **Same on the wire:** the body fields, the `input` item types and their keys, the one `muse`
+  namespace with the same 26 function tools for the main agent and `submit_reminder_decision`
+  for the reminder observers, `reasoning` (`effort` low/high, `summary: auto`),
+  `include: ["reasoning.encrypted_content"]`, `store: false`, `stream: true`,
+  `max_output_tokens: 128000`, the four `prompt_cache_key` kinds, 12 requests per run, and the
+  `response.*` event types it takes. No new field, so the fail-closed allow-list needed no
+  change.
+- **Results:** in all 8 runs 0 requests refused, 0 of 14 gold values upstream, 14 of 14
+  restored in `reply.md`, one path session. The release manifest's `msp_schema_fingerprint`
+  changed, but nothing that reaches the gateway did.
+- Not re-run against the Meta Model API for 1.4.15.
 
 ### 1.4.13 to 1.4.14
 
