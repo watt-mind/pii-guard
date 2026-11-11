@@ -10,7 +10,7 @@ For a plain OpenAI-compatible client (cURL, Python SDK), see [integrations.md](.
 
 | Tool | API it uses | Setup | Tested version | End-to-end test |
 |---|---|---|---|---|
-| [Muse Code](muse-code.md) (Meta's coding agent) | Responses (`/v1/responses`) | `pii-guard run muse-code` or `pii-guard connect muse-code` | 1.4.14-R7309.1 | [`test_muse_e2e.py`](../../tests/integrations/test_muse_e2e.py) |
+| [Muse Code](muse-code.md) (Meta's coding agent) | Responses (`/v1/responses`) | `pii-guard run muse-code` or `pii-guard connect muse-code` | 1.4.15-R8339.1 | [`test_muse_e2e.py`](../../tests/integrations/test_muse_e2e.py) |
 | [pi](pi.md) (coding agent) | Chat Completions | `pii-guard run pi` or `pii-guard connect pi` | 1.4.0 | [`test_pi_e2e.py`](../../tests/integrations/test_pi_e2e.py) |
 | [Codex](codex.md) (OpenAI's coding agent) | Responses (`/v1/responses`) | `pii-guard run codex` or a launch command with `-c` flags | 0.163.0 | [`test_codex_e2e.py`](../../tests/integrations/test_codex_e2e.py) |
 | [OpenCode](opencode.md) | Chat Completions | `pii-guard run opencode` or `OPENCODE_CONFIG_CONTENT` | 1.19.3 | [`test_opencode_e2e.py`](../../tests/integrations/test_opencode_e2e.py) |
