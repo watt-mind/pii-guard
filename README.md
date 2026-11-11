@@ -27,7 +27,7 @@
 <p align="center"><sub>990 fictional documents (de, en, hu), drawn by <code>pii-guard eval report</code> from the <a href="eval/results/runs/">run records</a>. <a href="#results">All sets</a> · <a href="docs/benchmarks/README.md">Shareable PNGs</a></sub></p>
 <!-- intro:end -->
 
-<p align="center"><sub>Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 4, 2026) · <a href="https://youtu.be/Lsr74ddhxRo">3-minute video walkthrough</a>. Version 0.1.0, installed from git; no tagged release yet. <a href="docs/why-pii-guard.md#what-is-not-here-yet">Known gaps</a>.</sub></p>
+<p align="center"><sub><a href="https://youtu.be/Lsr74ddhxRo">3-minute video walkthrough</a>. Version 0.1.0, installed from git; no tagged release yet. <a href="docs/why-pii-guard.md#what-is-not-here-yet">Known gaps</a>.</sub></p>
 
 ## Quickstart
 
