@@ -73,8 +73,11 @@ const SECTIONS = ["image-preview", "how", "results", "account"] as const;
 
 const link = "inline-flex min-h-6 items-center underline underline-offset-4 hover:text-ink";
 
-/** Anonymous visitors get the public page; a signed-in owner gets the console (`console`). */
-export function HostedApp({ call = request, console: renderConsole }: { call?: Requester; console?: (session: HostedSession) => ReactNode }) {
+/**
+ * Anonymous visitors get the public page; a signed-in owner gets the console (`console`). A guest
+ * who opens the Playground gets the guest Playground (`guest`, LAB-1812).
+ */
+export function HostedApp({ call = request, console: renderConsole, guest }: { call?: Requester; console?: (session: HostedSession) => ReactNode; guest?: (session: HostedSession) => ReactNode }) {
   const { account, error, refresh } = useAccount(call);
   const hash = useHash();
   // Signed in earlier on this page, so an anonymous account now means the session ended.
@@ -89,13 +92,16 @@ export function HostedApp({ call = request, console: renderConsole }: { call?: R
   // Evaluation shows only the published benchmarks bundled with the page, so it needs no sign-in
   // (LAB-1533), and it still opens when the account can't be read.
   if (renderConsole && !account?.authenticated && (account || error) && consoleSectionOf(hash) === "evaluation") return <PublicEvaluation loginUrl={account?.login_url || LOGIN} hash="#evaluation" />;
+  // Text and Chat run for guests on the shared default policy; its Images tab asks to sign in (LAB-1812).
+  // A session that ended on this page still says so.
+  if (guest && section === "playground" && account && !wasSignedIn) return guest({ account, error, refresh, call });
   if (section && account) return <SignedOutConsole section={section} hash={hash} loginUrl={account.login_url || LOGIN} expired={wasSignedIn} />;
   // Back from sign-in: wait for the account rather than flash the public page.
   if (renderConsole && !account && !error && hash !== "" && !SITE_HASHES.has(hash) && hash !== "#account") return <p role="status" className="p-6 text-sm text-muted">Opening your console…</p>;
-  return <HostedContent call={call} account={error ? null : account} accountError={error} refresh={refresh} console={Boolean(renderConsole)} />;
+  return <HostedContent call={call} account={error ? null : account} accountError={error} refresh={refresh} console={Boolean(renderConsole)} guestPlayground={Boolean(guest && renderConsole)} />;
 }
 
-function HostedContent({ call, account, accountError, refresh, console: hasConsole }: { call: Requester; account: Account | null; accountError: string; refresh: () => Promise<void>; console: boolean }) {
+function HostedContent({ call, account, accountError, refresh, console: hasConsole, guestPlayground }: { call: Requester; account: Account | null; accountError: string; refresh: () => Promise<void>; console: boolean; guestPlayground: boolean }) {
   const [language, setLanguage] = useState<Language>("en");
   const [result, setResult] = useState<DemoResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -122,6 +128,9 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
   const ownConnection = signedIn && sponsoredOff ? account?.connections[0] : undefined;
   const needsKey = signedIn && sponsoredOff && !ownConnection;
   const canRun = guestLive || (signedIn && !needsKey);
+  // A guest can mask their own text in the Playground, and chat there when free runs are on (LAB-1812).
+  const guestOwnText = guestPlayground && Boolean(account) && !signedIn;
+  const guestPerDay = account?.limits.requests_per_day;
   // The model's name comes from the server (`included_model`), never from this page (LAB-1466).
   const model = account?.included_model ? modelName(account.included_model) : null;
   const modelOr = (fallback: string) => model ?? fallback;
@@ -218,7 +227,13 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <dl aria-label="Measured results" className="grid grid-cols-3 gap-3 sm:gap-6">{PROOF.map((p) => <Metric key={p.label} size="hero" label={<><span className="sm:hidden">{p.short}</span><span className="max-sm:hidden">{p.label}</span></>} value={p.value} hint={p.hint} />)}</dl>
             <p className="text-xs text-muted">{MEASURED} · compared with the open-source tools Presidio, PrivAiTe and LLM Guard · <a className={[link, "whitespace-nowrap"].join(" ")} href={`${DOCS}/benchmarks.md`}>All results ↗</a></p>
           </div>
-          <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>
+          {guestOwnText ? (
+            // A guest's first step is their own text (LAB-1814); the fixed demo stays one press away.
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#playground/text">Try it with your own text</ButtonLink><ButtonLink href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><a className={[link, "text-sm"].join(" ")} href={SELF_HOST}>Self-host it ↗</a></div>
+              <p className="text-xs text-muted">No sign-in{typeof guestPerDay === "number" ? <> · <span className="tabular-nums">{guestPerDay}</span> free requests a day</> : null} · text{sponsoredOff ? "" : " and chat"}</p>
+            </div>
+          ) : <div className="flex flex-wrap items-center gap-3"><ButtonLink variant="primary" href="#demo" onClick={heroRun}>{heroCta}</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></div>}
           <ul aria-label="Proof" className="flex max-w-2xl flex-wrap gap-x-4 gap-y-0.5 border-t border-line pt-4 text-xs text-muted">
             <ProofItem href={HARNESS_REPORT}>Tested with {HARNESS.agents.length} real coding agents</ProofItem>
             <ProofItem href={`${DOCS}/benchmarks.md#run-log`}>{RUNS.label} committed benchmark runs</ProofItem>
@@ -259,6 +274,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
             <div className="basis-full sm:basis-auto sm:self-center"><Badge tone={badge.tone}>{badge.text}</Badge></div>
             {canRun && !running && !quota && <p className="w-full text-xs text-muted sm:w-auto sm:self-center">{ownConnection ? <>Runs through your {providerLabel(ownConnection.provider)} connection.{hasConsole && <> <a className={link} href="#connect">Change it in Connect</a></>}</> : <>Runs on {modelOr("Meta’s model")} · no key needed{account && runsLeft(account) && <> · <span className="tabular-nums">{runsLeft(account)}</span></>}</>}</p>}
           </div>
+          {guestOwnText && <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4"><ButtonLink href="#playground/text">Now try your own text →</ButtonLink><p className="text-xs text-muted">No account needed: mask a document{sponsoredOff ? "" : ` or chat with ${modelOr("the included model")}`} in the Playground.</p></div>}
           <div className="mt-4 space-y-3 empty:hidden">
             {account && !signedIn && sponsoredOff && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={loginUrl}>Sign in to run your own text</ButtonLink>}>The recorded run below shows the same flow, answered by a real model.</Notice>}
             {needsKey && <Notice title="Free runs are paused right now" action={<ButtonLink variant="primary" href={hasConsole ? "#connect" : "#account"}>Add a model key</ButtonLink>}>Add your own model key to run it, or follow the recorded run below.</Notice>}
@@ -305,10 +321,10 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <MetaModel stage="Runtime detection" name="XLM-RoBERTa" where="Inside PII Guard, CPU" role={<>The NER component used for hosted fast text detection, alongside validated rules. Rules-only configurations are also available. <a className={link} href={NER_MODEL}>Published ↗</a></>} />
           <MetaModel stage="Training only" name="Muse Glimmer 30B" where="Open weights, served on Modal" role="The teacher: it labeled 4,964 fictional documents, and our NER was distilled from its labels." />
           <MetaModel stage="Optional remote audit" name="Muse Spark Open" where="Open weights, on Baseten" role="The opt-in audit detector receives originals. It also supports red-team evaluation that tries to re-identify masked text." />
-          <MetaModel stage="Image processing" name="SAM 3.1" where="Self-hosted installs" role="Finds signatures on scans, so they’re masked along with faces and ID photos." />
+          <MetaModel stage="Image processing" name="SAM 3.1" where="Meta Model API" role="Finds faces, ID photos and signatures on scans so they’re masked. It receives the original image." />
           <MetaModel stage="Downstream generation" name={modelOr("Muse Spark")} where="Meta Model API" role="Answers in this demo after masking. Detection can miss values; inspect the masked request before relying on it." />
         </ul>
-        <p className="text-sm text-muted">The hosted preview uses local image detectors rather than SAM. <a className={link} href="#trust">Check the hosted trust boundary</a> before choosing remote detection.</p>
+        <p className="text-sm text-muted">Only Meta models run by default. Images go to SAM 3.1 on the Meta Model API. <a className={link} href="#trust">Check the hosted trust boundary</a> before uploading one.</p>
       </section>
     ),
     europe: (
@@ -336,7 +352,7 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
       <section id="images" aria-labelledby="images-heading" className="scroll-mt-20 space-y-6">
         <SectionHead id="images-heading" eyebrow="Images" title="Images too: faces blocked, ID details tokenized." lead="Text-only gateways pass screenshots and scans through untouched. PII Guard blocks faces and ID photos and covers each printed detail with a placeholder, the same one that person gets in your text, so the model can still answer." />
         <RecordedImageExample />
-        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a model, with faces, ID photos and signatures found on the server itself. The recorded specimens keep signatures and stamps visible; current project policies can choose to mask detected signatures. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
+        <p className="max-w-3xl text-xs text-muted">Through the gateway, the model receives the masked image and its masked transcript. This hosted preview masks images and returns them to you, never to a downstream model. SAM 3.1 on the Meta Model API finds faces, ID photos and signatures, so the original image is sent to Meta for that. The recorded specimens keep signatures and stamps visible; current project policies can choose to mask detected signatures. {signedIn && hasConsole ? <a className={link} href="#playground/images">Try your own image in the Playground</a> : <><a className={link} href={loginUrl}>Sign in</a> to try your own image.</>}</p>
         <div aria-labelledby="images-proof-heading" role="group" className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 border-y border-line py-5 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,1fr))]">
           <div className="min-w-0">
             <h3 id="images-proof-heading" className="text-sm font-medium text-ink">Measured on images</h3>
@@ -384,11 +400,11 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
           <div className="grid grid-cols-[minmax(0,1fr)] gap-x-10 gap-y-2 lg:grid-cols-2">
             <div><h3 className="mb-3 text-sm font-medium text-ink">Processing and access</h3><KeyValues items={[
               { label: "Where", value: "Microsoft Azure, Sweden Central (EU). Processed in memory. No content archive, and no backup of the mappings. Azure operators can access process memory." },
-              { label: "As a guest", value: `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
+              { label: "As a guest", value: guestPlayground ? `On this page a fixed, fictional sample is masked. In the Playground you can type your own text: PII Guard receives it in full and masks it with the shared default policy; in Chat only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` : `You can’t type anything. A fixed, fictional sample is masked here, and only the masked version goes to ${modelOr("Meta’s model")}, when free runs are on.` },
               { label: "Signed in", value: `Google receives your sign-in (name, email, profile). PII Guard receives your text in full; only the masked text goes to ${modelOr("Meta’s model")} or to the provider you connect.` },
             ]} /></div>
             <div><h3 className="mb-3 text-sm font-medium text-ink">Images, retention and provider</h3><KeyValues items={[
-              { label: "Images", value: "Signed in only. Faces, ID photos and signatures are detected locally; your project policy decides mask or keep. Stamps cannot be detected, so a policy requiring stamp masking refuses the image. Images are processed in memory, returned to you, and never stored or sent to a model." },
+              { label: "Images", value: "Signed in only. The original image is sent to SAM 3.1 on the Meta Model API, which finds faces, ID photos, signatures and stamps; your project policy decides mask or keep. Images are processed in memory, returned to you, and never stored or sent to a downstream model." },
               { label: "How long", value: "Placeholder mappings expire after 1 hour without use. Your last 50 masked requests are kept in memory for your activity log. A restart clears both. Expiry makes them unavailable; it doesn’t prove the memory is erased." },
               { label: "What Meta receives", value: <>The request after masking; missed values can remain. The <a className={link} href={META_TERMS}>Meta Model API terms ↗</a> exclude training on it (section 5.1) but allow retention as needed (section 4.4), and processing there isn’t guaranteed to stay in the EU.</> },
             ]} /></div>
@@ -420,9 +436,9 @@ function HostedContent({ call, account, accountError, refresh, console: hasConso
     ),
     account: (
       <section id="account" aria-labelledby="account-heading" className="scroll-mt-20 space-y-6">
-        <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={!account && accountError ? "The live service isn’t reachable right now. You can still self-host it, or come back to run the live demo." : signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : "No sign-in needed for the live demo. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address."} />
+        <SectionHead id="account-heading" eyebrow="Get started" title="Try it now. Connect your app when you’re ready." lead={!account && accountError ? "The live service isn’t reachable right now. You can still self-host it, or come back to run the live demo." : signedIn ? "You’re signed in. Your projects, endpoints, model connections and activity are in the console." : sponsoredOff ? "Free runs are paused right now. Sign in with Google to run your own text with your own model key, create projects and point your app at your own PII Guard address." : `No sign-in needed for the live demo${guestPlayground ? " or the Playground" : ""}. Sign in with Google to run your own text, create projects and point your app at your own PII Guard address.`} />
         <div className="flex flex-wrap items-center gap-3">
-          {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink><ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
+          {signedIn ? <>{hasConsole && <ButtonLink variant="primary" href="#overview">Open console</ButtonLink>}<ButtonLink variant="ghost" href={account?.logout_url || LOGOUT}>Sign out</ButtonLink></> : <>{startsRun && <ButtonLink variant="primary" href="#demo" onClick={heroRun}>Run the live demo ↑</ButtonLink>}<ButtonLink variant={startsRun ? "secondary" : "primary"} href={loginUrl}>Sign in with Google</ButtonLink>{guestOwnText && <ButtonLink href="#playground/text">Open the Playground</ButtonLink>}<ButtonLink href={SELF_HOST}>Self-host it ↗</ButtonLink></>}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Card title="Hosted console" subtitle="Try your own text and connect your app." headingLevel={3}><p className="text-muted">Manage projects, model connections and gateway endpoints in one place.</p><p className="mt-4 text-xs text-muted"><a className={link} href="#trust">Hosted processing and retention details</a></p></Card>

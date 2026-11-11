@@ -11,11 +11,18 @@ Resolution order (LAB-1192, ``docs/models.md``), first match wins:
    :data:`PREVIOUS_PUBLISHED`'s revision (``<repo>@95f612a9...``) rolls back to v2.0 with its
    weights still checked.
 3. **Public fallback**: :data:`PUBLIC_FALLBACK`, a public multilingual PII token classifier
-   (Apache-2.0), pinned to a hub revision. A stop-gap until the published checkpoint exists:
-   it leaks little but over-masks (about 23 % on en-smoke). ``PII_GUARD_NER_FALLBACK`` decides
-   what happens when it is not in the cache yet: ``download`` (default) fetches it on first
-   use, ``cached`` uses it only if it is already there, ``off`` never uses it (fast mode is
-   then rules only). Only ``download`` fetches anything, a pinned published model included.
+   (Apache-2.0, not a Meta model), pinned to a hub revision. Optional and off by default
+   (Meta-only runtime, ADR 0015, LAB-1795): it leaks little but over-masks (about 23 % on
+   en-smoke). ``PII_GUARD_NER_FALLBACK`` decides:
+
+   - ``published`` (default): the published checkpoint is fetched on first use; the public
+     fallback is never used, so fast mode is rules only when there is no published model
+     (the startup line says so).
+   - ``download``: as ``published``, and the public fallback is fetched on first use too
+     (opt-in).
+   - ``cached``: nothing is fetched; either model is used only if it is already there.
+   - ``off``: nothing is fetched and the fallback is never used (rules only unless the
+     published model is cached).
 
 Pinned models are fetched with ``huggingface_hub.snapshot_download`` at their revision, only the
 files the detector reads, into ``$PII_GUARD_MODELS_DIR/ner/<repo>-<revision>`` (default
@@ -45,6 +52,7 @@ from typing import Literal
 from pii_guard.types import DetectionError
 
 __all__ = [
+    "DEFAULT_FALLBACK",
     "FALLBACK_ENV_VAR",
     "NER_DEPS_MISSING",
     "PREVIOUS_PUBLISHED",
@@ -67,7 +75,9 @@ MODEL_ENV_VAR = "PII_GUARD_NER_MODEL"
 REVISION_ENV_VAR = "PII_GUARD_NER_REVISION"
 PUBLISHED_ENV_VAR = "PII_GUARD_NER_PUBLISHED_MODEL"
 FALLBACK_ENV_VAR = "PII_GUARD_NER_FALLBACK"
-FALLBACK_MODES = ("download", "cached", "off")
+FALLBACK_MODES = ("published", "download", "cached", "off")
+#: The default (ADR 0015): the published Meta fine-tune only, never the public fallback.
+DEFAULT_FALLBACK = "published"
 #: Why the NER can't run when torch/transformers don't import. They are core dependencies
 #: (LAB-1733); the rules-only base Docker image skips them on purpose.
 NER_DEPS_MISSING = (
@@ -267,28 +277,34 @@ def resolve(
         return NerChoice(
             "configured", model, revision or _env(env, REVISION_ENV_VAR) or None, ready=True
         )
-    mode = (fallback or _env(env, FALLBACK_ENV_VAR) or "download").lower()
+    mode = (fallback or _env(env, FALLBACK_ENV_VAR) or DEFAULT_FALLBACK).lower()
     if mode not in FALLBACK_MODES:
         raise ValueError(f"{FALLBACK_ENV_VAR} must be one of {FALLBACK_MODES}")
     candidates: list[tuple[Source, PinnedModel]] = []
     pub = _published((published or _env(env, PUBLISHED_ENV_VAR)).strip())
     if pub is not None:
         candidates.append(("published", pub))
-    if mode != "off":
+    if mode in {"download", "cached"}:
         candidates.append(("fallback", PUBLIC_FALLBACK))
     for source, pinned in candidates:
         ready = pinned.is_ready(base)
-        if ready or mode == "download":
+        fetch = mode == "download" or (mode == "published" and source == "published")
+        if ready or fetch:
             return NerChoice(
                 source,
                 str(pinned.local_dir(base)),
                 None,
                 pinned,
                 ready=ready,
-                may_download=not ready and mode == "download",
+                may_download=not ready and fetch,
             )
     if mode == "off":
         reason = f"no NER model configured and {FALLBACK_ENV_VAR}=off"
+    elif mode == "published":
+        reason = (
+            "no published pii-guard model pinned and the public fallback is off "
+            f"({FALLBACK_ENV_VAR}=published)"
+        )
     else:
         reason = f"public fallback not downloaded and {FALLBACK_ENV_VAR}=cached"
     return NerChoice("none", None, reason=reason)

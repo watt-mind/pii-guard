@@ -174,17 +174,20 @@ def test_hosted_validation_is_strict_and_preflight_has_no_credentials(management
     )
     assert valid["provider"] == "openai"
     assert checked == ["https://api.openai.com/v1"]
-    # Visual types are mask or keep (LAB-1444); hosted detection is on-device only.
+    # Visual types are mask or keep (LAB-1444); hosted policies default to SAM 3.1 and use
+    # the replica's segmenter whatever they say (ADR 0015).
     visual = client.post(
         f"{prefix}/policies", json={"name": "Visual", "entity_policies": {"FACE": "keep"}}
     )
     assert visual.status_code == 201
     assert visual.json()["entity_policies"]["FACE"] == "keep"
-    assert visual.json()["visual_detection"] == "local"
+    assert visual.json()["visual_detection"] == "sam"
+    remote = client.post(f"{prefix}/policies", json={"name": "Remote", "visual_detection": "sam"})
+    assert remote.status_code == 201
     for refused in (
         {"name": "Blocked", "entity_policies": {"SIGNATURE": "block"}},
-        {"name": "Remote", "visual_detection": "sam"},
         {"name": "Unknown", "visual_detection": "cloud"},
+        {"name": "Audit", "mode": "audit"},
     ):
         assert client.post(f"{prefix}/policies", json=refused).status_code == 422
     secret = "synthetic-credential-must-not-echo"  # noqa: S105 - fictional test value

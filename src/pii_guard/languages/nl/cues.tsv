@@ -1,0 +1,65 @@
+# Cue words for context-cued numbers (languages/cues.py; docs/languages.md); format in
+# hu/cues.tsv. Dutch writes compounds as one word: a trailing "*" covers the compounds and
+# plurals that keep the stem (telefoonnummer, rekeningnummers). Matching ignores case and
+# accents, and a space also matches a hyphen or nothing ("BSN-nummer", "sofi-nummer").
+telefoon*	PHONE
+tel.	PHONE
+mobiel*	PHONE
+mobieltje	PHONE
+gsm	PHONE
+vaste lijn	PHONE
+bel	PHONE
+bellen	PHONE
+rekeningnummer*	BANK_ACCOUNT
+bankrekening*	BANK_ACCOUNT
+rekeningnr.	BANK_ACCOUNT
+creditcard*	BANK_ACCOUNT
+pasnummer*	BANK_ACCOUNT
+kaartnummer*	BANK_ACCOUNT
+BSN	ID_DOCUMENT
+BSN nummer	ID_DOCUMENT
+burgerservicenummer*	ID_DOCUMENT
+burger service nummer	ID_DOCUMENT
+sofinummer*	ID_DOCUMENT
+sofi nr.	ID_DOCUMENT
+persoonsnummer*	ID_DOCUMENT
+paspoort*	ID_DOCUMENT
+identiteitskaart*	ID_DOCUMENT
+identiteitsbewijs*	ID_DOCUMENT
+ID-kaart*	ID_DOCUMENT
+rijbewijs*	ID_DOCUMENT
+documentnummer*	ID_DOCUMENT
+verblijfsdocument*	ID_DOCUMENT
+verblijfsvergunning*	ID_DOCUMENT
+vreemdelingennummer*	ID_DOCUMENT
+zorgpas*	ID_DOCUMENT
+# Numbers that are not personal data: orders, invoices, customers, references, payment
+# references, files and the company register (KvK, btw). Each ends the window, so
+# "telefoon- of bestelnummer 4500123456" stays unmasked.
+bestelnummer*	-
+bestelling*	-
+ordernummer*	-
+factuurnummer*	-
+factuur*	-
+creditnota*	-
+klantnummer*	-
+klantnr.	-
+kenmerk*	-
+betalingskenmerk*	-
+referentie*	-
+dossiernummer*	-
+zaaknummer*	-
+artikelnummer*	-
+zendingnummer*	-
+track and trace*	-
+KvK*	-
+handelsregister*	-
+# Not a bare "btw": in English chat it is "by the way".
+btw nummer*	-
+btw id	-
+postcode	-
+bedrag*	-
+totaal	-
+# Not "en" (and) or "of" (or): every pack's cues run for every text, and "en" is the
+# French and Spanish "in", "of" the English "of", which often stand between a cue and its
+# value ("phone number of the office 020 ...", "téléphone en cas d'urgence ...").

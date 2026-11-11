@@ -1,0 +1,42 @@
+# Field captions on Italian identity documents and forms (visual/captions.py): the carta
+# d'identità elettronica, the paper ID card, the passport and the tessera sanitaria.
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours).
+Cognome	PERSON
+Nome	PERSON
+Nome e cognome	PERSON
+Cognome e nome	PERSON
+Luogo e data di nascita	DATE_OF_BIRTH
+Data di nascita	DATE_OF_BIRTH
+Luogo di nascita	ADDRESS
+Comune di nascita	ADDRESS
+Indirizzo di residenza	ADDRESS
+Residenza	ADDRESS
+Indirizzo	ADDRESS
+Codice fiscale	ID_DOCUMENT
+Numero documento	ID_DOCUMENT
+Numero carta	ID_DOCUMENT
+Passaporto N.	ID_DOCUMENT
+N. passaporto	ID_DOCUMENT
+Numero identificazione tessera	ID_DOCUMENT
+Estremi atto di nascita	ID_DOCUMENT
+Telefono	PHONE
+E-mail	EMAIL
+Sesso	-
+Statura	-
+Cittadinanza	-
+Stato civile	-
+Professione	-
+Capelli	-
+Occhi	-
+Segni particolari	-
+Emissione	-
+Data di emissione	-
+Data di rilascio	-
+Scadenza	-
+Data di scadenza	-
+Comune di	-
+Autorità	-
+Firma del titolare	-
+Tipo	-
+Codice Paese	-

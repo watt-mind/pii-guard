@@ -6,6 +6,9 @@
   [ADR 0013](0013-one-console-owner-scoped-api.md) (hosted `images` capability)
 - **Builds on:** [ADR 0006](0006-fail-closed.md)
 - **Amended:** 2026-10-29 (LAB-1444): on-device signatures; visual actions in project policies
+- **Overridden in part:** 2026-11-02 by [ADR 0015](0015-meta-only-runtime-defaults.md) (LAB-1795):
+  hosted images now use SAM 3.1 on the Meta Model API by default; the on-device segmenter is
+  opt-in (`PII_GUARD_SEGMENTER=local`)
 
 ## Context
 

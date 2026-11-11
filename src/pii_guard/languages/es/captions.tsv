@@ -1,0 +1,38 @@
+# Field captions on Spanish identity documents and forms (visual/captions.py).
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours).
+Apellidos	PERSON
+Primer apellido	PERSON
+Segundo apellido	PERSON
+Nombre	PERSON
+Nombre y apellidos	PERSON
+Hijo/a de	PERSON
+Titular	PERSON
+Fecha de nacimiento	DATE_OF_BIRTH
+Lugar de nacimiento	ADDRESS
+Domicilio	ADDRESS
+Dirección	ADDRESS
+DNI	ID_DOCUMENT
+Núm. DNI	ID_DOCUMENT
+NIF	ID_DOCUMENT
+NIE	ID_DOCUMENT
+Núm. soporte	ID_DOCUMENT
+Número de soporte	ID_DOCUMENT
+Pasaporte n.º	ID_DOCUMENT
+Número de pasaporte	ID_DOCUMENT
+Número de documento	ID_DOCUMENT
+Número de la Seguridad Social	ID_DOCUMENT
+Teléfono	PHONE
+Correo electrónico	EMAIL
+Sexo	-
+Nacionalidad	-
+Válido hasta	-
+Fecha de expedición	-
+Fecha de caducidad	-
+Fecha de validez	-
+Emisión	-
+Autoridad	-
+Equipo	-
+Firma del titular	-
+Tipo	-
+Código del país	-

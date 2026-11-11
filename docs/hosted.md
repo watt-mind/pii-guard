@@ -11,14 +11,22 @@ service has passed review. Start with internal ingress and zero sponsored budget
 |---|---|---|---|
 | Anonymous walkthrough | Curated server-owned HU/EN synthetic sample; local rules and CPU NER | Masked sample to sponsored Meta, only when budget permits | Public; sample IDs only |
 | Signed-in editable text | Azure hosted service receives original text; local rules and CPU NER | Masked text to configured sponsored Meta or approved BYOK destination | Google identity or owner API key; owner-scoped vault |
-| Signed-in images | Azure hosted service receives the original image in memory; local Tesseract OCR, on-device face/ID-photo detector, local rules and CPU NER; never stored | None: the masked image returns to the owner | Google identity only (no API keys, no guests); owner-scoped vault |
+| Signed-in images | Azure hosted service receives the original image in memory and sends it to SAM 3.1 on the Meta Model API for faces, ID photos and signatures and to Muse Spark Open on Baseten, which reads its text (ADR 0016); local rules and CPU NER check that text; never stored | None: the masked image returns to the owner | Google identity only (no API keys, no guests); owner-scoped vault |
 | BYOK | The service receives the provider key and configured endpoint | Masked input, key sent only to that approved public HTTPS destination | Signed-in owner; the endpoint credential is encrypted in project configuration (see [projects](projects.md)) |
 | Self-hosted | Original input stays in the operator's chosen guard/detector infrastructure | Masked input to the operator's provider | The operator controls access and retention |
 
-Hosted images are processed on the replica only ([ADR 0014](decisions/0014-hosted-local-images.md)):
-no SAM, no remote detector, no image spend. Faces and ID photos are found by YuNet and
-signatures by the pinned YOLOS-tiny detector, both on the CPU; the owner's project policy decides
-what is masked (LAB-1444). Nothing local finds stamps, so a policy that masks `STAMP` is refused.
+Hosted images go to the Meta Model API ([ADR 0015](decisions/0015-meta-only-runtime-defaults.md),
+which overrides [ADR 0014](decisions/0014-hosted-local-images.md)'s on-device rule): SAM 3.1
+finds faces, ID photos, signatures and stamps, with the same Key Vault Meta key the sponsored
+route uses. Only Meta models run by default. Without the key `/readyz` fails and images are
+refused; nothing falls back to a non-Meta model. The owner's project policy decides what is
+masked (LAB-1444); its `visual_detection` is not read on hosted, because the replica's segmenter
+serves every policy. The daily image counts bound the SAM spend (about 5 SAM requests per
+image); there is no separate per-image SAM reservation. The non-Meta on-device engines (YuNet for
+faces and ID photos, the pinned YOLOS-tiny signature detector) stay available as an opt-in:
+build with `--build-arg PII_GUARD_ON_DEVICE_VISION=true` and set `PII_GUARD_SEGMENTER=local`.
+Then no image leaves the replica, and a policy that masks `STAMP` is refused (nothing on the
+device finds stamps).
 Document uploads (PDF/DOCX) and remote LLM detection are outside the initial scope. A remote detector
 is different from downstream generation: it receives originals. Never enable one without an
 explicitly approved trust boundary and terms review. See [models](models.md) and LAB-1139 for
@@ -194,8 +202,10 @@ startup characteristics and is not subject to the self-hosted image's 650 MB OCR
 | `PII_GUARD_HOSTED_PROJECT_CONTAINER` | `project-configuration`; fixed `<environment>.projects.v1.enc` snapshot |
 | `PII_GUARD_HOSTED_PROJECT_ENVIRONMENT` | `dev` or `prod`; separate account, identity and stable tenant key |
 | `PII_GUARD_HOSTED_PROJECT_MANAGED_IDENTITY_CLIENT_ID` | The environment runtime identity's client ID |
-| `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires Tesseract and the on-device segmenter |
-| `PII_GUARD_SEGMENTER` | `local` (image default); `hybrid`/`sam-api`/`off` refuse startup while hosted images are on |
+| `PII_GUARD_HOSTED_IMAGES` | Default `true`: signed-in image masking; `/readyz` then requires OCR (Muse Spark Open with `PII_GUARD_OCR_API_KEY`, or Tesseract when opted in) and the segmenter (SAM 3.1 with its key, or the opt-in on-device engines) |
+| `PII_GUARD_SEGMENTER` | `sam-api` (the default: SAM 3.1 on the Meta Model API, ADR 0015) or `local` (opt-in on-device engines, which need an image built with `PII_GUARD_ON_DEVICE_VISION=true`); `hybrid`/`off` refuse startup while hosted images are on |
+| `PII_GUARD_SAM_API_KEY` | The SAM 3.1 key; the release sets it from the `meta-key` Key Vault secret |
+| `PII_GUARD_OCR_ENGINE`, `PII_GUARD_OCR_API_KEY` | `muse` (the image's default, ADR 0016) needs a Baseten key; the release sets it from the `ocr-key` Key Vault secret (LAB-1802). `tesseract` needs an image built with `PII_GUARD_TESSERACT=true` |
 | `PII_GUARD_POLICY_OVERRIDES` | Unset: owners' project policies decide visual actions; an override set here wins when stricter |
 | `PII_GUARD_HOSTED_MAX_IMAGE_BYTES`, `PII_GUARD_HOSTED_IMAGE_MAX_PIXELS` | Defaults 4 MiB decoded and 8 MP, checked before OCR |
 | `PII_GUARD_HOSTED_IMAGE_TIMEOUT` | Default 60 s per image; one image job per replica, a busy replica answers `429` |
@@ -269,7 +279,8 @@ the selected subscription first if not already registered.
    on this vault; the runtime retains Secrets User access. Revoke temporary provisioning
    access when operational policy requires it.
 4. Set `HOSTED_IMAGE`, `HOSTED_PUBLIC_ORIGIN`, `GOOGLE_CLIENT_ID`, `META_KEY_SECRET_URI`,
-   `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`, `METRICS_TOKEN_SECRET_URI`. URI variables must refer to **versioned**
+   `TENANT_KEY_SECRET_URI`, `GOOGLE_SECRET_URI`, `METRICS_TOKEN_SECRET_URI`, `OCR_KEY_SECRET_URI`
+   (Baseten, for Muse Spark Open OCR). URI variables must refer to **versioned**
    secrets in the dedicated vault. No secret values enter the script. Run
    `deploy/azure/deploy.sh stage`; it validates and deploys internal ingress, Google Easy Auth,
    one replica in prod or zero to one in dev (LAB-1711), with one worker per replica, and waits boundedly for the latest revision to be admitted as ready. Verify application

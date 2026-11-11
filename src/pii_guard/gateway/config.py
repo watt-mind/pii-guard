@@ -4,7 +4,7 @@ These live here, not in ``pii_guard.config``, until the settings work (LAB-1095)
 
 | Env var | Field | Default |
 |---|---|---|
-| ``PII_GUARD_GATEWAY_MODE`` | ``mode`` (``fast`` or ``audit``) | ``fast`` |
+| ``PII_GUARD_GATEWAY_MODE`` | ``mode`` (``fast``, ``escalate`` or ``audit``) | ``fast`` |
 | ``PII_GUARD_GATEWAY_DETECTION_TIMEOUT`` | ``detection_timeout`` (s) | ``30`` |
 | ``PII_GUARD_GATEWAY_UPSTREAM_TIMEOUT`` | ``upstream_timeout`` (s, per read) | ``120`` |
 | ``PII_GUARD_GATEWAY_UPSTREAM_STREAM_TIMEOUT`` | ``upstream_stream_timeout`` (s) | ``600`` |
@@ -19,6 +19,12 @@ These live here, not in ``pii_guard.config``, until the settings work (LAB-1095)
 | ``PII_GUARD_GATEWAY_IMAGE_TIMEOUT`` | ``image_timeout`` (s, all images of a request) | ``120`` |
 | ``PII_GUARD_GATEWAY_KEEP_TYPES`` | ``keep_types`` (deprecated) | unset |
 | ``PII_GUARD_LLM_DETECTOR_REASONING_EFFORT`` | ``llm_reasoning_effort`` | unset |
+| ``PII_GUARD_GATEWAY_ESCALATE_WINDOW`` | ``escalate_window`` (chars each side) | ``200`` |
+| ``PII_GUARD_GATEWAY_ESCALATE_MAX_WINDOWS`` | ``escalate_max_windows`` (per text) | ``4`` |
+| ``PII_GUARD_GATEWAY_ESCALATE_MAX_TEXTS`` | ``escalate_max_texts`` (per request) | ``8`` |
+| ``PII_GUARD_GATEWAY_ESCALATE_LOW_SCORE`` | ``escalate_low_score`` (NER) | ``0.75`` |
+| ``PII_GUARD_GATEWAY_ESCALATE_TIMEOUT`` | ``escalate_timeout`` (s, per LLM call) | ``10`` |
+| ``PII_GUARD_GATEWAY_ESCALATE_ON_FAILURE`` | ``escalate_on_failure`` (mask, keep) | ``mask`` |
 
 Entity policies (mask / keep / block) come from ``PII_GUARD_POLICY_OVERRIDES`` in
 :class:`pii_guard.config.Settings`, shared with the REST API. ``PII_GUARD_GATEWAY_KEEP_TYPES``
@@ -36,7 +42,7 @@ from __future__ import annotations
 import logging
 import sys
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -51,6 +57,13 @@ logger = logging.getLogger("pii_guard.gateway")
 class Mode(StrEnum):
     """``fast`` (the default): rules + NER, local, nothing leaves the machine.
 
+    ``escalate``: fast, then only the spans fast mode is unsure about (low-confidence NER,
+    capitalised words next to a form of address or a name, numbers without a checksum or a
+    cue, rules-vs-NER type conflicts) go to the LLM detector, as small windows (about 200
+    characters each side) with every span already found masked. The LLM can only add spans
+    or settle a type; on a timeout or error the uncertain words are masked (fail closed).
+    Text with nothing uncertain makes no remote call (:mod:`pii_guard.detect.escalate`).
+
     ``audit``: the fast detectors + an LLM detector per message, waiting for both. A second
     opinion for sampled or offline quality checks, label generation and the benchmark upper
     bound, not the production path: it costs a remote call (about 2 s and $2.5-3 per 1k
@@ -58,6 +71,7 @@ class Mode(StrEnum):
     """
 
     FAST = "fast"
+    ESCALATE = "escalate"
     AUDIT = "audit"
 
     @classmethod
@@ -166,6 +180,26 @@ class GatewayConfig(BaseSettings):
     )
     llm_reasoning_effort: str | None = Field(
         default=None, validation_alias="PII_GUARD_LLM_DETECTOR_REASONING_EFFORT"
+    )
+    # Escalate mode (LAB-1766): which spans go to the LLM, how much text around them, and
+    # what a failed LLM call does.
+    escalate_window: int = Field(
+        default=200, ge=20, le=2000, validation_alias="PII_GUARD_GATEWAY_ESCALATE_WINDOW"
+    )
+    escalate_max_windows: int = Field(
+        default=4, ge=1, le=32, validation_alias="PII_GUARD_GATEWAY_ESCALATE_MAX_WINDOWS"
+    )
+    escalate_max_texts: int = Field(
+        default=8, ge=1, le=256, validation_alias="PII_GUARD_GATEWAY_ESCALATE_MAX_TEXTS"
+    )
+    escalate_low_score: float = Field(
+        default=0.75, ge=0.0, le=1.0, validation_alias="PII_GUARD_GATEWAY_ESCALATE_LOW_SCORE"
+    )
+    escalate_timeout: float = Field(
+        default=10.0, gt=0, validation_alias="PII_GUARD_GATEWAY_ESCALATE_TIMEOUT"
+    )
+    escalate_on_failure: Literal["mask", "keep"] = Field(
+        default="mask", validation_alias="PII_GUARD_GATEWAY_ESCALATE_ON_FAILURE"
     )
 
     @field_validator("keep_types", mode="before")

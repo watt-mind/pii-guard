@@ -58,6 +58,8 @@ FORGED = [
 
 
 FORGED_MARKER = b"synthetic-forged"
+# The raw email the mask check sends; a guest answer must never carry it back.
+MASK_SECRET = b"jane.placeholder@example.com"
 GUEST_COOKIE = "__Host-pii-guard-guest"
 DEMO_KEYS = frozenset(
     {"sample_id", "language", "original", "masked", "answer", "restored", "entities", "session_id"}
@@ -154,6 +156,45 @@ def guest_demo(send: Send, reply: Reply, forged: list[tuple[str, str]]) -> dict[
     return facts
 
 
+def guest_work(
+    send: Send, reply: Reply, forged: list[tuple[str, str]], secret: bytes
+) -> dict[str, Any]:
+    """Guest Playground semantics for mask or chat sent with a forged identity (LAB-1813).
+
+    Refusal passes. A served call passes only as an anonymous guest: no identity in the body, the
+    forged marker never reflected, the probe's raw email never echoed, and the returned guest
+    cookie still reads as anonymous with and without the forged headers.
+    """
+    if reply.status in {400, 401, 403, 404, 429, 503}:
+        return {"path": "refused", "ok": True}
+    data = as_json(reply.raw)
+    cookie = guest_cookie(reply.set_cookies)
+    facts: dict[str, Any] = {
+        "path": "guest",
+        "identity_keys": sorted(IDENTITY_KEYS & data.keys()),
+        "guest_cookie": cookie is not None,
+        "reflected": FORGED_MARKER in reply.raw
+        or any(FORGED_MARKER in c.encode() for c in reply.set_cookies),
+        "echoed_secret": secret in reply.raw,
+    }
+    accounts: list[bool] = []
+    if cookie is not None:
+        for extra in ([], forged):
+            accounts.append(
+                anonymous_account(send("GET", "/v1/account", [*extra, ("Cookie", cookie)], None))
+            )
+    facts["account_anonymous"] = accounts
+    facts["ok"] = (
+        reply.status == 200
+        and not facts["identity_keys"]
+        and facts["guest_cookie"]
+        and not facts["reflected"]
+        and not facts["echoed_secret"]
+        and accounts == [True, True]
+    )
+    return facts
+
+
 def main(argv: list[str] | None = None, send: Send | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     base = urllib.parse.urlsplit(argv[0] if argv else "")
@@ -173,7 +214,7 @@ def main(argv: list[str] | None = None, send: Send | None = None) -> int:
         ("forged-principal", "GET", "/v1/account", FORGED[:1], None, "anonymous"),
         ("forged-status", "GET", "/v1/status", FORGED, None, "refused"),
         ("forged-projects", "GET", "/v1/projects", FORGED, None, "refused"),
-        ("forged-mask", "POST", "/v1/mask", FORGED + same, mask, "refused"),
+        ("forged-mask", "POST", "/v1/mask", FORGED + same, mask, "guest-work"),
         ("forged-keys", "GET", "/v1/account/api-keys", FORGED, None, "refused"),
         (
             "forged-key-create",
@@ -183,7 +224,7 @@ def main(argv: list[str] | None = None, send: Send | None = None) -> int:
             b'{"name":"x"}',
             "refused",
         ),
-        ("forged-chat", "POST", "/v1/chat/completions", FORGED + same, chat, "refused"),
+        ("forged-chat", "POST", "/v1/chat/completions", FORGED + same, chat, "guest-work"),
         ("forged-demo", "POST", "/v1/demo", FORGED + same, demo, "guest-demo"),
         (
             "forged-guard-key",
@@ -280,6 +321,9 @@ def main(argv: list[str] | None = None, send: Send | None = None) -> int:
         extra: dict[str, Any] = {}
         if expect == "guest-demo":
             extra = guest_demo(send, reply, FORGED)
+            ok = extra.pop("ok")
+        elif expect == "guest-work":
+            extra = guest_work(send, reply, FORGED, MASK_SECRET)
             ok = extra.pop("ok")
         else:
             ok = {

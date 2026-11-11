@@ -198,7 +198,7 @@ def test_image_limits() -> None:
         ({"type": "input_image", "file_id": "file_0"}, "file_id"),
         (image_part(data_url(png()), file_id="file_0"), "file_id"),
         ({"type": "input_image", "image_url": {"url": data_url(png())}}, "inline data URL"),
-        (image_part(data_url(png()), extra=1), "extra"),
+        (image_part(data_url(png()), extra=1), "unsupported input_image part field"),
         (image_part(data_url(b"GIF89a-not-a-png")), "not a PNG or JPEG"),
         ({"type": "input_file", "file_data": "data:application/pdf;base64,AAAA"}, "input_file"),
         ({"type": "input_audio", "input_audio": {"data": "AAAA", "format": "wav"}}, "input_audio"),

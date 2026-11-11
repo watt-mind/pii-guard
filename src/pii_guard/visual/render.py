@@ -2,14 +2,14 @@
 
 An opaque box hides a value and says nothing; the upstream model sees a black rectangle and
 can't connect the card to anything else in the conversation. Here a covered region is filled
-with a neutral box (:data:`LABEL_FILL`, with a border) and the session placeholder is printed
+with a neutral box (:data:`LABEL_FILL`, with a light border) and the session placeholder is printed
 in it (``[[PERSON_a1b2c3]]``; ``PHOTO · [[PERSON_a1b2c3]]`` on a portrait), so the model can
 read which value was there, and the same person has the same placeholder in the image, the
 transcript and the text of the conversation.
 
 Coverage is exactly that of :func:`~pii_guard.visual.image.mask_image`: the same boxes grown
-by the same padding, every pixel overwritten (fill, border or label ink, never an original
-pixel), so visual recall does not depend on the mode. Only the label differs.
+by the same padding, every pixel overwritten (fill, border, hairline or label ink, never an
+original pixel), so visual recall does not depend on the mode. Only the label differs.
 
 A value box on a card is often narrower than its placeholder (``FIKTÍV`` vs
 ``[[PERSON_a1b2c3]]``). So that the label stays legible, a box is first **extended to the
@@ -32,6 +32,14 @@ to :data:`MIN_FONT_SIZE` at which it fits; if the bracketed placeholder is too w
 the brackets are dropped (``PERSON_a1b2c3``), then the label is split over two lines
 (``PERSON`` / ``a1b2c3``); a box too small for any of them is filled without a label (its
 placeholder is still in the transcript).
+
+Overlapping covers read as one shape (LAB-1804). OCR line boxes are often taller than the
+line, so stacked fields on a card (name, given names, date of birth) overlap by half a row.
+The border (:data:`LABEL_EDGE`) is drawn once around the union of the covers, never across
+another cover; a cover nested inside another keeps its own rectangle. Where two covers stack
+with a partial vertical overlap the overlap is split at its midpoint: each label is centred
+in its own band, a hairline (:data:`LABEL_RULE`) separates the bands, and the labels of one
+stack share a font size, the largest at which every one of them fits its band.
 """
 
 from __future__ import annotations
@@ -40,15 +48,17 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 
-from PIL import ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from pii_guard.types import MaskingError
 from pii_guard.visual.image import encode_image, load_image
 from pii_guard.visual.regions import Box, same_value
 
 __all__ = [
+    "LABEL_EDGE",
     "LABEL_FILL",
     "LABEL_INK",
+    "LABEL_RULE",
     "LEGIBLE_FONT_SIZE",
     "MIN_FONT_SIZE",
     "LabelBox",
@@ -58,8 +68,12 @@ __all__ = [
 
 #: The box fill: a light neutral grey, distinct from paper white and from ink.
 LABEL_FILL: tuple[int, int, int] = (226, 228, 232)
-#: Border and text colour.
+#: Text colour.
 LABEL_INK: tuple[int, int, int] = (32, 36, 44)
+#: Border colour, drawn once around each group of overlapping covers.
+LABEL_EDGE: tuple[int, int, int] = (150, 154, 162)
+#: Hairline between the bands of covers that stack with a partial overlap.
+LABEL_RULE: tuple[int, int, int] = (196, 199, 205)
 #: Smallest font size (px) a label is drawn at.
 MIN_FONT_SIZE = 8
 #: Font size a box is extended (to the right, into free space) to print its label at.
@@ -107,11 +121,16 @@ def _variants(label: str) -> list[list[str]]:
 
 
 def fit_label(
-    draw: ImageDraw.ImageDraw, label: str, width: int, height: int
+    draw: ImageDraw.ImageDraw,
+    label: str,
+    width: int,
+    height: int,
+    max_size: int = MAX_FONT_SIZE,
 ) -> tuple[list[str], int] | None:
-    """The lines and font size to print ``label`` in a ``width`` x ``height`` box, or ``None``."""
+    """The lines and font size (at most ``max_size``) to print ``label`` in a ``width`` x
+    ``height`` box, or ``None``."""
     for lines in _variants(label):
-        top = min(MAX_FONT_SIZE, int(height / (len(lines) * (1 + MARGIN))))
+        top = min(max_size, MAX_FONT_SIZE, int(height / (len(lines) * (1 + MARGIN))))
         for size in range(top, MIN_FONT_SIZE - 1, -1):
             margin = max(1, round(size * MARGIN))
             sizes = [_measure(draw, line, size) for line in lines]
@@ -249,22 +268,92 @@ def _padded_rects(
     return rects
 
 
-def _draw_box_label(
+Rect = tuple[int, int, int, int]
+
+
+def _stacks(rects: list[Rect | None], shown: list[int]) -> tuple[dict[int, Rect], list[Rect]]:
+    """Each shown cover's label band, and the hairlines between stacked covers.
+
+    Two covers *stack* when they overlap horizontally and one starts below the other's top
+    and ends below its bottom (a partial vertical overlap, not nesting). The overlap is split
+    at its midpoint: the upper band ends there, the lower one starts after it.
+    """
+    bands = {i: r for i in shown if (r := rects[i]) is not None}
+    rules: list[Rect] = []
+    for i in shown:
+        for j in shown:
+            a, b = rects[i], rects[j]
+            if a is None or b is None or i == j:
+                continue
+            if b[0] > a[2] or a[0] > b[2] or not a[1] < b[1] <= a[3] < b[3]:
+                continue  # b is not stacked below a
+            mid = (a[3] + b[1]) // 2
+            ba, bb = bands[i], bands[j]
+            bands[i] = (ba[0], ba[1], ba[2], min(ba[3], mid))
+            bands[j] = (bb[0], max(bb[1], mid + 1), bb[2], bb[3])
+            x1, x2 = max(a[0], b[0]), min(a[2], b[2])
+            inset = max(2, (x2 - x1) // 40)
+            if x2 - x1 > 2 * inset:
+                rules.append((x1 + inset, mid, x2 - inset, mid))
+    return bands, rules
+
+
+def _stack_groups(bands: dict[int, Rect], rects: list[Rect | None]) -> list[list[int]]:
+    """Shown covers grouped by stack (connected through a stacking overlap)."""
+    parent = {i: i for i in bands}
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i in bands:
+        for j in bands:
+            a, b = rects[i], rects[j]
+            if a is None or b is None or i == j:
+                continue
+            if not (b[0] > a[2] or a[0] > b[2]) and a[1] < b[1] <= a[3] < b[3]:
+                parent[root(j)] = root(i)
+    groups: dict[int, list[int]] = {}
+    for i in bands:
+        groups.setdefault(root(i), []).append(i)
+    return list(groups.values())
+
+
+def _draw_edges(
+    image: Image.Image, rects: list[Rect | None], suppressed: set[int], edge: tuple[int, int, int]
+) -> None:
+    """One border around the union of the covers; a nested cover keeps its own rectangle."""
+    width, height = image.size
+    union = Image.new("L", (width + 2, height + 2), 0)
+    shape = ImageDraw.Draw(union)
+    for rect in rects:
+        if rect is not None:
+            shape.rectangle((rect[0] + 1, rect[1] + 1, rect[2] + 1, rect[3] + 1), fill=255)
+    inner = union.filter(ImageFilter.MinFilter(3))
+    ring = union.crop((1, 1, width + 1, height + 1))
+    ring.paste(0, (0, 0), inner.crop((1, 1, width + 1, height + 1)))
+    image.paste(edge, (0, 0), ring)
+    draw = ImageDraw.Draw(image)
+    for index, rect in enumerate(rects):
+        if rect is None or index in suppressed or rect[2] - rect[0] < 3 or rect[3] - rect[1] < 3:
+            continue
+        if any(
+            other is not None and j != index and other != rect and _inside(rect, other)
+            for j, other in enumerate(rects)
+        ):
+            draw.rectangle(rect, outline=edge, width=1)
+
+
+def _draw_label(
     draw: ImageDraw.ImageDraw,
-    rect: tuple[int, int, int, int],
-    label: str | None,
-    suppressed: bool,
+    rect: Rect,
+    fitted: tuple[list[str], int],
     ink: tuple[int, int, int],
 ) -> None:
     x1, y1, x2, y2 = rect
     w, h = x2 - x1 + 1, y2 - y1 + 1
-    if not suppressed and w >= 4 and h >= 4:
-        draw.rectangle(rect, outline=ink, width=1)
-    if suppressed or not label:
-        return
-    fitted = fit_label(draw, label, w, h)
-    if fitted is None:
-        return
     lines, size = fitted
     font = _font(size)
     margin = max(1, round(size * MARGIN))
@@ -277,6 +366,34 @@ def _draw_box_label(
         y += lh + margin
 
 
+def _draw_labels(
+    draw: ImageDraw.ImageDraw,
+    items: list[LabelBox],
+    rects: list[Rect | None],
+    suppressed: set[int],
+    ink: tuple[int, int, int],
+) -> None:
+    shown = [i for i, r in enumerate(rects) if r is not None and i not in suppressed]
+    bands, rules = _stacks(rects, shown)
+    for rule in rules:
+        draw.line(rule, fill=LABEL_RULE, width=1)
+    for group in _stack_groups(bands, rects):
+        labelled = [i for i in group if items[i].label]
+        fits = {}
+        for i in labelled:
+            x1, y1, x2, y2 = bands[i]
+            fits[i] = fit_label(draw, items[i].label or "", x2 - x1 + 1, y2 - y1 + 1)
+        sizes = [f[1] for f in fits.values() if f is not None]
+        if len(sizes) > 1:
+            for i in labelled:
+                x1, y1, x2, y2 = bands[i]
+                label = items[i].label or ""
+                fits[i] = fit_label(draw, label, x2 - x1 + 1, y2 - y1 + 1, min(sizes))
+        for i, fitted in fits.items():
+            if fitted is not None:
+                _draw_label(draw, bands[i], fitted, ink)
+
+
 def render_labels(
     image_bytes: bytes,
     boxes: Iterable[LabelBox],
@@ -285,6 +402,7 @@ def render_labels(
     image_format: str = "PNG",
     fill: tuple[int, int, int] = LABEL_FILL,
     ink: tuple[int, int, int] = LABEL_INK,
+    edge: tuple[int, int, int] = LABEL_EDGE,
     obstacles: Iterable[Box] = (),
 ) -> LabelledImage:
     """Cover every box (grown by ``padding``, extended for its label, clipped to the image)
@@ -317,9 +435,8 @@ def render_labels(
         for rect in rects:
             if rect is not None:
                 draw.rectangle(rect, fill=fill)
-        for index, (item, rect) in enumerate(zip(items, rects, strict=True)):
-            if rect is not None:
-                _draw_box_label(draw, rect, item.label, index in suppressed, ink)
+        _draw_edges(image, rects, suppressed, edge)
+        _draw_labels(ImageDraw.Draw(image), items, rects, suppressed, ink)
         covered = [Box(*rect) if rect is not None else None for rect in rects]
         return LabelledImage(encode_image(image, image_format), covered)
     except Exception as exc:

@@ -23,6 +23,7 @@ What is masked:
 
 ``thinking.signature`` and ``redacted_thinking.data`` are forwarded untouched: they are the
 provider's own signed or encrypted reasoning from an earlier turn, produced from masked input.
+The gateway requires the exact blob to have been observed upstream in the same vault session.
 The masked thinking text is the text the model wrote (placeholders and all), so its signature
 still matches.
 
@@ -43,16 +44,19 @@ from pii_guard.gateway.request import (
     CollectedTexts,
     ImageSlot,
     InvalidChatRequestError,
+    OpaqueBlob,
     TextSlot,
     UnsupportedContentError,
     _check_json,
     _check_text,
     _collect_json,
     _collect_schema,
+    _collect_tool_output,
     _reject_unknown,
     _require_scalars,
     _setter,
     _text_slot,
+    remove_item,
 )
 
 __all__ = ["collect_message_texts"]
@@ -93,6 +97,8 @@ def collect_message_texts(body: object) -> CollectedTexts:
 
     ``POST /v1/messages/count_tokens`` takes the same body without ``max_tokens``/``stream``:
     this walks it too."""
+    out = CollectedTexts([], [])
+    out.check_structure(body)
     if not isinstance(body, dict):
         raise InvalidChatRequestError("request body must be a JSON object")
     if not isinstance(body.get("model"), str) or not body["model"]:
@@ -105,7 +111,6 @@ def collect_message_texts(body: object) -> CollectedTexts:
             )
     allowed = _TOP_SCALAR | _TOP_CHECKED | _TOP_WALKED | frozenset(_TOP_UPSTREAM)
     _reject_unknown(body, allowed, "", "request")
-    out = CollectedTexts([], [])
     _collect_messages(body, out)
     _collect_system(body, out)
     for key in _TOP_SCALAR:
@@ -199,9 +204,8 @@ def _block_type(
         raise InvalidChatRequestError(f"{where} must be an object")
     block_type = block.get("type")
     if not isinstance(block_type, str) or block_type not in allowed:
-        shown = block_type if isinstance(block_type, str) and len(block_type) <= 32 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: content blocks of type {shown!r} are not supported; the gateway masks "
+            f"{where}: unsupported content block type; the gateway masks "
             "text, inline images, tool use and results, and thinking, and does not forward "
             "what it cannot mask"
         )
@@ -241,15 +245,20 @@ def _collect_block(
         if not isinstance(thinking, str):
             raise InvalidChatRequestError(f"{where}.thinking must be a string")
         out.slots.append(_text_slot(block, "thinking", "reasoning"))
-        _opaque(block, "signature", where)
+        _opaque(block, "signature", where, out, content)
     else:  # redacted_thinking: the provider's encrypted reasoning, forwarded as is
-        _opaque(block, "data", where)
+        _opaque(block, "data", where, out, content)
 
 
-def _opaque(block: dict[str, Any], key: str, where: str) -> None:
+def _opaque(
+    block: dict[str, Any], key: str, where: str, out: CollectedTexts, content: list[Any]
+) -> None:
     value = block.get(key)
     if value is not None and not isinstance(value, str):
         raise InvalidChatRequestError(f"{where}.{key} must be a string")
+    if isinstance(value, str):
+        # Unverified, the whole block is dropped: signed thinking text is not forwarded alone.
+        out.opaque.append(OpaqueBlob(key, value, remove_item(content, block)))
 
 
 def _collect_text_block(block: dict[str, Any], where: str, out: CollectedTexts, kind: str) -> None:
@@ -264,7 +273,10 @@ def _collect_text_block(block: dict[str, Any], where: str, out: CollectedTexts, 
         raise UnsupportedContentError(
             f"{where}.citations: citations point into documents the gateway does not forward"
         )
-    out.slots.append(_text_slot(block, "text", kind))
+    if kind == "tool":
+        _collect_tool_output(block, "text", out)
+    else:
+        out.slots.append(_text_slot(block, "text", kind))
 
 
 def _collect_tool_result(block: dict[str, Any], where: str, out: CollectedTexts) -> None:
@@ -277,7 +289,7 @@ def _collect_tool_result(block: dict[str, Any], where: str, out: CollectedTexts)
     if content is None:
         return
     if isinstance(content, str):
-        out.slots.append(_text_slot(block, "content", "tool"))
+        _collect_tool_output(block, "content", out)
         return
     if not isinstance(content, list):
         raise InvalidChatRequestError(f"{where}.content must be a string or an array")
@@ -332,9 +344,8 @@ def _collect_one_tool(tool: Any, where: str, out: CollectedTexts) -> None:
         raise InvalidChatRequestError(f"{where} must be an object")
     tool_type = tool.get("type", "custom")
     if tool_type != "custom":
-        shown = tool_type if isinstance(tool_type, str) and len(tool_type) <= 40 else "unknown"
         raise UnsupportedContentError(
-            f"{where}: tools of type {shown!r} are not supported; server tools act upstream "
+            f"{where}: unsupported tool type; server tools act upstream "
             "on data the gateway never sees (client tools with an input_schema are)"
         )
     _reject_unknown(tool, _TOOL_KEYS, where, "tool")

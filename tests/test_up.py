@@ -25,6 +25,7 @@ from pii_guard.app_bundle import (
     Status,
     UpOptions,
     _banner,
+    _image_hints,
     active_detectors,
     create_bundle_app,
     image_gaps,
@@ -157,6 +158,7 @@ def test_without_ui_root_explains_how_to_get_it(tmp_path: Path) -> None:
     page = client.get("/")
     assert page.status_code == 200
     assert "no web UI bundled" in page.text
+    assert "--from wattmind-pii-guard pii-guard up" in page.text
     assert "make wheel" in page.text
     assert client.get("/healthz").status_code == 200
 
@@ -234,9 +236,32 @@ def test_launcher_names_the_distribution_with_extras() -> None:
 
 def test_image_gaps_lists_what_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("shutil.which", lambda _name: None)
-    gaps = image_gaps(Settings(segmenter="off"))  # "ocr" first too when pytesseract is missing
+    # "ocr" first too when pytesseract is missing
+    gaps = image_gaps(Settings(_env_file=None, segmenter="off", ocr_engine="tesseract"))
     assert gaps[-2:] == ["tesseract", "segmenter"]
     assert image_gaps(Settings(image_require_ocr=False, segmenter="off")) == ["segmenter"]
+
+
+def test_muse_ocr_without_a_key_is_an_image_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The Meta-only OCR default (ADR 0016) refuses images without a key: say so (LAB-1796).
+    monkeypatch.delenv("PII_GUARD_OCR_API_KEY", raising=False)
+    monkeypatch.delenv("BASETEN_API_KEY", raising=False)
+    keyless = Settings(_env_file=None, segmenter="off")
+    assert image_gaps(keyless) == ["ocr_key", "segmenter"]
+    keyed = Settings(_env_file=None, segmenter="off", ocr_api_key="synthetic-not-a-key")
+    assert image_gaps(keyed) == ["segmenter"]
+    hints = " ".join(_image_hints(["ocr_key"]))
+    assert "PII_GUARD_OCR_API_KEY" in hints and "PII_GUARD_OCR_ENGINE=tesseract" in hints
+    assert Status(upstream="mock", image_gaps=["ocr_key"]).images == "refused (no Muse OCR key)"
+
+
+def test_sam_default_without_a_key_is_an_image_gap() -> None:
+    # The Meta-only default (ADR 0015) refuses images without a SAM key: say so (LAB-1795).
+    assert image_gaps(Settings(image_require_ocr=False)) == ["sam"]
+    keyed = Settings(image_require_ocr=False, sam_api_key="synthetic-not-a-key")
+    assert image_gaps(keyed) == []
+    status = Status(upstream="mock", detectors=["rules"], image_gaps=["sam"])
+    assert status.images == "refused (no SAM 3.1 key)"
 
 
 def test_distribution_name_is_the_pypi_one() -> None:
@@ -361,6 +386,14 @@ def test_banner_names_the_ner_model_or_why_there_is_none(
         UpOptions(port=18999), Status(upstream="mock", detectors=["rules"]), "masked", ui=True
     )
     assert "free-text names need NER" in text and "[ner]" in text
+    # Intel macOS has no PyTorch build: point at Docker, not at a reinstall (LAB-1743).
+    from pii_guard.detect import stack
+
+    monkeypatch.setattr(stack, "no_torch_build", lambda: True)
+    text = _banner(
+        UpOptions(port=18999), Status(upstream="mock", detectors=["rules"]), "masked", ui=True
+    )
+    assert "no Intel macOS build" in text and "Docker" in text and "[ner]" not in text
 
 
 _UP_ENV = (

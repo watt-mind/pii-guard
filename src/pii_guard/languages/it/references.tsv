@@ -1,0 +1,40 @@
+# Reference words: labels that make a number a business number, not personal data
+# (order, invoice, receipt ...). One entry per line, `#` comments, blank lines ignored; format
+# in pl/references.tsv. A trailing `*` lets the word take suffixes (`fattur*`: `fattura`,
+# `fatture`), a trailing `.` matches with or without the dot (`prot`/`prot.`).
+# The shared check accepts "nr"/"no" between the label and the number but not the Italian
+# "n." or "numero", so the forms with them are listed as entries (`fattura n.`).
+# Every entry is scoped to the rules check for now: the NER check's negative words are pinned
+# to the built-in list (tests/detect/test_reference_packs.py, LAB-1788), so an Italian label
+# does not drop an NER number yet.
+ordin*	rules
+ordine n.	rules
+ordine numero	rules
+fattur*	rules
+fattura n.	rules
+fattura numero	rules
+ricevut*	rules
+ricevuta n.	rules
+scontrin*	rules
+scontrino n.	rules
+spedizion*	rules
+spedizione n.	rules
+prenotazion*	rules
+prenotazione n.	rules
+preventiv*	rules
+preventivo n.	rules
+protocollo	rules
+protocollo n.	rules
+prot.	rules
+prot. n.	rules
+pratica	rules
+pratica n.	rules
+articol*	rules
+prodott*	rules
+cliente	rules
+codice cliente	rules
+lotto	rules
+riferimento	weak
+rif.	weak
+importo	weak
+totale	weak

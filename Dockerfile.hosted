@@ -1,12 +1,15 @@
 # syntax=docker/dockerfile:1
-# Hosted build: text plus local-only image masking (ADR 0014). Keep the self-hosted Dockerfile
-# independent. Images use Tesseract, the on-device YuNet segmenter and the pinned YOLOS-tiny
-# signature detector only; never SAM (ADR 0014, LAB-1444). The `sam` extra (Meta's SAM 3.1
-# output parser, LAB-1665) is installed so the image matches the self-hosted one; it makes no
-# calls and does not enable SAM.
+# Hosted build: text plus image masking (ADR 0014, ADR 0015). Keep the self-hosted Dockerfile
+# independent. Only Meta models run by default (ADR 0015, ADR 0016): images use Muse Spark Open
+# on Baseten for their text (PII_GUARD_OCR_ENGINE=muse; the unmasked image goes to
+# PII_GUARD_OCR_URL) and SAM 3.1 on the Meta Model API (PII_GUARD_SEGMENTER=sam-api, the `sam`
+# extra: Meta's SAM 3.1 output parser, LAB-1665) for faces, ID photos and signatures. The
+# non-Meta on-device engines are opt-in: --build-arg PII_GUARD_ON_DEVICE_VISION=true bakes in
+# YuNet and the pinned YOLOS-tiny signature detector (PII_GUARD_SEGMENTER=local selects them),
+# and --build-arg PII_GUARD_TESSERACT=true installs Tesseract (PII_GUARD_OCR_ENGINE=tesseract).
 # python-deps ends with the dependency-only venv. The runtime copies it as its own layer, which
 # keeps its digest across src-only changes; only the small project layer changes (LAB-1449).
-FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim@sha256:bf889bda77474aa50c351caf1538b855ef2b7a30add45f26ca50dcb6ade06402 AS python-deps
+FROM ghcr.io/astral-sh/uv:0.13.7-python3.12-trixie-slim@sha256:d4a752dd52f42e0c508bb0b6a912f15922bb32e42f66af30671c3fdc0d759f21 AS python-deps
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
@@ -38,21 +41,32 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && .venv/bin/python -m pii_guard.eval.report_cli --print-index > /app/benchmarks-index.json
 # Loads the fetched checkpoint with this commit's detector and warms a CPU forward pass.
 RUN .venv/bin/python -c "from pii_guard.detect.ner import NerDetector; NerDetector(model='/app/models/ner', device='cpu')"
-# The YuNet face/ID-photo model (0.23 MB, MIT) and the YOLOS-tiny signature detector (26 MB,
-# Apache-2.0, safetensors), each fetched from its pinned URL and checked against its pinned
-# SHA-256 (pii_guard.visual.segment.YUNET, pii_guard.visual.segmenters.SIGNATURE_DETECTOR); the
-# build fails on a mismatch. The detector is then loaded offline once, as readiness does.
-# The runtime copies the NER checkpoint from ner-model and only these files from here, so this
+# Opt-in, non-Meta on-device engines (ADR 0015): with PII_GUARD_ON_DEVICE_VISION=true, the YuNet
+# face/ID-photo model (0.23 MB, MIT) and the YOLOS-tiny signature detector (26 MB, Apache-2.0,
+# safetensors), each fetched from its pinned URL and checked against its pinned SHA-256
+# (pii_guard.visual.segment.YUNET, pii_guard.visual.segmenters.SIGNATURE_DETECTOR); the build
+# fails on a mismatch. The detector is then loaded offline once, as readiness does. Off (the
+# default), nothing is fetched and /app/vision stays empty.
+# The runtime copies the NER checkpoint from ner-model and only /app/vision from here, so this
 # fails if a step above changed the checkpoint or left anything else in /app/models.
+ARG PII_GUARD_ON_DEVICE_VISION=false
 RUN --mount=type=bind,from=ner-model,source=/app/models/ner,target=/tmp/ner-pinned \
-    PII_GUARD_MODEL_DIR=/app/models .venv/bin/python -m pii_guard.visual.segment fetch \
-    && PII_GUARD_MODEL_DIR=/app/models .venv/bin/python -m pii_guard.visual.segmenters fetch \
-    && PII_GUARD_MODEL_DIR=/app/models HF_HUB_OFFLINE=1 .venv/bin/python -c "from pii_guard.visual.segmenters import SignatureDetector; SignatureDetector()" \
-    && test "$(ls -A /app/models | tr '\n' ' ')" = "face_detection_yunet_2023mar.onnx ner yolos-tiny-signature " \
-    && test "$(ls -A /app/models/yolos-tiny-signature | tr '\n' ' ')" = "config.json model.safetensors preprocessor_config.json " \
+    mkdir -p /app/vision \
+    && if [ "$PII_GUARD_ON_DEVICE_VISION" = "true" ]; then \
+        PII_GUARD_MODEL_DIR=/app/vision .venv/bin/python -m pii_guard.visual.segment fetch \
+        && PII_GUARD_MODEL_DIR=/app/vision .venv/bin/python -m pii_guard.visual.segmenters fetch \
+        && PII_GUARD_MODEL_DIR=/app/vision HF_HUB_OFFLINE=1 .venv/bin/python -c "from pii_guard.visual.segmenters import SignatureDetector; SignatureDetector()" \
+        && test "$(ls -A /app/vision | tr '\n' ' ')" = "face_detection_yunet_2023mar.onnx yolos-tiny-signature " \
+        && test "$(ls -A /app/vision/yolos-tiny-signature | tr '\n' ' ')" = "config.json model.safetensors preprocessor_config.json "; \
+    elif [ "$PII_GUARD_ON_DEVICE_VISION" = "false" ]; then \
+        test -z "$(ls -A /app/vision)"; \
+    else \
+        echo "PII_GUARD_ON_DEVICE_VISION must be true or false" >&2; exit 1; \
+    fi \
+    && test "$(ls -A /app/models | tr '\n' ' ')" = "ner " \
     && diff -r --no-dereference /tmp/ner-pinned /app/models/ner
 
-FROM node:24-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a AS ui-build
+FROM node:26-trixie-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072 AS ui-build
 WORKDIR /ui
 RUN npm install --global pnpm@12.10.1
 COPY ui/package.json ui/pnpm-lock.yaml ui/pnpm-workspace.yaml ./
@@ -72,13 +86,26 @@ ENV VITE_PII_GUARD_MODE=api VITE_PII_GUARD_HOSTED=true VITE_PII_GUARD_ROBOTS=$VI
 RUN pnpm build
 
 FROM python:3.12-slim-trixie@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 AS runtime
-# Tesseract reads the text in images so it can be masked; without it /readyz fails while hosted
-# images are on (ADR 0006). The packs match the language packs, plus OSD for orientation.
+# The pinned base ships apt 3.0.3 (CVE-2026-109518, DSA-6607-1) and zlib1g 1.3.1-1+b1
+# (CVE-2026-85091, CVE-2026-76844, LAB-2349); take the trixie-security fixes until the digest
+# above is bumped to a rebuild that already carries apt >= 3.0.4 and zlib1g >= 1.3.1-1+deb13u1.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-hun tesseract-ocr-deu \
-        tesseract-ocr-pol \
+    && apt-get install -y --no-install-recommends --only-upgrade apt libapt-pkg7.0 zlib1g \
     && rm -rf /var/lib/apt/lists/*
+# Opt-in Tesseract (ADR 0016): not a Meta model, so only --build-arg PII_GUARD_TESSERACT=true
+# installs it, with the language packs plus OSD for orientation. The default OCR engine, Muse
+# Spark Open, needs its key (PII_GUARD_OCR_API_KEY); without it /readyz fails while hosted
+# images are on (ADR 0006).
+ARG PII_GUARD_TESSERACT=false
+RUN if [ "$PII_GUARD_TESSERACT" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-hun tesseract-ocr-deu \
+            tesseract-ocr-pol \
+        && rm -rf /var/lib/apt/lists/*; \
+    elif [ "$PII_GUARD_TESSERACT" != "false" ]; then \
+        echo "PII_GUARD_TESSERACT must be true or false" >&2; exit 1; \
+    fi
 # Mount a private filesystem here to retain configuration across container replacement.
 # Without a mount this directory lasts only as long as the container's writable layer.
 RUN groupadd --system --gid 10001 piiguard \
@@ -88,8 +115,8 @@ WORKDIR /app
 COPY --from=python-deps /app/.venv /app/.venv
 COPY --from=python-build /app/venv-project /app/.venv
 COPY --from=ner-model /app/models/ner /app/models/ner
-COPY --from=python-build /app/models/face_detection_yunet_2023mar.onnx /app/models/
-COPY --from=python-build /app/models/yolos-tiny-signature /app/models/yolos-tiny-signature
+# Empty unless built with PII_GUARD_ON_DEVICE_VISION=true (ADR 0015).
+COPY --from=python-build /app/vision/ /app/models/
 COPY --from=ui-build /ui/dist /app/.venv/lib/python3.12/site-packages/pii_guard/_ui
 COPY deploy/azure/entrypoint.py /app/entrypoint.py
 ENV PATH=/app/.venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
@@ -99,7 +126,8 @@ ENV PATH=/app/.venv/bin:$PATH PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     PII_GUARD_PROJECT_STATE_PATH=/var/lib/pii-guard/projects/state.sqlite3 \
     PII_GUARD_NER_MODEL=/app/models/ner PII_GUARD_NER_DEVICE=cpu \
     PII_GUARD_DETECTORS=rules,ner PII_GUARD_NER_FALLBACK=off \
-    PII_GUARD_MODEL_DIR=/app/models PII_GUARD_SEGMENTER=local PII_GUARD_IMAGE_CONCURRENCY=1 \
+    PII_GUARD_MODEL_DIR=/app/models PII_GUARD_SEGMENTER=sam-api PII_GUARD_OCR_ENGINE=muse \
+    PII_GUARD_IMAGE_CONCURRENCY=1 \
     PII_GUARD_TRAFFIC_LOG=off PII_GUARD_METRICS=false
 USER piiguard
 EXPOSE 8787

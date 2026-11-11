@@ -68,6 +68,8 @@ def settings(**overrides: Any) -> Settings:
             "allowed_hosts": ("guard.example",),
             "detectors": ("rules",),
             "ner_fallback": "off",
+            # The opt-in on-device engines (ADR 0015); the SAM 3.1 default has its own tests.
+            "segmenter": "local",
             "upstream_api_key": "synthetic-sponsored-key",
             "hosted_chat_images": True,
             **overrides,

@@ -1,0 +1,44 @@
+# Romanian company and brand names (detect/ner_orgs.py; the shared list is ../brands.tsv).
+# One name per line; matching ignores case. Leave out names that are also surnames or given
+# names (Ursu, Dacian ...).
+Banca Transilvania
+BRD
+BCR
+CEC Bank
+Raiffeisen Bank România
+ING Bank România
+Dacia
+OMV Petrom
+Petrom
+Rompetrol
+Romgaz
+Hidroelectrica
+Transgaz
+Transelectrica
+Electrica
+Nuclearelectrica
+Tarom
+CFR Călători
+Poșta Română
+Fan Courier
+Sameday
+Cargus
+eMAG
+Altex
+Flanco
+Dedeman
+Bitdefender
+UiPath
+Digi
+Mega Image
+Profi
+Pro TV
+Antena 1
+TVR
+Agerpres
+Catena
+Sensiblu
+Elefant.ro
+Libris
+Borsec
+Timișoreana

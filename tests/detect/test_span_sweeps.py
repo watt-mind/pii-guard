@@ -177,39 +177,65 @@ class _EveryWord:
         return spans
 
 
+# (language, repeated unit, prefix, repeats for about 100 kB)
 ADVERSARIAL = {
-    "emails": ("en", "a@b.co " * 14_000),
-    "parcel list": ("hu", "hrsz.: 1" + ", 1" * 33_000),
-    "phones": ("hu", "+36 1 234 5678, " * 6_000),
+    "emails": ("en", "", "a@b.co ", 14_000),
+    "parcel list": ("hu", "hrsz.: 1", ", 1", 33_000),
+    "phones": ("hu", "", "+36 1 234 5678, ", 6_000),
 }
+
+
+def _adversarial(name: str, fraction: float = 1.0) -> tuple[str, str]:
+    language, prefix, unit, repeats = ADVERSARIAL[name]
+    return language, prefix + unit * int(repeats * fraction)
+
+
+def _scaling(run: object, name: str) -> tuple[float, float]:
+    """Best-of-2 time on the full input and on a quarter of it.
+
+    A runner's speed cancels out of the ratio: linear work grows about 4x from the quarter
+    to the full input, the quadratic scans this guards against about 16x. Absolute budgets
+    flaked on loaded CI runners (LAB-1748).
+    """
+    times = []
+    for fraction in (0.25, 1.0):
+        language, text = _adversarial(name, fraction)
+        best = float("inf")
+        for _ in range(2):
+            t0 = time.perf_counter()
+            run(text, language)  # type: ignore[operator]
+            best = min(best, time.perf_counter() - t0)
+        times.append(best)
+    return times[1], times[1] / max(times[0], 1e-3)
+
+
+def _resolve(text: str, language: str) -> None:
+    rule_spans = RuleDetector().detect(text, language)
+    model_spans = _EveryWord("ner", E.EMAIL, 1).detect(text) + _EveryWord(
+        "llm", E.PERSON, 0
+    ).detect(text)
+    resolve_spans(text, rule_spans + model_spans, detector_order=("rules", "ner", "llm"))
 
 
 @pytest.mark.parametrize("name", ADVERSARIAL)
 @pytest.mark.slow
 def test_adversarial_100kb_resolves_in_linear_time(name: str) -> None:
-    language, text = ADVERSARIAL[name]
+    language, text = _adversarial(name)
     assert len(text) >= 95_000
-    rule_spans = RuleDetector().detect(text, language)
-    model_spans = _EveryWord("ner", E.EMAIL, 1).detect(text) + _EveryWord(
-        "llm", E.PERSON, 0
-    ).detect(text)
-    assert len(rule_spans) > 5_000
-    t0 = time.perf_counter()
-    resolve_spans(text, rule_spans + model_spans, detector_order=("rules", "ner", "llm"))
-    elapsed = time.perf_counter() - t0
-    # About 100k candidate spans: the scans took minutes here, the sweeps about a second
-    # (the budget leaves room for coverage and a loaded CI runner).
-    assert elapsed < 6.0, f"{name}: resolver took {elapsed:.2f}s"
+    assert len(RuleDetector().detect(text, language)) > 5_000
+    # About 100k candidate spans: the scans took minutes here, the sweeps about a second.
+    elapsed, ratio = _scaling(_resolve, name)
+    assert ratio < 8.0, f"{name}: resolver grew {ratio:.1f}x for 4x input ({elapsed:.2f}s)"
+    assert elapsed < 60.0, f"{name}: resolver took {elapsed:.2f}s"
 
 
 @pytest.mark.parametrize("name", ADVERSARIAL)
 @pytest.mark.slow
 def test_adversarial_100kb_rules_pipeline_is_fast(name: str) -> None:
-    language, text = ADVERSARIAL[name]
     detector = DetectionPipeline([RuleDetector()])
-    t0 = time.perf_counter()
-    found = detector.detect(text, language)
-    elapsed = time.perf_counter() - t0
-    assert found
+    language, text = _adversarial(name)
+    assert detector.detect(text, language)
     # The scans took 8-60 s per input here.
-    assert elapsed < 4.0, f"{name}: pipeline took {elapsed:.2f}s"
+    elapsed, ratio = _scaling(detector.detect, name)
+    assert ratio < 8.0, f"{name}: pipeline grew {ratio:.1f}x for 4x input ({elapsed:.2f}s)"
+    assert elapsed < 60.0, f"{name}: pipeline took {elapsed:.2f}s"

@@ -62,7 +62,7 @@ async def _serve(request: Request, *, count_tokens: bool) -> Response:
     received_at = time.perf_counter()
     try:
         body = json.loads(raw)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         # Never the decoder's message: it quotes the body.
         raise InvalidChatRequestError("request body is not valid JSON") from None
     # The traffic event id, assigned before detection (LAB-1179): even a refused call
@@ -81,7 +81,9 @@ async def _serve(request: Request, *, count_tokens: bool) -> Response:
     return response
 
 
-_RESPONSES = error_responses("unsupported_api", "detection_profile_denied", "outbound_check_failed")
+_RESPONSES = error_responses(
+    "unsupported_api", "detection_profile_denied", "outbound_check_failed", "unsupported_media_type"
+)
 
 
 @router.post("/v1/messages", tags=["gateway"], responses=_RESPONSES)

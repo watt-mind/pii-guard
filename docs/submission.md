@@ -128,11 +128,11 @@ See [published limitations](../training/ner/model-card.md#limitations),
 | Training and release evidence | [v4.2 protocol](../eval/results/2026-10-30-lab-1625-ner-v42/README.md), [release](journey/2026-10-30-lab-1625-ner-v42-published.md) |
 | Model and trust boundaries | [models](models.md), [privacy](privacy-model.md), [hosted processing](hosted.md#what-each-mode-processes) |
 | Repeatable demo and limits | [walkthrough](demo-story.md), [integrations](integrations.md), [synthetic-image notice](../eval/fixtures/visual/NOTICE) |
-| Demo video | [3-minute judge walkthrough](https://youtu.be/Lsr74ddhxRo) |
+| Demo video | [3-minute judge walkthrough](https://youtu.be/VrY8x3h26ws) |
 
 ## Owner checklist before submitting
 
-- [x] Add the approved demo URL: [3-minute judge walkthrough](https://youtu.be/Lsr74ddhxRo).
+- [x] Add the approved demo URL: [3-minute judge walkthrough](https://youtu.be/VrY8x3h26ws).
 - [ ] Freeze the source revision and use immutable links for the submitted evidence.
 - [ ] Recheck the exact metrics and model pin against the linked records; do not mix test sets,
   old audit results, NER-only latency or full gateway latency.

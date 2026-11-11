@@ -302,6 +302,7 @@ def test_committed_readme_has_no_internal_ids_in_its_text() -> None:
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     prose = re.sub(r"\]\([^)]*\)|(?:src|srcset|href)=\"[^\"]*\"", "", text)
     assert not re.search(r"LAB-\d+|v42-b3|#\d{3}\b", prose)
-    assert "wattmind-pii-guard pii-guard" not in text  # no unreleased-PyPI commands
+    # The quickstart installs the released PyPI wheel (it bundles the web console, LAB-1740).
+    assert "--from wattmind-pii-guard pii-guard up" in text
     config = json.loads((ROOT / "docs" / "benchmarks" / "config.json").read_text())
     assert config["readme"]["layout"] == "compact"

@@ -21,7 +21,12 @@ from pii_guard.api.routes.vault import (
     SessionRecorderMiddleware,
     check_inspect_bind,
 )
-from pii_guard.api.security import BearerTokenMiddleware, LoopbackOnlyMiddleware, allowed_hosts
+from pii_guard.api.security import (
+    BearerTokenMiddleware,
+    BrowserRequestSecurityMiddleware,
+    LoopbackOnlyMiddleware,
+    allowed_hosts,
+)
 from pii_guard.config import Settings, get_settings
 from pii_guard.detect import stack
 from pii_guard.detect.stack import (
@@ -172,15 +177,22 @@ def _register_healthz(app: FastAPI, settings: Settings, warmup: NerWarmup) -> No
         },
     )
     def healthz() -> dict[str, object]:
-        """``{"status": "ok", "version": ..., "ner": ..., "ocr": ...}`` while the server
-        is up, also while the NER model loads (``ner``: ``loading``). ``ocr`` is ``"on"``
-        when Tesseract is installed and ``"off"`` otherwise; ``image_require_ocr`` says
-        whether image requests are refused without it (503 ``ocr_unavailable``). Needs no
-        token, and touches no detector, vault or upstream."""
+        """``{"status": "ok", "version": ..., "ner": ..., "ocr": ..., "ocr_engine": ...}``
+        while the server is up, also while the NER model loads (``ner``: ``loading``).
+        ``ocr_engine`` is ``PII_GUARD_OCR_ENGINE`` (``muse`` or ``tesseract``); ``ocr`` is
+        ``"on"`` when that engine can run (Muse Spark Open has its key, or Tesseract is
+        installed) and ``"off"`` otherwise; ``image_require_ocr`` says whether image requests
+        are refused without it (503 ``ocr_unavailable``). Needs no token, and touches no
+        detector, vault or upstream."""
         try:
-            from pii_guard.visual.ocr import tesseract_available
+            if settings.ocr_engine == "muse":
+                from pii_guard.visual.ocr_muse import muse_configured
 
-            ocr = "on" if tesseract_available() else "off"
+                ocr = "on" if muse_configured(settings) else "off"
+            else:
+                from pii_guard.visual.ocr import tesseract_available
+
+                ocr = "on" if tesseract_available() else "off"
         except Exception:  # the ocr extra is not installed: OCR is off, not an error
             ocr = "off"
         return {
@@ -188,6 +200,7 @@ def _register_healthz(app: FastAPI, settings: Settings, warmup: NerWarmup) -> No
             "version": __version__,
             "ner": warmup.state,
             "ocr": ocr,
+            "ocr_engine": settings.ocr_engine,
             "image_require_ocr": settings.image_require_ocr,
         }
 
@@ -259,7 +272,7 @@ def _install_middlewares(
 
         app.add_middleware(HostedMiddleware, service=app.state.hosted)
 
-    # Outermost last: Host check, then (full only) loopback sockets, then the token.
+    # Outermost last: Host check, local browser guard, (full only) loopback sockets, token.
     if (
         obs_settings.metrics_token is not None
         and not obs_settings.metrics_token.get_secret_value().strip()
@@ -281,6 +294,8 @@ def _install_middlewares(
         )
     if obs_settings.traffic_log is TrafficLevel.FULL:
         app.add_middleware(LoopbackOnlyMiddleware)
+    if not settings.hosted:
+        app.add_middleware(BrowserRequestSecurityMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts, www_redirect=False)
 
 

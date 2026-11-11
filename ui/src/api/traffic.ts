@@ -85,6 +85,8 @@ export interface TrafficEvent {
   detectors: string[];
   entities: TrafficEntities | null;
   cache: { hits: number; misses: number; seeded: number } | null;
+  /** Escalate mode (LAB-1766): texts sent to the LLM detector as masked windows; `null` in other modes. */
+  audit_escalations?: number | null;
   upstream: { status: number | null; model: string | null; unresolved_placeholders: number } | null;
   usage: Record<string, number> | null;
   timing: TrafficTiming;
@@ -164,6 +166,7 @@ export function parseTrafficEvent(raw: unknown): TrafficEvent | null {
     detectors: Array.isArray(raw.detectors) ? raw.detectors.filter((d): d is string => typeof d === "string") : [],
     entities: isRecord(raw.entities) ? (raw.entities as unknown as TrafficEntities) : null,
     cache: isRecord(raw.cache) ? (raw.cache as TrafficEvent["cache"]) : null,
+    audit_escalations: typeof raw.audit_escalations === "number" ? raw.audit_escalations : null,
     upstream: isRecord(raw.upstream) ? (raw.upstream as TrafficEvent["upstream"]) : null,
     usage: isRecord(raw.usage) ? (raw.usage as Record<string, number>) : null,
     timing: {

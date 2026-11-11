@@ -57,6 +57,8 @@ _HU_SHORT = {v: k for k, v in _HU_LONG.items()}
 _HU_DOUBLED_ENDINGS = ("al", "el", "á", "é")
 _HU_HYPHENATED = ("val", "vel", "vá", "vé")
 _MIN_LEMMA_LETTERS = 2
+# Shortest last token that takes AkH. 62 simplified suffixes (Mustermann|ak, not Ann|ak).
+_MIN_SIMPLIFIED_LETTERS = 5
 # Stacked suffixes (LAB-1337): the possessive ``-é`` (``Ottóé``, "Ottó's"), the family plural
 # ``-ék`` (``Ottóék``, "the Ottós") and the plural possessive ``-éi`` (``Ottóéi``) take a case
 # ending of their own: ``Kerekes Ottóéknál``, ``Teszt Hajnáéknak``, ``Tihaméréit``. The ending
@@ -331,9 +333,10 @@ class HungarianSuffixMatcher:
             # Kiss -> Kissel, Bernadett -> Bernadettel: the v assimilates, no third letter.
             # AkH. 62 also drops the third consonant when a suffix starts with the same letter
             # (Mariann -> Mariannak, Mustermann -> Mustermannak, Bernadett -> Bernadettől).
-            suffixes |= set(_HU_DOUBLED_ENDINGS) | {
-                s[1:] for s in _HU_SUFFIXES if len(s) >= 2 and s[0] == last
-            }
+            suffixes |= set(_HU_DOUBLED_ENDINGS)
+            # Short names stay out: Ann + ak, Finn + ek would mask annak, annál, finnek.
+            if _last_token_letters(value) >= _MIN_SIMPLIFIED_LETTERS:
+                suffixes |= {s[1:] for s in _HU_SUFFIXES if len(s) >= 2 and s[0] == last}
         elif last.isalpha() and not value.casefold().endswith(_HU_DIGRAPHS):
             suffixes |= {f"{last}al", f"{last}el", f"{last}á", f"{last}é"}
         plain = (

@@ -1,0 +1,42 @@
+# Field captions on French identity documents and forms (visual/captions.py).
+# caption <TAB> entity type of the value printed next to it, or "-" when that value is not
+# personal data (the caption is still recognised, so it bounds its neighbours). The carte
+# nationale d'identité and the passport print bilingual captions ("Nom / Surname"); the
+# English half is in the en pack.
+Nom	PERSON
+Nom de naissance	PERSON
+Nom d'usage	PERSON
+Prénom	PERSON
+Prénoms	PERSON
+Nom et prénom	PERSON
+Date de naissance	DATE_OF_BIRTH
+Date et lieu de naissance	DATE_OF_BIRTH
+Lieu de naissance	ADDRESS
+Adresse	ADDRESS
+Domicile	ADDRESS
+Adresse postale	ADDRESS
+N° du document	ID_DOCUMENT
+Numéro du document	ID_DOCUMENT
+N° de passeport	ID_DOCUMENT
+Passeport n°	ID_DOCUMENT
+Carte n°	ID_DOCUMENT
+N° de sécurité sociale	ID_DOCUMENT
+Numéro de sécurité sociale	ID_DOCUMENT
+Numéro fiscal	ID_DOCUMENT
+N° de permis	ID_DOCUMENT
+Téléphone	PHONE
+Courriel	EMAIL
+Adresse électronique	EMAIL
+Sexe	-
+Nationalité	-
+Taille	-
+Date de délivrance	-
+Date d'expiration	-
+Valable jusqu'au	-
+Délivré par	-
+Autorité	-
+Signature du titulaire	-
+Type	-
+Code du pays	-
+Couleur des yeux	-
+Catégories	-

@@ -134,6 +134,28 @@ feedback first. Nightly and manual runs use separate concurrency groups, so a st
 cannot cancel the scheduled full-suite check. Pushes to `main` and merge-queue runs retain
 their full checks without cancelling a running check.
 
+### Judge path (outside `ci-ok`)
+
+[`.github/workflows/judge-path.yml`](.github/workflows/judge-path.yml) installs and runs
+pii-guard the way the README tells someone on a clean machine to: `uvx --python 3.12 --from
+<source> pii-guard up` with a fresh uv cache (no caches restored) on `ubuntu-latest` and
+`macos-14` (arm64). `scripts/ci/wheel_smoke.sh` then waits for `"ner":"ready"` (10 minute
+cap, time-to-ready in the job summary), checks the UI at `/`, masks and restores one chat call
+on the mock upstream (checked in `/v1/traffic`), sends one image and stops it with Ctrl-C. It
+is slow (PyTorch and the 1.1 GB NER download every time), so it never runs on `develop` pull
+requests or pushes:
+
+| Trigger | Sources tested | Blocks |
+|---|---|---|
+| Manual (`workflow_dispatch`, input `ref`, default `develop`) | a wheel built from `ref` (UI bundled) and `git+https://...@<sha>` (no UI: the page must say so) | nothing |
+| Pull request to `main` (a release PR) | the same two | the release PR (red is visible on it) |
+| `release.yml`, before publishing | the exact wheel the release built | the GitHub release and PyPI |
+| `release.yml`, after the PyPI upload | `wattmind-pii-guard==<version>` from PyPI | nothing; a red run files a GitHub issue |
+
+Windows is not covered (the smoke stops the server with SIGINT). Locally, against any wheel:
+`PII_GUARD_SMOKE_PORT=18790 scripts/ci/wheel_smoke.sh --python 3.12 --image dist/*.whl`
+(`--image` needs the `tesseract` binary with Hungarian and English data).
+
 Report behavior tests use a small, fixed set of synthetic benchmark records; separate tests
 still validate the complete committed report and recompute every stored dataset summary.
 The summary checks are parametrized per file so parallel workers can share that work as the

@@ -1,6 +1,7 @@
 # Entity taxonomy
 
-> Status: proposed. Built-in languages: Hungarian (`hu`), English (`en`), German (`de`) and Polish (`pl`). The entity types
+> Status: proposed. Built-in languages: Hungarian (`hu`), English (`en`), German (`de`), Polish (`pl`),
+> French (`fr`), Spanish (`es`), Italian (`it`), Dutch (`nl`) and Romanian (`ro`). The entity types
 > below are shared by every language; the per-language tables say which identifiers each
 > language pack's rules find and which type they map to ([ADR 0008](decisions/0008-language-packs.md)).
 
@@ -240,6 +241,99 @@ business number, but a sole trader's identifies a person, as a NIP does.
 Vault inflection: case endings that leave the written name intact are kept outside the
 placeholder (`Nowaka` → `[[PERSON_7f3a]]a`, `Kowalskiego` → `[[PERSON_7f3a]]ego`); forms
 whose stem changes (`Annie`, `Kowalskiej`) are matched as written.
+
+### French (`fr`)
+
+French IBANs and `+33` phone numbers are found by the language-independent rules.
+
+| Identifier | Type | Validation | Scope |
+|---|---|---|---|
+| NIR, numéro de sécurité sociale (15 characters, compact or grouped 1-2-2-2-3-3-2 as on the carte Vitale) next to `sécurité sociale`, `NIR`, `INSEE`, `carte Vitale` | `ID_DOCUMENT` | key = 97 − (first 13 digits mod 97), `2A`/`2B` (Corsica) counted as 19/18, INSEE field codes + label | everywhere |
+| NIR without a label | `ID_DOCUMENT` | as above, sex digit 1 or 2 and a calendar month, not after an order, invoice or reference label (scores lower) | everywhere |
+| Numéro fiscal (SPI, 13 digits starting 0–3) next to `numéro fiscal` / `SPI` | `ID_DOCUMENT` | last three digits = first ten mod 511 + label | everywhere |
+| Passport, CNI, driving-licence, residence-permit, social-security or tax number written after `n°` (`passeport n° …`) | `ID_DOCUMENT` | label + `n°`/`no.` + 6–20 letters and digits, at least two digits (the cue score; covers the `°` the shared cue window stops at, LAB-1785) | everywhere |
+| National phone number (trunk `0` + four pairs, spaced, dotted, hyphenated or compact) | `PHONE` | `0[1-9]` + 8 digits, not an amount | language |
+| Street address (`12 rue des Lilas[, 69003 Lyon]`) | `ADDRESS` | house number + street-type word | language |
+| Postcode and place where an address line starts (`75008 Paris`, `… Cedex 1`) | `ADDRESS` | 5 digits + place | language |
+| NIR or numéro fiscal with a bad key, passport, CNI and driving-licence numbers after their cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
+
+Vault inflection: none. French names don't inflect, so the vault matches them exactly; an
+elided `d'` / `l'` stays outside the placeholder (`l'avis d'[[PERSON_7f3a]]`).
+
+### Spanish (`es`)
+
+Spanish IBANs and `+34` phone numbers are found by the language-independent rules.
+
+| Identifier | Type | Validation | Scope |
+|---|---|---|---|
+| DNI / NIF (8 digits + check letter, compact, dotted in thousands, or with a hyphen) | `ID_DOCUMENT` | mod-23 check letter; without a `DNI`/`NIF` label not after an order, invoice or amount label, and no space before the letter (scores lower) | everywhere |
+| NIE (`X`/`Y`/`Z` + 7 digits + check letter) | `ID_DOCUMENT` | prefix mapped to 0/1/2, mod-23 check letter; without a `NIE`/`TIE` label not after an order, invoice or amount label (scores lower) | everywhere |
+| Company CIF next to `CIF` / `NIF` | `ID_DOCUMENT` | organisation-type letter + 7 digits + control digit or letter + label | everywhere |
+| National phone number (nine digits starting 6–9, grouped or a compact mobile) | `PHONE` | numbering plan, not an amount | language |
+| Street address (`Calle del Olmo 14, 3.º B[, 28012 Madrid]`, `C/`, `Avda.`, `Plaza`, `Paseo`) | `ADDRESS` | street-type word + name + house number | language |
+| Postcode and place where an address line starts (line start, after a comma or `C.P.`) | `ADDRESS` | 5 digits + place | language |
+| DNI, NIE or CIF with a bad check character, passport, social-security and driving-licence numbers after their cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
+
+Vault inflection: none. Spanish names don't decline, so the vault matches them exactly.
+
+### Italian (`it`)
+
+Italian IBANs and `+39` phone numbers are found by the language-independent rules. A partita
+IVA is a business number, but a sole trader's identifies a person, as a Polish NIP does.
+
+| Identifier | Type | Validation | Scope |
+|---|---|---|---|
+| Codice fiscale (16 characters, capitals) | `ID_DOCUMENT` | letter/digit positions, month letter, day (+40 for women), odd/even table mod 26, omocodia letters in the seven digit positions | everywhere |
+| EU VAT number `IT` + partita IVA | `ID_DOCUMENT` | provincial office code + Luhn check digit | everywhere |
+| CIE number (`CA00000AA` layout) next to `carta d'identità`, `CIE`, `documento` | `ID_DOCUMENT` | `C` + letter + 5 digits + 2 letters + label | everywhere |
+| Partita IVA (11 digits) next to `P.IVA`, `partita IVA`, `codice IVA` | `ID_DOCUMENT` | office code + Luhn + label (a bare one is never matched: 11 digits with a Luhn digit are as often a Hungarian personal ID or a German Steuer-ID) | language |
+| CIE number without a label | `ID_DOCUMENT` | shape, not after an order, invoice or amount label (scores lower) | language |
+| National phone number (grouped mobile `3xx`, landline with its area code) | `PHONE` | numbering plan; a compact mobile needs a cue | language |
+| Street address (`Via dei Mille 27[, 40121 Bologna (BO)]`) | `ADDRESS` | street-type word + name + house number | language |
+| CAP and place where an address line starts | `ADDRESS` | 5 digits + place | language |
+| Codice fiscale or partita IVA with a bad check character, passport, driving-licence and tessera sanitaria numbers after their cue; a partita IVA label in another language's text | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
+
+Vault inflection: none. Italian names don't inflect (`allow_suffix=False`).
+
+### Dutch (`nl`)
+
+Dutch IBANs and `+31` phone numbers are found by the language-independent rules. The KvK
+number (Chamber of Commerce) is a company's: it is a `-` cue and a reference word, never masked.
+
+| Identifier | Type | Validation | Scope |
+|---|---|---|---|
+| BSN / sofinummer (9 digits, compact or grouped) next to `BSN`, `burgerservicenummer`, `sofinummer` | `ID_DOCUMENT` | elfproef (weights 9…2 and −1, mod 11), not all zeros + label | everywhere |
+| BSN without a label, compact only | `ID_DOCUMENT` | elfproef, not after an order, invoice or amount label (scores lower). Dutch text only: one nine-digit number in eleven passes the check, so elsewhere a Polish phone number or a Hungarian TAJ would (LAB-1433) | language |
+| National phone number (trunk `0`, ten digits; mobile `06`, landline with its area code) | `PHONE` | numbering plan; `0800`/`0900` service numbers are companies' | language |
+| Street address (`Lindelaan 42`, `Van Goghstraat 7-II`[, `3521 AB Utrecht`]) | `ADDRESS` | street name + house number | language |
+| Postcode (`3521 AB`) with its place anywhere, or after `postcode` | `ADDRESS` | 4 digits + 2 letters, not `SA`/`SD`/`SS` | language |
+| BSN with a failed elfproef after its label, passport, ID-card and driving-licence numbers after their cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
+
+Vault inflection: the genitive kept outside the placeholder (`Pieters` → `[[PERSON_7f3a]]s`,
+`Anna's`; after a sibilant the apostrophe alone, `Joris'`). Surname prefixes (`van`, `de`,
+`van der`) are part of the name span. `DutchGenitiveMatcher`, `languages/nl/inflection.py`.
+
+### Romanian (`ro`)
+
+Romanian IBANs and `+40` phone numbers are found by the language-independent rules. A CIF /
+CUI is a business number, but a sole trader's identifies a person, as a Polish NIP does.
+
+| Identifier | Type | Validation | Scope |
+|---|---|---|---|
+| CNP (13 digits, `SYYMMDDJJNNNC`) | `ID_DOCUMENT` | sex/century digit, a possible date of birth, county code 01–52, weights 2-7-9-1-4-6-3-5-8-2-7-9 mod 11 (10 → 1); an unlabelled one right after an order, invoice or amount label is left alone (scores lower without a label) | everywhere |
+| CIF / CUI (2–10 digits, optional `RO` VAT prefix) next to `CIF`, `CUI`, `cod fiscal`, `cod TVA` | `ID_DOCUMENT` | weights 7-5-3-2-1-7-5-3-2, sum × 10 mod 11 + label | language |
+| Identity card (carte de identitate) series and number (`CI seria RX nr. 123456`) next to `seria`, `CI`, `buletin`, `carte de identitate` | `ID_DOCUMENT` | 2 letters + 6 digits + label (no check digit) | language |
+| National phone number (mobile `07…`, landline with its area code) | `PHONE` | numbering plan, not an amount | language |
+| Street address (`Strada Teilor nr. 15, ap. 7[, 400123 Cluj-Napoca]`, `Str.`, `Bd.`, `Calea`, `Șoseaua`, `Aleea`) | `ADDRESS` | street-type word + name + house number | language |
+| Postcode and place where an address line starts | `ADDRESS` | 6 digits + place | language |
+| CNP with a bad check digit, identity card number after `buletin`, passport and driving-licence numbers after their cue | `ID_DOCUMENT` | cue + shape (`cues.tsv`) | everywhere |
+
+Vault inflection: the article and genitive/dative endings kept outside the placeholder
+(`Popescului` → `[[PERSON_7f3a]]lui`, `-ul`, `-ului`, vocative `-le`/`-ule`; an acronym after a
+hyphen, `SRL-ului`), and the stem change of a final `-a` (`Maria` → `Mariei`, `Monica` →
+`Monicăi`): every form maps to one vault entry keyed on the nominative and unmasks as written.
+A full name declines on its given name, inside the value (`Mariei Popescu`), which is masked
+as a value of its own. `RomanianCaseMatcher`, `languages/ro/inflection.py`.
 
 ## Visual entities
 

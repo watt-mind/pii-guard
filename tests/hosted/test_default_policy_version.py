@@ -55,6 +55,7 @@ def settings() -> Settings:
         allowed_hosts=("guard.example",),
         detectors=("rules",),
         ner_fallback="off",
+        segmenter="local",  # the opt-in on-device engines (ADR 0015)
         upstream_api_key="synthetic-sponsored-key",
     )
 

@@ -30,10 +30,11 @@ def store(tmp_path: Path) -> Iterator[ProjectStore]:
         instance.close()
 
 
-def test_defaults_hold_visual_types_and_local_detection(store: ProjectStore) -> None:
+def test_defaults_hold_visual_types_and_sam_detection(store: ProjectStore) -> None:
+    # New policies use the server's Meta segmenter, SAM 3.1 (ADR 0015, LAB-1795).
     project = store.default_project(OWNER)
     policy = store.get_policy(OWNER, project["id"], project["default_policy_version_id"])
-    assert policy["visual_detection"] == "local"
+    assert policy["visual_detection"] == "sam"
     assert {
         k: policy["entity_policies"][k] for k in ("FACE", "ID_PHOTO", "SIGNATURE", "STAMP")
     } == {
@@ -49,7 +50,7 @@ def test_memory_store_defaults_hold_visual_types() -> None:
     try:
         project = store.default_project(OWNER)
         policy = store.get_policy(OWNER, project["id"], project["default_policy_version_id"])
-        assert policy["visual_detection"] == "local"
+        assert policy["visual_detection"] == "sam"
         assert {
             k: policy["entity_policies"][k] for k in ("FACE", "ID_PHOTO", "SIGNATURE", "STAMP")
         } == {
@@ -67,18 +68,19 @@ def test_visual_actions_and_detection_are_versioned(store: ProjectStore) -> None
     first = store.create_policy(
         OWNER,
         project["id"],
-        {"name": "Images", "entity_policies": {"SIGNATURE": "keep", "STAMP": "mask"}},
+        {
+            "name": "Images",
+            "entity_policies": {"SIGNATURE": "keep", "STAMP": "mask"},
+            "visual_detection": "local",
+        },
     )
     assert first["entity_policies"]["SIGNATURE"] == "keep"
     assert first["entity_policies"]["STAMP"] == "mask"
     second = store.create_policy(
-        OWNER,
-        project["id"],
-        {"name": "Images", "visual_detection": "sam"},
-        policy_id=first["policy_id"],
+        OWNER, project["id"], {"name": "Images"}, policy_id=first["policy_id"]
     )
-    assert second["version"] == 2 and second["visual_detection"] == "sam"
-    # The earlier version is unchanged (append-only).
+    assert second["version"] == 2 and second["visual_detection"] == "sam"  # the default
+    # The earlier version is unchanged (append-only): an explicit local stays local.
     again = store.get_policy(OWNER, project["id"], first["policy_version_id"])
     assert again["visual_detection"] == "local"
     assert again["entity_policies"]["SIGNATURE"] == "keep"
@@ -143,3 +145,7 @@ def test_versions_saved_before_visual_types_still_read(store: ProjectStore) -> N
         )
     legacy = store.get_policy(OWNER, project["id"], version)
     assert "visual_detection" not in legacy and "SIGNATURE" not in legacy["entity_policies"]
+    # Saved before the field: the server's segmenter decides, as it did then (ADR 0015).
+    from pii_guard.projects.visual import visual_detection
+
+    assert visual_detection(legacy) == "sam"

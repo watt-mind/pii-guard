@@ -10,6 +10,8 @@ interface NavItem {
 }
 
 const PRIMARY: readonly NavItem[] = [
+  // The guest Playground (LAB-1812) first: own text, no sign-in (LAB-1814).
+  { href: "#playground/text", label: "Playground" },
   { href: "#demo", label: "Demo" },
   { href: "#how", label: "How it works" },
   { href: "#results", label: "Benchmarks" },

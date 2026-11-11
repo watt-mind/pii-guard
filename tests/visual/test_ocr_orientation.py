@@ -221,8 +221,8 @@ def fake_tesseract(monkeypatch: pytest.MonkeyPatch) -> FakeTesseract:
     fake = FakeTesseract()
     module = types.ModuleType("pytesseract")
     module.Output = FakeTesseract.Output  # type: ignore[attr-defined]
-    module.image_to_data = fake.image_to_data  # type: ignore[attr-defined]
-    module.image_to_osd = fake.image_to_osd  # type: ignore[attr-defined]
+    monkeypatch.setattr("pii_guard.visual.ocr.image_to_data", fake.image_to_data)
+    monkeypatch.setattr("pii_guard.visual.ocr.image_to_osd", fake.image_to_osd)
     monkeypatch.setitem(sys.modules, "pytesseract", module)
     return fake
 
@@ -333,7 +333,7 @@ def test_orientation_can_be_turned_off(fake_tesseract: FakeTesseract) -> None:
 def test_a_page_that_reads_poorly_every_way_keeps_the_upright_reading(
     fake_tesseract: FakeTesseract, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(sys.modules["pytesseract"], "image_to_data", lambda image, **k: _junk())
+    monkeypatch.setattr("pii_guard.visual.ocr.image_to_data", lambda image, **k: _junk())
     page = TesseractOcr(upscale_to=None).read(bar_page())
     assert page.frame.identity
     assert [w.text for w in page.words] == ["~#"]

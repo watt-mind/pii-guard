@@ -477,7 +477,7 @@ class ReleaseTemplateTests(unittest.TestCase):
             "PII_GUARD_NER_MODEL": "/app/models/ner",
             "PII_GUARD_DETECTORS": "rules,ner",
             "PII_GUARD_HOSTED_IMAGES": "true",
-            "PII_GUARD_SEGMENTER": "local",
+            "PII_GUARD_SEGMENTER": "sam-api",
             "PII_GUARD_HOSTED_MODELS": "muse-spark-1.3",
             "PII_GUARD_TRAFFIC_LOG": "off",
             "PII_GUARD_METRICS": "true",
@@ -487,7 +487,17 @@ class ReleaseTemplateTests(unittest.TestCase):
             env["PII_GUARD_METRICS_TOKEN"],
             {"name": "PII_GUARD_METRICS_TOKEN", "secretRef": "metrics-token"},
         )
-        # Signatures are masked on-device by the owner's policy: no server override (LAB-1444).
+        # Meta-only runtime (ADR 0015): SAM 3.1 finds faces, ID photos and signatures, with the
+        # Key Vault Meta key; signatures follow the owner's policy, no server override.
+        self.assertEqual(
+            env["PII_GUARD_SAM_API_KEY"],
+            {"name": "PII_GUARD_SAM_API_KEY", "secretRef": "meta-key"},
+        )
+        # Muse Spark Open on Baseten reads image text (ADR 0016, LAB-1802).
+        self.assertEqual(
+            env["PII_GUARD_OCR_API_KEY"],
+            {"name": "PII_GUARD_OCR_API_KEY", "secretRef": "ocr-key"},
+        )
         self.assertNotIn("PII_GUARD_POLICY_OVERRIDES", env)
         hosts = env["PII_GUARD_ALLOWED_HOSTS"]["value"]
         self.assertIn("publicOrigin", hosts)
@@ -625,13 +635,14 @@ class ReleaseTemplateTests(unittest.TestCase):
             "tenantKeySecretUri",
             "googleSecretUri",
             "metricsTokenSecretUri",
+            "ocrKeySecretUri",
         ):
             self.assertEqual(params[name]["minLength"], 1)
             self.assertNotIn("defaultValue", params[name])
         secrets = self.resource("Microsoft.App/containerApps")["properties"]["configuration"][
             "secrets"
         ]
-        self.assertEqual(len(secrets), 4)
+        self.assertEqual(len(secrets), 5)
         for secret in secrets:
             self.assertEqual(set(secret), {"name", "keyVaultUrl", "identity"})
             self.assertIn("parameters(", secret["keyVaultUrl"])
@@ -758,6 +769,7 @@ class ReleaseDriverIngressTests(unittest.TestCase):
             "TENANT_KEY_SECRET_URI": secret.format("tenant-key"),
             "GOOGLE_SECRET_URI": secret.format("google-client-secret"),
             "METRICS_TOKEN_SECRET_URI": secret.format("metrics-token"),
+            "OCR_KEY_SECRET_URI": secret.format("ocr-key"),
             **extra,
         }
         result = subprocess.run(  # noqa: S603 - local driver against a fake az, no cloud
@@ -1089,6 +1101,24 @@ class ProjectConfigurationFoundationTests(unittest.TestCase):
         self.assertIn(
             "output projectAccountUrl string = projectConfiguration.outputs.accountUrl", source
         )
+
+
+class DevSecretReaderTests(unittest.TestCase):
+    """Dev grants Key Vault read per secret: each secret the release mounts needs one (LAB-1802)."""
+
+    def test_every_release_secret_is_readable_by_the_dev_identity(self) -> None:
+        release = TEMPLATE.read_text()
+        mounted = set(re.findall(r"\{ name: '([a-z0-9-]+)', keyVaultUrl:", release))
+        self.assertIn("ocr-key", mounted)
+        main = TEMPLATE.with_name("main.bicep").read_text()
+        listed = re.search(r"var devAppSecretNames = \[([^\]]*)\]", main)
+        self.assertIsNotNone(listed)
+        assert listed is not None  # noqa: S101 - narrows the type for mypy
+        granted = set(re.findall(r"'([a-z0-9-]+)'", listed.group(1)))
+        # Container and vault secret names differ (meta-key vs meta-api-key): match the count
+        # and the one secret named the same in both.
+        self.assertEqual(len(granted), len(mounted))
+        self.assertIn("ocr-key", granted)
 
 
 if __name__ == "__main__":

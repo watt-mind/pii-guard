@@ -1,0 +1,4 @@
+# The Dutch pack's fictional identifiers in code and docs (LAB-1777); format in ../README.md.
+# The published BSN examples of the elfproef: RvIG's test number and the textbook example.
+111222333
+123456782

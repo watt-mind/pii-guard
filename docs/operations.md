@@ -85,7 +85,8 @@ the ingress topology or logging configuration changes.
 With the source enabled, anonymous demo requests share a 30-request burst refilling
 30/minute and 120 requests per fixed hour starting at bucket creation. Signed-in users
 have independent 10-request bursts refilling 30/minute even on a shared judge network.
-The existing five guest requests/day and other token/cost quotas still apply. New guest
+Guest demo and Playground requests share their network's daily allowance (100 by default,
+`PII_GUARD_HOSTED_GUEST_REQUESTS_PER_DAY`), and other token/cost quotas still apply. New guest
 cookies do not reset a network allowance, and sign-in cannot replenish global sponsorship.
 429 responses include `Retry-After`; hourly anonymous exhaustion asks for Google sign-in
 or the free walkthrough. Missing/untrusted address signals return sanitized 503 errors.
@@ -116,6 +117,18 @@ spend. This is a secondary abuse signal, without an external CAPTCHA or bot-proo
   CPU, $0, and nothing leaves the machine. It needs no model key. What it adds per request is
   measured, not estimated: see [gateway latency](benchmarks.md#gateway-latency) (the README
   quotes one cell of it).
+- **`escalate`** (LAB-1766) runs fast mode, then sends only the spans it is unsure of to the
+  LLM detector: about 200 characters each side of each uncertain place, with every value fast
+  mode found already replaced by a placeholder. The LLM can add spans or settle a type, never
+  unmask one; a timeout or error masks the uncertain words (or, with
+  `PII_GUARD_GATEWAY_ESCALATE_ON_FAILURE=keep`, keeps the rules + NER result). A text with
+  nothing uncertain makes no call. It needs the same key as audit mode (no key: `503
+  detection_unavailable`, "escalate mode needs PII_GUARD_LLM_DETECTOR_API_KEY"), is refused by
+  the local-only profile and by the hosted service, and is never the default. Windows of the
+  original text do leave the machine: the uncertain words and their unmasked context. The
+  response carries `X-PII-Guard-Escalations` (texts sent) and, after a fail-closed call,
+  `X-PII-Guard-Escalation-Failures`. Selector, settings and measured cost:
+  [architecture-gateway.md](architecture-gateway.md#escalate-mode).
 - **`audit`** adds an LLM detector (Muse Spark Open on Baseten by default) to every message: a
   second opinion for sampled or offline quality checks, generating labels and teacher data for
   the NER, and the benchmark upper bound. It is not meant for production traffic: each
@@ -176,8 +189,11 @@ local-only this also sets the gateway fast detector stack; no NER dependency or 
 loaded. Rules alone miss much free-form personal data. This is an explicit coverage choice,
 never an automatic fallback when NER is broken.
 
-Images require local Tesseract with the necessary language packs and `SEGMENTER=local` or
-`off`. Provision the pinned YuNet weights explicitly with
+Images require OCR on your side (`PII_GUARD_OCR_ENGINE=tesseract` with the necessary language
+packs, or Muse Spark Open at a self-hosted `PII_GUARD_OCR_URL`; the default Baseten endpoint is
+refused, ADR 0016) and `SEGMENTER=local` or
+`off` (the default `sam-api` sends images to the Meta Model API and is refused here; YuNet is not
+a Meta model, so this profile is an explicit opt-in out of the Meta-only defaults, ADR 0015). Provision the pinned YuNet weights explicitly with
 `python -m pii_guard.visual.segment fetch` before using `local`; the local loader does not
 download missing weights. YuNet supports faces and estimated ID-photo regions, not signatures
 or stamps. The default `SIGNATURE=mask` therefore refuses local images. The guard does not
@@ -203,7 +219,16 @@ uvx --python 3.12 --from wattmind-pii-guard pii-guard up
 uvx --from https://github.com/watt-mind/pii-guard/releases/download/vX.Y.Z/wattmind_pii_guard-X.Y.Z-py3-none-any.whl pii-guard up
 # From source: API + gateway only (a git build has no UI; / says how to get it)
 uvx --from git+https://github.com/watt-mind/pii-guard pii-guard up
+# Linux: the CPU build of PyTorch (about 190 MB) instead of the CUDA one (several GB)
+uvx --python 3.12 --torch-backend cpu --from wattmind-pii-guard pii-guard up
+# pip: the same, from the PyTorch CPU index
+pip install wattmind-pii-guard --extra-index-url https://download.pytorch.org/whl/cpu
 ```
+
+PyTorch publishes no build for Intel macOS (and none for macOS 13 or older), so on an Intel Mac
+the install skips it and `pii-guard up` masks text with rules only and refuses images (the
+signature detector needs PyTorch; fail closed), with a warning that names the reason.
+For rules + NER there, or on macOS 13, run the [Docker demo](#docker) (a Linux image).
 
 The distribution is `wattmind-pii-guard` (the name `pii-guard` on PyPI is an unrelated
 project); the command is `pii-guard` and the import package `pii_guard`.
@@ -217,21 +242,25 @@ What it does:
   banner and a strip above the UI say so. `--mock` forces it.
 - **Mode.** Fast: rules plus NER (torch and transformers are in the default install). The
   NER model resolves as in [models.md](models.md#which-ner-model-fast-mode-runs): on the
-  first run the published checkpoint or the public fallback is downloaded once (about 1.1 GB).
+  first run the published checkpoint is downloaded once (about 1.1 GB). The public fallback, not
+  a Meta model, is off by default (`PII_GUARD_NER_FALLBACK=download` opts in; ADR 0015).
   The server answers at once and loads (or downloads) it in the background: `/healthz` and
   `/v1/status` say `"ner": "loading"`, and requests that need detection wait for it (up to
   `PII_GUARD_NER_WARMUP_TIMEOUT`, 120 s, then `503 detector_loading` with `Retry-After`;
   LAB-1303). The strip and the banner list the active detectors, the banner
-  names the NER model (`NER model  …@… (public fallback, Apache-2.0)`). Where torch and
+  names the NER model (`NER model  …@… (published pii-guard model, Apache-2.0)`). Where torch and
   transformers are missing (an install that skipped them) it says so and prints the exact
   `uvx --from 'wattmind-pii-guard[ner] @ <same source>' pii-guard up` line to reinstall
   (`[ner]` is now a no-op alias, kept so the line works on older releases too).
   `PII_GUARD_GATEWAY_MODE` overrides the mode.
-- **Images.** They need OCR (the `ocr` extra plus the Tesseract binary) and face detection (the
-  `local-vision` extra with its model, or `META_API_KEY` for SAM 3.1; see
-  [Segmenter](#segmenter-faces-on-the-device-signatures-on-sam-31)). Whatever is missing, image
-  parts are refused (fail closed), the strip says `images: refused (no OCR, face detection)`,
-  and the banner names the missing pieces with the commands to add them. Text works regardless.
+- **Images.** They need a key for Muse Spark Open, the default OCR engine
+  (`PII_GUARD_OCR_API_KEY` or `BASETEN_API_KEY`; with `PII_GUARD_OCR_ENGINE=tesseract`, the `ocr`
+  extra plus the Tesseract binary instead), and a key for SAM 3.1, the default segmenter
+  (`PII_GUARD_SAM_API_KEY` or `META_API_KEY`; see
+  [Segmenter](#segmenter-sam-31-by-default-on-device-engines-optional)). The unmasked image goes
+  to Baseten and to the Meta Model API. Whatever is missing, image parts are refused (fail
+  closed), the strip says `images: refused (no Muse OCR key, SAM 3.1 key)`, and the banner
+  names the missing pieces with the commands to add them. Text works regardless.
 - **Traffic log** `masked` by default (the dashboard needs it); `--traffic-log full` only on a
   loopback bind, as everywhere. A fresh tenant key per run unless `PII_GUARD_TENANT_KEY` is set (in the environment or `.env`).
 - It opens the browser (`--no-browser` to skip) and prints the gateway base URL and the
@@ -275,8 +304,9 @@ make smoke-fast       # the same in fast mode with the NER (local)
 PII Guard checkpoint, `watt-mind/pii-guard-ner-xlmr-base` release `v2.0` (LAB-1306; see
 [models.md](models.md#which-ner-model-fast-mode-runs)), pinned to a hub revision and
 checked against its SHA-256, stored in `~/.cache/pii-guard/models/ner/`
-(`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK=cached`
-uses it only if it is already there; `off` (what `MODE=rules` sets) never uses it.
+(`PII_GUARD_MODELS_DIR`). Later runs load it from there, offline. `PII_GUARD_NER_FALLBACK`
+(default `published`) never uses the public fallback; `download` opts in to it, `cached` uses
+either model only if it is already there, and `off` (what `MODE=rules` sets) fetches nothing.
 
 `make demo` starts, all bound to 127.0.0.1:
 
@@ -294,10 +324,10 @@ It prints a banner with the URLs and what it found:
   sends `model: pii-guard-mock`; set `PII_GUARD_DEMO_MODEL` for a real upstream. The demo
   traffic is fictional, so it may go to a hosted model.
 - **Fast mode** uses rules + the NER model that resolves (`PII_GUARD_NER_MODEL`, else the
-  published PII Guard checkpoint once it is pinned, else the public fallback) and names it,
-  for example `fast mode  rules + NER: bardsai/eu-pii-anonimization-multilang@62ca57123687
-  (public fallback, Apache-2.0)`. Rules only with `MODE=rules`, or when torch and
-  transformers are missing (the banner says so).
+  published PII Guard checkpoint; the public fallback only with `PII_GUARD_NER_FALLBACK=download`)
+  and names it, for example `fast mode  rules + NER: watt-mind/pii-guard-ner-xlmr-base@33ef18fed56a
+  (published pii-guard model, Apache-2.0)`. Rules only with `MODE=rules`, when no published
+  model can be had, or when torch and transformers are missing (the banner says so).
 - **Audit mode** (opt in with the header `X-PII-Guard-Mode: audit`) is available when an LLM
   detector key is set (`PII_GUARD_LLM_DETECTOR_API_KEY`, or `BASETEN_API_KEY`).
 
@@ -387,36 +417,49 @@ service (the demo image, `eval/` and `docs/` mounted read-only) prints it into t
 server binds `0.0.0.0`, so the traffic log can only be `masked` there (see below). Send the demo
 traffic with `uv run python scripts/demo_traffic.py --url http://127.0.0.1:8788`.
 
-**OCR.** The image installs Tesseract with the Hungarian, English and German data
-(`tesseract-ocr-hun`/`-eng`/`-deu`/`-osd`) and the `ocr` extra (`pytesseract`), so the text in
-inline images (a TAJ, a name) is read and masked. That adds about 115 MB (the apt layer; the
-image grew from about 269 MB to 429 MB in `docker image ls` on arm64). Without an OCR engine,
+**OCR.** The text in inline images (a TAJ, a name) is read by Muse Spark Open on Baseten by
+default (`PII_GUARD_OCR_ENGINE=muse`, [ADR 0016](decisions/0016-meta-only-ocr.md),
+[docs/models.md](models.md#ocr-muse-spark-open)): set `PII_GUARD_OCR_API_KEY` or
+`BASETEN_API_KEY` in `.env`. **The unmasked image goes to `PII_GUARD_OCR_URL`** (Baseten unless
+you point it at your own Muse Spark Open). Tesseract, not a Meta model, is opt-in: build with
+`--build-arg PII_GUARD_TESSERACT=true` (Hungarian, English and German data,
+`tesseract-ocr-hun`/`-eng`/`-deu`/`-osd`, about 115 MB) and run with
+`PII_GUARD_OCR_ENGINE=tesseract`; the `ocr` extra (`pytesseract`) is in the image either way.
+Without an OCR engine,
 image parts are refused with `503 ocr_unavailable` (fail closed, ADR 0006): set
 `PII_GUARD_IMAGE_REQUIRE_OCR=false` only if SAM-only masking is acceptable, which leaves text in
 images unchecked (`X-PII-Guard-Image-OCR: off`). pytesseract hands Tesseract the image through
 a temp file, so the read-only `api` and `demo-api` containers mount a `tmpfs` on `/tmp`; a
 read-only container without one fails every OCR call (`No usable temporary directory`). The container healthcheck reads `/healthz`
-(`"ocr"` plus `"image_require_ocr"`), and prints `ocr on|off` (`docker inspect --format
-'{{json .State.Health}}' <container>`). For `make demo` outside Docker: `brew install
+(`"ocr"`, `"ocr_engine"` and `"image_require_ocr"`) and prints `ocr <engine> on|off`
+(`docker inspect --format '{{json .State.Health}}' <container>`). It fails only when Tesseract
+is the configured engine and missing; a missing Muse key shows in `/v1/status` as the
+`ocr_key` gap instead. For `make demo` outside Docker: `brew install
 tesseract tesseract-lang` or `apt install tesseract-ocr tesseract-ocr-hun`, then
 `uv sync --extra ocr`; the banner says whether OCR is on.
 
-### Segmenter: faces on the device, signatures on SAM 3.1
+### Segmenter: SAM 3.1 by default, on-device engines optional
 
-`PII_GUARD_SEGMENTER` picks who finds the visual personal data in images (LAB-1245,
-[contracts.md](contracts.md), [models.md](models.md#local-segmentation)):
+`PII_GUARD_SEGMENTER` picks who finds the visual personal data in images (LAB-1245, LAB-1795,
+[ADR 0015](decisions/0015-meta-only-runtime-defaults.md), [contracts.md](contracts.md),
+[models.md](models.md#local-segmentation)). Only Meta models run by default:
 
 | Value | Faces, ID photos | Signatures | SAM 3.1 calls per image | Image leaves the machine |
 |---|---|---|---:|---|
-| `hybrid` (default) | YuNet on the CPU | SAM 3.1 (`signature`, `squiggly line`) | 2 | yes, for the signature prompts |
-| `sam-api` (the default before LAB-1245) | SAM 3.1 | SAM 3.1 | 5 (with `stamp`) | yes |
-| `local` | YuNet on the CPU | not found: images are refused while `SIGNATURE` is masked | 0 | no |
+| `sam-api` (default) | SAM 3.1 | SAM 3.1 | 5 (with `stamp`) | yes: to the Meta Model API |
+| `hybrid` (opt-in, not Meta-only) | YuNet on the CPU | SAM 3.1 (`signature`, `squiggly line`) | 2 | yes, for the signature prompts |
+| `local` (opt-in, not Meta-only) | YuNet on the CPU | not found: images are refused while `SIGNATURE` is masked | 0 | no |
 | `off` | — | — | 0 | no; every image is refused |
 
-`hybrid` is a latency and cost win, not a privacy win: the image still goes to the Meta API for
-the signature prompts. YuNet (OpenCV model zoo, 0.23 MB, MIT) runs alongside those calls.
-`STAMP` is `keep` by default, so `hybrid` does not ask SAM for stamps; give it another policy
-and it does (one more call).
+`sam-api` needs a key (`PII_GUARD_SAM_API_KEY`, else `META_API_KEY`). Without one every image is
+`503 detection_failed`, `/v1/status` lists the gap `sam`, and nothing falls back to a non-Meta
+model. YuNet (OpenCV model zoo, 0.23 MB, MIT) and the YOLOS-tiny signature detector are not Meta
+models: they run only when you choose `hybrid` or `local` (or a project policy's `local`
+detection on such a server). On a `sam-api` server, a project policy saved with `local`
+detection has its images refused rather than sent to SAM. `hybrid` is a latency and cost win,
+not a privacy win: the image still goes to the Meta API for the signature prompts. `STAMP` is
+`keep` by default, so `hybrid` does not ask SAM for stamps; give it another policy and it does
+(one more call).
 
 **Fallback (fail closed, ADR 0006).** The segmenter is built on the first image. If OpenCV or
 the YuNet model is missing, `hybrid` logs a warning (`on-device face detection unavailable ...;
@@ -424,9 +467,10 @@ faces and ID photos go to SAM 3.1 too`) and sends every type to SAM (4 calls): s
 With no SAM API key either, every image is `503 detection_failed`. `local` never falls back to
 the API, and any SAM or YuNet error while an image is processed refuses the image.
 
-**Getting YuNet.** The Docker image ships it: the `local-vision` extra (OpenCV headless) and the
-model, fetched at build time from its pinned OpenCV model zoo URL and checked against its
-pinned SHA-256 (the build fails on a mismatch), in `/app/models` (`PII_GUARD_MODEL_DIR`). That
+**Getting YuNet (opt-in).** The Docker image ships the `local-vision` extra (OpenCV headless).
+The model is fetched only when you build with `--build-arg PII_GUARD_ON_DEVICE_VISION=true`
+(ADR 0015), from its pinned OpenCV model zoo URL and checked against its pinned SHA-256 (the
+build fails on a mismatch), into `/app/models` (`PII_GUARD_MODEL_DIR`). That
 adds about 160 MB unpacked (`du` inside the container, arm64: 317 MB → 478 MB; `docker image
 inspect` on Docker Desktop: 430 MB → 653 MB): OpenCV headless about 87 MB, numpy about 68 MB, the
 model 0.23 MB. The local-vision change raised the CI size budget from 375 to 525 MB.
@@ -437,7 +481,8 @@ footprint increase supports encrypted configuration without implementing custom 
 Since LAB-1733 the NER (torch, transformers) is a core dependency that this image skips; it then
 measured 544 MB, so LAB-1734 raised the budget to 650 MB: room for ordinary growth, while the NER
 leaking into the base image (about +1 GB) still fails the check.
-`make demo` fetches YuNet too. Elsewhere: `uv sync --extra local-vision`, then
+`make demo` fetches YuNet and YOLOS-tiny too; they stay unused unless you set `hybrid` or
+`local`. Elsewhere: `uv sync --extra local-vision`, then
 `uv run python -m pii_guard.visual.segment fetch` (into `PII_GUARD_MODEL_DIR`, default
 `~/.cache/pii-guard/models`). Model files are never committed.
 
@@ -447,6 +492,17 @@ returns and checks every mask. Elsewhere: `uv sync --extra sam`. Without it, pii
 decoder reads SAM output (logged once at info level); limits and fail-closed checks are the same.
 
 ## Exposure and authentication
+
+The built-in `serve` and `up` launchers disable Uvicorn access logging: raw request URLs can
+contain session handles and personal data in query parameters. The application access log
+records route templates, status codes and timings instead. When starting Uvicorn yourself,
+use `--no-access-log`, and configure any reverse proxy to omit or sanitize request URLs too.
+
+Self-hosted browser mutations require the application's own origin. Foreign or ambiguous
+Origin headers and cross-site Fetch Metadata are refused before processing, even on loopback.
+Gateway POSTs also refuse explicit non-JSON content types, preventing simple HTML forms from
+using the server's provider credentials. Native SDKs may omit browser headers and Content-Type;
+this does not replace the API token or an authenticating proxy.
 
 **There is no authentication by default.** Anyone who can reach the API can mask and unmask,
 read the traffic log and `/metrics`, and use the gateway. With `PII_GUARD_UPSTREAM_API_KEY` set,
@@ -588,9 +644,10 @@ runtime.
 | `outbound_check` | The [outbound re-check](architecture-gateway.md#outbound-re-check) of the masked request: `result` (`passed` or `blocked`), `texts` checked, `hits` (blocking occurrences per entity type), `short` (occurrences too short to block), `ms`; `null` when the call was refused before it |
 | `mode`, `language`, `stream`, `model` | As requested; `model` is `"[withheld]"` unless it passed its identifier check (refused, blocked and failed calls), here and in the `full` original (LAB-1358) |
 | `session_ref`, `session_new`, `session_source` | Hashed session (see above); whether the call started the conversation; which step chose it: `header`, `path`, `prompt_cache_key` or `default` ([architecture-gateway.md](architecture-gateway.md#sessions)) |
-| `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`) |
+| `detectors` | Detectors that ran (`rules`, `ner`, `llm`, `known`, `visual`; escalate mode lists `llm` only when a text had uncertain spans) |
 | `entities` | `detected` and `masked` counts per entity type, number of texts; `images` (count, regions masked / kept, OCR) |
-| `cache` | Detection cache `hits`, `misses`, `seeded` |
+| `cache` | Detection cache `hits`, `misses`, `seeded` (retained for compatibility, now always zero: response restoration is not a complete detection result) |
+| `audit_escalations` | Escalate mode only: texts sent to the LLM detector as masked windows (0 when nothing was uncertain or every decision came from the session cache); absent in fast and audit events |
 | `upstream` | HTTP status, the model it reported (`"[withheld]"` when it is not model-id shaped, for example holds an e-mail address), `unresolved_placeholders` (placeholders the model invented) |
 | `usage` | Token usage as the upstream reported it (streams: when `stream_options.include_usage` is set) |
 | `timing` | See [Timing](#timing) |

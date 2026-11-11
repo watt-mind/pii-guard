@@ -1,0 +1,63 @@
+# Cue words for context-cued numbers (languages/cues.py; docs/languages.md); format in
+# hu/cues.tsv. Romanian nouns take the article and case endings at the end of the word, so a
+# trailing "*" covers "telefon", "telefonul", "telefonului"; forms whose stem changes
+# ("comandă" -> "comenzii", "factură" -> "facturii") are listed by stem. Matching ignores case
+# and accents, so "ș"/"ş" (comma or cedilla) and a missing diacritic are the same cue.
+telefon*	PHONE
+tel.	PHONE
+mobil*	PHONE
+nr. de telefon	PHONE
+număr de telefon	PHONE
+numărul de telefon	PHONE
+fax	PHONE
+card bancar	BANK_ACCOUNT
+cardul bancar	BANK_ACCOUNT
+card de credit	BANK_ACCOUNT
+card de debit	BANK_ACCOUNT
+număr card	BANK_ACCOUNT
+numărul cardului	BANK_ACCOUNT
+cont bancar	BANK_ACCOUNT
+contul bancar	BANK_ACCOUNT
+cont curent	BANK_ACCOUNT
+CNP	ID_DOCUMENT
+C.N.P.	ID_DOCUMENT
+cod numeric personal	ID_DOCUMENT
+codul numeric personal	ID_DOCUMENT
+CIF	ID_DOCUMENT
+cod fiscal	ID_DOCUMENT
+codul fiscal	ID_DOCUMENT
+carte de identitate	ID_DOCUMENT
+cartea de identitate	ID_DOCUMENT
+cărții de identitate	ID_DOCUMENT
+buletin*	ID_DOCUMENT
+act de identitate	ID_DOCUMENT
+actul de identitate	ID_DOCUMENT
+pașaport*	ID_DOCUMENT
+permis de conducere	ID_DOCUMENT
+permisul de conducere	ID_DOCUMENT
+permis de ședere	ID_DOCUMENT
+comand*	-
+comenz*	-
+nr. comandă	-
+factur*	-
+bon fiscal	-
+bonul fiscal	-
+chitanț*	-
+client*	-
+cod client	-
+referinț*	-
+nr. de referință	-
+AWB	-
+colet*	-
+expediți*	-
+rezervar*	-
+dosar*	-
+cod poștal	-
+codul poștal	-
+sumă	-
+total*	-
+valoare*	-
+sold*	-
+și	-
+sau	-
+ori	-

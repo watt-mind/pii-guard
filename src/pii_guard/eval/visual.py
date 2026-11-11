@@ -5,6 +5,7 @@ pii-guard eval visual --specimens data/specimens [--manifest eval/visual/manifes
                       [--labels eval/visual/labels.json] [--cache data/visual-cache]
                       [--offline] [--max-live-calls 800] [--no-ocr] [--country HU,DE]
                       [--detectors rules[,ner,llm]] [--no-captions] [--ocr-upscale 2000]
+                      [--ocr-engine tesseract|muse] [--ocr-replay JSON] [--ocr-record JSON]
                       [--prompts JSON] [--prompt-study JSON] [--baseline NAME]
                       [--json OUT] [--markdown OUT]
 ```
@@ -26,6 +27,11 @@ directory (keyed by a hash of the request body: model, prompt and image), so rer
 nothing. ``--max-live-calls`` caps network calls per run; ``--offline`` forbids them. The
 report counts SAM calls (live and cached), estimates their cost and reports latency (the SAM
 latency recorded when each response was first fetched, plus local OCR/detection time).
+
+``--ocr-engine muse`` reads the text with Muse Spark Open (LAB-1796; the image goes to
+``PII_GUARD_OCR_URL``, fictional images only), ``--ocr-record JSON`` stores the words each
+image's OCR returned (``eval/fixtures/visual/ocr/muse.json``), and ``--ocr-replay JSON`` reads
+them back instead of running any OCR, so the run is offline.
 
 ``--baseline NAME`` scores an open-source image redaction tool instead of pii-guard, with the
 same images and the same scorer (:mod:`pii_guard.eval.baselines.image`): each tool runs in its
@@ -666,6 +672,18 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PX",
         help="enlarge images for OCR to this longer side (0: read them as they are)",
     )
+    parser.add_argument(
+        "--ocr-engine",
+        choices=("tesseract", "muse"),
+        default="tesseract",
+        help="OCR engine (muse: Muse Spark Open; sends each image to PII_GUARD_OCR_URL)",
+    )
+    parser.add_argument(
+        "--ocr-replay", type=Path, metavar="JSON", help="recorded OCR words instead of any OCR"
+    )
+    parser.add_argument(
+        "--ocr-record", type=Path, metavar="JSON", help="store each image's OCR words here"
+    )
     parser.add_argument("--country", type=_csv, help="only these countries (comma-separated)")
     parser.add_argument("--max-side", type=int, default=DEFAULT_MAX_SIDE)
     parser.add_argument(
@@ -699,11 +717,23 @@ def _ocr_and_detector(
     several) and its report name (``rules+llm``)."""
     if args.no_ocr:
         return None, None, None
-    from pii_guard.visual.ocr import TesseractOcr, tesseract_available
+    ocr: OcrEngine
+    if args.ocr_replay:
+        from pii_guard.eval.visual_labels_core import CachedOcr
 
-    if not tesseract_available():
-        raise DetectionError("OCR unavailable (install the 'ocr' extra and tesseract)")
-    ocr = TesseractOcr(upscale_to=args.ocr_upscale or None)
+        ocr = CachedOcr.load(args.ocr_replay, name=args.ocr_engine)
+    elif args.ocr_engine == "muse":
+        from pii_guard.visual.ocr_muse import MuseOcr
+
+        ocr = MuseOcr(max_retries=2)
+        if not ocr.configured:
+            raise DetectionError("Muse OCR has no key (PII_GUARD_OCR_API_KEY or BASETEN_API_KEY)")
+    else:
+        from pii_guard.visual.ocr import TesseractOcr, tesseract_available
+
+        if not tesseract_available():
+            raise DetectionError("OCR unavailable (install the 'ocr' extra and tesseract)")
+        ocr = TesseractOcr(upscale_to=args.ocr_upscale or None)
     names = list(dict.fromkeys(args.detectors))
     if len(names) == 1:
         from pii_guard.registry import create_detector
@@ -832,6 +862,11 @@ def main(
             markdown = render_prompt_study(rows)
         else:
             ocr, detector, detector_name = _ocr_and_detector(args)
+            recorder = None
+            if args.ocr_record and ocr is not None:
+                from pii_guard.eval.visual_labels_core import RecordingOcr
+
+                ocr = recorder = RecordingOcr(ocr)
             sam = sam_factory()
             results = evaluate(
                 specimens,
@@ -858,6 +893,9 @@ def main(
             if args.title:
                 output = {"title": args.title, **output}
             markdown = render_markdown(output)
+            if recorder is not None:
+                recorder.write(args.ocr_record, specimens, engine=args.ocr_engine)
+                log(f"recorded the OCR words of {len(recorder.images)} images to {args.ocr_record}")
     except PiiGuardError as exc:
         log(f"run failed: {exc.code}: {exc.message}")
         return 1

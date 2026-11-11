@@ -20,20 +20,21 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import AsyncIterator, Callable, Iterable, Mapping
+from collections.abc import AsyncIterator, Callable, Iterable
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from pii_guard.gateway.opaque_ids import upstream_ids
+from pii_guard.gateway.opaque_reasoning import OpaqueStream
 from pii_guard.gateway.restore import (
     MESSAGE_TEXT_FIELDS,
     JsonEscapingSession,
     ToolInputSession,
     restore_text,
 )
-from pii_guard.types import PiiGuardError, Span
+from pii_guard.types import PiiGuardError
 from pii_guard.vault import StreamUnmasker, VaultSession
 
 if TYPE_CHECKING:
@@ -104,7 +105,6 @@ async def stream_sse_events(
     stats: Any,
     restorer: Any,
     session: VaultSession,
-    seed_cache: Callable[[Mapping[int, tuple[str, list[Span]]]], None],
     on_error: Callable[[Exception], Iterable[bytes]],
 ) -> AsyncIterator[bytes]:
     """Hand ``source``'s events to the client; time suspended in ``yield`` is the
@@ -129,7 +129,7 @@ async def stream_sse_events(
                 timer.add("client", time.perf_counter() - sending)
     except (GeneratorExit, asyncio.CancelledError):
         # The client went away mid-stream (the server closes or cancels this generator).
-        # The answer is partial: record it as such and never seed the cache with it.
+        # The answer is partial: record it as such.
         if outcome == "ok":
             outcome = "client_disconnected"
         raise
@@ -144,7 +144,6 @@ async def stream_sse_events(
             stats=stats,
             restorer=restorer,
             session=session,
-            seed_cache=seed_cache,
         )
 
 
@@ -156,14 +155,13 @@ def _finalize_sse_stream(
     stats: Any,
     restorer: Any,
     session: VaultSession,
-    seed_cache: Callable[[Mapping[int, tuple[str, list[Span]]]], None],
 ) -> None:
     stats.upstream_ms = timer.stages["upstream"] * 1000
     stats.unresolved = len(restorer.unresolved)
     if trace.recording and getattr(restorer, "usage", None):
         trace.usage = restorer.usage
-    if outcome == "ok":
-        _seed_restored_stream(session, restorer, trace, seed_cache)
+    if outcome == "ok" and trace.full:
+        _record_restored_stream(session, restorer, trace)
     stats.log(outcome)
     if trace.payloads:
         trace.stream_masked = restorer.masked_content()
@@ -178,22 +176,20 @@ def _finalize_sse_stream(
         trace.finish(outcome="stream_error", error={"code": "stream_failed"})
 
 
-def _seed_restored_stream(
+def _record_restored_stream(
     session: VaultSession,
     restorer: Any,
     trace: CallTrace,
-    seed_cache: Callable[[Mapping[int, tuple[str, list[Span]]]], None],
 ) -> None:
+    # Restored-placeholder spans are not complete detections. Keep them out of the
+    # request detection cache: every previously unseen response must be detected if reused.
     with suppress(PiiGuardError):
-        restored = {}
-        for index, masked in restorer.masked_content().items():
-            text, spans, _ = restore_text(session, masked)
-            restored[index] = (text, spans)
-        seed_cache(restored)
-        if trace.full:
-            trace.stream_restored = {i: t for i, (t, _) in restored.items()}
-            if hasattr(restorer, "restored_tool_calls"):
-                trace.stream_restored_tools = restorer.restored_tool_calls()
+        trace.stream_restored = {
+            index: restore_text(session, masked)[0]
+            for index, masked in restorer.masked_content().items()
+        }
+        if hasattr(restorer, "restored_tool_calls"):
+            trace.stream_restored_tools = restorer.restored_tool_calls()
 
 
 async def iter_sse_data(lines: AsyncIterator[str]) -> AsyncIterator[str]:
@@ -236,12 +232,14 @@ class SseRestorer:
         on_ids: Callable[[list[str]], None] | None = None,
         *,
         keep_restored_tools: bool = False,
+        opaque: OpaqueStream | None = None,
     ) -> None:
         """``on_ids`` receives the ids each chunk carries, raw (LAB-1469).
 
         ``keep_restored_tools`` also retains the restored tool-call arguments (traffic log
         level ``full``); the masked ones are always retained, under the same cap (LAB-1189).
         """
+        self._opaque = opaque
         self._session = session
         self._on_ids = on_ids
         # One budget for the whole response: every choice, field and tool call (LAB-1350).
@@ -402,6 +400,8 @@ class SseRestorer:
             ]
         if self._on_ids is not None:
             self._on_ids(upstream_ids(chunk))
+        if self._opaque is not None:
+            self._opaque.observe(chunk)
         self._process_choices(chunk)
         self.chunks += 1
         return [json.dumps(chunk, ensure_ascii=False)]
@@ -484,6 +484,8 @@ class SseRestorer:
         if self._done:
             return []
         self._done = True
+        if self._opaque is not None:
+            self._opaque.finish()  # a stream may end without finish_reason or a stop event
         pending: dict[int, dict[str, Any]] = {}
         for key, unmasker in self._unmaskers.items():
             rest = unmasker.flush()

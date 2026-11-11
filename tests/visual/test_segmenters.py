@@ -97,9 +97,29 @@ def _unavailable() -> LocalSegmenter:
 # --- the setting -----------------------------------------------------------------------------
 
 
-def test_hybrid_is_the_default_setting() -> None:
-    assert Settings().segmenter == "hybrid"
+def test_sam_api_is_the_default_setting() -> None:
+    # Only Meta models run by default (ADR 0015, LAB-1795); hybrid and local are opt-in.
+    assert Settings().segmenter == "sam-api"
     assert SEGMENTER_MODES == ("hybrid", "sam-api", "local", "off")
+
+
+def test_default_builds_sam_and_never_an_on_device_model() -> None:
+    def refused() -> LocalSegmenter:
+        raise AssertionError("a non-Meta on-device model was built by default")
+
+    seg = build_segmenter(Settings(), local=refused)
+    assert type(seg) is SamClient and seg.model == "sam-3.1"
+
+
+def test_default_without_a_key_fails_closed_without_an_on_device_fallback() -> None:
+    def refused() -> LocalSegmenter:
+        raise AssertionError("a non-Meta on-device model was built by default")
+
+    seg = build_segmenter(Settings(), local=refused)
+    # No PII_GUARD_SAM_API_KEY or META_API_KEY (conftest clears them).
+    assert isinstance(seg, SamClient) and not seg.configured
+    with pytest.raises(DetectionError, match="no API key"):
+        seg.segment(b"not an image", [EntityType.FACE])
 
 
 def test_setting_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,7 +140,7 @@ def test_build_rejects_an_unknown_mode() -> None:
 
 def test_build_hybrid() -> None:
     local = FakeLocal()
-    seg = build_segmenter(Settings(), local=lambda: local)  # type: ignore[arg-type,return-value]
+    seg = build_segmenter(Settings(segmenter="hybrid"), local=lambda: local)  # type: ignore[arg-type,return-value]
     assert isinstance(seg, HybridSegmenter)
     assert seg.local is local
     assert seg.model == "yunet-2023mar+sam-3.1"
@@ -143,7 +163,7 @@ def test_hybrid_without_yunet_falls_back_to_sam_with_a_warning(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     with caplog.at_level(logging.WARNING, logger="pii_guard.visual.segmenters"):
-        seg = build_segmenter(Settings(meta_api_key="k"), local=_unavailable)
+        seg = build_segmenter(Settings(meta_api_key="k", segmenter="hybrid"), local=_unavailable)
     assert isinstance(seg, HybridSegmenter)
     assert seg.local is None and seg.local_types == ()
     assert seg.model == "sam-3.1"
@@ -154,7 +174,7 @@ def test_hybrid_without_yunet_falls_back_to_sam_with_a_warning(
 
 def test_hybrid_without_yunet_and_without_a_key_raises() -> None:
     with pytest.raises(DetectionError, match="no API key"):
-        build_segmenter(Settings(), local=_unavailable)
+        build_segmenter(Settings(segmenter="hybrid"), local=_unavailable)
 
 
 # --- segmenting ------------------------------------------------------------------------------

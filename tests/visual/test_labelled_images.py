@@ -43,7 +43,7 @@ from pii_guard.visual.labels import VaultMatcher
 from pii_guard.visual.masking import ImageMasker
 from pii_guard.visual.ocr import OcrText, OcrWord, TextFinding
 from pii_guard.visual.regions import Box, Region
-from pii_guard.visual.render import LABEL_FILL, LABEL_INK, LabelBox, render_labels
+from pii_guard.visual.render import LABEL_EDGE, LABEL_FILL, LABEL_RULE, LabelBox, render_labels
 
 TENANT_KEY = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
 GOLD = (FICTIONAL_NAME, FICTIONAL_TAJ, FICTIONAL_TAJ.replace(" ", ""), FICTIONAL_TAX_ID)
@@ -788,7 +788,7 @@ def test_nested_independent_cover_keeps_its_outline(label: str | None) -> None:
     outer = LabelBox(Box(10, 10, 300, 150), "PHOTO · [[PERSON_a1b2c3]]")
     inner = LabelBox(Box(60, 30, 200, 120), label)
     out = render_labels(magenta_png((400, 200)), [outer, inner])
-    assert load_image(out.image).getpixel((inner.box.x1 - 2, inner.box.y1 - 2)) == LABEL_INK
+    assert load_image(out.image).getpixel((inner.box.x1 - 2, inner.box.y1 - 2)) == LABEL_EDGE
 
 
 @pytest.mark.parametrize("photo_policy", [Policy.MASK, Policy.KEEP])
@@ -817,13 +817,26 @@ def test_photo_outline_suppression_respects_policy_and_preserves_signature(
     assert face.policy is Policy.MASK and face.cover_box is not None
     assert signature.policy is Policy.MASK and signature.cover_box is not None
     assert _magenta_pixels(outcome.image, [face.cover_box, signature.cover_box]) == 0
-    expected = LABEL_FILL if photo_policy is Policy.MASK else LABEL_INK
+    expected = LABEL_FILL if photo_policy is Policy.MASK else LABEL_EDGE
     assert load_image(outcome.image).getpixel((face.cover_box.x1, face.cover_box.y1)) == expected
     if photo_policy is Policy.MASK:
         assert photo.cover_box is not None
         assert _magenta_pixels(outcome.image, [photo.cover_box]) == 0
     else:
         assert photo.cover_box is None
+
+
+def test_stacked_covers_share_one_border_and_a_hairline() -> None:
+    # OCR line boxes taller than the line: the second field overlaps the first by half a row.
+    upper = LabelBox(Box(12, 12, 198, 60), "[[PERSON_a1b2c3]]")
+    lower = LabelBox(Box(12, 40, 148, 100), "[[DATE_OF_BIRTH_d4e5f6]]")
+    image = load_image(render_labels(magenta_png((400, 200)), [upper, lower]).image)
+    # No border crosses the other cover: the column inside both shows no edge colour
+    # between the lower cover's (hidden) top and its bottom border.
+    assert all(image.getpixel((146, y)) != LABEL_EDGE for y in range(38, 102))
+    assert image.getpixel((146, 102)) == LABEL_EDGE
+    # The overlap is split at its midpoint by a hairline.
+    assert LABEL_RULE in {image.getpixel((x, (62 + 38) // 2)) for x in range(10, 151)}
 
 
 def test_nested_different_labels_still_print_both() -> None:

@@ -141,7 +141,7 @@ CAPABILITIES = {
 def test_local_status_shape_is_unchanged_plus_capabilities(api: TestClient) -> None:
     body = api.get("/v1/status", headers={"host": "localhost:8787"}).json()
     assert set(body) == LOCAL_KEYS | {"capabilities"}
-    assert set(body["gateway"]["modes"]) == {"fast", "audit"}
+    assert set(body["gateway"]["modes"]) == {"fast", "escalate", "audit"}
     assert body["capabilities"] == {
         "text": True,
         "chat": True,

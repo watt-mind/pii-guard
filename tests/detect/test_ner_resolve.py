@@ -161,6 +161,32 @@ def test_fallback_modes(fallback: PinnedModel, hub: list[dict[str, Any]]) -> Non
     assert "downloads on first run" not in describe(cached)
 
 
+def test_default_is_published_only_and_never_the_public_fallback(
+    monkeypatch: pytest.MonkeyPatch, fallback: PinnedModel, hub: list[dict[str, Any]]
+) -> None:
+    """Meta-only runtime (ADR 0015, LAB-1795): the bards.ai fallback is off by default."""
+    from pii_guard.config import Settings
+
+    monkeypatch.delenv("PII_GUARD_NER_FALLBACK")
+    assert Settings(_env_file=None).ner_fallback == "published" == ner_resolve.DEFAULT_FALLBACK
+    # The published fine-tune of Meta's XLM-RoBERTa still downloads on first use.
+    published = resolve(published="fictional/pii-guard-ner@abcdef1234567")
+    assert (published.source, published.may_download) == ("published", True)
+    # No published model: rules only, even with the fallback already in the cache.
+    ensure(resolve(fallback="download"), progress=lambda _: None)
+    assert PIN.is_ready()
+    none = resolve()
+    assert (none.source, none.model, none.usable) == ("none", None, False)
+    assert describe(none) == (
+        "rules only (no published pii-guard model pinned and the public fallback is off "
+        "(PII_GUARD_NER_FALLBACK=published))"
+    )
+    assert resolve(fallback="published").model is None
+    # Opting back in still works: "download" (and "cached") use the fallback.
+    assert resolve(fallback="download").source == "fallback"
+    assert resolve(fallback="cached").source == "fallback"
+
+
 def test_ensure_downloads_once_at_the_pinned_revision(
     fallback: PinnedModel, hub: list[dict[str, Any]]
 ) -> None:

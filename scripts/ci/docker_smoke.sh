@@ -10,7 +10,7 @@
 #    to ~316 MB (arm64).
 # 2. The image runs read-only as in compose.yaml: the mock upstream and the API from the same
 #    image on a private network; /healthz answers and the container healthcheck (which also
-#    checks OCR) turns healthy.
+#    checks Tesseract when it is the configured OCR engine) turns healthy.
 # 3. One chat request with fictional PII goes through the gateway: the answer is restored
 #    exactly and the upstream (the mock records what it receives) never saw a raw value.
 # Offline apart from the image itself; no key, no model download.

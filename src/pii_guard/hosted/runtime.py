@@ -35,6 +35,8 @@ from pii_guard.vault import Vault
 from pii_guard.workers import BoundedWorkers
 
 if TYPE_CHECKING:
+    from starlette.datastructures import Headers
+
     from pii_guard.projects.runtime import ProjectService
 
 
@@ -117,9 +119,11 @@ class Runtime:
     holds_lock: Any = field(default_factory=threading.Lock)
     issued_ids: IssuedIds = field(default_factory=IssuedIds)
     session_incarnations: OrderedDict[str, Any] = field(default_factory=OrderedDict)
-    #: The ``_runtimes`` key; a guest runtime is dropped as soon as it is idle.
+    #: The ``_runtimes`` key; a guest's demo-only runtime is dropped as soon as it is idle.
     identity: str = ""
     guest: bool = False
+    #: A guest runtime the Playground used: it keeps its sessions until it expires (LAB-1812).
+    playground: bool = False
     #: The principal that owns this runtime; its traffic log belongs to that owner's feed.
     owner: str = ""
 
@@ -171,14 +175,15 @@ class HostedService:
                 "a 32-byte tenant key and local fast detectors"
             )
         if settings.hosted_images and (
-            not settings.image_require_ocr
-            or ("segmenter" in settings.model_fields_set and settings.segmenter != "local")
+            not settings.image_require_ocr or settings.segmenter not in {"sam-api", "local"}
         ):
-            # ADR 0014: hosted images are processed on the replica only. A remote segmenter
-            # (hybrid, sam-api) would send the original image out; "off" refuses every image;
-            # SAM-only masking leaves the image's text unchecked.
+            # ADR 0015 (amends ADR 0014): hosted images use SAM 3.1 on the Meta Model API by
+            # default, or the opt-in on-device segmenter. "hybrid" would run a non-Meta face
+            # model next to SAM; "off" refuses every image; masking without OCR leaves the
+            # image's text unchecked.
             raise ValueError(
-                "Hosted images require OCR and the local segmenter (PII_GUARD_SEGMENTER=local)"
+                "Hosted images require OCR and SAM 3.1 (PII_GUARD_SEGMENTER=sam-api, the "
+                "default) or the opt-in local segmenter (PII_GUARD_SEGMENTER=local)"
             )
         self.settings = settings
         self.master_key = key
@@ -189,6 +194,8 @@ class HostedService:
         self.abuse = AbuseAdmission(settings.hosted_client_ip_source)
         self.quotas = QuotaLedger(
             QuotaLimits(
+                guest_requests=settings.hosted_guest_requests_per_day,
+                guest_tokens=settings.hosted_guest_tokens_per_day,
                 input_microdollars_per_token=settings.hosted_input_microdollars_per_token,
                 output_microdollars_per_token=settings.hosted_output_microdollars_per_token,
                 user_images=settings.hosted_user_images_per_day,
@@ -227,7 +234,9 @@ class HostedService:
         # never a queue. A timed-out job keeps the slot until its thread has finished.
         self.image_workers = BoundedWorkers(1, "pii-guard-hosted-image")
 
-    def acquire(self, principal: Principal, *, namespace: str | None = None) -> Runtime:
+    def acquire(
+        self, principal: Principal, *, namespace: str | None = None, playground: bool = False
+    ) -> Runtime:
         self.purge_expired()
         with self._lock:
             now = time.monotonic()
@@ -249,7 +258,7 @@ class HostedService:
                     if guest
                     else self.settings.hosted_max_principals
                 )
-                if pooled >= maximum:
+                if pooled >= maximum and not (guest and self._evict_idle_guest_locked()):
                     raise HostedCapacityError("Hosted runtime capacity reached; try later")
                 key = hmac.digest(self.master_key, b"vault\0" + identity.encode(), "sha256")
                 budget = self._session_budgets.setdefault(
@@ -285,18 +294,33 @@ class HostedService:
                 self._runtimes[identity] = runtime
             runtime.active += 1
             runtime.touched = now
+            runtime.playground = runtime.playground or playground
             return runtime
 
     def release(self, runtime: Runtime) -> None:
         with self._lock:
             runtime.active -= 1
             runtime.touched = time.monotonic()
-            # A guest's only work is one ephemeral demo: nothing outlives it.
-            if runtime.guest and not runtime.active:
-                runtime.vault.close()
-                if self._runtimes.get(runtime.identity) is runtime:
-                    del self._runtimes[runtime.identity]
-                    self._detach_traffic_locked(runtime)
+            # A guest's demo is one ephemeral request: nothing outlives it. Its Playground
+            # runtime keeps its sessions between requests (mask, chat, restore) until it
+            # expires, or until a new guest needs its pool slot (LAB-1812).
+            if runtime.guest and not runtime.active and not runtime.playground:
+                self._drop_locked(runtime)
+
+    def _drop_locked(self, runtime: Runtime) -> None:
+        runtime.vault.close()
+        if self._runtimes.get(runtime.identity) is runtime:
+            del self._runtimes[runtime.identity]
+            self._session_budgets.pop(runtime.owner, None)
+            self._detach_traffic_locked(runtime)
+
+    def _evict_idle_guest_locked(self) -> bool:
+        """Free the least recently used idle guest runtime; False when every one is busy."""
+        idle = [r for r in self._runtimes.values() if r.guest and not r.active]
+        if not idle:
+            return False
+        self._drop_locked(min(idle, key=lambda r: r.touched))
+        return True
 
     def purge_expired(self) -> None:
         with self._lock:
@@ -465,22 +489,22 @@ class HostedService:
         if images:
             from pii_guard.hosted.images import (
                 hosted_image_limits,
+                hosted_segmenter,
                 hosted_visual_policies,
                 local_ocr,
-                local_segmenter,
-                require_local_visual_policies,
+                require_servable_visual_policies,
             )
 
             # The owner's policy, text and visual, with the operator's stricter overrides,
-            # exactly as /v1/mask/image; a policy only SAM could serve is refused first.
+            # exactly as /v1/mask/image; a policy the pipeline can't serve is refused first.
             policy = getattr(request.state, "project_policy", None)
             request.state.project_policies = hosted_visual_policies(
                 policy, get_policies(request), self.settings, request.app.state.policies
             )
-            require_local_visual_policies(request.state.project_policies, policy)
+            require_servable_visual_policies(request.state.project_policies, self.settings)
             max_pixels, image_timeout = hosted_image_limits(self.settings)
             image_kwargs = {
-                "sam": local_segmenter(request.app.state),
+                "sam": hosted_segmenter(request.app.state),
                 "ocr": local_ocr(request.app.state),
                 "image_workers": self.image_workers,
             }
@@ -615,6 +639,16 @@ class HostedService:
             pass
         self.quotas.disable_sponsored()
         return True
+
+    def quota_key(self, principal: Principal, headers: Headers) -> str:
+        """Whose daily allowance a request spends: a guest's network, else the principal.
+
+        A guest cookie is free to rotate, so with a client address source configured guests
+        share their network's allowance (LAB-1812); with the source off, the cookie's own.
+        """
+        if principal.authenticated:
+            return principal.id
+        return self.abuse.network_id(headers) or principal.id
 
     def enter_ingress(self, principal: Principal) -> None:
         """Take one ingress slot for an identified, admitted principal; never queue."""

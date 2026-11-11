@@ -1,6 +1,6 @@
 # Architecture
 
-> Status: implemented on develop. Version 0.1.0 is planned as the first tagged release; nothing is tagged or published yet (see [CHANGELOG](../CHANGELOG.md)).
+> Status: implemented on develop and released on PyPI as `wattmind-pii-guard` (versions and changes: [CHANGELOG](../CHANGELOG.md)).
 
 ## Overview
 
