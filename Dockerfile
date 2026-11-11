@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # --- build: resolve dependencies and install the project into /app/.venv -----
-FROM ghcr.io/astral-sh/uv:0.13.6-python3.12-trixie-slim AS build
+FROM ghcr.io/astral-sh/uv:0.13.7-python3.12-trixie-slim AS build
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -59,6 +59,11 @@ RUN mkdir -p /app/models \
 
 # --- runtime: Python and the virtualenv (Tesseract opt-in), as a non-root user -
 FROM python:3.12-slim-trixie AS runtime
+# The base can lag trixie-security: zlib1g 1.3.1-1+b1 carries CVE-2026-85091 and CVE-2026-76844
+# (LAB-2349), which the CI Trivy scan fails on. Take the fix until the base image ships it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade zlib1g \
+    && rm -rf /var/lib/apt/lists/*
 
 # The text in images (a TAJ, a name) is read by Muse Spark Open by default (ADR 0016,
 # PII_GUARD_OCR_ENGINE=muse), which receives the unmasked image. Tesseract is not a Meta model,
