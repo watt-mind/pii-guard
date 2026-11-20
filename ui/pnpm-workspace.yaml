@@ -6,3 +6,10 @@ allowBuilds:
 # never includes it (it is Node's HTTP client), but `pnpm audit --prod` counts it.
 overrides:
   undici@7.29.1: 7.30.1
+# picomatch <=4.0.7 (GHSA-fc5q-39xc-vjpf, high, ReDoS) has no patched release, so no override can
+# fix it. It arrives via @scalar/api-reference > @unhead/vue > unplugin, which is build tooling:
+# the built dist/ contains no picomatch code (LAB-2431). Drop this, and override to the patched
+# version instead, once picomatch ships a fix.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
