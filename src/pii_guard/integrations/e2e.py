@@ -16,9 +16,10 @@ uv run python -m pii_guard.integrations.e2e --client muse-code --upstream https:
 What runs, all on loopback, in throwaway directories (``HOME`` and the client's config too):
 
 1. The client is installed: pi ``PI_VERSION`` with npm into a temp prefix (or ``--pi-prefix``);
-   Muse Code with its official installer (``MUSE_INSTALLER``) into a throwaway ``HOME`` (or
-   ``--muse-home``), and only version ``MUSE_VERSION`` is run (``--muse-version`` runs another;
-   an installer that serves a different version stops the run with :class:`MuseVersionError`).
+   Muse Code ``MUSE_VERSION`` (``--muse-version`` runs another) from its release manifest
+   (``MUSE_MANIFEST``, size and ``sha256`` checked) into a throwaway ``HOME`` (or
+   ``--muse-home``), whatever the official installer serves today. A newer release upstream is
+   reported by ``scripts/ci/muse_drift.py`` (the nightly ``muse-drift`` job), not by this run.
 2. A **recorder** stands in for the upstream: it keeps every request body it gets, then either
    answers like a scripted coding model (read the letter, read the CSV, read ``.env``, write
    ``reply.md`` with the placeholders it saw, finish), as Chat Completions chunks, ``response.*``
@@ -49,8 +50,10 @@ gateway's vault, how many gold values were masked under more than one placeholde
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import platform
 import re
 import secrets
 import shlex
@@ -131,7 +134,7 @@ __all__ = [
     "CLAUDE_SCRIPTED_MODEL",
     "CODEX_VERSION",
     "EXAMPLE_DIR",
-    "MUSE_INSTALLER",
+    "MUSE_MANIFEST",
     "MUSE_VERSION",
     "OPENCODE_VERSION",
     "PI_PACKAGE",
@@ -139,7 +142,7 @@ __all__ = [
     "PROMPT",
     "SCRIPTED_MODEL",
     "_READS",
-    "MuseVersionError",
+    "MuseIntegrityError",
     "Recorder",
     "RunResult",
     "_ResponseEvents",
@@ -164,6 +167,7 @@ __all__ = [
     "install_pi",
     "load_gold",
     "main",
+    "muse_platform",
     "run",
     "run_claude_code",
     "run_codex",
@@ -179,7 +183,13 @@ CLAUDE_CODE_PACKAGE = "@anthropic-ai/claude-code"
 #: messages and ``model_words`` recognises ``claude`` / ``sonnet`` in its system prompt.
 CLAUDE_SCRIPTED_MODEL = "claude-sonnet-4-5"
 MUSE_VERSION = MUSE_VERSION_CHECKED
-MUSE_INSTALLER = "https://dev.meta.ai/install.sh"
+#: The release manifest of one Muse Code version: the file the official launcher reads, with a
+#: download URL, size and sha256 per platform. Unlike the installer (which only serves the
+#: current release), it serves every published version, so the e2e runs exactly the pin.
+MUSE_MANIFEST = (
+    "https://lookaside.facebook.com/lookaside/muse/download/"
+    "?channel=muse&version={version}&file=manifest.json"
+)
 EXAMPLE_DIR = Path(__file__).resolve().parents[3] / "examples" / "coding-agents"
 #: The key Muse Code sends the gateway in a run; the gateway replaces it with its own.
 MUSE_RUN_KEY = "pii-guard-e2e-not-a-key"
@@ -276,64 +286,106 @@ def install_claude_code(prefix: Path, version: str = CLAUDE_CODE_VERSION) -> Pat
     return _install_npm(prefix, CLAUDE_CODE_PACKAGE, version, "claude")
 
 
-class MuseVersionError(RuntimeError):
-    """The official installer served another Muse Code version than the pinned one.
+class MuseIntegrityError(RuntimeError):
+    """The Muse Code release manifest or download is not what the pin asks for: another
+    version, an unknown platform, a size or ``sha256`` mismatch. Not a reason to skip."""
 
-    Not a reason to skip: the e2e then no longer covers what users install. Re-run the protocol
-    capture (docs/integrations/muse-code.md) and bump ``MUSE_VERSION_CHECKED``, or run the
-    served version anyway with ``--muse-version`` (``PII_GUARD_MUSE_VERSION`` for the tests).
-    """
 
-    def __init__(self, served: str, pinned: str) -> None:
-        self.served = served
-        self.pinned = pinned
-        super().__init__(
-            f"the official Muse Code installer serves {served}, but this harness is pinned to "
-            f"{pinned}. Re-run the protocol capture in docs/integrations/muse-code.md and bump "
-            f"MUSE_VERSION_CHECKED (src/pii_guard/integrations/muse_code.py), or run {served} "
-            f"anyway with --muse-version {served} (PII_GUARD_MUSE_VERSION={served} for pytest)"
-        )
+#: ``(platform.system(), platform.machine())`` -> the release manifest's artifact key, as the
+#: official launcher maps ``uname -s`` / ``uname -m``.
+_MUSE_PLATFORMS = {
+    ("Darwin", "arm64"): "aarch64_macos",
+    ("Darwin", "aarch64"): "aarch64_macos",
+    ("Darwin", "x86_64"): "x86_macos",
+    ("Darwin", "amd64"): "x86_macos",
+    ("Linux", "arm64"): "aarch64_linux",
+    ("Linux", "aarch64"): "aarch64_linux",
+    ("Linux", "x86_64"): "x86_linux",
+    ("Linux", "amd64"): "x86_linux",
+}
+
+
+def muse_platform() -> str:
+    """This machine's artifact key in a Muse Code release manifest (``x86_linux``, ...)."""
+    key = (platform.system(), platform.machine())
+    if key not in _MUSE_PLATFORMS:
+        raise RuntimeError(f"Muse Code has no build for {key[0]} {key[1]}")
+    return _MUSE_PLATFORMS[key]
+
+
+def _muse_artifact(manifest: Any, version: str, target: str) -> tuple[str, str, int]:
+    """``(url, sha256, size)`` of ``target``'s build in a release manifest for ``version``."""
+    if not isinstance(manifest, dict) or manifest.get("version") != version:
+        found = manifest.get("version") if isinstance(manifest, dict) else None
+        raise MuseIntegrityError(f"the release manifest is for {found!r}, not {version}")
+    if manifest.get("checksum_algorithm") != "sha256":
+        raise MuseIntegrityError("the release manifest does not list sha256 checksums")
+    artifacts = manifest.get("artifacts")
+    artifact = artifacts.get(target) if isinstance(artifacts, dict) else None
+    if not isinstance(artifact, dict):
+        raise MuseIntegrityError(f"the release manifest for {version} has no {target} build")
+    url, checksum, size = artifact.get("url"), artifact.get("checksum"), artifact.get("size")
+    if (
+        not isinstance(url, str)
+        or not url.startswith("https://")
+        or not isinstance(checksum, str)
+        or re.fullmatch(r"[0-9a-f]{64}", checksum) is None
+        or not isinstance(size, int)
+        or isinstance(size, bool)
+        or size <= 0
+    ):
+        raise MuseIntegrityError(f"the release manifest's {target} entry is malformed")
+    return url, checksum, size
 
 
 def install_muse(home: Path, version: str = MUSE_VERSION) -> Path:
-    """Muse Code's binary, from the official installer into the throwaway ``home``.
+    """Muse Code ``version``'s binary into the throwaway ``home`` (reused when it's there).
 
-    The installer always fetches the current release; only ``version`` is run (the protocol
-    capture and these tests are for it). Another version raises :class:`MuseVersionError`:
-    re-run the capture (docs/integrations/muse-code.md) and update ``MUSE_VERSION_CHECKED``, or
-    pass the served version as ``version`` (``--muse-version``) to run it anyway.
+    It comes from that version's release manifest (``MUSE_MANIFEST``), the way the official
+    launcher installs a release: the build for this platform, its size and ``sha256`` checked,
+    as ``~/.local/bin/muse-bin-<version>``. So the run is the pinned version whatever the
+    installer serves today; a newer release is the nightly drift check's business
+    (``scripts/ci/muse_drift.py``). A manifest or download that doesn't match raises
+    :class:`MuseIntegrityError`; an unreachable one raises :class:`httpx.HTTPError`.
     """
     bin_dir = home / ".local" / "bin"
     binary = bin_dir / f"muse-bin-{version}"
     if binary.exists():
         return binary
-    bash = shutil.which("bash")
-    if bash is None:
-        raise RuntimeError("bash is not installed")
-    home.mkdir(parents=True, exist_ok=True)
-    script = home / "muse-install.sh"
-    response = httpx.get(MUSE_INSTALLER, follow_redirects=True, timeout=60)
+    response = httpx.get(MUSE_MANIFEST.format(version=version), follow_redirects=True, timeout=60)
     response.raise_for_status()
-    script.write_bytes(response.content)
-    env = {
-        "PATH": os.environ.get("PATH", ""),
-        "HOME": str(home),
-        "XDG_CONFIG_HOME": str(home / ".config"),
-        "MUSE_NO_MODIFY_PATH": "1",
-    }
-    subprocess.run(  # noqa: S603 - the official installer, into a throwaway HOME
-        [bash, str(script)], env=env, check=True, capture_output=True, timeout=900
-    )
-    if not binary.exists():
-        # The launcher records the version it installed in .muse-version.
-        state = bin_dir / ".muse-version"
-        served = state.read_text(encoding="utf-8").strip() if state.exists() else ""
-        if not served:
-            found = sorted(p.name.removeprefix("muse-bin-") for p in bin_dir.glob("muse-bin-*"))
-            if not found:
-                raise RuntimeError("the Muse Code installer installed no muse-bin-* binary")
-            served = found[-1]
-        raise MuseVersionError(served, version)
+    try:
+        manifest = response.json()
+    except ValueError as exc:
+        raise MuseIntegrityError(f"the release manifest for {version} is not JSON") from exc
+    url, checksum, size = _muse_artifact(manifest, version, muse_platform())
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    partial = bin_dir / f".muse-bin-{version}.partial"
+    digest = hashlib.sha256()
+    received = 0
+    try:
+        with (
+            httpx.stream("GET", url, follow_redirects=True, timeout=120) as download,
+            partial.open("wb") as out,
+        ):
+            download.raise_for_status()
+            for chunk in download.iter_bytes(1 << 20):
+                received += len(chunk)
+                if received > size:
+                    break
+                digest.update(chunk)
+                out.write(chunk)
+        if received != size:
+            raise MuseIntegrityError(
+                f"Muse Code {version}: expected {size} bytes, the download had "
+                f"{'more' if received > size else received}"
+            )
+        if digest.hexdigest() != checksum:
+            raise MuseIntegrityError(f"Muse Code {version}: the download failed its sha256 check")
+        partial.chmod(0o755)
+        partial.replace(binary)
+    finally:
+        partial.unlink(missing_ok=True)
     return binary
 
 
@@ -881,8 +933,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--muse-version",
         default=MUSE_VERSION,
-        help=f"the Muse Code version to run (default: the pinned {MUSE_VERSION}); another "
-        "version than the installer serves stops with an error",
+        help=f"the Muse Code version to run (default: the pinned {MUSE_VERSION}), installed "
+        "from its release manifest",
     )
     parser.add_argument(
         "--session",
@@ -918,7 +970,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         try:
             muse_bin = install_muse(home, args.muse_version)
-        except MuseVersionError as exc:
+        except MuseIntegrityError as exc:
             parser.exit(2, f"error: {exc}\n")
         result = run_muse(
             muse_bin=muse_bin,
