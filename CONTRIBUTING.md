@@ -111,7 +111,10 @@ Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml). 
 passes only when every job it needs passed or was skipped on purpose, so it is the one check
 to require. Most jobs run in parallel on GitHub-hosted runners and need no secret. Two
 delivery jobs sit outside `ci-ok`: `hosted-image-push` (develop pushes only, OIDC to the dev
-registry) and `hosted-deployment` (called after `ci-ok`, off unless explicitly enabled).
+registry) and `hosted-deployment` (called after `ci-ok`, off unless explicitly enabled). So
+does `muse-drift` (nightly and manual runs): it warns, and files an issue, when Muse Code's
+installer serves a newer version than the pinned one the tests install
+([docs/integrations/muse-code.md](docs/integrations/muse-code.md#end-to-end)).
 
 Pull requests, the merge queue and pushes to `develop` run a **fast** suite; pushes to `main`,
 the nightly run and manual runs run **everything**. The fast test step itself recently took

@@ -1,21 +1,25 @@
 """A real, pinned Muse Code works on the fictional mini-repo through the gateway's Responses
 API front end (scripted upstream).
 
-Muse Code comes from its official installer (into a throwaway ``HOME``; ~400 MB): set
-``PII_GUARD_MUSE_HOME`` to reuse an install across runs. Skipped when the installer can't be
-fetched (offline). An installer that serves another version than the pinned one **fails** the
-tests with what to do (re-check the protocol and bump ``MUSE_VERSION_CHECKED``), unless
-``PII_GUARD_MUSE_VERSION`` names the version to run. The live variant against the Meta Model
-API is ``python -m pii_guard.integrations.e2e --client muse-code --upstream ...``
+Muse Code ``MUSE_VERSION_CHECKED`` comes from its release manifest (size and sha256 checked)
+into a throwaway ``HOME`` (~450 MB): set ``PII_GUARD_MUSE_HOME`` to reuse an install across
+runs, ``PII_GUARD_MUSE_VERSION`` to run another version. Whatever the official installer serves
+today does not matter here: a new upstream release is reported by the nightly ``muse-drift``
+job (``scripts/ci/muse_drift.py``, LAB-2433). Skipped when the release can't be fetched
+(offline); a manifest or download that doesn't match the pin **fails**. The live variant against
+the Meta Model API is ``python -m pii_guard.integrations.e2e --client muse-code --upstream ...``
 (docs/integrations/muse-code.md).
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
 import platform
 import shutil
-import subprocess
+import stat
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -25,15 +29,16 @@ import pytest
 from pii_guard.integrations import e2e
 from pii_guard.integrations.e2e import (
     MUSE_VERSION,
-    MuseVersionError,
+    MuseIntegrityError,
     install_muse,
     load_gold,
+    muse_platform,
     run_muse,
 )
 
 needs_bash = pytest.mark.skipif(
     shutil.which("bash") is None or platform.system() not in ("Darwin", "Linux"),
-    reason="Muse Code installs on macOS and Linux with bash",
+    reason="Muse Code runs on macOS and Linux",
 )
 VERSION = os.environ.get("PII_GUARD_MUSE_VERSION") or MUSE_VERSION
 
@@ -44,9 +49,9 @@ def muse_bin(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path = Path(home) if home else tmp_path_factory.mktemp("muse-home")
     try:
         return install_muse(path, VERSION)
-    except MuseVersionError as exc:
+    except MuseIntegrityError as exc:
         pytest.fail(str(exc), pytrace=False)
-    except (subprocess.SubprocessError, OSError, httpx.HTTPError, RuntimeError) as exc:
+    except (OSError, httpx.HTTPError, RuntimeError) as exc:
         pytest.skip(f"could not install Muse Code {VERSION} ({type(exc).__name__}: {exc})")
 
 
@@ -90,93 +95,154 @@ def test_muse_code_without_the_session_path_uses_prompt_cache_key(muse_bin: Path
     assert result.ok
 
 
-# --- the version pin, offline (no installer download) ------------------------------------
+# --- the pinned install, offline (no download) -------------------------------------------
+
+BUILD = b"\x7fELF a fake Muse Code build"
+ARTIFACT_URL = "https://lookaside.example.test/muse-x86-linux"
 
 
-class _Installer:
-    """Stands in for the official installer: writes ``muse-bin-<served>`` and the launcher's
-    ``.muse-version``, the way ``install.sh`` does, into the throwaway HOME."""
+def _manifest(version: str = MUSE_VERSION, **artifact: Any) -> dict[str, Any]:
+    entry = {"url": ARTIFACT_URL, "checksum": hashlib.sha256(BUILD).hexdigest(), "size": len(BUILD)}
+    return {
+        "version": version,
+        "checksum_algorithm": "sha256",
+        "artifacts": {"x86_linux": {**entry, **artifact}, "aarch64_macos": dict(entry)},
+    }
 
-    def __init__(self, served: str, state: bool = True) -> None:
-        self.served = served
-        self.state = state
-        self.calls = 0
+
+class _Release:
+    """Stands in for the release manifest and the build it points at."""
+
+    def __init__(self, manifest: Any, body: bytes = BUILD, status: int = 200) -> None:
+        self.manifest = manifest
+        self.body = body
+        self.status = status
+        self.manifests: list[str] = []
+        self.downloads: list[str] = []
 
     def get(self, url: str, **_: Any) -> httpx.Response:
-        assert url == e2e.MUSE_INSTALLER
-        return httpx.Response(
-            200, content=b"#!/usr/bin/env bash\n", request=httpx.Request("GET", url)
-        )
+        self.manifests.append(url)
+        return httpx.Response(self.status, json=self.manifest, request=httpx.Request("GET", url))
 
-    def run(
-        self, cmd: list[str], env: dict[str, str], **_: Any
-    ) -> subprocess.CompletedProcess[str]:
-        self.calls += 1
-        bin_dir = Path(env["HOME"]) / ".local" / "bin"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        (bin_dir / f"muse-bin-{self.served}").write_text("binary")
-        if self.state:
-            (bin_dir / ".muse-version").write_text(self.served + "\n")
-        return subprocess.CompletedProcess(cmd, 0, "", "")
+    @contextmanager
+    def stream(self, method: str, url: str, **_: Any) -> Iterator[httpx.Response]:
+        self.downloads.append(url)
+        chunks = [self.body[i : i + 7] for i in range(0, len(self.body), 7)]
+        yield httpx.Response(200, content=iter(chunks), request=httpx.Request(method, url))
 
 
 @pytest.fixture
-def installer(monkeypatch: pytest.MonkeyPatch) -> Any:
-    def make(served: str, state: bool = True) -> _Installer:
-        fake = _Installer(served, state)
+def release(monkeypatch: pytest.MonkeyPatch) -> Any:
+    def make(manifest: Any = None, body: bytes = BUILD, status: int = 200) -> _Release:
+        fake = _Release(_manifest() if manifest is None else manifest, body, status)
         monkeypatch.setattr(e2e.httpx, "get", fake.get)
-        monkeypatch.setattr(e2e.subprocess, "run", fake.run)
-        monkeypatch.setattr(e2e.shutil, "which", lambda name: "/bin/" + name)
+        monkeypatch.setattr(e2e.httpx, "stream", fake.stream)
+        monkeypatch.setattr(e2e, "muse_platform", lambda: "x86_linux")
         return fake
 
     return make
 
 
-def test_the_pin_is_installed_and_reused(installer: Any, tmp_path: Path) -> None:
-    fake = installer(MUSE_VERSION)
+def test_the_pin_is_installed_from_its_release_manifest_and_reused(
+    release: Any, tmp_path: Path
+) -> None:
+    fake = release()
     binary = install_muse(tmp_path)
-    assert binary.name == f"muse-bin-{MUSE_VERSION}"
+    assert binary == tmp_path / ".local" / "bin" / f"muse-bin-{MUSE_VERSION}"
+    assert binary.read_bytes() == BUILD
+    assert binary.stat().st_mode & stat.S_IXUSR
+    assert fake.manifests == [e2e.MUSE_MANIFEST.format(version=MUSE_VERSION)]
+    assert f"version={MUSE_VERSION}&" in fake.manifests[0]
+    assert fake.downloads == [ARTIFACT_URL]
     assert install_muse(tmp_path) == binary
-    assert fake.calls == 1  # the second call reuses the install
+    assert len(fake.manifests) == 1  # the second call reuses the install
+    assert [p.name for p in binary.parent.iterdir()] == [binary.name]  # no partial left
 
 
-@pytest.mark.parametrize("state", [True, False])
-def test_another_served_version_fails_with_what_to_do(
-    installer: Any, tmp_path: Path, state: bool
-) -> None:
-    installer("9.9.9-R1.1", state)
-    with pytest.raises(MuseVersionError) as caught:
-        install_muse(tmp_path)
-    assert (caught.value.served, caught.value.pinned) == ("9.9.9-R1.1", MUSE_VERSION)
-    message = str(caught.value)
-    assert "MUSE_VERSION_CHECKED" in message
-    assert "--muse-version 9.9.9-R1.1" in message
-    assert "PII_GUARD_MUSE_VERSION=9.9.9-R1.1" in message
-
-
-def test_the_served_version_runs_when_asked_for(installer: Any, tmp_path: Path) -> None:
-    installer("9.9.9-R1.1")
+def test_another_version_comes_from_its_own_manifest(release: Any, tmp_path: Path) -> None:
+    fake = release(_manifest("9.9.9-R1.1"))
     assert install_muse(tmp_path, "9.9.9-R1.1").name == "muse-bin-9.9.9-R1.1"
+    assert fake.manifests == [e2e.MUSE_MANIFEST.format(version="9.9.9-R1.1")]
 
 
-def test_an_installer_that_installs_nothing_is_not_a_version_error(
-    monkeypatch: pytest.MonkeyPatch, installer: Any, tmp_path: Path
+@pytest.mark.parametrize(
+    ("body", "match"),
+    [
+        (BUILD[:-1] + b"!", "sha256"),
+        (BUILD[:-3], f"expected {len(BUILD)} bytes"),
+        (BUILD + b"tail", "had more"),
+    ],
+    ids=["checksum", "short", "long"],
+)
+def test_a_download_that_does_not_match_fails_and_leaves_nothing(
+    release: Any, tmp_path: Path, body: bytes, match: str
 ) -> None:
-    fake = installer(MUSE_VERSION)
-    monkeypatch.setattr(
-        e2e.subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(cmd, 0, "", "")
-    )
-    with pytest.raises(RuntimeError, match="no muse-bin") as caught:
+    release(body=body)
+    with pytest.raises(MuseIntegrityError, match=match):
         install_muse(tmp_path)
-    assert not isinstance(caught.value, MuseVersionError)
-    assert fake.calls == 0
+    assert list((tmp_path / ".local" / "bin").iterdir()) == []
 
 
-def test_the_cli_stops_on_a_version_mismatch(
-    installer: Any, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        _manifest("1.0.0-R1.1"),  # another version than asked for
+        {**_manifest(), "checksum_algorithm": "md5"},
+        {**_manifest(), "artifacts": {"aarch64_macos": _manifest()["artifacts"]["aarch64_macos"]}},
+        _manifest(url="http://lookaside.example.test/muse"),
+        _manifest(checksum="not-a-sha256"),
+        _manifest(size=0),
+        _manifest(size=True),
+        ["not", "a", "manifest"],
+    ],
+    ids=["version", "algorithm", "platform", "http", "checksum", "size", "bool-size", "list"],
+)
+def test_a_manifest_that_does_not_match_the_pin_fails(
+    release: Any, tmp_path: Path, manifest: Any
 ) -> None:
-    installer("9.9.9-R1.1")
+    fake = release(manifest)
+    with pytest.raises(MuseIntegrityError):
+        install_muse(tmp_path)
+    assert fake.downloads == []
+
+
+def test_an_unreachable_manifest_is_an_http_error_not_an_integrity_error(
+    release: Any, tmp_path: Path
+) -> None:
+    release(status=404)
+    with pytest.raises(httpx.HTTPStatusError):
+        install_muse(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("system", "machine", "expected"),
+    [
+        ("Linux", "x86_64", "x86_linux"),
+        ("Linux", "aarch64", "aarch64_linux"),
+        ("Darwin", "arm64", "aarch64_macos"),
+        ("Darwin", "x86_64", "x86_macos"),
+    ],
+)
+def test_the_platform_maps_like_the_launcher(
+    monkeypatch: pytest.MonkeyPatch, system: str, machine: str, expected: str
+) -> None:
+    monkeypatch.setattr(e2e.platform, "system", lambda: system)
+    monkeypatch.setattr(e2e.platform, "machine", lambda: machine)
+    assert muse_platform() == expected
+
+
+def test_an_unsupported_platform_is_not_an_integrity_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(e2e.platform, "system", lambda: "Windows")
+    with pytest.raises(RuntimeError, match="no build") as caught:
+        muse_platform()
+    assert not isinstance(caught.value, MuseIntegrityError)
+
+
+def test_the_cli_stops_on_a_manifest_mismatch(
+    release: Any, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    release(body=b"tampered")
     with pytest.raises(SystemExit) as caught:
         e2e.main(["--client", "muse-code", "--muse-home", str(tmp_path)])
     assert caught.value.code == 2
-    assert "serves 9.9.9-R1.1, but this harness is pinned to" in capsys.readouterr().err
+    assert f"expected {len(BUILD)} bytes" in capsys.readouterr().err

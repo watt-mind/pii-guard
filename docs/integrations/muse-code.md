@@ -157,13 +157,21 @@ The event types it receives and the gateway rewrites: `response.created`,
 
 `python -m pii_guard.integrations.e2e --client muse-code` runs a real Muse Code on the fictional
 mini-repo ([examples/coding-agents/](../../examples/coding-agents/)): read the client letter, the
-customer CSV and `.env`, then write `reply.md`. It installs Muse with the official installer
-into a throwaway `HOME` (about 400 MB; `--muse-home DIR` reuses one) and runs only the pinned
-version (`MUSE_VERSION_CHECKED`). When the installer serves another version, the run stops and
-the tests fail (they don't skip): re-check the protocol ([How this was found](#how-this-was-found))
-and bump the pin, or run the served version anyway with `--muse-version <version>`
-(`PII_GUARD_MUSE_VERSION` for pytest). The tests skip only when the installer can't be fetched. Muse runs in a throwaway `HOME` too, with `connect muse-code` writing its settings and
-the gateway in fast mode.
+customer CSV and `.env`, then write `reply.md`. It installs the pinned version
+(`MUSE_VERSION_CHECKED`) from that version's release manifest, the way the official launcher
+installs a release: the build for this platform, its size and `sha256` checked, into a throwaway
+`HOME` (about 450 MB; `--muse-home DIR` reuses one). `--muse-version <version>`
+(`PII_GUARD_MUSE_VERSION` for pytest) runs another published version. The run doesn't depend on
+what the official installer serves today, so a new Muse release doesn't turn CI red (LAB-2433).
+The tests skip only when the release can't be fetched (offline); a manifest or download that
+doesn't match the pin fails them. Muse runs in a throwaway `HOME` too, with `connect muse-code`
+writing its settings and the gateway in fast mode.
+
+A new release is caught by the `muse-drift` job instead (nightly and manual `ci` runs, outside
+`ci-ok`, never red): [`scripts/ci/muse_drift.py`](../../scripts/ci/muse_drift.py) compares the
+version the `muse-stable` channel serves with the pin, adds a warning to the run, and on the
+nightly run files one GitHub issue per new version. Then re-check the protocol
+([How this was found](#how-this-was-found)) and bump the pin.
 
 ```bash
 # scripted mock model, as in the test
@@ -208,6 +216,9 @@ $HOME/.local/bin/muse --version        # Muse Code 1.4.15 (1.4.15-R8339.1)
 The installer only installs the current release. An older one, for a comparison, comes from its
 release manifest, the file the launcher reads (check the `sha256` it lists):
 `https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=<version>&file=manifest.json`.
+The e2e harness installs the pin this way (`install_muse` in
+[`e2e.py`](../../src/pii_guard/integrations/e2e.py)), so after a capture
+`--muse-version <version>` runs either side of the comparison.
 
 `MUSE_TRANSPORT_TRACE=1` prints each request body and every SSE event Muse receives (keys
 aren't printed). The table above comes from a traced run against the Meta Model API and from

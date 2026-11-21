@@ -116,8 +116,9 @@ jobs:
           uv run --no-sync python -c "import azure.identity, azure.storage.blob"
           uv run --no-sync pytest tests/hosted/test_spend_adapter.py -k real_sdk --no-cov -q
       # The integration e2e fixtures reuse an exact-version npm install already in these
-      # prefixes. Muse is deliberately not cached: its test must notice when the official
-      # installer starts serving a version other than MUSE_VERSION_CHECKED.
+      # prefixes. Muse (~450 MB) is not cached: its test installs the pinned
+      # MUSE_VERSION_CHECKED from that version's release manifest (sha256 checked), so a new
+      # upstream release can't fail this job; the muse-drift job reports one (LAB-2433).
       - name: Cache pinned integration CLI installs (pi, Codex, OpenCode)
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -603,6 +604,41 @@ jobs:
           gh issue create --repo "${{ github.repository }}" \
             --title "Nightly CI failed on develop (${{ github.sha }})" \
             --body "The scheduled full run failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Triage the failure and file follow-ups in Linear (project PII Guard, team LAB)."
+
+  # Muse Code drift (LAB-2433), outside ci-ok and never red: the e2e runs the pinned version,
+  # so this is where a new upstream release shows up. A warning on the run, and on the nightly
+  # one issue per new version, so the protocol gets re-checked and the pin bumped.
+  muse-drift:
+    name: muse-drift
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare the served Muse Code with MUSE_VERSION_CHECKED
+        id: check
+        run: python3 scripts/ci/muse_drift.py
+      - name: File an issue for the new Muse Code release (once per version)
+        if: github.event_name == 'schedule' && steps.check.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SERVED: ${{ steps.check.outputs.served }}
+          PINNED: ${{ steps.check.outputs.pinned }}
+        run: |
+          title="Muse Code $SERVED is out; the e2e is pinned to $PINNED"
+          if gh issue list --repo "$REPO" --state open --search "\"Muse Code $SERVED is out\" in:title" \
+              --json number --jq '.[0].number' | grep -q .; then
+            echo "An open issue already covers $SERVED."
+            exit 0
+          fi
+          gh issue create --repo "$REPO" --title "$title" \
+            --body "The official Muse Code installer now serves $SERVED; the e2e harness runs the pinned $PINNED from its release manifest. Re-run the protocol capture in docs/integrations/muse-code.md, bump MUSE_VERSION_CHECKED and file the work in Linear (project PII Guard, team LAB)."
 
   # Disabled until reviewed identity, network, durable budget and release gates are configured.
   # No PR/merge-group/nightly/manual test run can enter this credential-bearing flow.
